@@ -15,52 +15,22 @@ public final class WorldRenderer {
     private final ArrayList<Shrub> shrubs = new ArrayList<>();
     private final ArrayList<Road> roads = new ArrayList<>();
     private final Random random = new Random(20260816L);
-
-    public WorldRenderer(Context context) {
-        background = context.getDrawable(com.persiawar2d.R.drawable.achaemenid_background);
-        ground = context.getDrawable(com.persiawar2d.R.drawable.persia_ground);
-        buildLayout();
-    }
-
-    private void buildLayout() {
-        roads.add(new Road(300,980,5700,980,150)); roads.add(new Road(420,2850,5600,2850,125)); roads.add(new Road(700,4650,5300,4650,140));
-        roads.add(new Road(1200,300,1200,5700,130)); roads.add(new Road(3380,250,3380,5750,150)); roads.add(new Road(5050,600,5050,5400,120));
-        roads.add(new Road(600,1600,2300,1600,70)); roads.add(new Road(1900,1100,1900,2700,62)); roads.add(new Road(2580,2950,2580,4500,64));
-        roads.add(new Road(3650,1650,4900,1650,68)); roads.add(new Road(4200,3150,4200,5050,70)); roads.add(new Road(850,3900,2500,3900,66)); roads.add(new Road(4700,900,4700,2500,60));
+    public WorldRenderer(Context context){background=context.getDrawable(com.persiawar2d.R.drawable.achaemenid_background);ground=context.getDrawable(com.persiawar2d.R.drawable.persia_ground);buildLayout();}
+    private void buildLayout(){
+        roads.add(new Road(300,980,5700,980,150));roads.add(new Road(420,2850,5600,2850,125));roads.add(new Road(700,4650,5300,4650,140));roads.add(new Road(1200,300,1200,5700,130));roads.add(new Road(3380,250,3380,5750,150));roads.add(new Road(5050,600,5050,5400,120));
+        roads.add(new Road(600,1600,2300,1600,70));roads.add(new Road(1900,1100,1900,2700,62));roads.add(new Road(2580,2950,2580,4500,64));roads.add(new Road(3650,1650,4900,1650,68));roads.add(new Road(4200,3150,4200,5050,70));roads.add(new Road(850,3900,2500,3900,66));roads.add(new Road(4700,900,4700,2500,60));
         int[][] spots={{430,520,360,280},{1530,520,430,300},{2250,520,470,320},{3900,520,500,330},{4550,620,380,260},{5400,580,330,350},{520,2050,420,320},{1500,2050,500,340},{2200,1900,380,280},{3600,2050,520,320},{4450,2100,420,310},{5200,1900,430,330},{500,3350,450,310},{1500,3250,420,300},{2850,3500,520,340},{3650,3500,450,290},{4700,3550,520,330},{5200,4200,390,300},{650,5000,500,300},{1750,5000,430,330},{2900,5000,460,310},{3850,5100,500,300},{4750,5100,420,330}};
-        int i=0; for(int[] s:spots){buildings.add(new Building(s[0],s[1],s[2],s[3],i%6,.75f+(i%4)*.12f));if(i%3!=1)buildings.add(new Building(s[0]+s[2]+90,s[1]+35,210+(i%3)*55,190+(i%4)*30,(i+2)%6,.58f));i++;}
+        int i=0;for(int[] s:spots){buildings.add(new Building(s[0],s[1],s[2],s[3],i%6,.75f+(i%4)*.12f));if(i%3!=1)buildings.add(new Building(s[0]+s[2]+90,s[1]+35,210+(i%3)*55,190+(i%4)*30,(i+2)%6,.58f));i++;}
         for(int n=0;n<95;n++){float x=260+random.nextFloat()*5480,y=300+random.nextFloat()*5400;if(!nearRoad(x,y,95))shrubs.add(new Shrub(x,y,18+random.nextFloat()*22));}
     }
-
     private boolean nearRoad(float x,float y,float pad){for(Road r:roads){if(r.x1==r.x2&&Math.abs(x-r.x1)<r.w/2+pad&&y>=Math.min(r.y1,r.y2)-pad&&y<=Math.max(r.y1,r.y2)+pad)return true;if(r.y1==r.y2&&Math.abs(y-r.y1)<r.w/2+pad&&x>=Math.min(r.x1,r.x2)-pad&&x<=Math.max(r.x1,r.x2)+pad)return true;}return false;}
-
-    public void draw(Canvas c,float playerX,float playerY,float cameraScale,float viewW,float viewH,float hudH){
-        drawParallaxBackground(c,playerX,playerY,viewW,viewH,hudH);
-        p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(38,58,47));c.drawRect(0,hudH,viewW,viewH,p);
-        float s=cameraScale,ox=viewW/2f-playerX*s,oy=(viewH+hudH)/2f-playerY*s;
-        c.save();c.translate(ox,oy);drawGround(c,s);drawRoads(c,s);
-        for(Shrub sh:shrubs)drawShrub(c,sh,playerX,playerY,s);
-        for(Building b:buildings)drawBuilding(c,b,playerX,playerY,s);
-        c.restore();
-    }
-
-    private void drawParallaxBackground(Canvas c,float px,float py,float viewW,float viewH,float hudH){
-        p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(24,39,35));c.drawRect(0,hudH,viewW,viewH,p);
-        if(background==null)return;
-        float parallaxX=-(px*0.055f)%viewW; float parallaxY=-(py*0.035f)%Math.max(1,viewH-hudH);
-        int top=Math.round(hudH);int bottom=Math.round(viewH);int w=Math.round(viewW*1.18f);int h=Math.max(bottom-top,Math.round((viewH-hudH)*0.72f));
-        background.setAlpha(235);
-        background.setBounds(Math.round(parallaxX-w*.09f),top+Math.round(parallaxY*.2f),Math.round(parallaxX+w),top+h+Math.round(parallaxY*.2f));background.draw(c);
-        background.setBounds(Math.round(parallaxX+w*.82f),top+Math.round(parallaxY*.2f),Math.round(parallaxX+w*1.91f),top+h+Math.round(parallaxY*.2f));background.draw(c);
-        p.setColor(Color.argb(75,20,32,28));c.drawRect(0,top,viewW,top+Math.round((bottom-top)*.18f),p);
-        background.setAlpha(255);
-    }
-
+    public void draw(Canvas c,float playerX,float playerY,float cameraScale,float viewW,float viewH,float hudH){drawParallaxBackground(c,playerX,playerY,viewW,viewH,hudH);p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(38,58,47));c.drawRect(0,hudH,viewW,viewH,p);float s=cameraScale,ox=viewW/2f-playerX*s,oy=(viewH+hudH)/2f-playerY*s;c.save();c.translate(ox,oy);drawGround(c,s);drawRoads(c,s);for(Shrub sh:shrubs)drawShrub(c,sh,playerX,playerY,s);for(Building b:buildings)drawBuilding(c,b,playerX,playerY,s);c.restore();}
+    private void drawParallaxBackground(Canvas c,float px,float py,float viewW,float viewH,float hudH){p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(24,39,35));c.drawRect(0,hudH,viewW,viewH,p);if(background==null)return;float parallaxX=-(px*.055f)%viewW,parallaxY=-(py*.035f)%Math.max(1,viewH-hudH);int top=Math.round(hudH),bottom=Math.round(viewH),w=Math.round(viewW*1.18f),h=Math.max(bottom-top,Math.round((viewH-hudH)*.72f));background.setAlpha(235);background.setBounds(Math.round(parallaxX-w*.09f),top+Math.round(parallaxY*.2f),Math.round(parallaxX+w),top+h+Math.round(parallaxY*.2f));background.draw(c);background.setBounds(Math.round(parallaxX+w*.82f),top+Math.round(parallaxY*.2f),Math.round(parallaxX+w*1.91f),top+h+Math.round(parallaxY*.2f));background.draw(c);p.setColor(Color.argb(75,20,32,28));c.drawRect(0,top,viewW,top+Math.round((bottom-top)*.18f),p);background.setAlpha(255);}
     private void drawGround(Canvas c,float s){p.setColor(Color.rgb(112,105,78));c.drawRect(0,0,WORLD_SIZE*s,WORLD_SIZE*s,p);if(ground!=null){int tile=Math.max(256,(int)(520*s));for(int y=0;y<WORLD_SIZE*s;y+=tile)for(int x=0;x<WORLD_SIZE*s;x+=tile){ground.setBounds(x,y,x+tile,y+tile);ground.setAlpha(115);ground.draw(c);}}}
     private void drawRoads(Canvas c,float s){for(Road r:roads){p.setColor(Color.rgb(73,69,57));if(r.x1==r.x2)c.drawRect((r.x1-r.w/2)*s,Math.min(r.y1,r.y2)*s,(r.x1+r.w/2)*s,Math.max(r.y1,r.y2)*s,p);else c.drawRect(Math.min(r.x1,r.x2)*s,(r.y1-r.w/2)*s,Math.max(r.x1,r.x2)*s,(r.y1+r.w/2)*s,p);p.setColor(Color.rgb(125,117,91));p.setStrokeWidth(Math.max(2,r.w*.035f*s));if(r.x1==r.x2)c.drawLine(r.x1*s,Math.min(r.y1,r.y2)*s,r.x1*s,Math.max(r.y1,r.y2)*s,p);else c.drawLine(Math.min(r.x1,r.x2)*s,r.y1*s,Math.max(r.x1,r.x2)*s,r.y1*s,p);}}
-    private void drawBuilding(Canvas c,Building b,float px,float py,float s){float fade=blocked(b,px,py)?.24f:1f;p.setAlpha((int)(255*fade));float x=b.x*s,y=b.y*s,w=b.w*s,h=b.h*s;float lift=Math.max(18*s,b.h*.22f*s);int[] walls={Color.rgb(157,123,82),Color.rgb(139,103,70),Color.rgb(174,139,94),Color.rgb(121,91,65),Color.rgb(188,151,101),Color.rgb(146,112,76)};p.setColor(walls[b.kind%walls.length]);c.drawRect(x,y-lift,x+w,y,p);p.setColor(Color.rgb(92,65,46));Path roof=new Path();roof.moveTo(x-10*s,y-lift);roof.lineTo(x+w*.5f,y-lift-34*s);roof.lineTo(x+w+10*s,y-lift);roof.close();c.drawPath(roof,p);p.setColor(Color.rgb(219,184,119));int cols=Math.max(2,(int)(b.w/95));for(int j=0;j<cols;j++){float wx=x+18*s+j*(w-36*s)/Math.max(1,cols-1);c.drawRect(wx,y-lift+30*s,wx+22*s,y-lift+70*s,p);}p.setColor(Color.rgb(72,52,39));c.drawRect(x+w*.42f,y-55*s,x+w*.58f,y,p);if(b.kind%2==0){p.setColor(Color.rgb(196,152,79));c.drawRect(x+w*.12f,y-lift-2*s,x+w*.36f,y-lift+10*s,p);}p.setAlpha(255);}
-    private boolean blocked(Building b,float px,float py){float bx=b.x+b.w*.5f,by=b.y+b.h*.5f;float camX=px,camY=py-700,dx=px-camX,dy=py-camY,len2=dx*dx+dy*dy;if(len2<1)return false;float t=((bx-camX)*dx+(by-camY)*dy)/len2;if(t<0||t>1)return false;float cx=camX+t*dx,cy=camY+t*dy;return cx>b.x-30&&cx<b.x+b.w+30&&cy>b.y-30&&cy<b.y+b.h+30&&Math.abs(cy-by)<b.h*.9f;}
-    private void drawShrub(Canvas c,Shrub sh,float px,float py,float scale){float fade=distance(sh.x,sh.y,px,py)<420&&blockedPoint(sh.x,sh.y,px,py)?.22f:1f;p.setAlpha((int)(255*fade));float x=sh.x*scale,y=sh.y*scale,r=sh.r*scale;p.setColor(Color.rgb(49,94,53));c.drawCircle(x,y,r,p);p.setColor(Color.rgb(77,126,66));c.drawCircle(x-r*.35f,y-r*.25f,r*.65f,p);p.setAlpha(255);}
+    private void drawBuilding(Canvas c,Building b,float px,float py,float s){float fade=blocked(b,px,py)?0.24f:1f;p.setAlpha((int)(255*fade));float x=b.x*s,y=b.y*s,w=b.w*s,lift=Math.max(18*s,b.h*.22f*s);int[] walls={Color.rgb(157,123,82),Color.rgb(139,103,70),Color.rgb(174,139,94),Color.rgb(121,91,65),Color.rgb(188,151,101),Color.rgb(146,112,76)};p.setColor(walls[b.kind%walls.length]);c.drawRect(x,y-lift,x+w,y,p);p.setColor(Color.rgb(92,65,46));Path roof=new Path();roof.moveTo(x-10*s,y-lift);roof.lineTo(x+w*.5f,y-lift-34*s);roof.lineTo(x+w+10*s,y-lift);roof.close();c.drawPath(roof,p);p.setColor(Color.rgb(219,184,119));int cols=Math.max(2,(int)(b.w/95));for(int j=0;j<cols;j++){float wx=x+18*s+j*(w-36*s)/Math.max(1,cols-1);c.drawRect(wx,y-lift+30*s,wx+22*s,y-lift+70*s,p);}p.setColor(Color.rgb(72,52,39));c.drawRect(x+w*.42f,y-55*s,x+w*.58f,y,p);if(b.kind%2==0){p.setColor(Color.rgb(196,152,79));c.drawRect(x+w*.12f,y-lift-2*s,x+w*.36f,y-lift+10*s,p);}p.setAlpha(255);}
+    private boolean blocked(Building b,float px,float py){float bx=b.x+b.w*.5f,by=b.y+b.h*.5f,camX=px,camY=py-700,dx=px-camX,dy=py-camY,len2=dx*dx+dy*dy;if(len2<1)return false;float t=((bx-camX)*dx+(by-camY)*dy)/len2;if(t<0||t>1)return false;float cx=camX+t*dx,cy=camY+t*dy;return cx>b.x-30&&cx<b.x+b.w+30&&cy>b.y-30&&cy<b.y+b.h+30&&Math.abs(cy-by)<b.h*.9f;}
+    private void drawShrub(Canvas c,Shrub sh,float px,float py,float scale){float fade=distance(sh.x,sh.y,px,py)<420&&blockedPoint(sh.x,sh.y,px,py)?0.22f:1f;p.setAlpha((int)(255*fade));float x=sh.x*scale,y=sh.y*scale,r=sh.r*scale;p.setColor(Color.rgb(49,94,53));c.drawCircle(x,y,r,p);p.setColor(Color.rgb(77,126,66));c.drawCircle(x-r*.35f,y-r*.25f,r*.65f,p);p.setAlpha(255);}
     private boolean blockedPoint(float x,float y,float px,float py){return Math.abs(x-px)<80&&y<py;}
     private float distance(float a,float b,float c,float d){return (float)Math.hypot(a-c,b-d);}
     static final class Building{final float x,y,w,h;final int kind;final float depth;Building(float x,float y,float w,float h,int kind,float depth){this.x=x;this.y=y;this.w=w;this.h=h;this.kind=kind;this.depth=depth;}}
