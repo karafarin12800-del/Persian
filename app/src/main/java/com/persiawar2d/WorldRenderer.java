@@ -6,8 +6,7 @@ import java.io.InputStream;
 
 /**
  * 6000x6000 square world. Only the camera window around the player is shown.
- * The map is intentionally non-repeating and uses small 2.5D Achaemenid-style
- * houses, roads and trees so one building can never fill the whole screen.
+ * Raster assets are preferred; the procedural map is only the final fallback.
  */
 public final class WorldRenderer {
     public static final float WORLD_SIZE=6000f;
@@ -24,7 +23,13 @@ public final class WorldRenderer {
     }
 
     private Bitmap loadMap(Context context){
-        String[] names={"world_map_square_2048.png","references/world_map_square_2048.png"};
+        // Prefer the original square world raster. Keep the existing reference
+        // JPEG as a real-image fallback before generating any procedural art.
+        String[] names={
+            "world_map_square_2048.png",
+            "references/world_map_square_2048.png",
+            "references/world_texture_ref.jpg"
+        };
         for(String name:names){
             try(InputStream in=context.getAssets().open(name)){
                 BitmapFactory.Options o=new BitmapFactory.Options();
