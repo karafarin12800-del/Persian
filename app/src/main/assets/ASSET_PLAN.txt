@@ -1,0 +1,4 @@
+Player: player_king_sheet.png
+Environment: app/src/main/kenney_isometric-buildings.zip
+
+The runtime should use Kenney isometric assets for houses, roads, trees, grass and props. The player sheet should be rendered with source-cell clipping so sheet borders/grid lines never become part of the sprite.
