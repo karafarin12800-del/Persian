@@ -15,6 +15,7 @@ public final class KenneyEnvironment {
     private final List<Bitmap> trees=new ArrayList<>();
     private final List<Bitmap> grass=new ArrayList<>();
     private boolean loaded;
+    private static final Set<Integer> ROAD_TILES=new HashSet<>(Arrays.asList(23,30,31,38,46,54,74,80,81,82,87,88,89,94,95,96,97,101,102,103,104,105,107,108,109,110,111,112,113,114,115,117,118,119,120,121,122,123,124,125,126,127));
 
     public void load(android.content.Context context){
         if(loaded)return;
@@ -50,6 +51,20 @@ public final class KenneyEnvironment {
             while((e=zip.getNextEntry())!=null){
                 if(e.isDirectory()||!e.getName().toLowerCase(Locale.US).endsWith(".png"))continue;
                 String n=e.getName().toLowerCase(Locale.US);
+                if(!buildingZip&&n.contains("landscapetiles_")){
+                    int idx=parseTileIndex(n);
+                    if(!ROAD_TILES.contains(idx))continue;
+                    Bitmap b=BitmapFactory.decodeStream(zip);if(b!=null&&roads.size()<24)roads.add(b);else if(b!=null)b.recycle();
+                    continue;
+                }
+                if(!buildingZip&&n.contains("isometric tiles/")){
+                    boolean tree=contains(n,"tree","pine","palm","bamboo","shrub");
+                    boolean g=contains(n,"grass","grasses","weed","flower","plant");
+                    if(!tree&&!g)continue;
+                    Bitmap b=BitmapFactory.decodeStream(zip);if(b==null)continue;
+                    if(tree&&trees.size()<24)trees.add(b);else if(g&&grass.size()<24)grass.add(b);else b.recycle();
+                    continue;
+                }
                 Bitmap b=BitmapFactory.decodeStream(zip);if(b==null)continue;
                 if(buildingZip){
                     if(n.contains("buildingtile_")||n.contains("buildingtiles_"))buildings.add(b);else b.recycle();
@@ -61,9 +76,8 @@ public final class KenneyEnvironment {
         }catch(Exception ignored){}
     }
 
-    private Bitmap decode(AssetManager am,String path){
-        try(InputStream in=am.open(path)){return BitmapFactory.decodeStream(in);}catch(Exception ignored){return null;}
-    }
+    private int parseTileIndex(String n){int p=n.lastIndexOf('_'),dot=n.lastIndexOf('.');if(p<0||dot<=p)return -1;try{return Integer.parseInt(n.substring(p+1,dot));}catch(Exception ignored){return -1;}}
+    private Bitmap decode(AssetManager am,String path){try(InputStream in=am.open(path)){return BitmapFactory.decodeStream(in);}catch(Exception ignored){return null;}}
     private static boolean contains(String s,String...keys){for(String k:keys)if(s.contains(k))return true;return false;}
     public boolean isLoaded(){return loaded;}
     public Bitmap building(int i){return pick(buildings,i);}
