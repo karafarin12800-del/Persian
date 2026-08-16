@@ -2,6 +2,18 @@ plugins {
     id 'com.android.application'
 }
 
+def sourceAssetRoot = file("src/main")
+def prepareWorldPacks = tasks.register("prepareWorldPacks", Copy) {
+    from(sourceAssetRoot) {
+        include "kenney_isometric-buildings.zip"
+        include "kenney_isometric-landscape.zip"
+        include "isometric-plant-pack.zip"
+        include "*.png"
+        exclude "king_sprite_sheet_6144x4096_sharp (1).png"
+    }
+    into("$buildDir/generated/worldAssets")
+}
+
 android {
     namespace 'com.persiawar2d'
     compileSdk 35
@@ -10,7 +22,19 @@ android {
         applicationId 'com.persiawar2d.v110'
         minSdk 23
         targetSdk 35
-        versionCode 110
-        versionName '11.0'
+        versionCode 113
+        versionName '11.3'
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ["src/main/assets", "$buildDir/generated/worldAssets"]
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name.toLowerCase().contains("merge") && task.name.toLowerCase().contains("assets")) {
+        task.dependsOn(prepareWorldPacks)
     }
 }
