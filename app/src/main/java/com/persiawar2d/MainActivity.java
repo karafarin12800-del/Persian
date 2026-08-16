@@ -19,142 +19,129 @@ public class MainActivity extends Activity {
     }
 
     public static class GameView extends View {
-        static final float HUD_H = 92f;
-        static final float WORLD_W = WorldRenderer.WORLD_SIZE;
-        static final float WORLD_H = WorldRenderer.WORLD_SIZE;
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        final Random random = new Random(20260816L);
-        final ArrayList<Enemy> enemies = new ArrayList<>();
-        final ArrayList<Bullet> bullets = new ArrayList<>();
+        static final float HUD_H=92f;
+        static final float WORLD_SIZE=WorldRenderer.WORLD_SIZE;
+        final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+        final Random random=new Random(20260816L);
+        final ArrayList<Enemy> enemies=new ArrayList<>();
+        final ArrayList<Bullet> bullets=new ArrayList<>();
         final WorldRenderer world;
-        final Drawable classic, archer, guard, scout, enemyArt;
-        float px, py, aimX, aimY;
-        float joyBaseX, joyBaseY, joyX, joyY, moveNX, moveNY;
-        boolean joystickDown, fireDown;
-        int joystickPointer=-1, firePointer=-1;
-        long joystickFadeAt, lastShot, lastMelee, lastSpawn, manualAimUntil;
-        int wave=1, score=0, ammo=12, reserve=100, hp=100, shield=0, weapon=0;
+        final KingSpriteDrawable king;
+        final Drawable enemyArt;
+        float px,py,aimX,aimY;
+        float joyBaseX,joyBaseY,joyX,joyY,moveNX,moveNY;
+        boolean joystickDown,fireDown;
+        int joystickPointer=-1,firePointer=-1;
+        long joystickFadeAt,lastShot,lastMelee,lastSpawn,lastFrameAt;
+        int wave=1,score=0,ammo=12,reserve=100,hp=100,shield=0,weapon=0;
+        int playerDir=0,playerFrame=0;
         boolean gameOver=false;
-        String playerSkin="archer";
 
-        public GameView(Context c) {
+        public GameView(Context c){
             super(c);
             world=new WorldRenderer(c);
-            classic=c.getDrawable(R.drawable.achaemenid_player);
-            // IMPORTANT: use the user's real king sprite sheet, not the temporary vector archer.
-            archer=new KingSpriteDrawable(c);
-            guard=c.getDrawable(R.drawable.player_guard);
-            scout=c.getDrawable(R.drawable.player_scout);
+            king=new KingSpriteDrawable(c);
             enemyArt=c.getDrawable(R.drawable.persia_enemy);
             setFocusable(true);
             setLayerType(View.LAYER_TYPE_HARDWARE,null);
             resetGame();
         }
 
-        void resetGame() {
-            px=WORLD_W*.50f; py=WORLD_H*.55f; aimX=px+700; aimY=py;
-            joyBaseX=Math.max(120,getWidth()*.12f); joyBaseY=Math.max(HUD_H+140,getHeight()-150);
-            joyX=joyBaseX; joyY=joyBaseY; moveNX=moveNY=0;
-            joystickDown=false; joystickPointer=-1; fireDown=false; firePointer=-1;
-            joystickFadeAt=System.currentTimeMillis(); manualAimUntil=0;
-            wave=1; score=0; ammo=12; reserve=100; hp=100; shield=0; weapon=0; gameOver=false;
-            enemies.clear(); bullets.clear(); spawnWave(); invalidate();
+        void resetGame(){
+            px=WORLD_SIZE*.50f;py=WORLD_SIZE*.55f;aimX=px+800;aimY=py;
+            moveNX=moveNY=0;joystickDown=false;joystickPointer=-1;fireDown=false;firePointer=-1;
+            joystickFadeAt=System.currentTimeMillis();lastFrameAt=System.currentTimeMillis();
+            wave=1;score=0;ammo=12;reserve=100;hp=100;shield=0;weapon=0;gameOver=false;
+            playerDir=0;playerFrame=0;king.setState(0,0);enemies.clear();bullets.clear();spawnWave();invalidate();
         }
 
-        void spawnWave() {
-            int n=Math.min(7+wave*2,20);
+        void spawnWave(){
+            int n=Math.min(7+wave*2,18);
             for(int i=0;i<n;i++){
-                double a=random.nextDouble()*Math.PI*2; float d=650+random.nextFloat()*550;
-                float x=clamp(px+(float)Math.cos(a)*d,120,WORLD_W-120);
-                float y=clamp(py+(float)Math.sin(a)*d,HUD_H+120,WORLD_H-120);
-                int type=(i%7==0)?3:(i%3==0?2:1);
-                enemies.add(new Enemy(x,y,type));
+                double a=random.nextDouble()*Math.PI*2;float d=700+random.nextFloat()*700;
+                float x=clamp(px+(float)Math.cos(a)*d,120,WORLD_SIZE-120);
+                float y=clamp(py+(float)Math.sin(a)*d,HUD_H+120,WORLD_SIZE-120);
+                int type=(i%7==0)?3:(i%3==0?2:1);enemies.add(new Enemy(x,y,type));
             }
             lastSpawn=System.currentTimeMillis();
         }
 
         @Override protected void onSizeChanged(int w,int h,int ow,int oh){
-            joyBaseX=Math.max(120,w*.12f); joyBaseY=h-Math.max(145,h*.17f);
-            if(!joystickDown){joyX=joyBaseX;joyY=joyBaseY;}
+            if(!joystickDown){joyBaseX=w*.16f;joyBaseY=h*.78f;joyX=joyBaseX;joyY=joyBaseY;}
         }
-        float cameraScale(){return getWidth()/1900f;}
+        float cameraScale(){return Math.min(getWidth()/1900f,Math.max(1,getHeight()-HUD_H)/1000f);}
 
         @Override protected void onDraw(Canvas c){
-            tick(System.currentTimeMillis()); drawWorld(c); drawHud(c); drawControls(c);
-            if(gameOver)drawGameOver(c); postInvalidateOnAnimation();
+            long now=System.currentTimeMillis();float dt=Math.min(.033f,Math.max(.001f,(now-lastFrameAt)/1000f));lastFrameAt=now;
+            tick(now,dt);drawWorld(c);drawHud(c);drawControls(c);if(gameOver)drawGameOver(c);postInvalidateOnAnimation();
         }
 
-        void tick(long now){
+        void tick(long now,float dt){
             if(gameOver)return;
-            if(joystickDown)movePlayer(moveNX*7f,moveNY*7f);
-            if(now>=manualAimUntil)autoAim();
+            if(joystickDown&&Math.hypot(moveNX,moveNY)>.05f){movePlayer(moveNX*360f*dt,moveNY*360f*dt);animatePlayer(now);}
+            if(now>=lastShot+900)autoAim();
             for(Enemy e:enemies)if(e.hp>0){
                 float dx=px-e.x,dy=py-e.y,d=Math.max(1,(float)Math.hypot(dx,dy));
-                float speed=e.type==3?1.65f:e.type==2?1.4f:1.15f;
-                if(d>110){e.x+=dx/d*speed;e.y+=dy/d*speed;}
-                if(d<120&&now-e.lastHit>700){damagePlayer(e.type==3?12:6);e.lastHit=now;}
-                if(d<900&&now-e.lastShot>(e.type==3?1100:1500)){enemyShoot(e);e.lastShot=now;}
+                float speed=e.type==3?105f:e.type==2?88f:72f;
+                if(d>105){e.x+=dx/d*speed*dt;e.y+=dy/d*speed*dt;}
+                if(d<115&&now-e.lastHit>700){damagePlayer(e.type==3?12:6);e.lastHit=now;}
+                if(d<1000&&now-e.lastShot>(e.type==3?950:1350)){enemyShoot(e);e.lastShot=now;}
             }
-            updateBullets(); enemies.removeIf(e->e.hp<=0);
-            if(enemies.isEmpty()&&now-lastSpawn>800){wave++;spawnWave();}
+            updateBullets(dt);enemies.removeIf(e->e.hp<=0);if(enemies.isEmpty()&&now-lastSpawn>700){wave++;spawnWave();}
         }
 
-        void updateBullets(){
-            for(int i=bullets.size()-1;i>=0;i--){
-                Bullet b=bullets.get(i); b.x+=b.vx; b.y+=b.vy; b.life--;
-                if(b.x<0||b.y<0||b.x>WORLD_W||b.y>WORLD_H||b.life<=0){bullets.remove(i);continue;}
-                if(b.player){
-                    boolean hit=false;
-                    for(Enemy e:enemies)if(e.hp>0&&distance(b.x,b.y,e.x,e.y)<34){e.hp-=b.damage;if(e.hp<=0)score+=e.type==3?40:10;hit=true;break;}
-                    if(hit)bullets.remove(i);
-                }else if(distance(b.x,b.y,px,py)<30){damagePlayer(b.damage);bullets.remove(i);}
+        void animatePlayer(long now){int f=(int)((now/95)%6);if(f!=playerFrame){playerFrame=f;king.setState(playerDir,playerFrame);}}
+        void updateDirection(float nx,float ny){if(Math.hypot(nx,ny)<.08)return;if(Math.abs(nx)>Math.abs(ny))playerDir=nx<0?1:2;else playerDir=ny<0?3:0;king.setState(playerDir,playerFrame);}
+
+        void updateBullets(float dt){
+            for(int i=bullets.size()-1;i>=0;i--){Bullet b=bullets.get(i);b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+                if(b.x<0||b.y<0||b.x>WORLD_SIZE||b.y>WORLD_SIZE||b.life<=0){bullets.remove(i);continue;}
+                if(b.player){boolean hit=false;for(Enemy e:enemies)if(e.hp>0&&distance(b.x,b.y,e.x,e.y)<38){e.hp-=b.damage;if(e.hp<=0)score+=e.type==3?40:10;hit=true;break;}if(hit)bullets.remove(i);}
+                else if(distance(b.x,b.y,px,py)<34){damagePlayer(b.damage);bullets.remove(i);}
             }
         }
-
         void autoAim(){Enemy best=null;float bestD=1450;for(Enemy e:enemies)if(e.hp>0){float d=distance(px,py,e.x,e.y);if(d<bestD){bestD=d;best=e;}}if(best!=null){aimX=best.x;aimY=best.y;}}
-        void enemyShoot(Enemy e){float dx=px-e.x,dy=py-e.y,d=Math.max(1,(float)Math.hypot(dx,dy));bullets.add(new Bullet(e.x,e.y,dx/d*10f,dy/d*10f,8,false));}
+        void enemyShoot(Enemy e){float dx=px-e.x,dy=py-e.y,d=Math.max(1,(float)Math.hypot(dx,dy));bullets.add(new Bullet(e.x+dx/d*40,e.y+dy/d*40,dx/d*720,dy/d*720,8,false));}
+
         void shoot(){
-            if(gameOver||weapon!=0)return; long now=System.currentTimeMillis(); if(now-lastShot<130)return;
-            if(ammo<=0){reload();return;} if(now>=manualAimUntil)autoAim();
-            float dx=aimX-px,dy=aimY-py,d=Math.max(1,(float)Math.hypot(dx,dy));
-            bullets.add(new Bullet(px+dx/d*44,py+dy/d*44,dx/d*20f,dy/d*20f,28,true)); ammo--; lastShot=now;
+            if(gameOver||weapon!=0)return;long now=System.currentTimeMillis();if(now-lastShot<150)return;if(ammo<=0){reload();return;}
+            if(now-lastShot>900)autoAim();float dx=aimX-px,dy=aimY-py,d=Math.max(1,(float)Math.hypot(dx,dy));
+            bullets.add(new Bullet(px+dx/d*58,py+dy/d*58,dx/d*1200,dy/d*1200,30,true));ammo--;lastShot=now;
         }
         void melee(){
-            if(gameOver||weapon!=1)return; long now=System.currentTimeMillis(); if(now-lastMelee<320)return; lastMelee=now;
+            if(gameOver||weapon!=1)return;long now=System.currentTimeMillis();if(now-lastMelee<320)return;lastMelee=now;
             float dx=aimX-px,dy=aimY-py,d=Math.max(1,(float)Math.hypot(dx,dy));
-            for(Enemy e:enemies)if(e.hp>0){float ex=e.x-px,ey=e.y-py,ed=Math.max(1,(float)Math.hypot(ex,ey));float dot=(ex*dx+ey*dy)/(ed*d);if(ed<145&&dot>.05f){e.hp-=45;if(e.hp<=0)score+=e.type==3?40:10;}}
+            for(Enemy e:enemies)if(e.hp>0){float ex=e.x-px,ey=e.y-py,ed=Math.max(1,(float)Math.hypot(ex,ey));float dot=(ex*dx+ey*dy)/(ed*d);if(ed<155&&dot>.05f){e.hp-=45;if(e.hp<=0)score+=e.type==3?40:10;}}
         }
         void reload(){if(gameOver||weapon!=0||ammo>=12||reserve<=0)return;int n=Math.min(12-ammo,reserve);ammo+=n;reserve-=n;}
         void toggleWeapon(){if(!gameOver)weapon=weapon==0?1:0;}
-        void setAimFromScreen(float x,float y){float s=cameraScale();float ox=getWidth()/2f-px*s;float oy=(getHeight()+HUD_H)/2f-py*s;aimX=(x-ox)/s;aimY=(y-oy)/s;manualAimUntil=System.currentTimeMillis()+1200;}
-        void movePlayer(float dx,float dy){px=clamp(px+dx,70,WORLD_W-70);py=clamp(py+dy,HUD_H+70,WORLD_H-70);}
+        void setAimFromScreen(float x,float y){float s=cameraScale(),ox=getWidth()/2f-px*s,oy=HUD_H+(getHeight()-HUD_H)/2f-py*s;aimX=(x-ox)/s;aimY=(y-oy)/s;}
+        void movePlayer(float dx,float dy){px=clamp(px+dx,70,WORLD_SIZE-70);py=clamp(py+dy,HUD_H+70,WORLD_SIZE-70);updateDirection(moveNX,moveNY);}
         void damagePlayer(int amount){int blocked=Math.min(shield,amount);shield-=blocked;amount-=blocked;if(amount>0){hp-=amount;if(hp<=0){hp=0;gameOver=true;}}}
 
         void drawWorld(Canvas c){
             world.draw(c,px,py,cameraScale(),getWidth(),getHeight(),HUD_H);
-            float s=cameraScale(),ox=getWidth()/2f-px*s,oy=(getHeight()+HUD_H)/2f-py*s;
+            float s=cameraScale(),ox=getWidth()/2f-px*s,oy=HUD_H+(getHeight()-HUD_H)/2f-py*s;
             c.save();c.translate(ox,oy);for(Bullet b:bullets)drawBullet(c,b,s);for(Enemy e:enemies)drawEnemy(c,e,s);drawPlayer(c,s);c.restore();
         }
-        Drawable player(){if("guard".equals(playerSkin))return guard;if("scout".equals(playerSkin))return scout;if("classic".equals(playerSkin))return classic;return archer;}
-        void drawDrawable(Canvas c,Drawable d,float x,float y,float size){if(d==null)return;int h=Math.max(1,Math.round(size*.5f));d.setAlpha(255);d.setBounds(Math.round(x-h),Math.round(y-h),Math.round(x+h),Math.round(y+h));d.draw(c);}
         void drawPlayer(Canvas c,float s){
-            p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(px*s-34*s,py*s+34*s,px*s+34*s,py*s+48*s,p);
-            drawDrawable(c,player(),px*s,py*s,Math.max(82,120*s));
-            if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawCircle(px*s,py*s,62*s,p);p.setStyle(Paint.Style.FILL);}
+            float x=px*s,y=py*s;p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(x-42*s,y+42*s,x+42*s,y+58*s,p);
+            king.setState(playerDir,playerFrame);king.setAlpha(255);int size=Math.max(118,Math.round(156*s));int h=size/2;king.setBounds(Math.round(x-h),Math.round(y-h),Math.round(x+h),Math.round(y+h));king.draw(c);
+            if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawCircle(x,y,66*s,p);p.setStyle(Paint.Style.FILL);}
         }
-        void drawEnemy(Canvas c,Enemy e,float s){drawDrawable(c,enemyArt,e.x*s,e.y*s,(e.type==3?136:e.type==2?118:104)*s);float bw=58*s,bh=Math.max(5,6*s),left=e.x*s-bw*.5f,top=(e.y-68)*s;p.setColor(0xB0141414);c.drawRect(left,top,left+bw,top+bh,p);p.setColor(Color.rgb(196,55,45));float max=e.type==3?120:e.type==2?70:45;c.drawRect(left,top,left+bw*Math.max(0,e.hp/max),top+bh,p);}
-        void drawBullet(Canvas c,Bullet b,float s){float x=b.x*s,y=b.y*s,speed=(float)Math.hypot(b.vx,b.vy),len=Math.min(30,Math.max(10,speed*.7f)),d=Math.max(1,speed);float tx=x-b.vx/d*len,ty=y-b.vy/d*len;p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(3,5*s));p.setStrokeCap(Paint.Cap.ROUND);p.setColor(b.player?Color.rgb(255,220,95):Color.rgb(255,85,70));c.drawLine(tx,ty,x,y,p);p.setStyle(Paint.Style.FILL);c.drawCircle(x,y,Math.max(3,5*s),p);}
+        void drawEnemy(Canvas c,Enemy e,float s){
+            if(enemyArt==null)return;float x=e.x*s,y=e.y*s;int size=Math.round((e.type==3?142:e.type==2?126:112)*s),h=size/2;enemyArt.setAlpha(255);enemyArt.setBounds(Math.round(x-h),Math.round(y-h),Math.round(x+h),Math.round(y+h));enemyArt.draw(c);
+            float bw=62*s,bh=Math.max(5,6*s),left=x-bw*.5f,top=(e.y-78)*s;p.setColor(0xB0141414);c.drawRect(left,top,left+bw,top+bh,p);p.setColor(Color.rgb(196,55,45));float max=e.type==3?120:e.type==2?70:45;c.drawRect(left,top,left+bw*Math.max(0,e.hp/max),top+bh,p);
+        }
+        void drawBullet(Canvas c,Bullet b,float s){float x=b.x*s,y=b.y*s,sp=(float)Math.hypot(b.vx,b.vy),len=Math.min(34,Math.max(12,sp*.025f)),d=Math.max(1,sp),tx=x-b.vx/d*len,ty=y-b.vy/d*len;p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(3,5*s));p.setStrokeCap(Paint.Cap.ROUND);p.setColor(b.player?Color.rgb(255,220,95):Color.rgb(255,85,70));c.drawLine(tx,ty,x,y,p);p.setStyle(Paint.Style.FILL);c.drawCircle(x,y,Math.max(3,5*s),p);}
 
-        void drawHud(Canvas c){
-            p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(225,12,22,19));c.drawRect(0,0,getWidth(),HUD_H,p);
-            p.setTextAlign(Paint.Align.LEFT);p.setTextSize(24);p.setColor(Color.rgb(245,205,105));c.drawText("PERSIA WAR 2.5D",22,32,p);p.setTextSize(17);p.setColor(Color.WHITE);c.drawText("WAVE "+wave+"   SCORE "+score,22,62,p);
-            p.setTextAlign(Paint.Align.RIGHT);c.drawText("HP "+hp+"   AMMO "+ammo+"/"+reserve+(weapon==1?"   SWORD":"   FIREARM"),getWidth()-22,34,p);p.setTextAlign(Paint.Align.LEFT);
-        }
+        void drawHud(Canvas c){p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(225,12,22,19));c.drawRect(0,0,getWidth(),HUD_H,p);p.setTextAlign(Paint.Align.LEFT);p.setTextSize(24);p.setColor(Color.rgb(245,205,105));c.drawText("PERSIA WAR 2.5D",22,32,p);p.setTextSize(17);p.setColor(Color.WHITE);c.drawText("WAVE "+wave+"   SCORE "+score,22,62,p);p.setTextAlign(Paint.Align.RIGHT);c.drawText("HP "+hp+"   AMMO "+ammo+"/"+reserve+(weapon==1?"   SWORD":"   FIREARM"),getWidth()-22,34,p);p.setTextAlign(Paint.Align.LEFT);}
+
         void drawControls(Canvas c){
-            long age=System.currentTimeMillis()-joystickFadeAt;int alpha=joystickDown?220:(int)Math.max(24,150-age/4);
-            p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0x6D786F);c.drawCircle(joyBaseX,joyBaseY,82,p);p.setColor(((Math.min(255,alpha+30))<<24)|0xE0C875);c.drawCircle(joyX,joyY,34,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(((Math.min(255,alpha+35))<<24)|0xF0D990);c.drawCircle(joyBaseX,joyBaseY,82,p);p.setStyle(Paint.Style.FILL);
-            float br=Math.max(72,Math.min(105,getHeight()*.11f));float fireX=getWidth()*.84f,fireY=getHeight()*.78f,reloadX=getWidth()*.70f,reloadY=getHeight()*.89f,switchX=getWidth()*.90f,switchY=getHeight()*.89f,swordX=getWidth()*.72f,swordY=getHeight()*.61f;
-            circleButton(c,fireX,fireY,br*1.08f,0xD09A4638);circleButton(c,reloadX,reloadY,br*.55f,0xB0446F5B);circleButton(c,switchX,switchY,br*.55f,0xB0446F5B);circleButton(c,swordX,swordY,br*.62f,0xB05D5140);
+            long age=System.currentTimeMillis()-joystickFadeAt;int alpha=joystickDown?225:(int)Math.max(22,225-age/3);
+            p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0x59615B);c.drawCircle(joyBaseX,joyBaseY,92,p);p.setColor(((Math.min(255,alpha+25))<<24)|0xE0C875);c.drawCircle(joyX,joyY,38,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(((Math.min(255,alpha+30))<<24)|0xF0D990);c.drawCircle(joyBaseX,joyBaseY,92,p);p.setStyle(Paint.Style.FILL);
+            float br=Math.max(88,Math.min(124,getHeight()*.13f));float fireX=getWidth()*.84f,fireY=getHeight()*.76f,reloadX=getWidth()*.70f,reloadY=getHeight()*.89f,switchX=getWidth()*.91f,switchY=getHeight()*.89f,swordX=getWidth()*.70f,swordY=getHeight()*.60f;
+            circleButton(c,fireX,fireY,br*1.08f,0xD09A4638);circleButton(c,reloadX,reloadY,br*.58f,0xB0446F5B);circleButton(c,switchX,switchY,br*.58f,0xB0446F5B);circleButton(c,swordX,swordY,br*.66f,0xB05D5140);
             textCenter(c,weapon==0?"FIRE":"SWING",fireX,fireY+8,Color.WHITE,22);textCenter(c,"R",reloadX,reloadY+7,Color.WHITE,18);textCenter(c,"SW",switchX,switchY+6,Color.WHITE,15);textCenter(c,"⚔",swordX,swordY+9,Color.WHITE,25);
         }
         void circleButton(Canvas c,float x,float y,float r,int color){p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawCircle(x,y,r,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xCFE8CF88);c.drawCircle(x,y,r,p);p.setStyle(Paint.Style.FILL);}
@@ -165,25 +152,23 @@ public class MainActivity extends Activity {
             int action=e.getActionMasked();
             if(gameOver){if(action==MotionEvent.ACTION_DOWN)resetGame();return true;}
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
-                int idx=e.getActionIndex(),id=e.getPointerId(idx);float x=e.getX(idx),y=e.getY(idx);float br=Math.max(72,Math.min(105,getHeight()*.11f));
-                float fireX=getWidth()*.84f,fireY=getHeight()*.78f,reloadX=getWidth()*.70f,reloadY=getHeight()*.89f,switchX=getWidth()*.90f,switchY=getHeight()*.89f,swordX=getWidth()*.72f,swordY=getHeight()*.61f;
-                if(near(x,y,fireX,fireY,br*1.25f)){firePointer=id;fireDown=true;if(weapon==0)shoot();else melee();return true;}
-                if(near(x,y,reloadX,reloadY,br*.75f)){reload();return true;}
-                if(near(x,y,switchX,switchY,br*.75f)){toggleWeapon();return true;}
-                if(near(x,y,swordX,swordY,br*.82f)){melee();return true;}
-                if(x<getWidth()*.48f&&y>HUD_H){joystickPointer=id;joystickDown=true;joystickFadeAt=System.currentTimeMillis();joyBaseX=clamp(x,82,getWidth()*.44f);joyBaseY=clamp(y,HUD_H+85,getHeight()-85);joyX=joyBaseX;joyY=joyBaseY;moveNX=moveNY=0;return true;}
+                int idx=e.getActionIndex(),id=e.getPointerId(idx);float x=e.getX(idx),y=e.getY(idx);float br=Math.max(88,Math.min(124,getHeight()*.13f));
+                float fireX=getWidth()*.84f,fireY=getHeight()*.76f,reloadX=getWidth()*.70f,reloadY=getHeight()*.89f,switchX=getWidth()*.91f,switchY=getHeight()*.89f,swordX=getWidth()*.70f,swordY=getHeight()*.60f;
+                if(near(x,y,fireX,fireY,br*1.28f)){firePointer=id;fireDown=true;if(weapon==0)shoot();else melee();return true;}
+                if(near(x,y,reloadX,reloadY,br*.78f)){reload();return true;}
+                if(near(x,y,switchX,switchY,br*.78f)){toggleWeapon();return true;}
+                if(near(x,y,swordX,swordY,br*.86f)){melee();return true;}
+                if(x<getWidth()*.52f&&y>HUD_H){joystickPointer=id;joystickDown=true;joystickFadeAt=System.currentTimeMillis();joyBaseX=clamp(x,92,getWidth()*.46f);joyBaseY=clamp(y,HUD_H+90,getHeight()-90);joyX=joyBaseX;joyY=joyBaseY;moveNX=moveNY=0;return true;}
                 if(y>HUD_H){setAimFromScreen(x,y);return true;}
             }
-            if(action==MotionEvent.ACTION_MOVE){
-                for(int i=0;i<e.getPointerCount();i++){int id=e.getPointerId(i);float x=e.getX(i),y=e.getY(i);if(id==joystickPointer){float dx=x-joyBaseX,dy=y-joyBaseY,d=Math.max(1,(float)Math.hypot(dx,dy)),max=58;if(d>max){dx=dx/d*max;dy=dy/d*max;}joyX=joyBaseX+dx;joyY=joyBaseY+dy;moveNX=dx/max;moveNY=dy/max;}else if(id==firePointer&&fireDown){if(weapon==0)shoot();else melee();}}return true;
-            }
+            if(action==MotionEvent.ACTION_MOVE){for(int i=0;i<e.getPointerCount();i++){int id=e.getPointerId(i);float x=e.getX(i),y=e.getY(i);if(id==joystickPointer){float dx=x-joyBaseX,dy=y-joyBaseY,d=Math.max(1,(float)Math.hypot(dx,dy)),max=68;if(d>max){dx=dx/d*max;dy=dy/d*max;}joyX=joyBaseX+dx;joyY=joyBaseY+dy;moveNX=dx/max;moveNY=dy/max;updateDirection(moveNX,moveNY);}else if(id==firePointer&&fireDown){if(weapon==0)shoot();else melee();}}return true;}
             if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_CANCEL){int idx=e.getActionIndex(),id=e.getPointerId(idx);if(id==joystickPointer){joystickPointer=-1;joystickDown=false;joystickFadeAt=System.currentTimeMillis();joyX=joyBaseX;joyY=joyBaseY;moveNX=moveNY=0;}if(id==firePointer){firePointer=-1;fireDown=false;}return true;}
             return true;
         }
         boolean near(float x,float y,float cx,float cy,float r){return Math.hypot(x-cx,y-cy)<=r;}
         float clamp(float v,float a,float b){return Math.max(a,Math.min(b,v));}
-        float distance(float a,float b,float c,float d){return (float)Math.hypot(a-c,b-d);}
+        float distance(float a,float b,float c,float d){return(float)Math.hypot(a-c,b-d);}
         static class Enemy{float x,y;int hp,type;long lastShot,lastHit;Enemy(float x,float y,int type){this.x=x;this.y=y;this.type=type;hp=type==3?120:type==2?70:45;}}
-        static class Bullet{float x,y,vx,vy;int damage,life=100;boolean player;Bullet(float x,float y,float vx,float vy,int damage,boolean player){this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.damage=damage;this.player=player;}}
+        static class Bullet{float x,y,vx,vy,damage,life=1.6f;boolean player;Bullet(float x,float y,float vx,float vy,float damage,boolean player){this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.damage=damage;this.player=player;}}
     }
 }
