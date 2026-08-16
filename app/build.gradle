@@ -1,0 +1,16 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.persiawar2d'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.persiawar2d.v110'
+        minSdk 23
+        targetSdk 35
+        versionCode 110
+        versionName '11.0'
+    }
+}
