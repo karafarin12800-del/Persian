@@ -1,0 +1,1 @@
+Assets are loaded by the game renderer. Do not treat this file as a runtime asset.
