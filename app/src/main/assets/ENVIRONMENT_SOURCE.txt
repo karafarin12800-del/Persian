@@ -1,0 +1,1 @@
+Use app/src/main/kenney_isometric-buildings.zip as the canonical source for houses, roads, trees, grass and other isometric environment props.
