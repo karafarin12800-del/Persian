@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.view.*;
 import java.util.*;
 
-/** Persia War 2.5D gameplay. The large square world scrolls under a player-centered camera. */
 public class MainActivity extends Activity {
  @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);setContentView(new GameView(this));}
  public static class GameView extends View {
@@ -29,7 +28,7 @@ public class MainActivity extends Activity {
   public void toggleWeapon(){if(!gameOver)weapon=weapon==0?1:0;}
   public void melee(){if(gameOver)return;long n=System.currentTimeMillis();if(n-lastShot<360)return;lastShot=n;float dx=aimX-px,dy=aimY-py,d=Math.max(1,(float)Math.hypot(dx,dy));for(Enemy e:enemies){if(e.hp<=0)continue;float ex=e.x-px,ey=e.y-py,ed=Math.max(1,(float)Math.hypot(ex,ey));float dot=(ex*dx+ey*dy)/(ed*d);if(ed<125&&dot>.15f){e.hp-=38;if(e.hp<=0)score+=e.type==3?40:10;}}}
   public void shoot(){if(gameOver)return;if(weapon==1){melee();return;}long n=System.currentTimeMillis();if(n-lastShot<220||ammo<=0)return;lastShot=n;ammo--;float dx=aimX-px,dy=aimY-py,d=Math.max(1,(float)Math.hypot(dx,dy));bullets.add(new Bullet(px,py,dx/d*18,dy/d*18,true));}
-  void enemyShoot(Enemy e){float dx=px-e.x,dy=py-e.y,d=Math.max(1,(float)Math.hypot(dx,dy));bullets.add(new Bullet(e.x,e.y,dx/d*7,dy/d*7,false);}
+  void enemyShoot(Enemy e){float dx=px-e.x,dy=py-e.y,d=Math.max(1,(float)Math.hypot(dx,dy));bullets.add(new Bullet(e.x,e.y,dx/d*7,dy/d*7,false));}
   void tick(){if(gameOver)return;long now=System.currentTimeMillis();if(now-lastSpawn>9000&&enemies.isEmpty()){wave++;spawnWave();}if(joyX!=0||joyY!=0)moveByJoystick(joyX,joyY);for(Enemy e:enemies){if(e.hp<=0)continue;float dx=px-e.x,dy=py-e.y,d=Math.max(1,(float)Math.hypot(dx,dy));float sp=e.type==3?1.7f:e.type==2?1.45f:1.15f;if(d>90){e.x+=dx/d*sp;e.y+=dy/d*sp;}if(d<115&&now-e.lastHit>700){hp-=e.type==3?12:6;e.lastHit=now;if(hp<=0){hp=0;gameOver=true;}}if(d<700&&now-e.lastShot>1500){enemyShoot(e);e.lastShot=now;}}for(Bullet b:bullets){b.x+=b.vx;b.y+=b.vy;b.life--;if(b.player){for(Enemy e:enemies){if(e.hp>0&&distance(b.x,b.y,e.x,e.y)<30){e.hp-=b.damage;b.life=0;if(e.hp<=0)score+=e.type==3?40:10;break;}}}else if(distance(b.x,b.y,px,py)<28){hp-=8;b.life=0;if(hp<=0){hp=0;gameOver=true;}}}bullets.removeIf(b->b.life<=0);enemies.removeIf(e->e.hp<=0);}
   @Override protected void onDraw(Canvas c){super.onDraw(c);tick();drawWorld(c);drawEntities(c);drawHud(c);postInvalidateOnAnimation();}
   float cameraScale(){return getWidth()/VIEW_WORLD_WIDTH;}
