@@ -2,7 +2,7 @@ name: PersiaWar2D Android CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/2.5d-character-background]
   workflow_dispatch:
 
 concurrency:
@@ -51,12 +51,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git status --porcelain | grep -E '(^| )gradlew(\.bat)?$|gradle/wrapper/' >/dev/null; then
+          if git status --porcelain | grep -E '(^| )gradlew(\\.bat)?$|gradle/wrapper/' >/dev/null; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
             git commit -m "build: add Gradle Wrapper [skip ci]"
-            git push origin HEAD:main
+            git push origin HEAD:$([[ "${GITHUB_REF_NAME}" == "main" ]] && echo main || echo feature/2.5d-character-background)
           fi
 
       - name: Verify Gradle Wrapper
