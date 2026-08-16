@@ -2,7 +2,7 @@ name: PersiaWar2D Android CI
 
 on:
   push:
-    branches: [main, feature/2.5d-character-background, feature/2.5d-kenney-environment-clean-sprite, feature/2.5d-city-master]
+    branches: [main, feature/2.5d-character-background, feature/2.5d-kenney-environment-clean-sprite, feature/2.5d-city-master, feature/2.5d-professional-map]
   workflow_dispatch:
 
 concurrency:
@@ -54,10 +54,10 @@ jobs:
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/kenney_isometric-buildings.zip'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/kenney_isometric-landscape.zip'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/isometric-plant-pack.zip'
-          echo "PersiaWar2D city assets and APK verification passed."
+          echo "PersiaWar2D professional 2.5D world build and asset verification passed."
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PersiaWar2D-city-${{ github.sha }}
+          name: PersiaWar2D-professional-map-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
