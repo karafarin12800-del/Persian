@@ -28,13 +28,11 @@ public final class KenneyEnvironment {
 
     private void scanAssets(AssetManager am,String dir){
         try{
-            String[] names=am.list(dir);
-            if(names==null)return;
+            String[] names=am.list(dir);if(names==null)return;
             for(String name:names){
                 String path=dir.length()==0?name:dir+"/"+name;
                 String low=path.toLowerCase(Locale.US);
-                String[] child=null;
-                try{child=am.list(path);}catch(Exception ignored){}
+                String[] child=null;try{child=am.list(path);}catch(Exception ignored){}
                 if(child!=null&&child.length>0){scanAssets(am,path);continue;}
                 if(!low.endsWith(".png"))continue;
                 Bitmap b=decode(am,path);if(b==null)continue;
@@ -54,7 +52,7 @@ public final class KenneyEnvironment {
                 String n=e.getName().toLowerCase(Locale.US);
                 Bitmap b=BitmapFactory.decodeStream(zip);if(b==null)continue;
                 if(buildingZip){
-                    if(buildings.size()<48&&(n.contains("buildingtile_")||n.contains("buildingtiles_")))buildings.add(b);else b.recycle();
+                    if(n.contains("buildingtile_")||n.contains("buildingtiles_"))buildings.add(b);else b.recycle();
                 }else if(roads.size()<20&&contains(n,"road","street","asphalt","path","intersection"))roads.add(b);
                 else if(trees.size()<20&&contains(n,"tree","pine","palm","vegetation"))trees.add(b);
                 else if(grass.size()<20&&contains(n,"grass","bush","shrub","flower","plant"))grass.add(b);
