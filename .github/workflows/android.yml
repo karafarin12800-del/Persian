@@ -2,7 +2,7 @@ name: PersiaWar2D Android CI
 
 on:
   push:
-    branches: [main, feature/2.5d-character-background]
+    branches: [main, feature/2.5d-character-background, feature/2.5d-kenney-environment-clean-sprite]
   workflow_dispatch:
 
 concurrency:
@@ -20,24 +20,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
       - name: Install Android SDK
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-
       - name: Ensure Gradle Wrapper is present
         shell: bash
         run: |
@@ -46,7 +41,6 @@ jobs:
             gradle wrapper --gradle-version 8.7 --distribution-type bin
           fi
           chmod +x gradlew
-
       - name: Commit Gradle Wrapper if it was generated
         shell: bash
         run: |
@@ -56,15 +50,12 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
             git commit -m "build: add Gradle Wrapper [skip ci]"
-            git push origin HEAD:$([[ "${GITHUB_REF_NAME}" == "main" ]] && echo main || echo feature/2.5d-character-background)
+            git push origin HEAD:$([[ "${GITHUB_REF_NAME}" == "main" ]] && echo main || echo feature/2.5d-kenney-environment-clean-sprite)
           fi
-
       - name: Verify Gradle Wrapper
         run: ./gradlew --version
-
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
-
       - name: Verify APK
         shell: bash
         run: |
@@ -72,7 +63,13 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
           echo "PersiaWar2D APK verification passed."
-
+      - name: Verify required assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/player_king_sheet.png'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/kenney_isometric-buildings.zip'
+          echo "Required character and Kenney assets are packaged."
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
