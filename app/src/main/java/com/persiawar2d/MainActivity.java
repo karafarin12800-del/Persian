@@ -41,7 +41,8 @@ public class MainActivity extends Activity {
             super(c);
             world=new WorldRenderer(c);
             classic=c.getDrawable(R.drawable.achaemenid_player);
-            archer=c.getDrawable(R.drawable.player_archer);
+            // IMPORTANT: use the user's real king sprite sheet, not the temporary vector archer.
+            archer=new KingSpriteDrawable(c);
             guard=c.getDrawable(R.drawable.player_guard);
             scout=c.getDrawable(R.drawable.player_scout);
             enemyArt=c.getDrawable(R.drawable.persia_enemy);
@@ -139,7 +140,6 @@ public class MainActivity extends Activity {
         void drawPlayer(Canvas c,float s){
             p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(px*s-34*s,py*s+34*s,px*s+34*s,py*s+48*s,p);
             drawDrawable(c,player(),px*s,py*s,Math.max(82,120*s));
-            // Removed the old player-to-enemy/aim line. Aim is invisible and only controls shots.
             if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawCircle(px*s,py*s,62*s,p);p.setStyle(Paint.Style.FILL);}
         }
         void drawEnemy(Canvas c,Enemy e,float s){drawDrawable(c,enemyArt,e.x*s,e.y*s,(e.type==3?136:e.type==2?118:104)*s);float bw=58*s,bh=Math.max(5,6*s),left=e.x*s-bw*.5f,top=(e.y-68)*s;p.setColor(0xB0141414);c.drawRect(left,top,left+bw,top+bh,p);p.setColor(Color.rgb(196,55,45));float max=e.type==3?120:e.type==2?70:45;c.drawRect(left,top,left+bw*Math.max(0,e.hp/max),top+bh,p);}
