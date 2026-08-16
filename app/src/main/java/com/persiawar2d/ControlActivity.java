@@ -22,6 +22,8 @@ public class ControlActivity extends MainActivity {
         root=new FrameLayout(this);
         game=new GameView(this);
         root.addView(game,new FrameLayout.LayoutParams(-1,-1));
+        RadarOverlayView radar=new RadarOverlayView(this,game);
+        root.addView(radar,new FrameLayout.LayoutParams(-1,-1));
         addMenuButton();
         setContentView(root);
     }
