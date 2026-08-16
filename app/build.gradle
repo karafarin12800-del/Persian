@@ -2,6 +2,13 @@ plugins {
     id 'com.android.application'
 }
 
+def kenneyZip = file("src/main/kenney_isometric-buildings.zip")
+def prepareKenneyAssets = tasks.register("prepareKenneyAssets", Copy) {
+    from kenneyZip.parentFile
+    include kenneyZip.name
+    into("$buildDir/generated/kenneyAssets")
+}
+
 android {
     namespace 'com.persiawar2d'
     compileSdk 35
@@ -10,7 +17,19 @@ android {
         applicationId 'com.persiawar2d.v110'
         minSdk 23
         targetSdk 35
-        versionCode 110
-        versionName '11.0'
+        versionCode 111
+        versionName '11.1'
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ["src/main/assets", "$buildDir/generated/kenneyAssets"]
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name.toLowerCase().contains("merge") && task.name.toLowerCase().contains("assets")) {
+        task.dependsOn(prepareKenneyAssets)
     }
 }
