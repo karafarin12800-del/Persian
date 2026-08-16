@@ -1,0 +1,152 @@
+package com.persiawar2d;
+
+import android.content.Context;
+import android.graphics.*;
+import android.graphics.drawable.Drawable;
+import java.util.*;
+
+/**
+ * Lightweight native Android 2.5D world renderer. It uses the repository's
+ * Achaemenid vector art as real render assets and builds a large square city
+ * from non-identical procedural building/road/shrub instances.
+ */
+public final class WorldRenderer {
+    public static final float WORLD_SIZE = 6000f;
+    private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Drawable background;
+    private final Drawable ground;
+    private final ArrayList<Building> buildings = new ArrayList<>();
+    private final ArrayList<Shrub> shrubs = new ArrayList<>();
+    private final ArrayList<Road> roads = new ArrayList<>();
+    private final Random random = new Random(20260816L);
+
+    public WorldRenderer(Context context) {
+        background = context.getDrawable(com.persiawar2d.R.drawable.achaemenid_background);
+        ground = context.getDrawable(com.persiawar2d.R.drawable.persia_ground);
+        buildLayout();
+    }
+
+    private void buildLayout() {
+        // Main roads: deliberately irregular spacing, no mirrored grid.
+        roads.add(new Road(300, 980, 5700, 980, 150));
+        roads.add(new Road(420, 2850, 5600, 2850, 125));
+        roads.add(new Road(700, 4650, 5300, 4650, 140));
+        roads.add(new Road(1200, 300, 1200, 5700, 130));
+        roads.add(new Road(3380, 250, 3380, 5750, 150));
+        roads.add(new Road(5050, 600, 5050, 5400, 120));
+
+        // Side streets / alleys with varied lengths.
+        roads.add(new Road(600, 1600, 2300, 1600, 70));
+        roads.add(new Road(1900, 1100, 1900, 2700, 62));
+        roads.add(new Road(2580, 2950, 2580, 4500, 64));
+        roads.add(new Road(3650, 1650, 4900, 1650, 68));
+        roads.add(new Road(4200, 3150, 4200, 5050, 70));
+        roads.add(new Road(850, 3900, 2500, 3900, 66));
+        roads.add(new Road(4700, 900, 4700, 2500, 60));
+
+        int[][] spots = {
+                {430,520,360,280},{1530,520,430,300},{2250,520,470,320},
+                {3900,520,500,330},{4550,620,380,260},{5400,580,330,350},
+                {520,2050,420,320},{1500,2050,500,340},{2200,1900,380,280},
+                {3600,2050,520,320},{4450,2100,420,310},{5200,1900,430,330},
+                {500,3350,450,310},{1500,3250,420,300},{2850,3500,520,340},
+                {3650,3500,450,290},{4700,3550,520,330},{5200,4200,390,300},
+                {650,5000,500,300},{1750,5000,430,330},{2900,5000,460,310},
+                {3850,5100,500,300},{4750,5100,420,330}
+        };
+        int i = 0;
+        for (int[] s : spots) {
+            buildings.add(new Building(s[0],s[1],s[2],s[3], i%6, 0.75f + (i%4)*0.12f));
+            if (i%3 != 1) buildings.add(new Building(s[0]+s[2]+90, s[1]+35, 210+(i%3)*55, 190+(i%4)*30, (i+2)%6, 0.58f));
+            i++;
+        }
+        for (int n=0;n<95;n++) {
+            float x=260+random.nextFloat()*5480, y=300+random.nextFloat()*5400;
+            if (!nearRoad(x,y,95)) shrubs.add(new Shrub(x,y,18+random.nextFloat()*22));
+        }
+    }
+
+    private boolean nearRoad(float x,float y,float pad) {
+        for (Road r: roads) {
+            if (r.x1==r.x2 && Math.abs(x-r.x1)<r.w/2+pad && y>=Math.min(r.y1,r.y2)-pad && y<=Math.max(r.y1,r.y2)+pad) return true;
+            if (r.y1==r.y2 && Math.abs(y-r.y1)<r.w/2+pad && x>=Math.min(r.x1,r.x2)-pad && x<=Math.max(r.x1,r.x2)+pad) return true;
+        }
+        return false;
+    }
+
+    public void draw(Canvas c, float playerX, float playerY, float cameraScale, float viewW, float viewH, float hudH) {
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.rgb(38,58,47)); c.drawRect(0,0,viewW,viewH,p);
+        float scale = cameraScale;
+        float ox = viewW/2f-playerX*scale;
+        float oy = (viewH+hudH)/2f-playerY*scale;
+        c.save(); c.translate(ox,oy);
+        drawGround(c,scale);
+        drawRoads(c,scale);
+        for (Shrub s: shrubs) drawShrub(c,s,playerX,playerY,scale);
+        for (Building b: buildings) drawBuilding(c,b,playerX,playerY,scale);
+        c.restore();
+    }
+
+    private void drawGround(Canvas c,float s) {
+        p.setColor(Color.rgb(112,105,78)); c.drawRect(0,0,WORLD_SIZE*s,WORLD_SIZE*s,p);
+        // Actual repository vector ground asset, scaled as a large tiled visual base.
+        if (ground!=null) {
+            int tile = Math.max(256,(int)(520*s));
+            for (int y=0;y<WORLD_SIZE*s;y+=tile) for(int x=0;x<WORLD_SIZE*s;x+=tile){
+                ground.setBounds(x,y,x+tile,y+tile); ground.setAlpha(115); ground.draw(c);
+            }
+        }
+    }
+
+    private void drawRoads(Canvas c,float s) {
+        for(Road r:roads){
+            p.setColor(Color.rgb(73,69,57));
+            if(r.x1==r.x2)c.drawRect((r.x1-r.w/2)*s,Math.min(r.y1,r.y2)*s,(r.x1+r.w/2)*s,Math.max(r.y1,r.y2)*s,p);
+            else c.drawRect(Math.min(r.x1,r.x2)*s,(r.y1-r.w/2)*s,Math.max(r.x1,r.x2)*s,(r.y1+r.w/2)*s,p);
+            p.setColor(Color.rgb(125,117,91)); p.setStrokeWidth(Math.max(2,r.w*.035f*s));
+            if(r.x1==r.x2)c.drawLine(r.x1*s,Math.min(r.y1,r.y2)*s,r.x1*s,Math.max(r.y1,r.y2)*s,p);
+            else c.drawLine(Math.min(r.x1,r.x2)*s,r.y1*s,Math.max(r.x1,r.x2)*s,r.y1*s,p);
+        }
+    }
+
+    private void drawBuilding(Canvas c,Building b,float px,float py,float s) {
+        float fade = blocked(b,px,py) ? 0.24f : 1f;
+        p.setAlpha((int)(255*fade));
+        float x=b.x*s,y=b.y*s,w=b.w*s,h=b.h*s;
+        // 2.5D side wall + roof with varied silhouettes.
+        float lift=Math.max(18*s,b.h*.22f*s);
+        int[] walls={Color.rgb(157,123,82),Color.rgb(139,103,70),Color.rgb(174,139,94),Color.rgb(121,91,65),Color.rgb(188,151,101),Color.rgb(146,112,76)};
+        int wall=walls[b.kind%walls.length]; p.setColor(wall); c.drawRect(x,y-lift,x+w,y,p);
+        p.setColor(Color.rgb(92,65,46));
+        Path roof=new Path(); roof.moveTo(x-10*s,y-lift);roof.lineTo(x+w*.5f,y-lift-34*s);roof.lineTo(x+w+10*s,y-lift);roof.close();c.drawPath(roof,p);
+        p.setColor(Color.rgb(219,184,119));
+        int cols=Math.max(2,(int)(b.w/95));
+        for(int j=0;j<cols;j++){float wx=x+18*s+j*(w-36*s)/Math.max(1,cols-1);c.drawRect(wx,y-lift+30*s,wx+22*s,y-lift+70*s,p);}
+        p.setColor(Color.rgb(72,52,39)); c.drawRect(x+w*.42f,y-55*s,x+w*.58f,y,p);
+        // facade detail / awning differs per building.
+        if(b.kind%2==0){p.setColor(Color.rgb(196,152,79));c.drawRect(x+w*.12f,y-lift-2*s,x+w*.36f,y-lift+10*s,p);}
+        p.setAlpha(255);
+    }
+
+    private boolean blocked(Building b,float px,float py){
+        float bx=b.x+b.w*.5f, by=b.y+b.h*.5f;
+        // Segment camera->player is approximated by a slightly extended segment from player outward.
+        float camX=px, camY=py-700; // fixed 2.5D camera elevation in world space
+        float dx=px-camX,dy=py-camY, len2=dx*dx+dy*dy; if(len2<1)return false;
+        float t=((bx-camX)*dx+(by-camY)*dy)/len2; if(t<0||t>1)return false;
+        float cx=camX+t*dx,cy=camY+t*dy;
+        return cx>b.x-30&&cx<b.x+b.w+30&&cy>b.y-30&&cy<b.y+b.h+30&&Math.abs(cy-by)<b.h*.9f;
+    }
+
+    private void drawShrub(Canvas c,Shrub s,float px,float py,float scale){
+        float fade=distance(s.x,s.y,px,py)<420 && blockedPoint(s.x,s.y,px,py)?0.22f:1f;p.setAlpha((int)(255*fade));
+        float x=s.x*scale,y=s.y*scale,r=s.r*scale;p.setColor(Color.rgb(49,94,53));c.drawCircle(x,y,r,p);p.setColor(Color.rgb(77,126,66));c.drawCircle(x-r*.35f,y-r*.25f,r*.65f,p);p.setAlpha(255);
+    }
+    private boolean blockedPoint(float x,float y,float px,float py){return Math.abs(x-px)<80 && y<py;}
+    private float distance(float a,float b,float c,float d){return (float)Math.hypot(a-c,b-d);}
+
+    static final class Building {final float x,y,w,h;final int kind;final float depth;Building(float x,float y,float w,float h,int kind,float depth){this.x=x;this.y=y;this.w=w;this.h=h;this.kind=kind;this.depth=depth;}}
+    static final class Shrub {final float x,y,r;Shrub(float x,float y,float r){this.x=x;this.y=y;this.r=r;}}
+    static final class Road {final float x1,y1,x2,y2,w;Road(float x1,float y1,float x2,float y2,float w){this.x1=x1;this.y1=y1;this.x2=x2;this.y2=y2;this.w=w;}}
+}
