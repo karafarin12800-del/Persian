@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -31,15 +33,40 @@ jobs:
       - name: Install Android SDK
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
+      - name: Ensure Gradle Wrapper is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f gradlew || ! -f gradle/wrapper/gradle-wrapper.jar || ! -f gradle/wrapper/gradle-wrapper.properties ]]; then
+            gradle wrapper --gradle-version 8.7 --distribution-type bin
+          fi
+          chmod +x gradlew
+
+      - name: Commit Gradle Wrapper if it was generated
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git status --porcelain | grep -E '(^| )gradlew(\.bat)?$|gradle/wrapper/' >/dev/null; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
+            git commit -m "build: add Gradle Wrapper [skip ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Verify Gradle Wrapper
+        run: ./gradlew --version
+
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
+        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK
+        shell: bash
         run: |
           set -euo pipefail
           test -s app/build/outputs/apk/debug/app-debug.apk
