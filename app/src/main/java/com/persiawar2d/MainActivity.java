@@ -25,9 +25,9 @@ public class MainActivity extends Activity {
         static final float HUD_H = 96f;
         static final float WORLD_SIZE = WorldRenderer.WORLD_SIZE;
         static final float PLAYER_RADIUS = 56f;
-        // Deliberate 2.5D camera: slight yaw + pitched ground plane. HUD remains untransformed.
-        static final float CAMERA_YAW = -8.0f;
-        static final float CAMERA_PITCH = 0.78f;
+        // Strong oblique projection: clearly different from a flat top-down view.
+        static final float CAMERA_YAW = -14.0f;
+        static final float CAMERA_PITCH = 0.58f;
 
         final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Random random = new Random(20260817L);
@@ -61,32 +61,16 @@ public class MainActivity extends Activity {
         }
 
         void resetGame() {
-            px = WORLD_SIZE * .5f;
-            py = WORLD_SIZE * .55f;
-            aimX = px + 900;
-            aimY = py;
-            moveNX = moveNY = 0;
-            joystickDown = fireDown = false;
+            px = WORLD_SIZE * .5f; py = WORLD_SIZE * .55f;
+            aimX = px + 900; aimY = py;
+            moveNX = moveNY = 0; joystickDown = fireDown = false;
             joystickPointer = firePointer = aimPointer = -1;
-            lastFrameAt = System.currentTimeMillis();
-            joystickVisibleUntil = lastFrameAt + 1600;
-            wave = 1;
-            score = 0;
-            ammo = 12;
-            reserve = 90;
-            grenades = 3;
-            maxHp = 100;
-            hp = maxHp;
-            shield = 0;
-            weapon = 0;
-            playerDir = 0;
-            playerFrame = 0;
-            gameOver = false;
-            explosionUntil = 0;
+            lastFrameAt = System.currentTimeMillis(); joystickVisibleUntil = lastFrameAt + 1600;
+            wave = 1; score = 0; ammo = 12; reserve = 90; grenades = 3;
+            maxHp = 100; hp = maxHp; shield = 0; weapon = 0;
+            playerDir = 0; playerFrame = 0; gameOver = false; explosionUntil = 0;
             enemies.clear(); bullets.clear(); pickups.clear(); thrownGrenades.clear();
-            king.setState(0, 0);
-            spawnWave();
-            invalidate();
+            king.setState(0, 0); spawnWave(); invalidate();
         }
 
         void spawnWave() {
@@ -94,85 +78,49 @@ public class MainActivity extends Activity {
             for (int i = 0; i < count; i++) {
                 double a = random.nextDouble() * Math.PI * 2.0;
                 float d = 750 + random.nextFloat() * 950;
-                float x = clamp(px + (float) Math.cos(a) * d, 150, WORLD_SIZE - 150);
-                float y = clamp(py + (float) Math.sin(a) * d, HUD_H + 150, WORLD_SIZE - 150);
-                int type = (i % 7 == 0) ? 3 : ((i % 3 == 0) ? 2 : 1);
-                if (world.isBlocked(x, y, 80)) { x = clamp(x + 220, 150, WORLD_SIZE - 150); y = clamp(y + 180, HUD_H + 150, WORLD_SIZE - 150); }
-                enemies.add(new Enemy(x, y, type));
+                float x = clamp(px + (float)Math.cos(a)*d,150,WORLD_SIZE-150);
+                float y = clamp(py + (float)Math.sin(a)*d,HUD_H+150,WORLD_SIZE-150);
+                int type = (i%7==0)?3:((i%3==0)?2:1);
+                if(world.isBlocked(x,y,80)){x=clamp(x+220,150,WORLD_SIZE-150);y=clamp(y+180,HUD_H+150,WORLD_SIZE-150);}
+                enemies.add(new Enemy(x,y,type));
             }
-            spawnWaveRewards();
-            lastSpawn = System.currentTimeMillis();
+            spawnWaveRewards(); lastSpawn=System.currentTimeMillis();
         }
-
-        void spawnWaveRewards() {
+        void spawnWaveRewards(){
             pickups.clear();
-            addPickup(Pickup.AMMO, clamp(px + 420, 180, WORLD_SIZE - 180), clamp(py - 180, 180, WORLD_SIZE - 180));
-            addPickup(Pickup.GRENADE, clamp(px - 420, 180, WORLD_SIZE - 180), clamp(py + 160, 180, WORLD_SIZE - 180));
-            addPickup(Pickup.MEDKIT, clamp(px + 130, 180, WORLD_SIZE - 180), clamp(py + 390, 180, WORLD_SIZE - 180));
+            addPickup(Pickup.AMMO,clamp(px+420,180,WORLD_SIZE-180),clamp(py-180,180,WORLD_SIZE-180));
+            addPickup(Pickup.GRENADE,clamp(px-420,180,WORLD_SIZE-180),clamp(py+160,180,WORLD_SIZE-180));
+            addPickup(Pickup.MEDKIT,clamp(px+130,180,WORLD_SIZE-180),clamp(py+390,180,WORLD_SIZE-180));
         }
+        void addPickup(int type,float x,float y){if(!world.isBlocked(x,y,45))pickups.add(new Pickup(x,y,type));}
+        @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){joyBaseX=w*.17f;joyBaseY=h*.80f;joyX=joyBaseX;joyY=joyBaseY;}
+        float cameraScale(){return Math.min(getWidth()/1900f,Math.max(.72f,(getHeight()-HUD_H)/1000f));}
 
-        void addPickup(int type, float x, float y) { if (!world.isBlocked(x, y, 45)) pickups.add(new Pickup(x, y, type)); }
-
-        @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-            joyBaseX = w * .17f; joyBaseY = h * .80f; joyX = joyBaseX; joyY = joyBaseY;
+        @Override protected void onDraw(Canvas canvas){
+            long now=System.currentTimeMillis();
+            float dt=Math.min(.033f,Math.max(.001f,(now-lastFrameAt)/1000f)); lastFrameAt=now;
+            tick(now,dt); drawWorld(canvas); drawHud(canvas); drawControls(canvas);
+            if(gameOver)drawGameOver(canvas); postInvalidateOnAnimation();
         }
-
-        float cameraScale() { return Math.min(getWidth() / 1900f, Math.max(.72f, (getHeight() - HUD_H) / 1000f)); }
-
-        @Override protected void onDraw(Canvas canvas) {
-            long now = System.currentTimeMillis();
-            float dt = Math.min(.033f, Math.max(.001f, (now - lastFrameAt) / 1000f));
-            lastFrameAt = now;
-            tick(now, dt);
-            drawWorld(canvas);
-            drawHud(canvas);
-            drawControls(canvas);
-            if (gameOver) drawGameOver(canvas);
-            postInvalidateOnAnimation();
+        void tick(long now,float dt){
+            if(gameOver)return;
+            if(joystickDown&&Math.hypot(moveNX,moveNY)>.05){movePlayer(moveNX*370f*dt,moveNY*370f*dt);animatePlayer(now);}
+            else{playerFrame=0;king.setState(playerDir,playerFrame);}
+            if(fireDown)shoot(); updateEnemies(now,dt); updateBullets(dt); updateGrenades(dt); collectPickups();
+            if(enemies.isEmpty()&&now-lastSpawn>800){wave++;spawnWave();}
         }
-
-        void tick(long now, float dt) {
-            if (gameOver) return;
-            if (joystickDown && Math.hypot(moveNX, moveNY) > .05) { movePlayer(moveNX * 370f * dt, moveNY * 370f * dt); animatePlayer(now); }
-            else { playerFrame = 0; king.setState(playerDir, playerFrame); }
-            if (fireDown) shoot();
-            updateEnemies(now, dt); updateBullets(dt); updateGrenades(dt); collectPickups();
-            if (enemies.isEmpty() && now - lastSpawn > 800) { wave++; spawnWave(); }
+        void updateEnemies(long now,float dt){
+            for(Enemy e:enemies){if(e.hp<=0)continue;float dx=px-e.x,dy=py-e.y,d=Math.max(1f,(float)Math.hypot(dx,dy));float speed=e.type==3?112f:(e.type==2?92f:76f);if(d>112)moveEnemy(e,dx/d*speed*dt,dy/d*speed*dt);if(d<118&&now-e.lastHit>700){damagePlayer(e.type==3?12:6);e.lastHit=now;}long rate=e.type==3?1150:(e.type==2?1500:1800);if(d<1100&&now-e.lastShot>rate){enemyShoot(e);e.lastShot=now;}}
         }
-
-        void updateEnemies(long now, float dt) {
-            for (Enemy e : enemies) {
-                if (e.hp <= 0) continue;
-                float dx = px - e.x, dy = py - e.y, d = Math.max(1f, (float)Math.hypot(dx, dy));
-                float speed = e.type == 3 ? 112f : (e.type == 2 ? 92f : 76f);
-                if (d > 112) moveEnemy(e, dx / d * speed * dt, dy / d * speed * dt);
-                if (d < 118 && now - e.lastHit > 700) { damagePlayer(e.type == 3 ? 12 : 6); e.lastHit = now; }
-                long rate = e.type == 3 ? 1150 : (e.type == 2 ? 1500 : 1800);
-                if (d < 1100 && now - e.lastShot > rate) { enemyShoot(e); e.lastShot = now; }
-            }
+        void moveEnemy(Enemy e,float dx,float dy){if(!world.isBlocked(e.x+dx,e.y,44))e.x+=dx;if(!world.isBlocked(e.x,e.y+dy,44))e.y+=dy;}
+        void animatePlayer(long now){int frame=(int)((now/95)%6);if(frame!=playerFrame){playerFrame=frame;king.setState(playerDir,playerFrame);}}
+        void updateDirection(float nx,float ny){if(Math.hypot(nx,ny)<.08)return;if(Math.abs(nx)>Math.abs(ny))playerDir=nx<0?1:2;else playerDir=ny<0?3:0;king.setState(playerDir,playerFrame);}
+        void updateBullets(float dt){
+            for(int i=bullets.size()-1;i>=0;i--){Bullet b=bullets.get(i);float oldX=b.x,oldY=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.y<0||b.x>WORLD_SIZE||b.y>WORLD_SIZE){bullets.remove(i);continue;}if(world.isBlocked(b.x,b.y,4)){bullets.remove(i);continue;}if(b.player){boolean hit=false;for(Enemy e:enemies){if(e.hp<=0)continue;if(segmentDistance(e.x,e.y,oldX,oldY,b.x,b.y)<48){e.hp-=b.damage;hit=true;if(e.hp<=0)onEnemyKilled(e);break;}}if(hit)bullets.remove(i);}else if(segmentDistance(px,py,oldX,oldY,b.x,b.y)<38){damagePlayer(Math.round(b.damage));bullets.remove(i);}}
+            for(int i=enemies.size()-1;i>=0;i--)if(enemies.get(i).hp<=0)enemies.remove(i);
         }
-
-        void moveEnemy(Enemy e, float dx, float dy) { if (!world.isBlocked(e.x + dx, e.y, 44)) e.x += dx; if (!world.isBlocked(e.x, e.y + dy, 44)) e.y += dy; }
-        void animatePlayer(long now) { int frame = (int)((now / 95) % 6); if (frame != playerFrame) { playerFrame = frame; king.setState(playerDir, playerFrame); } }
-        void updateDirection(float nx, float ny) { if (Math.hypot(nx, ny) < .08) return; if (Math.abs(nx) > Math.abs(ny)) playerDir = nx < 0 ? 1 : 2; else playerDir = ny < 0 ? 3 : 0; king.setState(playerDir, playerFrame); }
-
-        void updateBullets(float dt) {
-            for (int i = bullets.size() - 1; i >= 0; i--) {
-                Bullet b = bullets.get(i); float oldX = b.x, oldY = b.y;
-                b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-                if (b.life <= 0 || b.x < 0 || b.y < 0 || b.x > WORLD_SIZE || b.y > WORLD_SIZE) { bullets.remove(i); continue; }
-                if (world.isBlocked(b.x, b.y, 4)) { bullets.remove(i); continue; }
-                if (b.player) {
-                    boolean hit = false;
-                    for (Enemy e : enemies) { if (e.hp <= 0) continue; if (segmentDistance(e.x,e.y,oldX,oldY,b.x,b.y) < 48) { e.hp -= b.damage; hit = true; if (e.hp <= 0) onEnemyKilled(e); break; } }
-                    if (hit) bullets.remove(i);
-                } else if (segmentDistance(px,py,oldX,oldY,b.x,b.y) < 38) { damagePlayer(Math.round(b.damage)); bullets.remove(i); }
-            }
-            for (int i=enemies.size()-1;i>=0;i--) if(enemies.get(i).hp<=0) enemies.remove(i);
-        }
-
-        void onEnemyKilled(Enemy e) { score += e.type == 3 ? 40 : (e.type == 2 ? 20 : 10); float roll=random.nextFloat(); if(roll<.15f)addPickup(Pickup.AMMO,e.x,e.y); else if(roll<.25f)addPickup(Pickup.GRENADE,e.x,e.y); else if(roll<.34f)addPickup(Pickup.MEDKIT,e.x,e.y); }
-        Enemy nearestEnemy() { Enemy best=null; float bestDistance=Float.MAX_VALUE; for(Enemy e:enemies){if(e.hp<=0)continue;float d=distance(px,py,e.x,e.y);if(d<bestDistance){bestDistance=d;best=e;}}return best; }
+        void onEnemyKilled(Enemy e){score+=e.type==3?40:(e.type==2?20:10);float roll=random.nextFloat();if(roll<.15f)addPickup(Pickup.AMMO,e.x,e.y);else if(roll<.25f)addPickup(Pickup.GRENADE,e.x,e.y);else if(roll<.34f)addPickup(Pickup.MEDKIT,e.x,e.y);}
+        Enemy nearestEnemy(){Enemy best=null;float bestDistance=Float.MAX_VALUE;for(Enemy e:enemies){if(e.hp<=0)continue;float d=distance(px,py,e.x,e.y);if(d<bestDistance){bestDistance=d;best=e;}}return best;}
         void autoAim(){Enemy best=nearestEnemy();if(best!=null){aimX=best.x;aimY=best.y;}}
         void enemyShoot(Enemy e){float dx=px-e.x,dy=py-e.y,d=Math.max(1f,(float)Math.hypot(dx,dy));bullets.add(new Bullet(e.x+dx/d*42,e.y+dy/d*42,dx/d*680,dy/d*680,8,false,1f));}
         void shoot(){if(gameOver||weapon!=0)return;long now=System.currentTimeMillis();if(now-lastShot<155)return;if(ammo<=0){reload();return;}Enemy target=nearestEnemy();if(target==null)return;aimX=target.x;aimY=target.y;float dx=target.x-px,dy=target.y-py,d=Math.max(1f,(float)Math.hypot(dx,dy));bullets.add(new Bullet(px+dx/d*60,py+dy/d*60,dx/d*1260,dy/d*1260,30,true,2.2f));ammo--;lastShot=now;}
@@ -186,18 +134,17 @@ public class MainActivity extends Activity {
         void damagePlayer(int amount){int blocked=Math.min(shield,amount);shield-=blocked;amount-=blocked;if(amount>0){hp-=amount;if(hp<=0){hp=0;gameOver=true;fireDown=false;}}}
         void collectPickups(){for(int i=pickups.size()-1;i>=0;i--){Pickup item=pickups.get(i);if(distance(px,py,item.x,item.y)>75)continue;if(item.type==Pickup.AMMO)reserve=Math.min(180,reserve+30);else if(item.type==Pickup.GRENADE)grenades=Math.min(9,grenades+1);else if(item.type==Pickup.MEDKIT)hp=Math.min(maxHp,hp+35);pickups.remove(i);}}
 
-        void drawWorld(Canvas c) {
+        void drawWorld(Canvas c){
             float s=cameraScale();
-            // The camera is intentionally tilted. World-space, player, enemies and pickups all share this transform.
-            float cx=getWidth()*.5f, cy=HUD_H+(getHeight()-HUD_H)*.5f;
+            float cx=getWidth()*.5f,cy=HUD_H+(getHeight()-HUD_H)*.5f;
             c.save();
             c.translate(cx,cy);
             c.rotate(CAMERA_YAW);
             c.scale(1f,CAMERA_PITCH);
             c.translate(-cx,-cy);
             world.draw(c,px,py,s,getWidth(),getHeight(),HUD_H);
-            float ox=getWidth()/2f-px*s, oy=HUD_H+(getHeight()-HUD_H)/2f-py*s;
-            c.save(); c.translate(ox,oy);
+            float ox=getWidth()/2f-px*s,oy=HUD_H+(getHeight()-HUD_H)/2f-py*s;
+            c.save();c.translate(ox,oy);
             for(Pickup item:pickups)drawPickup(c,item,s);
             for(ThrownGrenade g:thrownGrenades)drawThrownGrenade(c,g,s);
             for(Bullet b:bullets)drawBullet(c,b,s);
@@ -209,8 +156,26 @@ public class MainActivity extends Activity {
             c.restore();
         }
 
-        void drawPlayer(Canvas c,float s){float x=px*s,y=py*s;p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(x-40*s,y+45*s,x+40*s,y+62*s,p);king.setState(playerDir,playerFrame);king.setAlpha(255);int width=Math.max(112,Math.round(142*s)),height=Math.max(150,Math.round(188*s));int halfW=width/2,halfH=height/2;king.setBounds(Math.round(x-halfW),Math.round(y-halfH-8*s),Math.round(x+halfW),Math.round(y+halfH-8*s));king.draw(c);if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawOval(x-56*s,y-78*s,x+56*s,y+58*s,p);p.setStyle(Paint.Style.FILL);}}
-        void drawEnemy(Canvas c,Enemy e,float s){if(enemyArt==null)return;float x=e.x*s,y=e.y*s;int size=Math.round((e.type==3?146:(e.type==2?130:116))*s),half=size/2;enemyArt.setAlpha(255);enemyArt.setBounds(Math.round(x-half),Math.round(y-half),Math.round(x+half),Math.round(y+half));enemyArt.draw(c);float bw=68*s,bh=Math.max(5,7*s),left=x-bw*.5f,top=(e.y-88)*s;p.setStyle(Paint.Style.FILL);p.setColor(0xB4141414);c.drawRoundRect(left,top,left+bw,top+bh,bh,bh,p);float max=e.type==3?120:(e.type==2?70:45);p.setColor(Color.rgb(196,55,45));c.drawRoundRect(left,top,left+bw*Math.max(0,e.hp/max),top+bh,bh,bh,p);}
+        void drawPlayer(Canvas c,float s){
+            float x=px*s,y=py*s;
+            p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(x-40*s,y+45*s,x+40*s,y+62*s,p);
+            king.setState(playerDir,playerFrame);king.setAlpha(255);
+            int width=Math.max(92,Math.round(116*s)),height=Math.max(154,Math.round(210*s));
+            int halfW=width/2,halfH=height/2;
+            // Counter the pitched camera on the character only: the player stays upright while the ground tilts.
+            c.save();
+            c.translate(x,y-8*s);
+            c.scale(1f,1f/CAMERA_PITCH);
+            king.setBounds(-halfW, -halfH, halfW, halfH);
+            king.draw(c);
+            c.restore();
+            if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawOval(x-56*s,y-78*s,x+56*s,y+58*s,p);p.setStyle(Paint.Style.FILL);}
+        }
+        void drawEnemy(Canvas c,Enemy e,float s){
+            if(enemyArt==null)return;float x=e.x*s,y=e.y*s;int size=Math.round((e.type==3?146:(e.type==2?130:116))*s),half=size/2;
+            c.save();c.translate(x,y);c.scale(1f,1f/CAMERA_PITCH);enemyArt.setAlpha(255);enemyArt.setBounds(-half,-half,half,half);enemyArt.draw(c);c.restore();
+            float bw=68*s,bh=Math.max(5,7*s),left=x-bw*.5f,top=(e.y-88)*s;p.setStyle(Paint.Style.FILL);p.setColor(0xB4141414);c.drawRoundRect(left,top,left+bw,top+bh,bh,bh,p);float max=e.type==3?120:(e.type==2?70:45);p.setColor(Color.rgb(196,55,45));c.drawRoundRect(left,top,left+bw*Math.max(0,e.hp/max),top+bh,bh,bh,p);
+        }
         void drawBullet(Canvas c,Bullet b,float s){float x=b.x*s,y=b.y*s;p.setStyle(Paint.Style.FILL);p.setColor(b.player?Color.rgb(255,218,87):Color.rgb(255,80,65));c.drawCircle(x,y,Math.max(4,6*s),p);}
         void drawPickup(Canvas c,Pickup item,float s){float x=item.x*s,y=item.y*s,pulse=1f+.08f*(float)Math.sin(System.currentTimeMillis()/180.0+item.type);p.setStyle(Paint.Style.FILL);p.setColor(0x3D000000);c.drawOval(x-26*s,y+20*s,x+26*s,y+31*s,p);if(item.type==Pickup.AMMO){p.setColor(Color.rgb(218,177,70));c.drawRoundRect(x-18*s,y-20*s,x+18*s,y+20*s,8*s,8*s,p);p.setColor(Color.rgb(87,69,41));c.drawRect(x-8*s,y-12*s,x-3*s,y+12*s,p);c.drawRect(x+4*s,y-12*s,x+9*s,y+12*s,p);}else if(item.type==Pickup.GRENADE){p.setColor(Color.rgb(55,92,58));c.drawCircle(x,y,18*s*pulse,p);p.setColor(Color.rgb(214,180,78));c.drawRect(x+4*s,y-18*s,x+11*s,y-8*s,p);}else{p.setColor(Color.rgb(205,63,58));c.drawRoundRect(x-20*s,y-16*s,x+20*s,y+16*s,8*s,8*s,p);p.setColor(Color.WHITE);c.drawRect(x-6*s,y-12*s,x+6*s,y+12*s,p);c.drawRect(x-12*s,y-6*s,x+12*s,y+6*s,p);}}
         void drawThrownGrenade(Canvas c,ThrownGrenade g,float s){p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(61,99,62));c.drawCircle(g.x*s,g.y*s,12*s,p);}
