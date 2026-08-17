@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -25,9 +26,10 @@ public class MainActivity extends Activity {
         static final float HUD_H = 96f;
         static final float WORLD_SIZE = WorldRenderer.WORLD_SIZE;
         static final float PLAYER_RADIUS = 56f;
-        // Strong oblique projection: clearly different from a flat top-down view.
-        static final float CAMERA_YAW = -14.0f;
-        static final float CAMERA_PITCH = 0.58f;
+        // Oblique 2.5D projection: yaw rotates the ground plane and pitch compresses its depth.
+        // Characters are counter-projected so they remain upright.
+        static final float CAMERA_YAW = -12.0f;
+        static final float CAMERA_PITCH = 0.64f;
 
         final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Random random = new Random(20260817L);
@@ -44,8 +46,9 @@ public class MainActivity extends Activity {
         boolean joystickDown, fireDown;
         int joystickPointer = -1, firePointer = -1, aimPointer = -1;
         long lastShot, lastMelee, lastSpawn, lastFrameAt, joystickVisibleUntil;
+        long playerActionUntil;
         int wave, score, ammo, reserve, grenades, hp, maxHp, shield, weapon;
-        int playerDir, playerFrame;
+        int playerDir, playerAction, playerFrame;
         boolean gameOver;
         float explosionX, explosionY;
         long explosionUntil;
@@ -66,11 +69,13 @@ public class MainActivity extends Activity {
             moveNX = moveNY = 0; joystickDown = fireDown = false;
             joystickPointer = firePointer = aimPointer = -1;
             lastFrameAt = System.currentTimeMillis(); joystickVisibleUntil = lastFrameAt + 1600;
+            playerActionUntil = 0;
             wave = 1; score = 0; ammo = 12; reserve = 90; grenades = 3;
             maxHp = 100; hp = maxHp; shield = 0; weapon = 0;
-            playerDir = 0; playerFrame = 0; gameOver = false; explosionUntil = 0;
+            playerDir = 0; playerAction = KingSpriteDrawable.ACTION_IDLE; playerFrame = 0;
+            gameOver = false; explosionUntil = 0;
             enemies.clear(); bullets.clear(); pickups.clear(); thrownGrenades.clear();
-            king.setState(0, 0); spawnWave(); invalidate();
+            king.setState(playerDir, playerAction, playerFrame); spawnWave(); invalidate();
         }
 
         void spawnWave() {
@@ -103,9 +108,22 @@ public class MainActivity extends Activity {
             if(gameOver)drawGameOver(canvas); postInvalidateOnAnimation();
         }
         void tick(long now,float dt){
-            if(gameOver)return;
-            if(joystickDown&&Math.hypot(moveNX,moveNY)>.05){movePlayer(moveNX*370f*dt,moveNY*370f*dt);animatePlayer(now);}
-            else{playerFrame=0;king.setState(playerDir,playerFrame);}
+            if(gameOver){
+                playerAction=KingSpriteDrawable.ACTION_DIE;
+                playerFrame=Math.min(KingSpriteDrawable.FRAME_COUNT-1,(int)((now/180)%KingSpriteDrawable.FRAME_COUNT));
+                king.setState(playerDir,playerAction,playerFrame);
+                return;
+            }
+            if(joystickDown&&Math.hypot(moveNX,moveNY)>.05){
+                movePlayer(moveNX*370f*dt,moveNY*370f*dt);
+                if(now>=playerActionUntil)animatePlayer(now);
+            } else if(now<playerActionUntil){
+                animateAction(now);
+            } else {
+                playerAction=KingSpriteDrawable.ACTION_IDLE;
+                playerFrame=0;
+                king.setState(playerDir,playerAction,playerFrame);
+            }
             if(fireDown)shoot(); updateEnemies(now,dt); updateBullets(dt); updateGrenades(dt); collectPickups();
             if(enemies.isEmpty()&&now-lastSpawn>800){wave++;spawnWave();}
         }
@@ -113,8 +131,27 @@ public class MainActivity extends Activity {
             for(Enemy e:enemies){if(e.hp<=0)continue;float dx=px-e.x,dy=py-e.y,d=Math.max(1f,(float)Math.hypot(dx,dy));float speed=e.type==3?112f:(e.type==2?92f:76f);if(d>112)moveEnemy(e,dx/d*speed*dt,dy/d*speed*dt);if(d<118&&now-e.lastHit>700){damagePlayer(e.type==3?12:6);e.lastHit=now;}long rate=e.type==3?1150:(e.type==2?1500:1800);if(d<1100&&now-e.lastShot>rate){enemyShoot(e);e.lastShot=now;}}
         }
         void moveEnemy(Enemy e,float dx,float dy){if(!world.isBlocked(e.x+dx,e.y,44))e.x+=dx;if(!world.isBlocked(e.x,e.y+dy,44))e.y+=dy;}
-        void animatePlayer(long now){int frame=(int)((now/95)%6);if(frame!=playerFrame){playerFrame=frame;king.setState(playerDir,playerFrame);}}
-        void updateDirection(float nx,float ny){if(Math.hypot(nx,ny)<.08)return;if(Math.abs(nx)>Math.abs(ny))playerDir=nx<0?1:2;else playerDir=ny<0?3:0;king.setState(playerDir,playerFrame);}
+        void animatePlayer(long now){
+            playerAction=KingSpriteDrawable.ACTION_WALK;
+            int frame=(int)((now/95)%KingSpriteDrawable.FRAME_COUNT);
+            if(frame!=playerFrame){playerFrame=frame;king.setState(playerDir,playerAction,playerFrame);}
+        }
+        void animateAction(long now){
+            int frame=(int)((now/105)%KingSpriteDrawable.FRAME_COUNT);
+            playerFrame=frame;
+            king.setState(playerDir,playerAction,playerFrame);
+        }
+        void setPlayerAction(int action,long duration){
+            playerAction=action;
+            playerActionUntil=System.currentTimeMillis()+duration;
+            playerFrame=0;
+            king.setState(playerDir,playerAction,playerFrame);
+        }
+        void updateDirection(float nx,float ny){
+            if(Math.hypot(nx,ny)<.08)return;
+            if(Math.abs(nx)>Math.abs(ny))playerDir=nx<0?1:2;else playerDir=ny<0?3:0;
+            king.setState(playerDir,playerAction,playerFrame);
+        }
         void updateBullets(float dt){
             for(int i=bullets.size()-1;i>=0;i--){Bullet b=bullets.get(i);float oldX=b.x,oldY=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.y<0||b.x>WORLD_SIZE||b.y>WORLD_SIZE){bullets.remove(i);continue;}if(world.isBlocked(b.x,b.y,4)){bullets.remove(i);continue;}if(b.player){boolean hit=false;for(Enemy e:enemies){if(e.hp<=0)continue;if(segmentDistance(e.x,e.y,oldX,oldY,b.x,b.y)<48){e.hp-=b.damage;hit=true;if(e.hp<=0)onEnemyKilled(e);break;}}if(hit)bullets.remove(i);}else if(segmentDistance(px,py,oldX,oldY,b.x,b.y)<38){damagePlayer(Math.round(b.damage));bullets.remove(i);}}
             for(int i=enemies.size()-1;i>=0;i--)if(enemies.get(i).hp<=0)enemies.remove(i);
@@ -123,52 +160,41 @@ public class MainActivity extends Activity {
         Enemy nearestEnemy(){Enemy best=null;float bestDistance=Float.MAX_VALUE;for(Enemy e:enemies){if(e.hp<=0)continue;float d=distance(px,py,e.x,e.y);if(d<bestDistance){bestDistance=d;best=e;}}return best;}
         void autoAim(){Enemy best=nearestEnemy();if(best!=null){aimX=best.x;aimY=best.y;}}
         void enemyShoot(Enemy e){float dx=px-e.x,dy=py-e.y,d=Math.max(1f,(float)Math.hypot(dx,dy));bullets.add(new Bullet(e.x+dx/d*42,e.y+dy/d*42,dx/d*680,dy/d*680,8,false,1f));}
-        void shoot(){if(gameOver||weapon!=0)return;long now=System.currentTimeMillis();if(now-lastShot<155)return;if(ammo<=0){reload();return;}Enemy target=nearestEnemy();if(target==null)return;aimX=target.x;aimY=target.y;float dx=target.x-px,dy=target.y-py,d=Math.max(1f,(float)Math.hypot(dx,dy));bullets.add(new Bullet(px+dx/d*60,py+dy/d*60,dx/d*1260,dy/d*1260,30,true,2.2f));ammo--;lastShot=now;}
-        void melee(){if(gameOver||weapon!=1)return;long now=System.currentTimeMillis();if(now-lastMelee<320)return;lastMelee=now;Enemy target=nearestEnemy();if(target==null||distance(px,py,target.x,target.y)>170)return;float dx=target.x-px,dy=target.y-py,d=Math.max(1f,(float)Math.hypot(dx,dy));for(Enemy e:enemies){if(e.hp<=0)continue;float ex=e.x-px,ey=e.y-py,ed=Math.max(1f,(float)Math.hypot(ex,ey));float dot=(ex*dx+ey*dy)/(ed*d);if(ed<180&&dot>.25f){e.hp-=45;if(e.hp<=0)onEnemyKilled(e);}}}
+        void shoot(){
+            if(gameOver||weapon!=0)return;long now=System.currentTimeMillis();if(now-lastShot<155)return;if(ammo<=0){reload();return;}
+            Enemy target=nearestEnemy();if(target==null)return;aimX=target.x;aimY=target.y;float dx=target.x-px,dy=target.y-py,d=Math.max(1f,(float)Math.hypot(dx,dy));
+            bullets.add(new Bullet(px+dx/d*60,py+dy/d*60,dx/d*1260,dy/d*1260,30,true,2.2f));ammo--;lastShot=now;setPlayerAction(KingSpriteDrawable.ACTION_ATTACK,300);
+        }
+        void melee(){
+            if(gameOver||weapon!=1)return;long now=System.currentTimeMillis();if(now-lastMelee<320)return;lastMelee=now;Enemy target=nearestEnemy();if(target==null||distance(px,py,target.x,target.y)>170)return;
+            float dx=target.x-px,dy=target.y-py,d=Math.max(1f,(float)Math.hypot(dx,dy));for(Enemy e:enemies){if(e.hp<=0)continue;float ex=e.x-px,ey=e.y-py,ed=Math.max(1f,(float)Math.hypot(ex,ey));float dot=(ex*dx+ey*dy)/(ed*d);if(ed<180&&dot>.25f){e.hp-=45;if(e.hp<=0)onEnemyKilled(e);}}setPlayerAction(KingSpriteDrawable.ACTION_ATTACK,300);
+        }
         void useGrenade(){if(gameOver||grenades<=0)return;Enemy target=nearestEnemy();if(target==null)return;grenades--;float dx=target.x-px,dy=target.y-py,d=Math.max(1f,(float)Math.hypot(dx,dy));thrownGrenades.add(new ThrownGrenade(px,py,dx/d*780f,dy/d*780f,.45f));}
         void updateGrenades(float dt){for(int i=thrownGrenades.size()-1;i>=0;i--){ThrownGrenade g=thrownGrenades.get(i);g.x+=g.vx*dt;g.y+=g.vy*dt;g.life-=dt;if(g.life<=0){explode(g.x,g.y);thrownGrenades.remove(i);}}}
         void explode(float x,float y){explosionX=x;explosionY=y;explosionUntil=System.currentTimeMillis()+360;for(Enemy e:enemies){if(e.hp<=0)continue;float d=distance(x,y,e.x,e.y);if(d<260){e.hp-=d<130?90:55;if(e.hp<=0)onEnemyKilled(e);}}}
         void reload(){if(gameOver||ammo>=12||reserve<=0)return;int amount=Math.min(12-ammo,reserve);ammo+=amount;reserve-=amount;}
         void toggleWeapon(){if(!gameOver)weapon=weapon==0?1:0;}
         void movePlayer(float dx,float dy){float nx=clamp(px+dx,90,WORLD_SIZE-90),ny=clamp(py+dy,HUD_H+90,WORLD_SIZE-90);if(!world.isBlocked(nx,py,PLAYER_RADIUS))px=nx;if(!world.isBlocked(px,ny,PLAYER_RADIUS))py=ny;updateDirection(moveNX,moveNY);}
-        void damagePlayer(int amount){int blocked=Math.min(shield,amount);shield-=blocked;amount-=blocked;if(amount>0){hp-=amount;if(hp<=0){hp=0;gameOver=true;fireDown=false;}}}
+        void damagePlayer(int amount){
+            int blocked=Math.min(shield,amount);shield-=blocked;amount-=blocked;
+            if(amount>0){hp-=amount;if(hp<=0){hp=0;gameOver=true;fireDown=false;playerActionUntil=0;playerAction=KingSpriteDrawable.ACTION_DIE;playerFrame=0;king.setState(playerDir,playerAction,playerFrame);}else setPlayerAction(KingSpriteDrawable.ACTION_HURT,240);}
+        }
         void collectPickups(){for(int i=pickups.size()-1;i>=0;i--){Pickup item=pickups.get(i);if(distance(px,py,item.x,item.y)>75)continue;if(item.type==Pickup.AMMO)reserve=Math.min(180,reserve+30);else if(item.type==Pickup.GRENADE)grenades=Math.min(9,grenades+1);else if(item.type==Pickup.MEDKIT)hp=Math.min(maxHp,hp+35);pickups.remove(i);}}
 
         void drawWorld(Canvas c){
-            float s=cameraScale();
-            float cx=getWidth()*.5f,cy=HUD_H+(getHeight()-HUD_H)*.5f;
-            c.save();
-            c.translate(cx,cy);
-            c.rotate(CAMERA_YAW);
-            c.scale(1f,CAMERA_PITCH);
-            c.translate(-cx,-cy);
+            float s=cameraScale();float cx=getWidth()*.5f,cy=HUD_H+(getHeight()-HUD_H)*.5f;
+            Matrix camera=new Matrix();camera.setRotate(CAMERA_YAW,cx,cy);camera.postScale(1f,CAMERA_PITCH,cx,cy);
+            c.save();c.concat(camera);
             world.draw(c,px,py,s,getWidth(),getHeight(),HUD_H);
             float ox=getWidth()/2f-px*s,oy=HUD_H+(getHeight()-HUD_H)/2f-py*s;
             c.save();c.translate(ox,oy);
-            for(Pickup item:pickups)drawPickup(c,item,s);
-            for(ThrownGrenade g:thrownGrenades)drawThrownGrenade(c,g,s);
-            for(Bullet b:bullets)drawBullet(c,b,s);
-            for(Enemy e:enemies)if(e.hp>0)drawEnemy(c,e,s);
-            drawPlayer(c,s);
-            if(System.currentTimeMillis()<explosionUntil)drawExplosion(c,s);
-            c.restore();
-            world.drawForeground(c,px,py,s,getWidth(),getHeight(),HUD_H);
-            c.restore();
+            for(Pickup item:pickups)drawPickup(c,item,s);for(ThrownGrenade g:thrownGrenades)drawThrownGrenade(c,g,s);for(Bullet b:bullets)drawBullet(c,b,s);for(Enemy e:enemies)if(e.hp>0)drawEnemy(c,e,s);drawPlayer(c,s);
+            if(System.currentTimeMillis()<explosionUntil)drawExplosion(c,s);c.restore();world.drawForeground(c,px,py,s,getWidth(),getHeight(),HUD_H);c.restore();
         }
-
         void drawPlayer(Canvas c,float s){
-            float x=px*s,y=py*s;
-            p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(x-40*s,y+45*s,x+40*s,y+62*s,p);
-            king.setState(playerDir,playerFrame);king.setAlpha(255);
-            int width=Math.max(92,Math.round(116*s)),height=Math.max(154,Math.round(210*s));
-            int halfW=width/2,halfH=height/2;
-            // Counter the pitched camera on the character only: the player stays upright while the ground tilts.
-            c.save();
-            c.translate(x,y-8*s);
-            c.scale(1f,1f/CAMERA_PITCH);
-            king.setBounds(-halfW, -halfH, halfW, halfH);
-            king.draw(c);
-            c.restore();
+            float x=px*s,y=py*s;p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(x-40*s,y+45*s,x+40*s,y+62*s,p);
+            king.setState(playerDir,playerAction,playerFrame);king.setAlpha(255);int width=Math.max(92,Math.round(116*s)),height=Math.max(154,Math.round(210*s));int halfW=width/2,halfH=height/2;
+            c.save();c.translate(x,y-8*s);c.scale(1f,1f/CAMERA_PITCH);king.setBounds(-halfW,-halfH,halfW,halfH);king.draw(c);c.restore();
             if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawOval(x-56*s,y-78*s,x+56*s,y+58*s,p);p.setStyle(Paint.Style.FILL);}
         }
         void drawEnemy(Canvas c,Enemy e,float s){
@@ -187,8 +213,20 @@ public class MainActivity extends Activity {
         void drawGameOver(Canvas c){p.setStyle(Paint.Style.FILL);p.setColor(0xDD000000);c.drawRect(0,0,getWidth(),getHeight(),p);centeredText(c,"GAME OVER",getWidth()/2f,getHeight()/2f-25,Color.WHITE,52);centeredText(c,"TAP TO RESTART",getWidth()/2f,getHeight()/2f+30,Color.rgb(238,210,150),22);}
         void centeredText(Canvas c,String text,float x,float y,int color,float size){p.setStyle(Paint.Style.FILL);p.setColor(color);p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(size);c.drawText(text,x,y,p);p.setTypeface(Typeface.DEFAULT);}
 
-        @Override public boolean onTouchEvent(MotionEvent event){int action=event.getActionMasked();if(gameOver){if(action==MotionEvent.ACTION_DOWN)resetGame();return true;}float br=Math.max(92,Math.min(132,getHeight()*.14f));float fireX=getWidth()*.83f,fireY=getHeight()*.72f,grenadeX=getWidth()*.67f,grenadeY=getHeight()*.72f,reloadX=getWidth()*.78f,reloadY=getHeight()*.91f,weaponX=getWidth()*.91f,weaponY=getHeight()*.91f,swordX=getWidth()*.63f,swordY=getHeight()*.55f;if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){int idx=event.getActionIndex(),id=event.getPointerId(idx);float x=event.getX(idx),y=event.getY(idx);if(near(x,y,fireX,fireY,br*1.34f)){firePointer=id;fireDown=true;shoot();return true;}if(near(x,y,grenadeX,grenadeY,br*.82f)){useGrenade();return true;}if(near(x,y,reloadX,reloadY,br*.68f)){reload();return true;}if(near(x,y,weaponX,weaponY,br*.68f)){toggleWeapon();return true;}if(near(x,y,swordX,swordY,br*.75f)){melee();return true;}if(x<getWidth()*.52f&&y>HUD_H){joystickPointer=id;joystickDown=true;joystickVisibleUntil=System.currentTimeMillis()+1800;joyBaseX=clamp(x,108,getWidth()*.46f);joyBaseY=clamp(y,HUD_H+108,getHeight()-108);joyX=joyBaseX;joyY=joyBaseY;moveNX=moveNY=0;return true;}if(y>HUD_H){aimPointer=id;setAimFromScreen(x,y);return true;}}if(action==MotionEvent.ACTION_MOVE){for(int i=0;i<event.getPointerCount();i++){int id=event.getPointerId(i);float x=event.getX(i),y=event.getY(i);if(id==joystickPointer){float dx=x-joyBaseX,dy=y-joyBaseY,mag=Math.max(1f,(float)Math.hypot(dx,dy)),max=92f,use=Math.min(max,mag);joyX=joyBaseX+dx/mag*use;joyY=joyBaseY+dy/mag*use;moveNX=(joyX-joyBaseX)/max;moveNY=(joyY-joyBaseY)/max;}if(id==aimPointer)setAimFromScreen(x,y);}return true;}if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_CANCEL){int id=event.getPointerId(event.getActionIndex());if(id==joystickPointer){joystickPointer=-1;joystickDown=false;moveNX=moveNY=0;joyX=joyBaseX;joyY=joyBaseY;joystickVisibleUntil=System.currentTimeMillis()+1200;}if(id==firePointer){firePointer=-1;fireDown=false;}if(id==aimPointer)aimPointer=-1;return true;}return true;}
-        void setAimFromScreen(float sx,float sy){float s=cameraScale();float ox=getWidth()/2f-px*s,oy=HUD_H+(getHeight()-HUD_H)/2f-py*s;aimX=(sx-ox)/s;aimY=(sy-oy)/s;}
+        @Override public boolean onTouchEvent(MotionEvent event){
+            int action=event.getActionMasked();if(gameOver){if(action==MotionEvent.ACTION_DOWN)resetGame();return true;}
+            float br=Math.max(92,Math.min(132,getHeight()*.14f));float fireX=getWidth()*.83f,fireY=getHeight()*.72f,grenadeX=getWidth()*.67f,grenadeY=getHeight()*.72f,reloadX=getWidth()*.78f,reloadY=getHeight()*.91f,weaponX=getWidth()*.91f,weaponY=getHeight()*.91f,swordX=getWidth()*.63f,swordY=getHeight()*.55f;
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){int idx=event.getActionIndex(),id=event.getPointerId(idx);float x=event.getX(idx),y=event.getY(idx);if(near(x,y,fireX,fireY,br*1.34f)){firePointer=id;fireDown=true;shoot();return true;}if(near(x,y,grenadeX,grenadeY,br*.82f)){useGrenade();return true;}if(near(x,y,reloadX,reloadY,br*.68f)){reload();return true;}if(near(x,y,weaponX,weaponY,br*.68f)){toggleWeapon();return true;}if(near(x,y,swordX,swordY,br*.75f)){melee();return true;}if(x<getWidth()*.52f&&y>HUD_H){joystickPointer=id;joystickDown=true;joystickVisibleUntil=System.currentTimeMillis()+1800;joyBaseX=clamp(x,108,getWidth()*.46f);joyBaseY=clamp(y,HUD_H+108,getHeight()-108);joyX=joyBaseX;joyY=joyBaseY;moveNX=moveNY=0;return true;}if(y>HUD_H){aimPointer=id;setAimFromScreen(x,y);return true;}}
+            if(action==MotionEvent.ACTION_MOVE){for(int i=0;i<event.getPointerCount();i++){int id=event.getPointerId(i);float x=event.getX(i),y=event.getY(i);if(id==joystickPointer){float dx=x-joyBaseX,dy=y-joyBaseY,mag=Math.max(1f,(float)Math.hypot(dx,dy)),max=92f,use=Math.min(max,mag);joyX=joyBaseX+dx/mag*use;joyY=joyBaseY+dy/mag*use;moveNX=(joyX-joyBaseX)/max;moveNY=(joyY-joyBaseY)/max;}if(id==aimPointer)setAimFromScreen(x,y);}return true;}
+            if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_CANCEL){int id=event.getPointerId(event.getActionIndex());if(id==joystickPointer){joystickPointer=-1;joystickDown=false;moveNX=moveNY=0;joyX=joyBaseX;joyY=joyBaseY;joystickVisibleUntil=System.currentTimeMillis()+1200;}if(id==firePointer){firePointer=-1;fireDown=false;}if(id==aimPointer)aimPointer=-1;return true;}return true;
+        }
+
+        /** Inverse of the same oblique camera projection used for the world, keeping touch aiming aligned. */
+        void setAimFromScreen(float sx,float sy){
+            float s=cameraScale();float cx=getWidth()*.5f,cy=HUD_H+(getHeight()-HUD_H)*.5f;float dx=sx-cx,dy=(sy-cy)/CAMERA_PITCH;
+            double a=Math.toRadians(CAMERA_YAW),cos=Math.cos(a),sin=Math.sin(a);float projectedX=(float)(dx*cos+dy*sin);float projectedY=(float)(-dx*sin+dy*cos);
+            float ox=getWidth()/2f-px*s,oy=HUD_H+(getHeight()-HUD_H)/2f-py*s;aimX=(projectedX-(ox-cx))/s;aimY=(projectedY-(oy-cy))/s;
+        }
         boolean near(float x,float y,float cx,float cy,float r){return Math.hypot(x-cx,y-cy)<=r;}float distance(float x1,float y1,float x2,float y2){return(float)Math.hypot(x1-x2,y1-y2);}float segmentDistance(float px,float py,float x1,float y1,float x2,float y2){float dx=x2-x1,dy=y2-y1;if(dx==0&&dy==0)return distance(px,py,x1,y1);float t=((px-x1)*dx+(py-y1)*dy)/(dx*dx+dy*dy);t=Math.max(0,Math.min(1,t));return distance(px,py,x1+t*dx,y1+t*dy);}float clamp(float v,float lo,float hi){return Math.max(lo,Math.min(hi,v));}
     }
 
