@@ -7,10 +7,10 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.persiawar2d.v110'
+        applicationId 'com.persiawar2d.v111'
         minSdk 23
         targetSdk 35
-        versionCode 110
-        versionName '11.0'
+        versionCode 111
+        versionName '11.1'
     }
 }
