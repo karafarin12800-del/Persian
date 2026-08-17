@@ -26,10 +26,10 @@ public class MainActivity extends Activity {
         static final float HUD_H = 96f;
         static final float WORLD_SIZE = WorldRenderer.WORLD_SIZE;
         static final float PLAYER_RADIUS = 56f;
-        // Oblique 2.5D projection: yaw rotates the ground plane and pitch compresses its depth.
-        // Characters are counter-projected so they remain upright.
-        static final float CAMERA_YAW = -12.0f;
-        static final float CAMERA_PITCH = 0.64f;
+        // Stable 2.5D projection: no yaw rotation, so roads/buildings keep their intended axes.
+        // A vertical compression gives depth while characters remain upright via counter-projection.
+        static final float CAMERA_YAW = 0.0f;
+        static final float CAMERA_PITCH = 0.80f;
 
         final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Random random = new Random(20260817L);
@@ -221,7 +221,6 @@ public class MainActivity extends Activity {
             if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_CANCEL){int id=event.getPointerId(event.getActionIndex());if(id==joystickPointer){joystickPointer=-1;joystickDown=false;moveNX=moveNY=0;joyX=joyBaseX;joyY=joyBaseY;joystickVisibleUntil=System.currentTimeMillis()+1200;}if(id==firePointer){firePointer=-1;fireDown=false;}if(id==aimPointer)aimPointer=-1;return true;}return true;
         }
 
-        /** Inverse of the same oblique camera projection used for the world, keeping touch aiming aligned. */
         void setAimFromScreen(float sx,float sy){
             float s=cameraScale();float cx=getWidth()*.5f,cy=HUD_H+(getHeight()-HUD_H)*.5f;float dx=sx-cx,dy=(sy-cy)/CAMERA_PITCH;
             double a=Math.toRadians(CAMERA_YAW),cos=Math.cos(a),sin=Math.sin(a);float projectedX=(float)(dx*cos+dy*sin);float projectedY=(float)(-dx*sin+dy*cos);
