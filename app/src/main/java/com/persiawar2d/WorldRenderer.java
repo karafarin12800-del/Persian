@@ -86,9 +86,7 @@ public final class WorldRenderer {
         for (int n = 0; n < 160; n++) {
             float x = 220 + random.nextFloat() * 5560f;
             float y = 220 + random.nextFloat() * 5560f;
-            if (!nearRoad(x, y, 115) && !nearBuilding(x, y, 85)) {
-                trees.add(new Tree(x, y, 22 + random.nextFloat() * 20, n % 4));
-            }
+            if (!nearRoad(x, y, 115) && !nearBuilding(x, y, 85)) trees.add(new Tree(x, y, 22 + random.nextFloat() * 20, n % 4));
         }
         for (int n = 0; n < 520; n++) {
             float x = random.nextFloat() * WORLD_SIZE;
@@ -130,110 +128,107 @@ public final class WorldRenderer {
 
     public void draw(Canvas c, float playerX, float playerY, float scale, float viewW, float viewH, float hudH) {
         p.setStyle(Paint.Style.FILL);
-        p.setColor(Color.rgb(38, 55, 43));
-        c.drawRect(0, 0, viewW, viewH, p);
-        float ox = viewW * .5f - playerX * scale;
-        float oy = hudH + (viewH - hudH) * .5f - playerY * scale;
+        p.setColor(Color.rgb(38,55,43));
+        c.drawRect(0,0,viewW,viewH,p);
+        float ox=viewW*.5f-playerX*scale;
+        float oy=hudH+(viewH-hudH)*.5f-playerY*scale;
         c.save();
-        c.translate(ox, oy);
-        drawGround(c, scale);
-        drawRoads(c, scale);
-        drawBehindDecor(c, playerY, scale);
+        c.translate(ox,oy);
+        drawGround(c,scale);
+        drawRoads(c,scale);
+        drawBehindDecor(c,playerY,scale);
         c.restore();
     }
 
-    public void drawForeground(Canvas c, float playerX, float playerY, float scale, float viewW, float viewH, float hudH) {
-        float ox = viewW * .5f - playerX * scale;
-        float oy = hudH + (viewH - hudH) * .5f - playerY * scale;
+    public void drawForeground(Canvas c,float playerX,float playerY,float scale,float viewW,float viewH,float hudH) {
+        float ox=viewW*.5f-playerX*scale;
+        float oy=hudH+(viewH-hudH)*.5f-playerY*scale;
         c.save();
-        c.translate(ox, oy);
-        for (Tree t : trees) if (t.y > playerY) drawTree(c, t, scale);
-        for (Building b : buildings) if (b.y + b.h * .78f > playerY) drawBuilding(c, b, scale);
+        c.translate(ox,oy);
+        for(Tree t:trees) if(t.y>playerY) drawTree(c,t,scale);
+        for(Building b:buildings) if(b.y+b.h>playerY) drawBuilding(c,b,scale);
         c.restore();
     }
 
-    private void drawGround(Canvas c, float s) {
+    private void drawGround(Canvas c,float s) {
         p.setStyle(Paint.Style.FILL);
-        p.setColor(Color.rgb(127, 113, 80));
-        c.drawRect(0, 0, WORLD_SIZE * s, WORLD_SIZE * s, p);
-        int[] colors = {0x1B46583D, 0x1E6A5940, 0x163F4B37, 0x1C907B52, 0x1834312A};
-        for (Mark m : terrainMarks) {
-            float x = m.x * s, y = m.y * s, r = m.size * s;
+        p.setColor(Color.rgb(127,113,80));
+        c.drawRect(0,0,WORLD_SIZE*s,WORLD_SIZE*s,p);
+        int[] colors={0x1B46583D,0x1E6A5940,0x163F4B37,0x1C907B52,0x1834312A};
+        for(Mark m:terrainMarks){
+            float x=m.x*s,y=m.y*s,r=m.size*s;
             p.setColor(colors[m.kind]);
-            c.drawOval(x - r, y - r * .55f, x + r, y + r * .55f, p);
+            c.drawOval(x-r,y-r*.55f,x+r,y+r*.55f,p);
         }
         p.setColor(0x1A3A3227);
-        for (int y = 180; y < WORLD_SIZE; y += 310) {
-            for (int x = 140; x < WORLD_SIZE; x += 360) {
-                c.drawCircle(x * s, (y + ((x / 360) % 3) * 32) * s, 10 * s, p);
-                c.drawCircle((x + 20) * s, (y - 9) * s, 6 * s, p);
-            }
+        for(int y=180;y<WORLD_SIZE;y+=310) for(int x=140;x<WORLD_SIZE;x+=360){
+            c.drawCircle(x*s,(y+((x/360)%3)*32)*s,10*s,p);
+            c.drawCircle((x+20)*s,(y-9)*s,6*s,p);
         }
     }
 
-    private void drawRoads(Canvas c, float s) {
-        for (Road r : roads) {
+    private void drawRoads(Canvas c,float s) {
+        for(Road r:roads){
             p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.rgb(61, 58, 51));
-            if (r.horizontal) c.drawRect(r.x1 * s, (r.y1 - r.width * .5f) * s, r.x2 * s, (r.y1 + r.width * .5f) * s, p);
-            else c.drawRect((r.x1 - r.width * .5f) * s, r.y1 * s, (r.x1 + r.width * .5f) * s, r.y2 * s, p);
-            p.setColor(Color.rgb(100, 93, 76));
-            if (r.horizontal) {
-                c.drawRect(r.x1 * s, (r.y1 - r.width * .5f) * s, r.x2 * s, (r.y1 - r.width * .38f) * s, p);
-                c.drawRect(r.x1 * s, (r.y1 + r.width * .38f) * s, r.x2 * s, (r.y1 + r.width * .5f) * s, p);
-            } else {
-                c.drawRect((r.x1 - r.width * .5f) * s, r.y1 * s, (r.x1 - r.width * .38f) * s, r.y2 * s, p);
-                c.drawRect((r.x1 + r.width * .38f) * s, r.y1 * s, (r.x1 + r.width * .5f) * s, r.y2 * s, p);
+            p.setColor(Color.rgb(61,58,51));
+            if(r.horizontal)c.drawRect(r.x1*s,(r.y1-r.width*.5f)*s,r.x2*s,(r.y1+r.width*.5f)*s,p);
+            else c.drawRect((r.x1-r.width*.5f)*s,r.y1*s,(r.x1+r.width*.5f)*s,r.y2*s,p);
+            p.setColor(Color.rgb(100,93,76));
+            if(r.horizontal){
+                c.drawRect(r.x1*s,(r.y1-r.width*.5f)*s,r.x2*s,(r.y1-r.width*.38f)*s,p);
+                c.drawRect(r.x1*s,(r.y1+r.width*.38f)*s,r.x2*s,(r.y1+r.width*.5f)*s,p);
+            }else{
+                c.drawRect((r.x1-r.width*.5f)*s,r.y1*s,(r.x1-r.width*.38f)*s,r.y2*s,p);
+                c.drawRect((r.x1+r.width*.38f)*s,r.y1*s,(r.x1+r.width*.5f)*s,r.y2*s,p);
             }
             p.setColor(0x889B916E);
-            for (float t = 70; t < (r.horizontal ? r.x2 - r.x1 : r.y2 - r.y1) - 30; t += 130) {
-                if (r.horizontal) c.drawRect((r.x1 + t) * s, (r.y1 - 3) * s, (r.x1 + t + 65) * s, (r.y1 + 3) * s, p);
-                else c.drawRect((r.x1 - 3) * s, (r.y1 + t) * s, (r.x1 + 3) * s, (r.y1 + t + 65) * s, p);
+            for(float t=70;t<(r.horizontal?r.x2-r.x1:r.y2-r.y1)-30;t+=130){
+                if(r.horizontal)c.drawRect((r.x1+t)*s,(r.y1-3)*s,(r.x1+t+65)*s,(r.y1+3)*s,p);
+                else c.drawRect((r.x1-3)*s,(r.y1+t)*s,(r.x1+3)*s,(r.y1+t+65)*s,p);
             }
         }
         p.setColor(0x789C9678);
-        int[] ys = {900, 2850, 4800};
-        int[] xs = {1000, 3000, 5000};
-        for (int y : ys) for (int x : xs) {
-            for (int k = -3; k <= 3; k++) c.drawRect((x + k * 22 - 6) * s, (y - 95) * s, (x + k * 22 + 6) * s, (y + 95) * s, p);
-        }
+        int[] ys={900,2850,4800}, xs={1000,3000,5000};
+        for(int y:ys) for(int x:xs) for(int k=-3;k<=3;k++) c.drawRect((x+k*22-6)*s,(y-95)*s,(x+k*22+6)*s,(y+95)*s,p);
     }
 
-    private void drawBehindDecor(Canvas c, float playerY, float s) {
-        for (Tree t : trees) if (t.y <= playerY) drawTree(c, t, s);
-        for (Building b : buildings) if (b.y + b.h * .78f <= playerY) drawBuilding(c, b, s);
+    private void drawBehindDecor(Canvas c,float playerY,float s) {
+        for(Tree t:trees) if(t.y<=playerY) drawTree(c,t,s);
+        for(Building b:buildings) if(b.y+b.h<=playerY) drawBuilding(c,b,s);
     }
 
-    private void drawBuilding(Canvas c, Building b, float s) {
-        float x = b.x * s, y = b.y * s, w = b.w * s;
-        float lift = Math.max(30 * s, b.depth * 85 * s);
-        int[] wallColors = {Color.rgb(159,124,81),Color.rgb(144,105,69),Color.rgb(177,142,93),Color.rgb(121,90,64),Color.rgb(186,151,100),Color.rgb(151,113,74),Color.rgb(170,130,84)};
+    private void drawBuilding(Canvas c,Building b,float s) {
+        float x=b.x*s,y=b.y*s,w=b.w*s,h=b.h*s;
+        float lift=Math.max(55*s,b.depth*105*s);
+        int[] wall={Color.rgb(159,124,81),Color.rgb(144,105,69),Color.rgb(177,142,93),Color.rgb(121,90,64),Color.rgb(186,151,100),Color.rgb(151,113,74),Color.rgb(170,130,84)};
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0x32000000);
-        c.drawOval(x - 8*s, y - 3*s, x+w+8*s, y+18*s, p);
-        p.setColor(Color.rgb(82,61,46));
-        c.drawRect(x, y-lift, x+w, y, p);
-        p.setColor(wallColors[b.kind % wallColors.length]);
-        c.drawRect(x+5*s, y-lift+5*s, x+w-5*s, y-3*s, p);
-        Path roof = new Path();
-        roof.moveTo(x-12*s, y-lift);
-        roof.lineTo(x+w*.5f, y-lift-(25+(b.kind%3)*8)*s);
-        roof.lineTo(x+w+12*s, y-lift);
+        p.setColor(0x35000000); c.drawOval(x-10*s,y+h-6*s,x+w+10*s,y+h+24*s,p);
+        // Vertical wall mass matches the exact footprint used for collision.
+        p.setColor(Color.rgb(82,61,46)); c.drawRect(x,y-lift,x+w,y+h,p);
+        p.setColor(wall[b.kind%wall.length]); c.drawRect(x+5*s,y-lift+5*s,x+w-5*s,y+h-4*s,p);
+
+        Path roof=new Path();
+        roof.moveTo(x-14*s,y-lift);
+        roof.lineTo(x+w*.5f,y-lift-30*s);
+        roof.lineTo(x+w+14*s,y-lift);
+        roof.lineTo(x+w,y-lift+16*s);
+        roof.lineTo(x,y-lift+16*s);
         roof.close();
-        p.setColor(Color.rgb(87+b.kind*5,62+b.kind*3,47));
-        c.drawPath(roof,p);
+        p.setColor(Color.rgb(87+b.kind*5,62+b.kind*3,47)); c.drawPath(roof,p);
+
         int cols=Math.max(2,(int)(b.w/105));
         for(int j=0;j<cols;j++){
             float wx=x+22*s+j*Math.max(1,(w-44*s)/Math.max(1,cols-1));
             p.setColor(Color.rgb(226,193,131));
-            c.drawRect(wx-8*s,y-lift+28*s,wx+12*s,y-lift+62*s,p);
+            c.drawRect(wx-8*s,y-lift+30*s,wx+12*s,y-lift+64*s,p);
+            p.setColor(0x664C3D2D); c.drawRect(wx-8*s,y-lift+30*s,wx+12*s,y-lift+33*s,p);
         }
         p.setColor(Color.rgb(73,52,39));
-        c.drawRect(x+w*.43f,y-62*s,x+w*.57f,y,p);
+        c.drawRect(x+w*.43f,y+h-64*s,x+w*.57f,y+h,p);
         if((b.kind&1)==0){p.setColor(Color.rgb(199,155,82));c.drawRect(x+w*.12f,y-lift-2*s,x+w*.35f,y-lift+10*s,p);}
     }
 
-    private void drawTree(Canvas c, Tree t, float s) {
+    private void drawTree(Canvas c,Tree t,float s) {
         float x=t.x*s,y=t.y*s,r=t.r*s;
         p.setStyle(Paint.Style.FILL);
         p.setColor(0x6A4D3928); c.drawRect(x-4*s,y-2*s,x+4*s,y+35*s,p);
