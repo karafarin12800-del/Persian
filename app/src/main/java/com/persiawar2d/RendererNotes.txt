@@ -1,0 +1,8 @@
+2.5D renderer invariants:
+- Never rotate the whole display canvas to fake camera yaw.
+- Keep HUD/control coordinates in screen space.
+- Every world object has a ground anchor.
+- Sort by ground anchor depth, then stable layer.
+- Buildings use a footprint/occluder separate from their visible pixels.
+- Characters are billboarded at their feet.
+- Shadows are separate low-alpha world sprites.
