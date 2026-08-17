@@ -11,13 +11,28 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import java.io.InputStream;
 
-/** Stable 6x4 player sprite renderer. Keeps every frame on the same canvas size. */
+/**
+ * Player sprite renderer.
+ * Sheet layout: 4 directions x 6 actions, with 3 real frames per action.
+ * The source PNG is 6144x4096, therefore it is treated as 18 frame-columns x 4 rows.
+ */
 public final class KingSpriteDrawable extends Drawable {
+    public static final int ACTION_IDLE = 0;
+    public static final int ACTION_WALK = 1;
+    public static final int ACTION_RUN = 2;
+    public static final int ACTION_ATTACK = 3;
+    public static final int ACTION_HURT = 4;
+    public static final int ACTION_DIE = 5;
+    public static final int FRAME_COUNT = 3;
+    private static final int ACTION_COUNT = 6;
+    private static final int DIRECTION_COUNT = 4;
+    private static final int TOTAL_COLUMNS = ACTION_COUNT * FRAME_COUNT;
+
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final BitmapRegionDecoder decoder;
     private final Rect source = new Rect();
     private Bitmap frame;
-    private int direction = -1, frameIndex = -1;
+    private int direction = -1, action = -1, frameIndex = -1;
 
     public KingSpriteDrawable(Context context) {
         BitmapRegionDecoder d = null;
@@ -26,27 +41,29 @@ public final class KingSpriteDrawable extends Drawable {
         } catch (Exception ignored) { }
         decoder = d;
         setAlpha(255);
-        setState(0, 0);
+        setState(0, ACTION_IDLE, 0);
     }
 
-    public void setState(int direction, int frameIndex) {
-        direction = Math.max(0, Math.min(3, direction));
-        frameIndex = Math.max(0, Math.min(5, frameIndex));
+    public void setState(int direction, int action, int frameIndex) {
+        direction = Math.max(0, Math.min(DIRECTION_COUNT - 1, direction));
+        action = Math.max(0, Math.min(ACTION_COUNT - 1, action));
+        frameIndex = Math.max(0, Math.min(FRAME_COUNT - 1, frameIndex));
         if (decoder == null) return;
-        if (this.direction == direction && this.frameIndex == frameIndex && frame != null) return;
+        if (this.direction == direction && this.action == action && this.frameIndex == frameIndex && frame != null) return;
         this.direction = direction;
+        this.action = action;
         this.frameIndex = frameIndex;
 
         final int sheetW = decoder.getWidth();
         final int sheetH = decoder.getHeight();
-        final int fw = sheetW / 6;
-        final int fh = sheetH / 4;
-        // Never crop individual frames: changing the crop rectangle between animation
-        // frames makes the character jump inside its box and can expose neighboring poses.
-        final int left = frameIndex * fw;
-        final int top = direction * fh;
-        final int right = (frameIndex == 5) ? sheetW : (frameIndex + 1) * fw;
-        final int bottom = (direction == 3) ? sheetH : (direction + 1) * fh;
+        // 6 actions x 3 real frames = 18 columns, 4 directions = 4 rows.
+        // Use proportional integer boundaries so the 6144px sheet is never rounded
+        // as a simple 6x4 grid and no neighboring pose can enter the source rectangle.
+        final int frameColumn = action * FRAME_COUNT + frameIndex;
+        final int left = Math.round(frameColumn * sheetW / (float) TOTAL_COLUMNS);
+        final int right = Math.round((frameColumn + 1) * sheetW / (float) TOTAL_COLUMNS);
+        final int top = Math.round(direction * sheetH / (float) DIRECTION_COUNT);
+        final int bottom = Math.round((direction + 1) * sheetH / (float) DIRECTION_COUNT);
         source.set(left, top, right, bottom);
 
         BitmapFactory.Options o = new BitmapFactory.Options();
@@ -60,6 +77,11 @@ public final class KingSpriteDrawable extends Drawable {
         frame = cleaned;
         if (old != null && !old.isRecycled()) old.recycle();
         invalidateSelf();
+    }
+
+    /** Compatibility helper for callers that only need idle/walk-style frame selection. */
+    public void setState(int direction, int frameIndex) {
+        setState(direction, ACTION_WALK, frameIndex);
     }
 
     /** Removes only black pixels connected to the frame edge; dark costume pixels are preserved. */
@@ -109,6 +131,6 @@ public final class KingSpriteDrawable extends Drawable {
     @Override public int getAlpha() { return paint.getAlpha(); }
     @Override public void setColorFilter(android.graphics.ColorFilter filter) { paint.setColorFilter(filter); }
     @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
-    @Override public int getIntrinsicWidth() { return 512; }
-    @Override public int getIntrinsicHeight() { return 768; }
+    @Override public int getIntrinsicWidth() { return 342; }
+    @Override public int getIntrinsicHeight() { return 1024; }
 }
