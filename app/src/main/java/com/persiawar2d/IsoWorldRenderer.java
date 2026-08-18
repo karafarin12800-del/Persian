@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 
 import java.io.ByteArrayOutputStream;
@@ -13,13 +14,18 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Random;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** Real isometric presentation layer. Existing gameplay coordinates stay X/Y. */
+/**
+ * Production isometric presentation layer. It deliberately uses the supplied
+ * Kenney building sprites instead of drawing placeholder boxes.
+ */
 public final class IsoWorldRenderer {
     public static final float WORLD_SIZE = 6000f;
+    private static final float ROAD_W = 170f;
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final ArrayList<Building> buildings = new ArrayList<>();
     private final ArrayList<Tree> trees = new ArrayList<>();
@@ -34,19 +40,32 @@ public final class IsoWorldRenderer {
     private void loadBuildingArt(Context context) {
         try (InputStream raw = context.getAssets().open("original_packages/kenney_isometric-buildings.zip");
              ZipInputStream zin = new ZipInputStream(raw)) {
+            ArrayList<NamedBitmap> candidates = new ArrayList<>();
             ZipEntry e;
             while ((e = zin.getNextEntry()) != null) {
                 if (e.isDirectory()) continue;
                 String n = e.getName().toLowerCase(java.util.Locale.US);
-                if (!n.endsWith(".png") || !n.contains("buildingtile")) continue;
+                String compact = n.replaceAll("[^a-z0-9]", "");
+                if (!n.endsWith(".png")) continue;
+                if (compact.contains("preview") || compact.contains("spritesheet") || compact.contains("atlas")) continue;
+                // Kenney's pack contains separate building sprites plus auxiliary tiles.
+                // Accept both old and new filename conventions (buildingTile, building-tile, etc.).
+                if (!(compact.contains("buildingtile") || compact.contains("building"))) continue;
                 byte[] bytes = read(zin);
                 Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                if (b != null && b.getWidth() >= 48 && b.getHeight() >= 48 && b.getWidth() <= 2048 && b.getHeight() <= 2048) {
-                    buildingArt.add(b);
+                if (b == null) continue;
+                if (b.getWidth() < 48 || b.getHeight() < 48 || b.getWidth() > 1024 || b.getHeight() > 1024) {
+                    b.recycle();
+                    continue;
                 }
+                candidates.add(new NamedBitmap(n, b));
             }
+            Collections.sort(candidates, Comparator.comparing(v -> v.name));
+            // Keep memory predictable on older Android phones while retaining visual variety.
+            for (int i = 0; i < Math.min(48, candidates.size()); i++) buildingArt.add(candidates.get(i).bitmap);
+            for (int i = Math.min(48, candidates.size()); i < candidates.size(); i++) candidates.get(i).bitmap.recycle();
         } catch (Exception ignored) {
-            // A missing optional art package must never prevent the game from starting.
+            // Optional artwork must not prevent the game from opening.
         }
     }
 
@@ -59,24 +78,26 @@ public final class IsoWorldRenderer {
     }
 
     private void buildCity() {
-        int[][] blocks = {
-            {350,350,520,360},{1320,350,520,360},{2250,350,520,360},{3180,350,520,360},{4110,350,520,360},{5040,350,500,360},
-            {350,1080,520,380},{1320,1080,520,380},{2250,1080,520,380},{3180,1080,520,380},{4110,1080,520,380},{5040,1080,500,380},
-            {350,1840,520,380},{1320,1840,520,380},{2250,1840,520,380},{3180,1840,520,380},{4110,1840,520,380},{5040,1840,500,380},
-            {350,2600,520,380},{1320,2600,520,380},{2250,2600,520,380},{3180,2600,520,380},{4110,2600,520,380},{5040,2600,500,380},
-            {350,3360,520,380},{1320,3360,520,380},{2250,3360,520,380},{3180,3360,520,380},{4110,3360,520,380},{5040,3360,500,380},
-            {350,4120,520,380},{1320,4120,520,380},{2250,4120,520,380},{3180,4120,520,380},{4110,4120,520,380},{5040,4120,500,380},
-            {350,4880,520,350},{1320,4880,520,350},{2250,4880,520,350},{3180,4880,520,350},{4110,4880,520,350},{5040,4880,500,350}
+        // Deliberately varied blocks. Buildings are offset from intersections so
+        // the map reads as a city rather than a repeated checkerboard of squares.
+        float[][] specs = {
+                {380,330,430,300},{1420,300,520,340},{2520,330,410,300},{3660,300,520,350},{4880,350,430,300},
+                {300,1160,520,350},{1450,1120,420,320},{2480,1160,560,340},{3650,1110,430,360},{4900,1160,520,330},
+                {420,1950,460,300},{1510,1910,540,350},{2510,1960,420,300},{3700,1910,520,340},{4930,1980,450,300},
+                {300,2800,520,340},{1450,2750,440,300},{2510,2820,560,350},{3650,2780,460,320},{4890,2820,520,340},
+                {420,3670,440,300},{1480,3620,520,340},{2530,3700,430,300},{3680,3640,540,350},{4910,3700,440,300},
+                {320,4520,540,340},{1490,4460,430,300},{2510,4560,520,330},{3680,4490,440,300},{4920,4560,540,350},
+                {430,5300,460,300},{1540,5240,520,330},{2580,5320,440,300},{3740,5240,520,330},{4930,5300,460,300}
         };
-        for (int i = 0; i < blocks.length; i++) {
-            int[] b = blocks[i];
+        for (int i = 0; i < specs.length; i++) {
+            float[] b = specs[i];
             buildings.add(new Building(b[0], b[1], b[2], b[3], i));
         }
-        for (int i = 0; i < 95; i++) {
-            float x = 180 + random.nextFloat() * 5640f;
-            float y = 180 + random.nextFloat() * 5640f;
-            if (nearRoad(x, y, 130) || nearBuilding(x, y, 110)) continue;
-            trees.add(new Tree(x, y, 28 + random.nextFloat() * 22f, i & 3));
+        for (int i = 0; i < 105; i++) {
+            float x = 150 + random.nextFloat() * 5700f;
+            float y = 150 + random.nextFloat() * 5700f;
+            if (nearRoad(x, y, 150) || nearBuilding(x, y, 100)) continue;
+            trees.add(new Tree(x, y, 30 + random.nextFloat() * 24f, i & 3));
         }
     }
 
@@ -99,10 +120,10 @@ public final class IsoWorldRenderer {
         drawGround(c, cameraX, cameraY, centerX, centerY, scale, hudH);
         drawRoads(c, cameraX, cameraY, centerX, centerY, scale, hudH);
 
-        ArrayList<DepthItem> all = new ArrayList<>();
+        ArrayList<DepthItem> all = new ArrayList<>(buildings.size() + trees.size());
         for (Building b : buildings) all.add(new DepthItem(b.x + b.w * .5f, b.y + b.h, 0, b));
         for (Tree t : trees) all.add(new DepthItem(t.x, t.y, 1, t));
-        Collections.sort(all, Comparator.comparingDouble((DepthItem d) -> d.y + d.x).thenComparingInt(d -> d.kind));
+        Collections.sort(all, Comparator.comparingDouble((DepthItem d) -> d.x + d.y).thenComparingInt(d -> d.kind));
         for (DepthItem item : all) {
             if (item.kind == 0) drawBuilding(c, (Building)item.object, cameraX, cameraY, centerX, centerY, scale);
             else drawTree(c, (Tree)item.object, cameraX, cameraY, centerX, centerY, scale);
@@ -113,71 +134,56 @@ public final class IsoWorldRenderer {
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xff857656);
         c.drawRect(0, hudH, c.getWidth(), c.getHeight(), p);
-        p.setColor(0x143f4938);
+        // Subtle diamond paving gives the map a real isometric floor instead of a flat fill.
+        p.setColor(0x123f4938);
+        p.setStrokeWidth(Math.max(1f, s));
         for (int x = 0; x <= (int)WORLD_SIZE; x += 250) {
-            float sx = screenX(x, 0, cx, cy, ox, s);
-            float sy = screenY(x, 0, cx, cy, oy, s);
-            float sx2 = screenX(x, WORLD_SIZE, cx, cy, ox, s);
-            float sy2 = screenY(x, WORLD_SIZE, cx, cy, oy, s);
-            c.drawLine(sx, sy, sx2, sy2, p);
+            c.drawLine(screenX(x,0,cx,cy,ox,s),screenY(x,0,cx,cy,oy,s),screenX(x,WORLD_SIZE,cx,cy,ox,s),screenY(x,WORLD_SIZE,cx,cy,oy,s),p);
         }
         for (int y = 0; y <= (int)WORLD_SIZE; y += 250) {
-            float sx = screenX(0, y, cx, cy, ox, s);
-            float sy = screenY(0, y, cx, cy, oy, s);
-            float sx2 = screenX(WORLD_SIZE, y, cx, cy, ox, s);
-            float sy2 = screenY(WORLD_SIZE, y, cx, cy, oy, s);
-            c.drawLine(sx, sy, sx2, sy2, p);
+            c.drawLine(screenX(0,y,cx,cy,ox,s),screenY(0,y,cx,cy,oy,s),screenX(WORLD_SIZE,y,cx,cy,ox,s),screenY(WORLD_SIZE,y,cx,cy,oy,s),p);
         }
     }
 
     private void drawRoads(Canvas c, float cx, float cy, float ox, float oy, float s, float hudH) {
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0xff44413a);
-        for (int y = 760; y <= 5300; y += 760) drawDiamondRoad(c, 300, y, 5700, y, 150, cx, cy, ox, oy, s);
-        for (int x = 950; x <= 5050; x += 820) drawDiamondRoad(c, x, 300, x, 5700, 150, cx, cy, ox, oy, s);
-        p.setColor(0x889a906e);
+        p.setColor(0xff45423d);
+        for (int y = 760; y <= 5300; y += 760) drawDiamondRoad(c, 200, y, 5800, y, ROAD_W, cx, cy, ox, oy, s);
+        for (int x = 950; x <= 5050; x += 820) drawDiamondRoad(c, x, 200, x, 5800, ROAD_W, cx, cy, ox, oy, s);
+        p.setColor(0x806f6a59);
         p.setStrokeWidth(Math.max(2f, 3f * s));
         for (int y = 760; y <= 5300; y += 760) {
-            float a = screenX(500, y, cx, cy, ox, s), b = screenY(500, y, cx, cy, oy, s);
-            float d = screenX(5400, y, cx, cy, ox, s), e = screenY(5400, y, cx, cy, oy, s);
-            c.drawLine(a, b, d, e, p);
+            c.drawLine(screenX(500,y,cx,cy,ox,s),screenY(500,y,cx,cy,oy,s),screenX(5500,y,cx,cy,ox,s),screenY(5500,y,cx,cy,oy,s),p);
         }
     }
 
     private void drawDiamondRoad(Canvas c, float x1, float y1, float x2, float y2, float width,
                                  float cx, float cy, float ox, float oy, float s) {
-        float dx = x2 - x1, dy = y2 - y1;
-        float len = Math.max(1f, (float)Math.hypot(dx, dy));
-        float nx = -dy / len * width * .5f, ny = dx / len * width * .5f;
-        float[] px = {x1+nx,x2+nx,x2-nx,x1-nx};
-        float[] py = {y1+ny,y2+ny,y2-ny,y1-ny};
-        android.graphics.Path path = new android.graphics.Path();
-        path.moveTo(screenX(px[0],py[0],cx,cy,ox,s), screenY(px[0],py[0],cx,cy,oy,s));
-        for(int i=1;i<4;i++) path.lineTo(screenX(px[i],py[i],cx,cy,ox,s),screenY(px[i],py[i],cx,cy,oy,s));
-        path.close(); c.drawPath(path,p);
+        float dx=x2-x1,dy=y2-y1,len=Math.max(1f,(float)Math.hypot(dx,dy));
+        float nx=-dy/len*width*.5f,ny=dx/len*width*.5f;
+        float[] px={x1+nx,x2+nx,x2-nx,x1-nx},py={y1+ny,y2+ny,y2-ny,y1-ny};
+        Path path=new Path();path.moveTo(screenX(px[0],py[0],cx,cy,ox,s),screenY(px[0],py[0],cx,cy,oy,s));
+        for(int i=1;i<4;i++)path.lineTo(screenX(px[i],py[i],cx,cy,ox,s),screenY(px[i],py[i],cx,cy,oy,s));
+        path.close();c.drawPath(path,p);
     }
 
     private void drawBuilding(Canvas c, Building b, float cx, float cy, float ox, float oy, float s) {
-        float anchorX = b.x + b.w * .5f;
-        float anchorY = b.y + b.h;
-        float x = screenX(anchorX, anchorY, cx, cy, ox, s);
-        float y = screenY(anchorX, anchorY, cx, cy, oy, s);
-        float base = Math.max(70f, b.w * .58f * s);
+        float anchorX=b.x+b.w*.5f,anchorY=b.y+b.h;
+        float x=screenX(anchorX,anchorY,cx,cy,ox,s),y=screenY(anchorX,anchorY,cx,cy,oy,s);
         if (buildingArt.isEmpty()) {
-            p.setColor(0xffc8bea0); c.drawRect(x-base*.45f,y-base*.75f,x+base*.45f,y,p); return;
+            // Only a safety fallback; normal builds use the supplied Kenney sprites.
+            p.setColor(0xff777267);c.drawRect(x-55*s,y-90*s,x+55*s,y,p);return;
         }
-        Bitmap art = buildingArt.get(Math.floorMod(b.kind, buildingArt.size()));
-        float w = Math.max(70f, b.w * .70f * s);
-        float h = w * art.getHeight() / (float)Math.max(1, art.getWidth());
-        h = Math.min(h, 270f*s);
-        w = h * art.getWidth() / (float)Math.max(1,art.getHeight());
-        p.setColor(0x42000000);
-        c.drawOval(new RectF(x-w*.42f,y-4*s,x+w*.42f,y+15*s),p);
-        c.drawBitmap(art,null,new RectF(x-w*.5f,y-h,x+w*.5f,y),p);
+        Bitmap art=buildingArt.get(Math.floorMod(b.kind,buildingArt.size()));
+        float targetW=Math.max(120f,Math.min(300f,b.w*.72f*s));
+        float targetH=targetW*art.getHeight()/(float)Math.max(1,art.getWidth());
+        if(targetH>330f*s){targetH=330f*s;targetW=targetH*art.getWidth()/(float)Math.max(1,art.getHeight());}
+        p.setColor(0x48000000);c.drawOval(new RectF(x-targetW*.43f,y-5*s,x+targetW*.43f,y+17*s),p);
+        c.drawBitmap(art,null,new RectF(x-targetW*.5f,y-targetH,x+targetW*.5f,y),p);
     }
 
     private void drawTree(Canvas c, Tree t, float cx, float cy, float ox, float oy, float s) {
-        float x=screenX(t.x,t.y,cx,cy,ox,s), y=screenY(t.x,t.y,cx,cy,oy,s), r=t.r*s;
+        float x=screenX(t.x,t.y,cx,cy,ox,s),y=screenY(t.x,t.y,cx,cy,oy,s),r=t.r*s;
         p.setColor(0x44000000);c.drawOval(new RectF(x-r*.9f,y-3*s,x+r*.9f,y+10*s),p);
         p.setColor(0xff5a4630);c.drawRect(x-4*s,y-34*s,x+4*s,y,p);
         int[] g={0xff3d6839,0xff4a7740,0xff315a34,0xff568249};p.setColor(g[t.kind]);c.drawCircle(x,y-r*.65f,r,p);
@@ -189,9 +195,12 @@ public final class IsoWorldRenderer {
         for(Building b:buildings)if(x>b.x-radius&&x<b.x+b.w+radius&&y>b.y-radius&&y<b.y+b.h+radius)return true;
         return false;
     }
-    private boolean nearRoad(float x,float y,float pad){return Math.abs((y/760f)-Math.round(y/760f))*760f<90+pad || Math.abs((x/820f)-Math.round(x/820f))*820f<90+pad;}
+    private boolean nearRoad(float x,float y,float pad){
+        return Math.abs((y/760f)-Math.round(y/760f))*760f<(ROAD_W*.5f)+pad || Math.abs((x/820f)-Math.round(x/820f))*820f<(ROAD_W*.5f)+pad;
+    }
     private boolean nearBuilding(float x,float y,float pad){for(Building b:buildings)if(x>b.x-pad&&x<b.x+b.w+pad&&y>b.y-pad&&y<b.y+b.h+pad)return true;return false;}
 
+    static final class NamedBitmap { final String name; final Bitmap bitmap; NamedBitmap(String n,Bitmap b){name=n;bitmap=b;} }
     static final class Building {final float x,y,w,h;final int kind;Building(float x,float y,float w,float h,int kind){this.x=x;this.y=y;this.w=w;this.h=h;this.kind=kind;}}
     static final class Tree {final float x,y,r;final int kind;Tree(float x,float y,float r,int kind){this.x=x;this.y=y;this.r=r;this.kind=kind;}}
     static final class DepthItem {final float x,y;final int kind;final Object object;DepthItem(float x,float y,int kind,Object object){this.x=x;this.y=y;this.kind=kind;this.object=object;}}
