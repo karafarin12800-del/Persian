@@ -1,0 +1,38 @@
+name: Unity Android Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_ref:
+        description: 'Branch to build'
+        required: true
+        default: 'unity-2.5d'
+        type: string
+
+jobs:
+  build-android:
+    name: Build Unity Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout selected Unity branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.build_ref }}
+
+      - name: Build Unity project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: UnityProject
+          targetPlatform: Android
+          versioning: Semantic
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PersiaWar-Unity-Android
+          path: build/Android/*.apk
+          if-no-files-found: error
