@@ -8,10 +8,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.*;
 import android.widget.*;
 
-/** Battle entry point with a lightweight in-game menu overlay. */
+/** Battle entry point. Uses the production isometric game view. */
 public class ControlActivity extends MainActivity {
     FrameLayout root;
-    GameView game;
+    IsoGameView game;
     TextView menuButton;
     LinearLayout menuPanel;
     final int gold=Color.rgb(239,197,92), cream=Color.rgb(248,238,211), dark=Color.rgb(15,27,24);
@@ -20,14 +20,13 @@ public class ControlActivity extends MainActivity {
         super.onCreate(b);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
         root=new FrameLayout(this);
-        game=new GameView(this);
+        game=new IsoGameView(this);
         root.addView(game,new FrameLayout.LayoutParams(-1,-1));
         RadarOverlayView radar=new RadarOverlayView(this,game);
         root.addView(radar,new FrameLayout.LayoutParams(-1,-1));
         addMenuButton();
         setContentView(root);
     }
-
     GradientDrawable bg(int color){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setStroke(3,gold);g.setCornerRadius(22);return g;}
     TextView actionButton(String text){TextView v=new TextView(this);v.setText(text);v.setTextColor(cream);v.setTextSize(21);v.setGravity(Gravity.CENTER);v.setTypeface(null,1);v.setIncludeFontPadding(false);v.setBackground(bg(0xff34463d));v.setClickable(true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,62);p.setMargins(0,7,0,7);v.setLayoutParams(p);return v;}
     void addMenuButton(){menuButton=new TextView(this);menuButton.setText("☰");menuButton.setTextColor(cream);menuButton.setTextSize(27);menuButton.setGravity(Gravity.CENTER);menuButton.setTypeface(null,1);menuButton.setBackground(bg(0xdd293b35));menuButton.setClickable(true);FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(62,62,Gravity.RIGHT|Gravity.TOP);p.setMargins(0,8,12,0);root.addView(menuButton,p);menuButton.setOnClickListener(v->showMenu());}
