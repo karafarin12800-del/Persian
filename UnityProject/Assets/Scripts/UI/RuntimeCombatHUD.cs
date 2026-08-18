@@ -4,7 +4,6 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class RuntimeCombatHUD : MonoBehaviour
     {
-        [SerializeField] private Transform player;
         [SerializeField] private TargetHealth playerHealth;
         [SerializeField] private PickupReceiver ammoSource;
         [SerializeField] private NearestTargetAim aim;
@@ -23,7 +22,7 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             if (style == null) return;
-            string health = playerHealth != null ? $"HP {playerHealth.Current}/{playerHealth.Max}" : "HP --";
+            string health = playerHealth != null ? $"HP {playerHealth.CurrentHealth}" : "HP --";
             string ammo = ammoSource != null ? $"AMMO {ammoSource.Ammo}" : "AMMO --";
             string target = aim != null && aim.CurrentTarget != null ? "TARGET LOCK" : "TARGET -";
 
