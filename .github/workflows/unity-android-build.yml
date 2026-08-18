@@ -1,0 +1,31 @@
+name: Unity Android Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Unity project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: UnityProject
+          targetPlatform: Android
+          buildMethod: UnityEditor.BuildPipeline.BuildPlayer
+          versioning: Semantic
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PersiaWar-Android
+          path: build/Android/*.apk
+          if-no-files-found: error
