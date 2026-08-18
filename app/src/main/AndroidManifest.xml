@@ -3,18 +3,13 @@
     <application
         android:name=".PersiaWarApplication"
         android:theme="@style/AppTheme"
-        android:label="Persia War 2D"
+        android:label="Persia War 3D"
         android:allowBackup="false"
         android:supportsRtl="true">
-        <activity
-            android:name=".StartActivity"
-            android:screenOrientation="landscape"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+        <activity android:name=".StartActivity" android:screenOrientation="landscape" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
+        <activity android:name=".ThreeDGameActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".ControlActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".GameShellActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".GameMenuActivity" android:screenOrientation="landscape" android:exported="false" />
