@@ -20,6 +20,5 @@
         <activity android:name=".GameShellActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".GameMenuActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".MainActivity" android:screenOrientation="landscape" android:exported="false" />
-        <activity android:name=".RendererPreviewActivity" android:screenOrientation="landscape" android:exported="false" />
     </application>
 </manifest>
