@@ -1,0 +1,2 @@
+The binary king_sprite_sheet.png is the exact Git blob reused from main:
+9694e9863aa537f7f285d35b0eb5adc5636db4ed
