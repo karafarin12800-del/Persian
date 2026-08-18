@@ -1,1 +1,0 @@
-This branch's new work is limited to the visual renderer and non-weapon scene presentation. Existing gameplay code is left untouched.
