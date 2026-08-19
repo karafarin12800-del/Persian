@@ -2,6 +2,12 @@ name: Unity Android Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - unity-2.5d
+    paths:
+      - 'UnityProject/**'
+      - '.github/workflows/unity-android-build.yml'
 
 jobs:
   build-android:
@@ -20,8 +26,8 @@ jobs:
         with:
           projectPath: UnityProject
           targetPlatform: Android
-          buildMethod: UnityEditor.BuildPipeline.BuildPlayer
           versioning: Semantic
+          buildName: PersiaWar
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
