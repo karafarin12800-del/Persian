@@ -15,7 +15,9 @@ public final class CityKit {
     public List<Piece> pieces(){return pieces;}
     private void generate(){
         int p=0;
+        // Main avenues plus smaller cross streets keep the map readable at isometric scale.
         road(0,0,8,68); road(0,0,68,8); road(-15,0,5,68); road(15,0,5,68); road(0,-15,68,5); road(0,15,68,5);
+        road(-23,15,4,26); road(23,-15,4,26); road(-15,-23,26,4); road(15,23,26,4);
         sidewalk(0,-4.7f,68,.8f); sidewalk(0,4.7f,68,.8f); sidewalk(-4.7f,0,.8f,68); sidewalk(4.7f,0,.8f,68);
         sidewalk(0,-17.8f,68,.8f); sidewalk(0,17.8f,68,.8f); sidewalk(-17.8f,0,.8f,68); sidewalk(17.8f,0,.8f,68);
 
@@ -34,19 +36,29 @@ public final class CityKit {
         add(Type.HOUSE_1,-27,-27,7,6,3.2f,p++); add(Type.HOUSE_2,-27,-19,7,6,5.2f,p++);
         add(Type.HOUSE_1,-11,-27,6,6,3.2f,p++); add(Type.SHOP,-20,-19,6,6,3.2f,p++);
         add(Type.HOUSE_1,-11,-19,6,6,3.2f,p++); add(Type.RUBBLE,-26,-11,7,4,1.1f,p++);
-        add(Type.RUBBLE,-18,-11,4,3,1.0f,p++);
+        add(Type.RUBBLE,-18,-11,4,3,1.0f,p++); add(Type.RUBBLE,-11,-11,3,2.5f,.9f,p++);
+        add(Type.WALL,-18,-8,6,.45f,1.1f,p++); add(Type.WALL,-9,-12,.45f,5,1.1f,p++);
 
         // SE industrial district.
         add(Type.WAREHOUSE,25,-26,10,7,4.0f,p++); add(Type.WAREHOUSE,25,-17,10,7,4.0f,p++);
         add(Type.SHOP,11,-26,6,6,3.2f,p++); add(Type.HOUSE_1,11,-17,6,6,3.2f,p++);
         add(Type.WALL,18,-12,1,8,2.0f,p++); add(Type.WALL,31,-12,1,8,2.0f,p++);
+        add(Type.RUBBLE,18,-25,3,2.5f,.8f,p++);
 
-        // Cover, vehicles and loot around combat lanes.
-        tree(-30,4); tree(-23,8); tree(-9,8); tree(9,8); tree(23,8); tree(30,4);
-        tree(-30,-4); tree(-9,-8); tree(9,-8); tree(30,-4);
-        rock(-5,27); rock(5,-27); rock(-31,-8); rock(31,8);
-        car(-7,10,0); car(7,-10,90); car(-7,-23,0); car(7,23,90); car(23,-7,90);
-        loot(-4,11); loot(4,-11); loot(-22,5); loot(22,-5); loot(0,27); loot(0,-27);
+        // Small central plaza / green pockets.
+        add(Type.WALL,-8,8,.45f,4,1.0f,p++); add(Type.WALL,8,8,.45f,4,1.0f,p++);
+        add(Type.WALL,-8,-8,.45f,4,1.0f,p++); add(Type.WALL,8,-8,.45f,4,1.0f,p++);
+
+        // Trees and rocks are placed as cover, not as a solid forest.
+        tree(-31,5); tree(-27,7); tree(-22,8); tree(-9,8); tree(9,8); tree(22,8); tree(27,7); tree(31,5);
+        tree(-31,-5); tree(-23,-8); tree(-9,-8); tree(9,-8); tree(23,-8); tree(31,-5);
+        tree(-5,31); tree(5,31); tree(-5,-31); tree(5,-31);
+        rock(-5,27); rock(5,-27); rock(-31,-8); rock(31,8); rock(-6,-22); rock(6,22);
+
+        // Empty decorative vehicles and environmental props.
+        car(-7,10,0); car(7,-10,90); car(-7,-23,0); car(7,23,90); car(23,-7,90); car(-23,7,90);
+        car(-28,-6,0); car(28,6,90);
+        loot(-4,11); loot(4,-11); loot(-22,5); loot(22,-5); loot(0,27); loot(0,-27); loot(-18,-5); loot(18,5);
 
         // Perimeter with four wide entries.
         for(int x=-32;x<=32;x+=4){if(Math.abs(x)>7){add(Type.WALL,x,-34,3.5f,.45f,1.7f,p++);add(Type.WALL,x,34,3.5f,.45f,1.7f,p++);}}
