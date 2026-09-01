@@ -40,11 +40,12 @@ namespace PersiaWar.Unity2D5D
         {
             if (gameplayCamera == null) return;
             gameplayCamera.orthographic = false;
-            gameplayCamera.fieldOfView = 55f;
+            gameplayCamera.fieldOfView = 52f;
             gameplayCamera.nearClipPlane = 0.1f;
-            gameplayCamera.farClipPlane = 260f;
-            gameplayCamera.transform.position = new Vector3(0f, 22f, -22f);
-            gameplayCamera.transform.rotation = Quaternion.Euler(45f, 0f, 0f);
+            gameplayCamera.farClipPlane = 220f;
+            // Match the gameplay camera's normal 3D angle immediately on frame one.
+            gameplayCamera.transform.position = new Vector3(0f, 11f, -11f);
+            gameplayCamera.transform.rotation = Quaternion.Euler(48f, 0f, 0f);
         }
 
         private void ConfigureLighting()
@@ -54,8 +55,8 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.fog = true;
             RenderSettings.fogColor = new Color(0.20f, 0.23f, 0.25f);
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogStartDistance = 95f;
-            RenderSettings.fogEndDistance = 230f;
+            RenderSettings.fogStartDistance = 75f;
+            RenderSettings.fogEndDistance = 220f;
 
             Light sun = FindFirstObjectByType<Light>();
             if (sun == null)
@@ -124,9 +125,8 @@ namespace PersiaWar.Unity2D5D
             roof.transform.SetParent(building.transform.parent, true);
 
             if (Random.value > 0.35f)
-            {
                 CreateBox("Door", position + new Vector3(0f, 0.9f, -size.z * 0.51f), new Vector3(1.0f, 1.8f, 0.12f), accentMaterial, false);
-            }
+
             if (Random.value > 0.45f)
             {
                 for (int side = -1; side <= 1; side += 2)
@@ -189,7 +189,8 @@ namespace PersiaWar.Unity2D5D
         {
             GameObject car = CreateBox("EmptyVehicle", position, tanker ? new Vector3(2.3f, 1.0f, 5.5f) : new Vector3(2.0f, 0.8f, 3.8f), tanker ? roofMaterial : accentMaterial, true);
             car.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 180f), 0f);
-            if (tanker) CreatePart(PrimitiveType.Cylinder, "Tank", position + Vector3.up * 0.75f, new Vector3(1.0f, 2.0f, 1.0f), roofMaterial, true).transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            if (tanker)
+                CreatePart(PrimitiveType.Cylinder, "Tank", position + Vector3.up * 0.75f, new Vector3(1.0f, 2.0f, 1.0f), roofMaterial.color, true).transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         }
 
         private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale, Material material, bool collider)
