@@ -114,6 +114,10 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildWorld()
         {
+            GameObject legacyGround = GameObject.Find("Ground");
+            if (legacyGround != null)
+                legacyGround.SetActive(false);
+
             if (worldRoot != null) Destroy(worldRoot.gameObject);
             worldRoot = new GameObject("BattleRoyaleCity").transform;
 
