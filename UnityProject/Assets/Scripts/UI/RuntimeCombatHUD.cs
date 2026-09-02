@@ -33,20 +33,23 @@ namespace PersiaWar.Unity2D5D
 
             TargetHealth health = player.Health;
             WeaponController weapon = player.Weapon;
+            PlayerInventory inventory = player.Inventory;
             EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
             GameSession session = GameSession.Instance;
 
             string hp = health != null ? $"HP {health.CurrentHealth}/{health.MaxHealth}" : "HP --";
             string shield = $"SHIELD {player.Shield}";
             string ammo = weapon != null ? $"AMMO {weapon.Magazine}/{weapon.Reserve}" : "AMMO --";
+            string grenades = inventory != null ? $"GRENADES {inventory.Grenades}" : "GRENADES --";
             string wave = spawner != null ? $"WAVE {spawner.CurrentWave}" : "WAVE --";
             string score = session != null ? $"SCORE {session.Score}" : "SCORE 0";
 
-            GUI.Label(new Rect(20f, 16f, 330f, 34f), hp, labelStyle);
-            GUI.Label(new Rect(20f, 48f, 330f, 34f), shield, labelStyle);
-            GUI.Label(new Rect(20f, 80f, 330f, 34f), ammo, labelStyle);
-            GUI.Label(new Rect(Screen.width - 250f, 18f, 225f, 32f), wave, titleStyle);
-            GUI.Label(new Rect(Screen.width - 250f, 50f, 225f, 32f), score, titleStyle);
+            GUI.Label(new Rect(20f, 16f, 360f, 32f), hp, labelStyle);
+            GUI.Label(new Rect(20f, 48f, 360f, 32f), shield, labelStyle);
+            GUI.Label(new Rect(20f, 80f, 360f, 32f), ammo, labelStyle);
+            GUI.Label(new Rect(20f, 112f, 360f, 32f), grenades, labelStyle);
+            GUI.Label(new Rect(Screen.width - 260f, 18f, 240f, 30f), wave, titleStyle);
+            GUI.Label(new Rect(Screen.width - 260f, 50f, 240f, 30f), score, titleStyle);
 
             if (player.IsDefeated)
             {
