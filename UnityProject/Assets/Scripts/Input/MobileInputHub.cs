@@ -250,11 +250,12 @@ namespace PersiaWar.Unity2D5D
             Vector2 basePos = movePointerId >= 0
                 ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y)
                 : defaultBase;
+            Vector2 knobPos = basePos + new Vector2(moveValue.x, -moveValue.y) * radius;
             Vector2 firePos = new Vector2(Screen.width - 120f * scale, Screen.height - 140f * scale);
             Vector2 grenadePos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
 
             DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.34f));
-            DrawCircle(new Vector2(basePos.x, Screen.height - (basePos.y + moveValue.y * radius)), radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
+            DrawCircle(knobPos, radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
 
             DrawCircle(firePos, radius * 0.72f, new Color(0.65f, 0.12f, 0.08f, firePointerId >= 0 ? 0.50f : 0.28f));
             DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
