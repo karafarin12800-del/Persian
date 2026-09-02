@@ -4,31 +4,54 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class RuntimeCombatHUD : MonoBehaviour
     {
-        [SerializeField] private TargetHealth playerHealth;
-        [SerializeField] private PickupReceiver ammoSource;
-        [SerializeField] private NearestTargetAim aim;
+        [SerializeField] private PlayerController player;
 
-        private GUIStyle style;
+        private GUIStyle labelStyle;
+        private GUIStyle titleStyle;
 
         private void Awake()
         {
-            style = new GUIStyle(GUI.skin.label)
+            if (player == null) player = FindFirstObjectByType<PlayerController>();
+
+            labelStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 28,
-                fontStyle = FontStyle.Bold
+                fontSize = 24,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.UpperLeft
+            };
+            titleStyle = new GUIStyle(labelStyle)
+            {
+                fontSize = 20,
+                alignment = TextAnchor.UpperRight
             };
         }
 
         private void OnGUI()
         {
-            if (style == null) return;
-            string health = playerHealth != null ? $"HP {playerHealth.CurrentHealth}" : "HP --";
-            string ammo = ammoSource != null ? $"AMMO {ammoSource.Ammo}" : "AMMO --";
-            string target = aim != null && aim.CurrentTarget != null ? "TARGET LOCK" : "TARGET -";
+            if (player == null) player = FindFirstObjectByType<PlayerController>();
+            if (player == null || labelStyle == null) return;
 
-            GUI.Label(new Rect(24f, 18f, 260f, 42f), health, style);
-            GUI.Label(new Rect(24f, 58f, 260f, 42f), ammo, style);
-            GUI.Label(new Rect(Screen.width - 260f, 18f, 240f, 42f), target, style);
+            TargetHealth health = player.Health;
+            WeaponController weapon = player.Weapon;
+            EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
+            GameSession session = GameSession.Instance;
+
+            string hp = health != null ? $"HP {health.CurrentHealth}/{health.MaxHealth}" : "HP --";
+            string shield = $"SHIELD {player.Shield}";
+            string ammo = weapon != null ? $"AMMO {weapon.Magazine}/{weapon.Reserve}" : "AMMO --";
+            string wave = spawner != null ? $"WAVE {spawner.CurrentWave}" : "WAVE --";
+            string score = session != null ? $"SCORE {session.Score}" : "SCORE 0";
+
+            GUI.Label(new Rect(20f, 16f, 330f, 34f), hp, labelStyle);
+            GUI.Label(new Rect(20f, 48f, 330f, 34f), shield, labelStyle);
+            GUI.Label(new Rect(20f, 80f, 330f, 34f), ammo, labelStyle);
+            GUI.Label(new Rect(Screen.width - 250f, 18f, 225f, 32f), wave, titleStyle);
+            GUI.Label(new Rect(Screen.width - 250f, 50f, 225f, 32f), score, titleStyle);
+
+            if (player.IsDefeated)
+            {
+                GUI.Box(new Rect(Screen.width * 0.5f - 150f, Screen.height * 0.5f - 45f, 300f, 90f), "GAME OVER");
+            }
         }
     }
 }
