@@ -34,16 +34,37 @@ namespace PersiaWar.Unity2D5D
             player = GetComponent<PlayerController>();
             magazine = Mathf.Clamp(startingMagazine, 0, magazineSize);
             reserve = Mathf.Max(0, startingReserve);
+            EnsureProjectileTemplate();
+
+            if (muzzle == null)
+            {
+                GameObject muzzleObject = new GameObject("WeaponMuzzle");
+                muzzle = muzzleObject.transform;
+                muzzle.SetParent(transform, false);
+                muzzle.localPosition = new Vector3(0f, 1.05f, 0.8f);
+            }
         }
 
-        public void Configure(Projectile projectile, Transform muzzleTransform)
+        private void EnsureProjectileTemplate()
         {
-            projectilePrefab = projectile;
-            muzzle = muzzleTransform;
-            if (projectilePrefab != null)
-            {
-                projectilePrefab.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
-            }
+            if (projectilePrefab != null) return;
+
+            GameObject projectileObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            projectileObject.name = "RuntimeProjectileTemplate";
+            projectileObject.SetActive(false);
+            projectileObject.transform.position = transform.position;
+            projectileObject.transform.localScale = Vector3.one * 0.18f;
+
+            SphereCollider collider = projectileObject.GetComponent<SphereCollider>();
+            collider.isTrigger = true;
+            collider.radius = 0.5f;
+
+            Rigidbody body = projectileObject.AddComponent<Rigidbody>();
+            body.isKinematic = true;
+            body.useGravity = false;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+            projectilePrefab = projectileObject.AddComponent<Projectile>();
         }
 
         public bool TryFire(Vector3 targetWorldPosition)
@@ -103,8 +124,7 @@ namespace PersiaWar.Unity2D5D
                 delta.y = 0f;
                 float distance = delta.magnitude;
                 if (distance <= 0.01f || distance > meleeRange) continue;
-                float dot = Vector3.Dot(forward, delta.normalized);
-                if (dot < 0.25f) continue;
+                if (Vector3.Dot(forward, delta.normalized) < 0.25f) continue;
 
                 target.ApplyDamage(meleeDamage);
                 hitSomething = true;
