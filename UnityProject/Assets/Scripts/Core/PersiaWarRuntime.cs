@@ -19,7 +19,12 @@ public sealed class PersiaWarRuntime : MonoBehaviour
 
     private void Update()
     {
-        if (player == null) player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null)
+        {
+            PlayerController controller = FindFirstObjectByType<PlayerController>();
+            if (controller != null) player = controller.gameObject;
+        }
+
         if (player == null || session == null || session.IsFinished) return;
 
         TargetHealth health = player.GetComponent<TargetHealth>();
