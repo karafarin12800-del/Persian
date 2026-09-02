@@ -3,32 +3,27 @@ using UnityEngine;
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// One mobile control layer for the same 3D gameplay scene.
-    /// Left side = virtual movement joystick. Right side = camera orbit.
-    /// Two-finger pinch = zoom. A small live top-down minimap is shown in the HUD.
+    /// Mobile gameplay controls: left side = continuous virtual joystick,
+    /// right side = fire/aim. The gameplay camera stays fixed in isometric 2.5D.
     /// </summary>
     public sealed class MobileInputHub : MonoBehaviour
     {
         [SerializeField] private PlayerController player;
-        [SerializeField] private Camera gameplayCamera;
-        [SerializeField] private CameraFollow25D cameraFollow;
         [SerializeField] private float joystickRadius = 120f;
-        [SerializeField] private float cameraSensitivity = 0.55f;
+        [SerializeField] private float fireInterval = 0.12f;
         [SerializeField] private float minimapSize = 180f;
 
         private int movePointerId = -1;
-        private int lookPointerId = -1;
+        private int firePointerId = -1;
         private Vector2 moveStartScreen;
         private Vector2 moveValue;
-        private Vector2 lookLastScreen;
+        private float nextFireTime;
         private Camera minimapCamera;
         private RenderTexture minimapTexture;
 
         private void Awake()
         {
             if (player == null) player = FindFirstObjectByType<PlayerController>();
-            if (gameplayCamera == null) gameplayCamera = Camera.main;
-            if (cameraFollow == null && gameplayCamera != null) cameraFollow = gameplayCamera.GetComponent<CameraFollow25D>();
             CreateMinimap();
         }
 
@@ -44,30 +39,28 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            if (player == null) return;
+            if (player == null)
+            {
+                player = FindFirstObjectByType<PlayerController>();
+                if (player == null) return;
+            }
 
 #if UNITY_EDITOR || UNITY_STANDALONE
             Vector2 keyboard = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-            player.SetMoveInput(ToCameraRelative(keyboard));
-            return;
+            if (keyboard.sqrMagnitude > 1f) keyboard.Normalize();
+            player.SetMoveInput(keyboard);
+
+            if (Input.GetMouseButton(0) && Time.time >= nextFireTime)
+                FireAtNearestTargetOrForward();
+#else
+            HandleTouches();
 #endif
 
-            HandleTouches();
-            player.SetMoveInput(ToCameraRelative(moveValue));
             UpdateMinimap();
         }
 
         private void HandleTouches()
         {
-            if (Input.touchCount == 0)
-            {
-                moveValue = Vector2.zero;
-                movePointerId = -1;
-                lookPointerId = -1;
-                return;
-            }
-
-            // First touch on the left half controls movement; touch on the right half rotates the camera.
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch touch = Input.GetTouch(i);
@@ -80,63 +73,65 @@ namespace PersiaWar.Unity2D5D
                         movePointerId = touch.fingerId;
                         moveStartScreen = touch.position;
                     }
-                    else if (!leftSide && lookPointerId < 0)
+                    else if (!leftSide && firePointerId < 0)
                     {
-                        lookPointerId = touch.fingerId;
-                        lookLastScreen = touch.position;
+                        firePointerId = touch.fingerId;
+                        FireAtNearestTargetOrForward();
                     }
                 }
             }
 
+            // The movement vector is persistent while the same finger remains down.
+            // The player therefore keeps moving without repeated dragging.
             if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch moveTouch))
             {
                 Vector2 delta = moveTouch.position - moveStartScreen;
                 moveValue = Vector2.ClampMagnitude(delta / joystickRadius, 1f);
+
                 if (moveTouch.phase == TouchPhase.Ended || moveTouch.phase == TouchPhase.Canceled)
                 {
                     movePointerId = -1;
                     moveValue = Vector2.zero;
                 }
             }
-            else
+            else if (movePointerId >= 0)
             {
-                moveValue = Vector2.zero;
                 movePointerId = -1;
+                moveValue = Vector2.zero;
             }
 
-            if (lookPointerId >= 0 && TryGetTouch(lookPointerId, out Touch lookTouch))
-            {
-                Vector2 delta = lookTouch.position - lookLastScreen;
-                lookLastScreen = lookTouch.position;
-                if (cameraFollow != null) cameraFollow.Rotate(delta.x * cameraSensitivity);
-                if (lookTouch.phase == TouchPhase.Ended || lookTouch.phase == TouchPhase.Canceled)
-                    lookPointerId = -1;
-            }
+            player.SetMoveInput(moveValue);
 
-            if (Input.touchCount >= 2 && cameraFollow != null)
+            if (firePointerId >= 0 && TryGetTouch(firePointerId, out Touch fireTouch))
             {
-                Touch a = Input.GetTouch(0);
-                Touch b = Input.GetTouch(1);
-                float previous = (a.position - a.deltaPosition - (b.position - b.deltaPosition)).magnitude;
-                float current = (a.position - b.position).magnitude;
-                if (previous > 0.01f)
-                    cameraFollow.Zoom((current - previous));
+                if (Time.time >= nextFireTime)
+                    FireAtNearestTargetOrForward();
+
+                if (fireTouch.phase == TouchPhase.Ended || fireTouch.phase == TouchPhase.Canceled)
+                    firePointerId = -1;
+            }
+            else if (firePointerId >= 0)
+            {
+                firePointerId = -1;
             }
         }
 
-        private Vector2 ToCameraRelative(Vector2 input)
+        private void FireAtNearestTargetOrForward()
         {
-            if (input.sqrMagnitude < 0.0001f || gameplayCamera == null) return Vector2.zero;
+            if (player == null || player.Aim == null || Time.time < nextFireTime)
+                return;
 
-            Vector3 forward = gameplayCamera.transform.forward;
-            Vector3 right = gameplayCamera.transform.right;
-            forward.y = 0f;
-            right.y = 0f;
-            forward.Normalize();
-            right.Normalize();
+            TargetHealth target = player.Aim.CurrentTarget;
+            if (target != null)
+            {
+                if (player.Aim.FireAt(target.transform.position))
+                    nextFireTime = Time.time + fireInterval;
+                return;
+            }
 
-            Vector3 world = right * input.x + forward * input.y;
-            return new Vector2(world.x, world.z);
+            Vector3 forwardTarget = player.transform.position + player.transform.forward * 25f;
+            if (player.Aim.FireAt(forwardTarget))
+                nextFireTime = Time.time + fireInterval;
         }
 
         private void CreateMinimap()
@@ -173,6 +168,13 @@ namespace PersiaWar.Unity2D5D
             DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.24f));
             DrawCircle(basePos + moveValue * radius, radius * 0.42f, new Color(1f, 1f, 1f, 0.55f));
 
+            if (firePointerId >= 0)
+            {
+                Vector2 firePos = new Vector2(Screen.width - 120f * scale, Screen.height - 140f * scale);
+                DrawCircle(firePos, radius * 0.72f, new Color(0.65f, 0.12f, 0.08f, 0.38f));
+                DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
+            }
+
             if (minimapTexture != null)
             {
                 float size = minimapSize * scale;
@@ -184,10 +186,9 @@ namespace PersiaWar.Unity2D5D
 
         private static void DrawCircle(Vector2 center, float radius, Color color)
         {
-            Texture2D texture = Texture2D.whiteTexture;
             Color old = GUI.color;
             GUI.color = color;
-            GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), texture);
+            GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), Texture2D.whiteTexture);
             GUI.color = old;
         }
 
@@ -202,6 +203,7 @@ namespace PersiaWar.Unity2D5D
                     return true;
                 }
             }
+
             touch = default;
             return false;
         }
