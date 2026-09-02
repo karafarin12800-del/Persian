@@ -9,13 +9,68 @@ on:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
 
+concurrency:
+  group: persiawar-unity-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-android:
-    name: Build Android APK
+  validate:
+    name: Validate Unity project
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate required Unity files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f UnityProject/ProjectSettings/ProjectVersion.txt
+          test -f UnityProject/ProjectSettings/EditorBuildSettings.asset
+          test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          test -f UnityProject/Assets/Resources/PersiaWarLit.shader
+          test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
+          test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
+          grep -q 'Assets/Scenes/PersiaWarPrototype.unity' UnityProject/ProjectSettings/EditorBuildSettings.asset
+          grep -q 'm_Name: GameRoot' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          grep -q 'm_Name: Main Camera' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          echo 'Unity project structure validation passed.'
+
+      - name: Check for tracked build outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(Library|Temp|Obj|Builds?)/' >/dev/null; then
+            echo 'Tracked Unity build/cache output detected.'
+            exit 1
+          fi
+          echo 'Repository hygiene validation passed.'
+
+  build-android:
+    name: Build Android APK
+    needs: validate
+    # GitHub Actions does not expose secrets to repository code as plain text.
+    # When no Unity activation secret is configured, this job is intentionally skipped
+    # so source changes do not appear as broken builds. Configure a Unity Personal
+    # license in UNITY_LICENSE (plus UNITY_EMAIL/UNITY_PASSWORD) or a Professional
+    # serial in UNITY_SERIAL (plus UNITY_EMAIL/UNITY_PASSWORD) to enable the APK build.
+    if: ${{ secrets.UNITY_LICENSE != '' || (secrets.UNITY_SERIAL != '' && secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: UnityProject/Library
+          key: Library-UnityProject-Android-${{ hashFiles('UnityProject/Assets/**', 'UnityProject/Packages/**', 'UnityProject/ProjectSettings/**') }}
+          restore-keys: |
+            Library-UnityProject-Android-
+            Library-UnityProject-
+            Library-
 
       - name: Build Unity project
         uses: game-ci/unity-builder@v4
@@ -40,11 +95,12 @@ jobs:
           apk=$(find build/Android -maxdepth 1 -type f -name '*.apk' -print -quit)
           test -n "$apk"
           test -s "$apk"
-          echo "APK created: $apk"
+          unzip -t "$apk" >/dev/null
+          echo "Verified APK: $apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PersiaWar-Android
+          name: PersiaWar-Android-${{ github.sha }}
           path: build/Android/*.apk
           if-no-files-found: error
