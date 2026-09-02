@@ -22,12 +22,25 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: UnityProject
           targetPlatform: Android
           versioning: Semantic
           buildName: PersiaWar
+          androidExportType: androidPackage
+          androidSymbolType: none
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d build/Android
+          apk=$(find build/Android -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$apk"
+          test -s "$apk"
+          echo "APK created: $apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
