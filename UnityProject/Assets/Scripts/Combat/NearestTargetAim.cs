@@ -65,7 +65,7 @@ namespace PersiaWar.Unity2D5D
             return best;
         }
 
-        private bool IsPathClear(Vector3 origin, Vector3 targetPosition)
+        private static bool IsPathClear(Vector3 origin, Vector3 targetPosition)
         {
             Vector3 target = targetPosition + Vector3.up * 0.7f;
             Vector3 direction = target - origin;
@@ -76,10 +76,7 @@ namespace PersiaWar.Unity2D5D
                 return true;
 
             TargetHealth hitTarget = hit.collider.GetComponentInParent<TargetHealth>();
-            if (hitTarget != null && hitTarget.CompareTag("Enemy"))
-                return true;
-
-            return hitTarget == null && hit.collider.GetComponentInParent<PlayerController>() == null;
+            return hitTarget != null && hitTarget.CompareTag("Enemy");
         }
     }
 }
