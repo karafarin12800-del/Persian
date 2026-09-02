@@ -66,12 +66,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "${UNITY_LICENSE}" || ( -n "${UNITY_SERIAL}" && -n "${UNITY_EMAIL}" && -n "${UNITY_PASSWORD}" ) ]]; then
+
+          has_license=false
+          has_serial=false
+          has_email=false
+          has_password=false
+
+          [[ -n "${UNITY_LICENSE}" ]] && has_license=true
+          [[ -n "${UNITY_SERIAL}" ]] && has_serial=true
+          [[ -n "${UNITY_EMAIL}" ]] && has_email=true
+          [[ -n "${UNITY_PASSWORD}" ]] && has_password=true
+
+          echo "UNITY_LICENSE present: ${has_license}"
+          echo "UNITY_SERIAL present: ${has_serial}"
+          echo "UNITY_EMAIL present: ${has_email}"
+          echo "UNITY_PASSWORD present: ${has_password}"
+
+          if [[ "${has_license}" == "true" ]]; then
+            echo 'Activation mode detected: UNITY_LICENSE (Personal/manual license path).'
             echo 'ready=true' >> "$GITHUB_OUTPUT"
-            echo 'Unity activation configuration is present.'
+          elif [[ "${has_serial}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
+            echo 'Activation mode detected: UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD.'
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
+            echo 'Activation configuration is incomplete; Unity build will be skipped.'
             echo 'ready=false' >> "$GITHUB_OUTPUT"
-            echo 'Unity activation is not configured. APK build is waiting for the repository Unity license secrets.'
           fi
 
       - name: Cache Unity Library
