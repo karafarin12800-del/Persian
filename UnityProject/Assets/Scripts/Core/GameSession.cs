@@ -27,9 +27,7 @@ public class GameSession : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
-        TimeRemaining = missionTime;
-        IsRunning = true;
-        Time.timeScale = 1f;
+        ResetMatch();
     }
 
     private void Update()
@@ -37,6 +35,18 @@ public class GameSession : MonoBehaviour
         if (!IsRunning || IsFinished || !useMissionTimer) return;
         TimeRemaining = Mathf.Max(0f, TimeRemaining - Time.deltaTime);
         if (TimeRemaining <= 0f) EndMission(false);
+    }
+
+    public void ResetMatch()
+    {
+        Time.timeScale = 1f;
+        EnemiesDefeated = 0;
+        Score = 0;
+        CurrentWave = 1;
+        TimeRemaining = missionTime;
+        IsRunning = true;
+        IsFinished = false;
+        PlayerWon = false;
     }
 
     public void SetWave(int wave)
@@ -69,6 +79,7 @@ public class GameSession : MonoBehaviour
     public void RestartMission()
     {
         Time.timeScale = 1f;
+        ResetMatch();
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
