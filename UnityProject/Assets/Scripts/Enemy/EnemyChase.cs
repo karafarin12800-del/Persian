@@ -19,11 +19,14 @@ namespace PersiaWar.Unity2D5D
             nextRetarget = Time.time + retargetInterval;
             Vector3 delta = target.position - transform.position;
             delta.y = 0f;
-            if (delta.sqrMagnitude <= stopDistance * stopDistance)
+            float distanceSqr = delta.sqrMagnitude;
+            if (distanceSqr <= stopDistance * stopDistance || distanceSqr < 0.0001f)
                 return;
 
-            transform.position += delta.normalized * moveSpeed * retargetInterval;
-            transform.rotation = Quaternion.LookRotation(delta.normalized, Vector3.up);
+            float step = moveSpeed * retargetInterval;
+            transform.position += delta.normalized * Mathf.Min(step, Mathf.Sqrt(distanceSqr) - stopDistance);
+            if (delta.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.LookRotation(delta.normalized, Vector3.up);
         }
 
         public void SetTarget(Transform value)
