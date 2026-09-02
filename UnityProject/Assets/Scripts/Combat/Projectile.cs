@@ -36,14 +36,13 @@ namespace PersiaWar.Unity2D5D
             if (other.GetComponentInParent<EnemyProjectile>() != null) return;
 
             TargetHealth target = other.GetComponentInParent<TargetHealth>();
-            if (target != null && target.CompareTag("Enemy"))
+            if (target != null && target.GetComponentInParent<EnemyChase>() != null)
             {
                 target.ApplyDamage(damage);
                 Destroy(gameObject);
                 return;
             }
 
-            // World geometry stops the shot; this prevents bullets passing through buildings and trees.
             Destroy(gameObject);
         }
     }
