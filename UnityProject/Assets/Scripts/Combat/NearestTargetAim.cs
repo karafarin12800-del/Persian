@@ -30,18 +30,22 @@ namespace PersiaWar.Unity2D5D
         {
             if (weapon == null || Time.time < nextFire) return false;
 
-            Vector3 direction = targetPosition - transform.position;
+            Vector3 origin = transform.position + Vector3.up * 0.75f;
+            Vector3 target = targetPosition + Vector3.up * 0.7f;
+            Vector3 direction = target - origin;
             direction.y = 0f;
             if (direction.sqrMagnitude < 0.001f) return false;
 
+            if (!IsPathClear(origin, targetPosition)) return false;
             if (!weapon.TryFire(targetPosition)) return false;
+
             nextFire = Time.time + autoFireInterval;
             return true;
         }
 
         private TargetHealth FindNearestTarget()
         {
-            Collider[] hits = Physics.OverlapSphere(transform.position, range, targetMask, QueryTriggerInteraction.Collide);
+            Collider[] hits = Physics.OverlapSphere(transform.position, range, targetMask, QueryTriggerInteraction.Ignore);
             TargetHealth best = null;
             float bestDistance = float.PositiveInfinity;
 
@@ -51,14 +55,31 @@ namespace PersiaWar.Unity2D5D
                 if (candidate == null || !candidate.isActiveAndEnabled || !candidate.CompareTag("Enemy")) continue;
 
                 float distance = (candidate.transform.position - transform.position).sqrMagnitude;
-                if (distance < bestDistance)
-                {
-                    bestDistance = distance;
-                    best = candidate;
-                }
+                if (distance >= bestDistance) continue;
+                if (!IsPathClear(transform.position + Vector3.up * 0.75f, candidate.transform.position)) continue;
+
+                bestDistance = distance;
+                best = candidate;
             }
 
             return best;
+        }
+
+        private bool IsPathClear(Vector3 origin, Vector3 targetPosition)
+        {
+            Vector3 target = targetPosition + Vector3.up * 0.7f;
+            Vector3 direction = target - origin;
+            float distance = direction.magnitude;
+            if (distance <= 0.01f) return true;
+
+            if (!Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
+                return true;
+
+            TargetHealth hitTarget = hit.collider.GetComponentInParent<TargetHealth>();
+            if (hitTarget != null && hitTarget.CompareTag("Enemy"))
+                return true;
+
+            return hitTarget == null && hit.collider.GetComponentInParent<PlayerController>() == null;
         }
     }
 }
