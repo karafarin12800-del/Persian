@@ -35,8 +35,17 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            if (CompareTag("Enemy") && GameSession.Instance != null)
-                GameSession.Instance.RegisterEnemyDefeated();
+            if (CompareTag("Enemy"))
+            {
+                int score = 10;
+                EnemyChase enemy = GetComponent<EnemyChase>();
+                if (enemy != null) score = enemy.ScoreValue;
+                if (GameSession.Instance != null)
+                {
+                    GameSession.Instance.RegisterEnemyDefeated();
+                    GameSession.Instance.AddScore(score - 10);
+                }
+            }
 
             Destroy(gameObject);
         }
