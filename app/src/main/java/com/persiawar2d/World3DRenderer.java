@@ -16,7 +16,6 @@ public final class World3DRenderer implements GLSurfaceView.Renderer {
     private final GameCore core;
     private final float[] proj=new float[16],view=new float[16],model=new float[16],mvp=new float[16];
     private int program,posHandle,colorHandle,mvpHandle;
-    private int width,height;
     private final FloatBuffer cube;
     private GameCore.Input input;
     private volatile boolean paused;
@@ -45,70 +44,51 @@ public final class World3DRenderer implements GLSurfaceView.Renderer {
         posHandle=GLES20.glGetAttribLocation(program,"aPosition");colorHandle=GLES20.glGetUniformLocation(program,"uColor");mvpHandle=GLES20.glGetUniformLocation(program,"uMvp");
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);GLES20.glDepthFunc(GLES20.GL_LEQUAL);GLES20.glClearColor(.035f,.065f,.05f,1f);
     }
-    @Override public void onSurfaceChanged(javax.microedition.khronos.opengles.GL10 gl,int w,int h){width=w;height=h;GLES20.glViewport(0,0,w,h);Matrix.perspectiveM(proj,0,55f,Math.max(.6f,w/(float)Math.max(1,h)),10f,10000f);}
+    @Override public void onSurfaceChanged(javax.microedition.khronos.opengles.GL10 gl,int w,int h){GLES20.glViewport(0,0,w,h);Matrix.perspectiveM(proj,0,55f,Math.max(.6f,w/(float)Math.max(1,h)),10f,10000f);}
     @Override public void onDrawFrame(javax.microedition.khronos.opengles.GL10 gl){
         if(input==null)return;
         synchronized(core){
             if(!paused)core.update(1f/60f,input);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT|GLES20.GL_DEPTH_BUFFER_BIT);
             GameCore.Player p=core.player();
-            float camX=p.x+720f,camY=1050f,camZ=p.y+860f;
-            Matrix.setLookAtM(view,0,camX,camY,camZ,p.x,0,p.y,0,1,0);
+            Matrix.setLookAtM(view,0,p.x+720f,1050f,p.y+860f,p.x,0,p.y,0,1,0);
             drawWorld(core.world());drawCombat();
         }
     }
     private void drawWorld(WorldMap map){
         drawBox(3000,0,3000,6000,10,6000,new float[]{.30f,.26f,.18f,1});
         for(WorldMap.Road r:map.roads()){
-            if(r.horizontal){
-                drawBox((r.x1+r.x2)*.5f,5,(r.y1+r.y2)*.5f,r.x2-r.x1,r.width,Math.max(4,r.width*.06f),new float[]{.14f,.14f,.13f,1});
-                drawBox((r.x1+r.x2)*.5f,8,(r.y1+r.y2)*.5f,r.x2-r.x1,r.width*.08f,5,new float[]{.67f,.57f,.33f,1});
-            }else{
-                drawBox((r.x1+r.x2)*.5f,5,(r.y1+r.y2)*.5f,Math.max(4,r.width*.06f),r.width,r.y2-r.y1,new float[]{.14f,.14f,.13f,1});
-                drawBox((r.x1+r.x2)*.5f,8,(r.y1+r.y2)*.5f,5,r.width*.08f,r.y2-r.y1,new float[]{.67f,.57f,.33f,1});
-            }
+            if(r.horizontal){drawBox((r.x1+r.x2)*.5f,10,(r.y1+r.y2)*.5f,r.x2-r.x1,r.width,4,new float[]{.14f,.14f,.13f,1});drawBox((r.x1+r.x2)*.5f,14,(r.y1+r.y2)*.5f,r.x2-r.x1,r.width*.05f,5,new float[]{.67f,.57f,.33f,1});}
+            else{drawBox((r.x1+r.x2)*.5f,10,(r.y1+r.y2)*.5f,4,r.width,r.y2-r.y1,new float[]{.14f,.14f,.13f,1});drawBox((r.x1+r.x2)*.5f,14,(r.y1+r.y2)*.5f,5,r.width*.05f,r.y2-r.y1,new float[]{.67f,.57f,.33f,1});}
         }
         for(WorldMap.Building b:map.buildings()){
-            float h=150+(b.style%5)*25;float rr=.30f+.035f*(b.style%4),gg=.22f+.018f*(b.style%5),bb=.14f+.012f*(b.style%3);
+            float h=150+(b.style%5)*25,rr=.30f+.035f*(b.style%4),gg=.22f+.018f*(b.style%5),bb=.14f+.012f*(b.style%3);
             drawBox(b.x+b.w*.5f,0,b.y+b.h*.5f,b.w,h,b.h,new float[]{rr,gg,bb,1});
             drawBox(b.x+b.w*.5f,h+7,b.y+b.h*.5f,b.w*1.04f,14,b.h*1.04f,new float[]{.16f,.11f,.08f,1});
             drawBox(b.x+b.w*.5f,h+15,b.y+b.h*.5f,b.w*.62f,22,b.h*.62f,new float[]{.22f,.15f,.10f,1});
         }
-        for(WorldMap.Vehicle v:map.vehicles()){
-            drawBox(v.x,0,v.y,v.w*1.35f,48,v.h*1.35f,new float[]{.18f,.28f,.30f,1});
-            drawBox(v.x,48,v.y,v.w*.70f,14,v.h*.64f,new float[]{.05f,.08f,.09f,1});
-        }
+        for(WorldMap.Vehicle v:map.vehicles()){drawBox(v.x,0,v.y,v.w*1.35f,48,v.h*1.35f,new float[]{.18f,.28f,.30f,1});drawBox(v.x,48,v.y,v.w*.70f,14,v.h*.64f,new float[]{.05f,.08f,.09f,1});}
         for(WorldMap.Fence f:map.fences()){
             float dx=f.x2-f.x1,dz=f.y2-f.y1,len=(float)Math.hypot(dx,dz),x=(f.x1+f.x2)*.5f,z=(f.y1+f.y2)*.5f;
-            if(Math.abs(dx)>=Math.abs(dz))drawBox(x,0,z,len,52,8,new float[]{.48f,.39f,.25f,1});
-            else drawBox(x,0,z,8,52,len,new float[]{.48f,.39f,.25f,1});
+            if(Math.abs(dx)>=Math.abs(dz))drawBox(x,0,z,len,52,8,new float[]{.48f,.39f,.25f,1});else drawBox(x,0,z,8,52,len,new float[]{.48f,.39f,.25f,1});
         }
-        for(WorldMap.Prop t:map.trees()){
-            drawBox(t.x,0,t.y,12,55,12,new float[]{.30f,.20f,.10f,1});
-            drawBox(t.x,55,t.y,t.size*1.55f,110,t.size*1.55f,new float[]{.13f,.31f,.16f,1});
-        }
+        for(WorldMap.Prop t:map.trees()){drawBox(t.x,0,t.y,12,55,12,new float[]{.30f,.20f,.10f,1});drawBox(t.x,55,t.y,t.size*1.55f,110,t.size*1.55f,new float[]{.13f,.31f,.16f,1});}
         for(WorldMap.Prop b:map.bushes())drawBox(b.x,0,b.y,b.size*1.7f,Math.max(8,b.size),b.size*1.7f,new float[]{.19f,.36f,.17f,1});
     }
     private void drawCombat(){
         for(GameCore.Enemy e:core.enemies()){
             if(e.dead)continue;float h=e.type==3?140:e.type==2?115:95,s=e.type==3?64:e.type==2?54:46;
-            drawBox(e.x,0,e.y,s,h,s,new float[]{e.type==3?.70f:.62f,.18f,.16f,1});
-            drawBox(e.x,h,e.y,s*1.05f,20,s*1.05f,new float[]{.74f,.56f,.29f,1});
+            drawBox(e.x,0,e.y,s,h,s,new float[]{e.type==3?.70f:.62f,.18f,.16f,1});drawBox(e.x,h,e.y,s*1.05f,20,s*1.05f,new float[]{.74f,.56f,.29f,1});
         }
-        GameCore.Player p=core.player();
-        drawBox(p.x,0,p.y,62,138,62,new float[]{.16f,.33f,.28f,1});
-        drawBox(p.x,138,p.y,66,22,66,new float[]{.79f,.64f,.37f,1});
+        GameCore.Player p=core.player();drawBox(p.x,0,p.y,62,138,62,new float[]{.16f,.33f,.28f,1});drawBox(p.x,138,p.y,66,22,66,new float[]{.79f,.64f,.37f,1});
         for(GameCore.Projectile b:core.projectiles())drawBox(b.x,0,b.y,10,10,10,b.fromPlayer?new float[]{1f,.82f,.32f,1}:new float[]{1f,.25f,.20f,1});
         for(GameCore.Grenade g:core.grenades())drawBox(g.x,0,g.y,22,22,22,new float[]{.25f,.55f,.30f,1});
         for(GameCore.Pickup p:core.pickups()){
-            float[] c=p.type==GameCore.PickupType.AMMO?new float[]{.85f,.68f,.18f,1}:p.type==GameCore.PickupType.MEDKIT?new float[]{.88f,.24f,.22f,1}:p.type==GameCore.PickupType.GRENADE?new float[]{.20f,.62f,.33f,1}:new float[]{.30f,.62f,.88f,1};
-            drawBox(p.x,0,p.y,30,30,30,c);
+            float[] c=p.type==GameCore.PickupType.AMMO?new float[]{.85f,.68f,.18f,1}:p.type==GameCore.PickupType.MEDKIT?new float[]{.88f,.24f,.22f,1}:p.type==GameCore.PickupType.GRENADE?new float[]{.20f,.62f,.33f,1}:new float[]{.30f,.62f,.88f,1};drawBox(p.x,0,p.y,30,30,30,c);
         }
     }
     private void drawBox(float x,float baseY,float z,float sx,float sy,float sz,float[] color){
-        Matrix.setIdentityM(model,0);Matrix.translateM(model,0,x,baseY,z);Matrix.scaleM(model,0,sx*.5f,sy,sz*.5f);
-        Matrix.multiplyMM(mvp,0,view,0,model,0);Matrix.multiplyMM(mvp,0,proj,0,mvp,0);
-        GLES20.glUseProgram(program);GLES20.glUniformMatrix4fv(mvpHandle,1,false,mvp,0);GLES20.glUniform4fv(colorHandle,1,color,0);
-        cube.position(0);GLES20.glEnableVertexAttribArray(posHandle);GLES20.glVertexAttribPointer(posHandle,3,GLES20.GL_FLOAT,false,0,cube);GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,48);GLES20.glDisableVertexAttribArray(posHandle);
+        Matrix.setIdentityM(model,0);Matrix.translateM(model,0,x,baseY,z);Matrix.scaleM(model,0,sx*.5f,sy,sz*.5f);Matrix.multiplyMM(mvp,0,view,0,model,0);Matrix.multiplyMM(mvp,0,proj,0,mvp,0);
+        GLES20.glUseProgram(program);GLES20.glUniformMatrix4fv(mvpHandle,1,false,mvp,0);GLES20.glUniform4fv(colorHandle,1,color,0);cube.position(0);GLES20.glEnableVertexAttribArray(posHandle);GLES20.glVertexAttribPointer(posHandle,3,GLES20.GL_FLOAT,false,0,cube);GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,36);GLES20.glDisableVertexAttribArray(posHandle);
     }
 }
