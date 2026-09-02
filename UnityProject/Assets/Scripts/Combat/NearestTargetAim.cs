@@ -4,10 +4,10 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class NearestTargetAim : MonoBehaviour
     {
-        [SerializeField] private float range = 24f;
+        [SerializeField] private float range = 82f;
         [SerializeField] private LayerMask targetMask = ~0;
         [SerializeField] private WeaponController weapon;
-        [SerializeField] private float autoFireInterval = 0.22f;
+        [SerializeField] private float autoFireInterval = 0.155f;
         [SerializeField] private bool autoFire;
 
         private float nextFire;
@@ -16,32 +16,25 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
-            if (weapon == null)
-                weapon = GetComponent<WeaponController>();
+            if (weapon == null) weapon = GetComponent<WeaponController>();
         }
 
         private void Update()
         {
             CurrentTarget = FindNearestTarget();
-            if (!autoFire || CurrentTarget == null || Time.time < nextFire)
-                return;
-
+            if (!autoFire || CurrentTarget == null || Time.time < nextFire) return;
             FireAt(CurrentTarget.transform.position);
         }
 
         public bool FireAt(Vector3 targetPosition)
         {
-            if (weapon == null || Time.time < nextFire)
-                return false;
+            if (weapon == null || Time.time < nextFire) return false;
 
             Vector3 direction = targetPosition - transform.position;
             direction.y = 0f;
-            if (direction.sqrMagnitude < 0.001f)
-                return false;
+            if (direction.sqrMagnitude < 0.001f) return false;
 
-            if (!weapon.TryFire(targetPosition))
-                return false;
-
+            if (!weapon.TryFire(targetPosition)) return false;
             nextFire = Time.time + autoFireInterval;
             return true;
         }
@@ -55,8 +48,7 @@ namespace PersiaWar.Unity2D5D
             foreach (Collider hit in hits)
             {
                 TargetHealth candidate = hit.GetComponentInParent<TargetHealth>();
-                if (candidate == null || !candidate.isActiveAndEnabled || candidate.transform == transform)
-                    continue;
+                if (candidate == null || !candidate.isActiveAndEnabled || !candidate.CompareTag("Enemy")) continue;
 
                 float distance = (candidate.transform.position - transform.position).sqrMagnitude;
                 if (distance < bestDistance)
