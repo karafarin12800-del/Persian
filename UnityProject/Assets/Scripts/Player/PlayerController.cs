@@ -75,14 +75,8 @@ namespace PersiaWar.Unity2D5D
 
             Renderer renderer = part.GetComponent<Renderer>();
             if (renderer != null)
-            {
-                Shader shader = Shader.Find("Standard");
-                if (shader != null)
-                {
-                    Material material = new Material(shader) { color = color, enableInstancing = true };
-                    renderer.sharedMaterial = material;
-                }
-            }
+                renderer.sharedMaterial = RuntimeMaterialFactory.Create(partName + "Material", color);
+
             return part.transform;
         }
     }
