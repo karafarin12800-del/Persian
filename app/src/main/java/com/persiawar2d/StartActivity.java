@@ -9,7 +9,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.*;
 
-/** Main menu and real character-selection entry point. */
+/** Main menu and character-selection entry point. */
 public final class StartActivity extends Activity {
     private final int gold=Color.rgb(239,197,92);
     @Override public void onCreate(Bundle b){super.onCreate(b);build();}
@@ -17,10 +17,10 @@ public final class StartActivity extends Activity {
     private void build(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setGravity(Gravity.CENTER);root.setPadding(40,30,40,30);root.setBackgroundColor(Color.rgb(7,27,43));
         TextView title=new TextView(this);title.setText("PERSIA WAR");title.setTextColor(gold);title.setTextSize(42);title.setGravity(Gravity.CENTER);root.addView(title,new LinearLayout.LayoutParams(-1,90));
-        TextView sub=new TextView(this);sub.setText("2.5D • ANCIENT PERSIA");sub.setTextColor(Color.rgb(230,205,155));sub.setTextSize(18);sub.setGravity(Gravity.CENTER);root.addView(sub,new LinearLayout.LayoutParams(-1,55));
+        TextView sub=new TextView(this);sub.setText("3D • ANCIENT PERSIA");sub.setTextColor(Color.rgb(230,205,155));sub.setTextSize(18);sub.setGravity(Gravity.CENTER);root.addView(sub,new LinearLayout.LayoutParams(-1,55));
         TextView start=button("▶  START BATTLE");start.setOnClickListener(v->startActivity(new Intent(this,MainActivity.class)));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(520,74);bp.setMargins(0,14,0,14);root.addView(start,bp);
         TextView chars=button("⚔  CHARACTER SELECT");chars.setOnClickListener(v->chooseCharacter());root.addView(chars,new LinearLayout.LayoutParams(520,74));
-        TextView info=new TextView(this);info.setText("AUTO-AIM • SWORD • BOMB • SHIELD • LARGE MAP");info.setTextColor(Color.rgb(200,205,196));info.setTextSize(14);info.setGravity(Gravity.CENTER);root.addView(info,new LinearLayout.LayoutParams(-1,70));
+        TextView info=new TextView(this);info.setText("AUTO-AIM • LINE OF SIGHT • SWORD • BOMB • SHIELD • 6000×6000 WORLD");info.setTextColor(Color.rgb(200,205,196));info.setTextSize(14);info.setGravity(Gravity.CENTER);root.addView(info,new LinearLayout.LayoutParams(-1,70));
         setContentView(root);
     }
     private void chooseCharacter(){
