@@ -80,7 +80,6 @@ namespace PersiaWar.Unity2D5D
             int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
             GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             enemy.name = $"Enemy_W{currentWave}_{index}";
-            enemy.tag = "Enemy";
             enemy.transform.position = position;
             enemy.transform.localScale = new Vector3(0.9f, 1f, 0.9f);
 
