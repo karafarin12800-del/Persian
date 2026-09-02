@@ -7,7 +7,8 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private Camera gameplayCamera;
         [SerializeField] private float worldSize = 192f;
         [SerializeField] private int seed = 32025;
-        [SerializeField] private int enemyCount = 12;
+        [SerializeField] private int enemyCount = 8;
+        [SerializeField] private float enemySpawnRadius = 44f;
 
         private Transform worldRoot;
         private Material groundMaterial;
@@ -23,6 +24,7 @@ namespace PersiaWar.Unity2D5D
             Random.InitState(seed);
 
             EnsureGameSession();
+            GameSession.Instance?.ResetMatch();
 
             if (gameplayCamera == null) gameplayCamera = Camera.main;
             ConfigureCamera();
@@ -35,6 +37,7 @@ namespace PersiaWar.Unity2D5D
                 CameraFollow25D follow = gameplayCamera != null ? gameplayCamera.GetComponent<CameraFollow25D>() : null;
                 if (follow != null) follow.SetTarget(player.transform);
                 EnsureEnemySpawner(player.transform);
+                EnsureGameplayHUD(player);
             }
 
             BuildWorld();
@@ -55,7 +58,16 @@ namespace PersiaWar.Unity2D5D
                 GameObject objectRoot = new GameObject("EnemySpawner");
                 spawner = objectRoot.AddComponent<EnemySpawner>();
             }
-            spawner.Configure(player, enemyCount, 70f, 1.6f);
+            spawner.Configure(player, enemyCount, enemySpawnRadius, 0f);
+        }
+
+        private void EnsureGameplayHUD(PlayerController player)
+        {
+            RuntimeCombatHUD existing = FindFirstObjectByType<RuntimeCombatHUD>();
+            if (existing != null) return;
+
+            GameObject hudObject = new GameObject("RuntimeCombatHUD");
+            hudObject.AddComponent<RuntimeCombatHUD>();
         }
 
         private void ConfigureCamera()
@@ -64,11 +76,15 @@ namespace PersiaWar.Unity2D5D
             gameplayCamera.orthographic = false;
             gameplayCamera.fieldOfView = 52f;
             gameplayCamera.nearClipPlane = 0.1f;
-            gameplayCamera.farClipPlane = 220f;
+            gameplayCamera.farClipPlane = 240f;
             gameplayCamera.allowHDR = false;
             gameplayCamera.allowMSAA = true;
-            gameplayCamera.transform.position = new Vector3(0f, 11f, -11f);
+            gameplayCamera.transform.position = new Vector3(0f, 14f, -14f);
             gameplayCamera.transform.rotation = Quaternion.Euler(48f, 0f, 0f);
+
+            CameraFollow25D follow = gameplayCamera.GetComponent<CameraFollow25D>();
+            if (follow == null) follow = gameplayCamera.gameObject.AddComponent<CameraFollow25D>();
+            follow.SetTarget(FindFirstObjectByType<PlayerController>()?.transform);
         }
 
         private void ConfigureLighting()
@@ -79,7 +95,7 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.fogColor = new Color(0.20f, 0.23f, 0.25f);
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogStartDistance = 75f;
-            RenderSettings.fogEndDistance = 220f;
+            RenderSettings.fogEndDistance = 240f;
 
             Light sun = FindFirstObjectByType<Light>();
             if (sun == null)
