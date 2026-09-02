@@ -7,13 +7,18 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float range = 24f;
         [SerializeField] private LayerMask targetMask = ~0;
         [SerializeField] private WeaponController weapon;
-        [SerializeField] private GameObject projectilePrefab;
         [SerializeField] private float autoFireInterval = 0.22f;
         [SerializeField] private bool autoFire;
 
         private float nextFire;
 
         public TargetHealth CurrentTarget { get; private set; }
+
+        private void Awake()
+        {
+            if (weapon == null)
+                weapon = GetComponent<WeaponController>();
+        }
 
         private void Update()
         {
@@ -26,7 +31,7 @@ namespace PersiaWar.Unity2D5D
 
         public bool FireAt(Vector3 targetPosition)
         {
-            if (weapon == null || projectilePrefab == null || Time.time < nextFire)
+            if (weapon == null || Time.time < nextFire)
                 return false;
 
             Vector3 direction = targetPosition - transform.position;
@@ -38,10 +43,6 @@ namespace PersiaWar.Unity2D5D
                 return false;
 
             nextFire = Time.time + autoFireInterval;
-            GameObject projectile = Instantiate(projectilePrefab, weapon.Muzzle.position, Quaternion.LookRotation(direction.normalized));
-            Projectile shot = projectile.GetComponent<Projectile>();
-            if (shot != null)
-                shot.Launch(direction);
             return true;
         }
 
