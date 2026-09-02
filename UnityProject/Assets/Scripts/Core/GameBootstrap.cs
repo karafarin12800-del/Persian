@@ -22,6 +22,8 @@ namespace PersiaWar.Unity2D5D
             QualitySettings.vSyncCount = 0;
             Random.InitState(seed);
 
+            EnsureGameSession();
+
             if (gameplayCamera == null) gameplayCamera = Camera.main;
             ConfigureCamera();
             ConfigureLighting();
@@ -36,6 +38,13 @@ namespace PersiaWar.Unity2D5D
             }
 
             BuildWorld();
+        }
+
+        private void EnsureGameSession()
+        {
+            if (GameSession.Instance != null) return;
+            GameObject sessionObject = new GameObject("GameSession");
+            sessionObject.AddComponent<GameSession>();
         }
 
         private void EnsureEnemySpawner(Transform player)
