@@ -99,24 +99,16 @@ jobs:
 
           if [[ "${has_license}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
             echo 'Activation mode detected: Unity Personal/manual license.'
-            echo 'ready=true' >> "$GITHUB_OUTPUT"
-            echo 'mode=personal' >> "$GITHUB_OUTPUT"
           elif [[ "${has_serial}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
             echo 'Activation mode detected: Unity serial license.'
-            echo 'ready=true' >> "$GITHUB_OUTPUT"
-            echo 'mode=serial' >> "$GITHUB_OUTPUT"
           else
             echo 'Activation configuration is incomplete.'
-            echo 'Required for Unity Personal CI: UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD.'
-            echo 'Required for serial licensing: UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD.'
+            echo 'For Unity Personal CI, set UNITY_LICENSE, UNITY_EMAIL and UNITY_PASSWORD repository secrets.'
             echo 'No secret values are printed.'
-            echo 'ready=false' >> "$GITHUB_OUTPUT"
-            echo 'mode=missing' >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
       - name: Cache Unity Library
-        if: steps.activation.outputs.ready == 'true'
         uses: actions/cache@v4
         with:
           path: UnityProject/Library
@@ -127,7 +119,6 @@ jobs:
             Library-
 
       - name: Build Unity project
-        if: steps.activation.outputs.ready == 'true'
         uses: game-ci/unity-builder@v4
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -143,7 +134,6 @@ jobs:
           androidSymbolType: none
 
       - name: Verify APK
-        if: steps.activation.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -155,7 +145,6 @@ jobs:
           echo "Verified APK: $apk"
 
       - name: Upload APK
-        if: steps.activation.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: PersiaWar-Android-${{ github.sha }}
