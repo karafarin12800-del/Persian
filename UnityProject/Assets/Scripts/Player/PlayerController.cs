@@ -4,39 +4,87 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class PlayerController : MonoBehaviour
     {
-        [SerializeField] private float moveSpeed = 6f;
-        [SerializeField] private float worldLimit = 88f;
+        [SerializeField] private float moveSpeed = 11.5f;
+        [SerializeField] private float worldLimit = 94f;
         [SerializeField] private float turnSpeed = 18f;
+        [SerializeField] private float collisionRadius = 0.62f;
+        [SerializeField] private int shield = 0;
 
         private Vector3 input;
         private Transform visualRoot;
         private Transform body;
         private WeaponController weapon;
         private NearestTargetAim aim;
+        private TargetHealth health;
 
         public NearestTargetAim Aim => aim;
         public WeaponController Weapon => weapon;
+        public TargetHealth Health => health;
+        public int Shield => shield;
+        public Vector2 MoveInput => new Vector2(input.x, input.z);
+        public bool IsDefeated { get; private set; }
 
         private void Awake()
         {
-            EnsurePlayerVisual();
             if (!CompareTag("Player")) gameObject.tag = "Player";
+            EnsurePlayerVisual();
             EnsureGameplayComponents();
         }
 
         public void SetMoveInput(Vector2 value)
         {
-            input = new Vector3(value.x, 0f, value.y);
-            if (input.sqrMagnitude > 1f) input.Normalize();
+            if (IsDefeated)
+            {
+                input = Vector3.zero;
+                return;
+            }
+
+            Vector2 clamped = Vector2.ClampMagnitude(value, 1f);
+            input = new Vector3(clamped.x, 0f, clamped.y);
+        }
+
+        public void ReceiveDamage(int amount)
+        {
+            if (IsDefeated || health == null) return;
+            amount = Mathf.Max(0, amount);
+            if (amount == 0) return;
+
+            int blocked = Mathf.Min(shield, amount);
+            shield -= blocked;
+            amount -= blocked;
+            if (amount > 0) health.ApplyDamage(amount);
+        }
+
+        public void Heal(int amount)
+        {
+            if (health != null) health.Restore(amount);
+        }
+
+        public void AddShield(int amount)
+        {
+            shield = Mathf.Clamp(shield + Mathf.Max(0, amount), 0, 100);
+        }
+
+        public void HandleDefeat()
+        {
+            IsDefeated = true;
+            input = Vector3.zero;
+            enabled = false;
         }
 
         private void Update()
         {
-            Vector3 next = transform.position + input * moveSpeed * Time.deltaTime;
+            if (IsDefeated) return;
+
+            Vector3 desired = input * moveSpeed * Time.deltaTime;
+            Vector3 next = transform.position + desired;
             next.x = Mathf.Clamp(next.x, -worldLimit, worldLimit);
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
             next.y = 0f;
-            transform.position = next;
+
+            Vector3 delta = next - transform.position;
+            if (delta.sqrMagnitude > 0.00001f && !WouldCollide(next))
+                transform.position = next;
 
             if (input.sqrMagnitude > 0.0001f)
             {
@@ -54,50 +102,29 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        private bool WouldCollide(Vector3 position)
+        {
+            Collider[] hits = Physics.OverlapSphere(position + Vector3.up * 0.7f, collisionRadius, ~0, QueryTriggerInteraction.Ignore);
+            foreach (Collider hit in hits)
+            {
+                if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+                if (hit.GetComponentInParent<EnemyChase>() != null) continue;
+                if (hit.GetComponentInParent<Projectile>() != null) continue;
+                return true;
+            }
+            return false;
+        }
+
         private void EnsureGameplayComponents()
         {
-            if (GetComponent<TargetHealth>() == null)
-                gameObject.AddComponent<TargetHealth>();
-
-            if (GetComponent<PickupReceiver>() == null)
-                gameObject.AddComponent<PickupReceiver>();
+            health = GetComponent<TargetHealth>();
+            if (health == null) health = gameObject.AddComponent<TargetHealth>();
 
             weapon = GetComponent<WeaponController>();
             if (weapon == null) weapon = gameObject.AddComponent<WeaponController>();
 
             aim = GetComponent<NearestTargetAim>();
             if (aim == null) aim = gameObject.AddComponent<NearestTargetAim>();
-
-            Transform muzzle = transform.Find("WeaponMuzzle");
-            if (muzzle == null)
-            {
-                GameObject muzzleObject = new GameObject("WeaponMuzzle");
-                muzzle = muzzleObject.transform;
-                muzzle.SetParent(transform, false);
-                muzzle.localPosition = new Vector3(0f, 1.05f, 0.8f);
-            }
-
-            Projectile projectileTemplate = CreateProjectileTemplate();
-            weapon.Configure(projectileTemplate, muzzle);
-        }
-
-        private Projectile CreateProjectileTemplate()
-        {
-            GameObject projectileObject = new GameObject("RuntimeProjectileTemplate");
-            projectileObject.SetActive(false);
-            projectileObject.transform.position = transform.position;
-
-            SphereCollider collider = projectileObject.AddComponent<SphereCollider>();
-            collider.isTrigger = true;
-            collider.radius = 0.14f;
-
-            Rigidbody rigidbody = projectileObject.AddComponent<Rigidbody>();
-            rigidbody.isKinematic = true;
-            rigidbody.useGravity = false;
-            rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-
-            Projectile projectile = projectileObject.AddComponent<Projectile>();
-            return projectile;
         }
 
         private void EnsurePlayerVisual()
