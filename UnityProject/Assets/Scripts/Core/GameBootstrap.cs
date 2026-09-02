@@ -127,7 +127,10 @@ namespace PersiaWar.Unity2D5D
             roofMaterial = MakeMaterial("Roof", new Color(0.24f, 0.28f, 0.34f));
             accentMaterial = MakeMaterial("Accent", new Color(1.00f, 0.46f, 0.12f));
 
-            CreateBox("Ground", new Vector3(0f, -0.35f, 0f), new Vector3(worldSize, 0.5f, worldSize), groundMaterial, true);
+            GameObject terrainObject = new GameObject("Terrain3D");
+            terrainObject.transform.SetParent(worldRoot, true);
+            Terrain3DBuilder terrain = terrainObject.AddComponent<Terrain3DBuilder>();
+            terrain.Build();
 
             const float roadWidth = 8f;
             for (float x = -worldSize * 0.5f + roadWidth * 0.5f; x <= worldSize * 0.5f; x += 24f)
