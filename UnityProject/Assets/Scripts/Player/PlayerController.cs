@@ -11,11 +11,17 @@ namespace PersiaWar.Unity2D5D
         private Vector3 input;
         private Transform visualRoot;
         private Transform body;
+        private WeaponController weapon;
+        private NearestTargetAim aim;
+
+        public NearestTargetAim Aim => aim;
+        public WeaponController Weapon => weapon;
 
         private void Awake()
         {
             EnsurePlayerVisual();
             if (!CompareTag("Player")) gameObject.tag = "Player";
+            EnsureGameplayComponents();
         }
 
         public void SetMoveInput(Vector2 value)
@@ -46,6 +52,52 @@ namespace PersiaWar.Unity2D5D
             {
                 body.localPosition = Vector3.Lerp(body.localPosition, new Vector3(0f, 0.78f, 0f), 1f - Mathf.Exp(-12f * Time.deltaTime));
             }
+        }
+
+        private void EnsureGameplayComponents()
+        {
+            if (GetComponent<TargetHealth>() == null)
+                gameObject.AddComponent<TargetHealth>();
+
+            if (GetComponent<PickupReceiver>() == null)
+                gameObject.AddComponent<PickupReceiver>();
+
+            weapon = GetComponent<WeaponController>();
+            if (weapon == null) weapon = gameObject.AddComponent<WeaponController>();
+
+            aim = GetComponent<NearestTargetAim>();
+            if (aim == null) aim = gameObject.AddComponent<NearestTargetAim>();
+
+            Transform muzzle = transform.Find("WeaponMuzzle");
+            if (muzzle == null)
+            {
+                GameObject muzzleObject = new GameObject("WeaponMuzzle");
+                muzzle = muzzleObject.transform;
+                muzzle.SetParent(transform, false);
+                muzzle.localPosition = new Vector3(0f, 1.05f, 0.8f);
+            }
+
+            Projectile projectileTemplate = CreateProjectileTemplate();
+            weapon.Configure(projectileTemplate, muzzle);
+        }
+
+        private Projectile CreateProjectileTemplate()
+        {
+            GameObject projectileObject = new GameObject("RuntimeProjectileTemplate");
+            projectileObject.SetActive(false);
+            projectileObject.transform.position = transform.position;
+
+            SphereCollider collider = projectileObject.AddComponent<SphereCollider>();
+            collider.isTrigger = true;
+            collider.radius = 0.14f;
+
+            Rigidbody rigidbody = projectileObject.AddComponent<Rigidbody>();
+            rigidbody.isKinematic = true;
+            rigidbody.useGravity = false;
+            rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+            Projectile projectile = projectileObject.AddComponent<Projectile>();
+            return projectile;
         }
 
         private void EnsurePlayerVisual()
