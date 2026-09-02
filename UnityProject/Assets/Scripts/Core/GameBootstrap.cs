@@ -121,11 +121,11 @@ namespace PersiaWar.Unity2D5D
             if (worldRoot != null) Destroy(worldRoot.gameObject);
             worldRoot = new GameObject("BattleRoyaleCity").transform;
 
-            groundMaterial = MakeMaterial("Ground", new Color(0.20f, 0.25f, 0.20f));
-            roadMaterial = MakeMaterial("Road", new Color(0.12f, 0.13f, 0.14f));
-            buildingMaterial = MakeMaterial("Building", new Color(0.43f, 0.40f, 0.34f));
-            roofMaterial = MakeMaterial("Roof", new Color(0.20f, 0.21f, 0.22f));
-            accentMaterial = MakeMaterial("Accent", new Color(0.67f, 0.50f, 0.20f));
+            groundMaterial = MakeMaterial("Ground", new Color(0.33f, 0.68f, 0.18f));
+            roadMaterial = MakeMaterial("Road", new Color(0.18f, 0.20f, 0.22f));
+            buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
+            roofMaterial = MakeMaterial("Roof", new Color(0.24f, 0.28f, 0.34f));
+            accentMaterial = MakeMaterial("Accent", new Color(1.00f, 0.46f, 0.12f));
 
             CreateBox("Ground", new Vector3(0f, -0.35f, 0f), new Vector3(worldSize, 0.5f, worldSize), groundMaterial, true);
 
@@ -135,10 +135,27 @@ namespace PersiaWar.Unity2D5D
             for (float z = -worldSize * 0.5f + roadWidth * 0.5f; z <= worldSize * 0.5f; z += 24f)
                 CreateBox("RoadZ", new Vector3(0f, -0.04f, z), new Vector3(worldSize, 0.18f, roadWidth), roadMaterial, false);
 
+            BuildRoadMarkings(roadWidth);
             BuildCityBlocks(roadWidth);
             BuildLandmarks();
             BuildStreetProps();
             BuildRuinedQuarter();
+        }
+
+        private void BuildRoadMarkings(float roadWidth)
+        {
+            Material marking = MakeMaterial("RoadMarking", new Color(0.95f, 0.88f, 0.45f));
+            float half = worldSize * 0.5f;
+            for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+            {
+                for (float z = -half + 3f; z < half; z += 8f)
+                    CreateBox("RoadMark", new Vector3(x, 0.08f, z), new Vector3(0.32f, 0.04f, 3.0f), marking, false);
+            }
+            for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
+            {
+                for (float x = -half + 3f; x < half; x += 8f)
+                    CreateBox("RoadMark", new Vector3(x, 0.081f, z), new Vector3(3.0f, 0.04f, 0.32f), marking, false);
+            }
         }
 
         private void BuildCityBlocks(float roadWidth)
@@ -227,8 +244,15 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateTree(Vector3 position)
         {
-            GameObject trunk = CreateBox("TreeTrunk", position + Vector3.up * 0.8f, new Vector3(0.45f, 1.6f, 0.45f), MakeMaterial("Trunk", new Color(0.24f, 0.14f, 0.08f)), true);
-            CreatePart(PrimitiveType.Sphere, "TreeCrown", position + Vector3.up * 2.15f, new Vector3(2.2f, 2.0f, 2.2f), new Color(0.14f, 0.30f, 0.14f), false).transform.SetParent(worldRoot, true);
+            Material trunkMaterial = MakeMaterial("Trunk", new Color(0.34f, 0.20f, 0.10f));
+            Material foliageMaterial = MakeMaterial("Foliage", new Color(0.10f, 0.42f, 0.12f));
+            GameObject trunk = CreateBox("TreeTrunk", position + Vector3.up * 0.9f, new Vector3(0.42f, 1.8f, 0.42f), trunkMaterial, true);
+
+            GameObject crown = CreateBox("TreeCrown", position + Vector3.up * 2.4f, new Vector3(2.2f, 1.55f, 2.2f), foliageMaterial, false);
+            crown.transform.Rotate(0f, Random.Range(0f, 45f), 0f);
+            GameObject crownTop = CreateBox("TreeCrownTop", position + Vector3.up * 3.15f, new Vector3(1.45f, 0.85f, 1.45f), foliageMaterial, false);
+            crownTop.transform.Rotate(0f, 45f, 0f);
+
             trunk.transform.SetParent(worldRoot, true);
         }
 
