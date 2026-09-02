@@ -13,6 +13,12 @@ namespace PersiaWar.Unity2D5D
             CurrentHealth = maxHealth;
         }
 
+        public void SetMaxHealth(int value)
+        {
+            maxHealth = Mathf.Max(1, value);
+            CurrentHealth = maxHealth;
+        }
+
         public void ApplyDamage(int amount)
         {
             if (CurrentHealth <= 0) return;
