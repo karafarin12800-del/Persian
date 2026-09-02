@@ -119,7 +119,7 @@ namespace PersiaWar.Unity2D5D
 
             foreach (TargetHealth target in targets)
             {
-                if (target == null || target.transform == transform || !target.CompareTag("Enemy")) continue;
+                if (target == null || target.transform == transform || target.GetComponentInParent<EnemyChase>() == null) continue;
                 Vector3 delta = target.transform.position - origin;
                 delta.y = 0f;
                 float distance = delta.magnitude;
