@@ -16,10 +16,12 @@ namespace PersiaWar.Unity2D5D
         private WeaponController weapon;
         private NearestTargetAim aim;
         private TargetHealth health;
+        private PlayerInventory inventory;
 
         public NearestTargetAim Aim => aim;
         public WeaponController Weapon => weapon;
         public TargetHealth Health => health;
+        public PlayerInventory Inventory => inventory;
         public int Shield => shield;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
@@ -38,7 +40,6 @@ namespace PersiaWar.Unity2D5D
                 input = Vector3.zero;
                 return;
             }
-
             Vector2 clamped = Vector2.ClampMagnitude(value, 1f);
             input = new Vector3(clamped.x, 0f, clamped.y);
         }
@@ -82,8 +83,7 @@ namespace PersiaWar.Unity2D5D
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
             next.y = 0f;
 
-            Vector3 delta = next - transform.position;
-            if (delta.sqrMagnitude > 0.00001f && !WouldCollide(next))
+            if (desired.sqrMagnitude > 0.00001f && !WouldCollide(next))
                 transform.position = next;
 
             if (input.sqrMagnitude > 0.0001f)
@@ -110,6 +110,7 @@ namespace PersiaWar.Unity2D5D
                 if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
                 if (hit.GetComponentInParent<EnemyChase>() != null) continue;
                 if (hit.GetComponentInParent<Projectile>() != null) continue;
+                if (hit.GetComponentInParent<EnemyProjectile>() != null) continue;
                 return true;
             }
             return false;
@@ -125,6 +126,9 @@ namespace PersiaWar.Unity2D5D
 
             aim = GetComponent<NearestTargetAim>();
             if (aim == null) aim = gameObject.AddComponent<NearestTargetAim>();
+
+            inventory = GetComponent<PlayerInventory>();
+            if (inventory == null) inventory = gameObject.AddComponent<PlayerInventory>();
         }
 
         private void EnsurePlayerVisual()
@@ -153,8 +157,7 @@ namespace PersiaWar.Unity2D5D
             if (collider != null) Destroy(collider);
 
             Renderer renderer = part.GetComponent<Renderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = RuntimeMaterialFactory.Create(partName + "Material", color);
+            if (renderer != null) renderer.sharedMaterial = RuntimeMaterialFactory.Create(partName + "Material", color);
 
             return part.transform;
         }
