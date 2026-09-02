@@ -11,6 +11,7 @@ public class GameSession : MonoBehaviour
 
     public int EnemiesDefeated { get; private set; }
     public int Score { get; private set; }
+    public int CurrentWave { get; private set; } = 1;
     public float TimeRemaining { get; private set; }
     public bool IsRunning { get; private set; }
     public bool IsFinished { get; private set; }
@@ -36,6 +37,11 @@ public class GameSession : MonoBehaviour
         if (!IsRunning || IsFinished || !useMissionTimer) return;
         TimeRemaining = Mathf.Max(0f, TimeRemaining - Time.deltaTime);
         if (TimeRemaining <= 0f) EndMission(false);
+    }
+
+    public void SetWave(int wave)
+    {
+        CurrentWave = Mathf.Max(1, wave);
     }
 
     public void RegisterEnemyDefeated()
