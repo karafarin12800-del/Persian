@@ -82,11 +82,11 @@ jobs:
           echo "UNITY_EMAIL present: ${has_email}"
           echo "UNITY_PASSWORD present: ${has_password}"
 
-          if [[ "${has_license}" == "true" ]]; then
-            echo 'Activation mode detected: UNITY_LICENSE (Personal/manual license path).'
+          if [[ "${has_license}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
+            echo 'Activation mode detected: Personal/manual license (UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD).'
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           elif [[ "${has_serial}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
-            echo 'Activation mode detected: UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD.'
+            echo 'Activation mode detected: Professional/serial (UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD).'
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
             echo 'Activation configuration is incomplete; Unity build will be skipped.'
