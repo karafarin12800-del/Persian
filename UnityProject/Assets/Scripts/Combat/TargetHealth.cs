@@ -28,22 +28,21 @@ namespace PersiaWar.Unity2D5D
             CurrentHealth = Mathf.Max(0, CurrentHealth - amount);
             if (CurrentHealth > 0) return;
 
-            if (CompareTag("Player"))
+            PlayerController player = GetComponent<PlayerController>();
+            if (player != null)
             {
-                PlayerController player = GetComponent<PlayerController>();
-                if (player != null) player.HandleDefeat();
+                player.HandleDefeat();
                 return;
             }
 
-            if (CompareTag("Enemy"))
+            EnemyChase enemy = GetComponent<EnemyChase>();
+            if (enemy != null)
             {
-                int score = 10;
-                EnemyChase enemy = GetComponent<EnemyChase>();
-                if (enemy != null) score = enemy.ScoreValue;
+                int scoreBonus = Mathf.Max(0, enemy.ScoreValue - 10);
                 if (GameSession.Instance != null)
                 {
                     GameSession.Instance.RegisterEnemyDefeated();
-                    GameSession.Instance.AddScore(score - 10);
+                    GameSession.Instance.AddScore(scoreBonus);
                 }
             }
 
