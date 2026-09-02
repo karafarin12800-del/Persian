@@ -8,8 +8,6 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float joystickRadius = 120f;
         [SerializeField] private float minimapSize = 190f;
         [SerializeField] private float fireRepeatInterval = 0.155f;
-
-        // Legacy serialized fields kept intentionally so older scenes load without stale-field warnings.
         [SerializeField] private Camera gameplayCamera;
         [SerializeField] private float moveRadius = 140f;
 
@@ -79,7 +77,7 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
             float radius = joystickRadius * scale;
-            Vector2 grenadePos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
+            Vector2 grenadeGuiPos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
             float grenadeRadius = radius * 0.56f;
 
             for (int i = 0; i < Input.touchCount; i++)
@@ -96,7 +94,8 @@ namespace PersiaWar.Unity2D5D
                     continue;
                 }
 
-                if (!leftSide && grenadePointerId < 0 && Vector2.Distance(touch.position, grenadePos) <= grenadeRadius)
+                Vector2 touchGuiPosition = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (!leftSide && grenadePointerId < 0 && Vector2.Distance(touchGuiPosition, grenadeGuiPos) <= grenadeRadius)
                 {
                     grenadePointerId = touch.fingerId;
                     ThrowGrenadeAtTarget();
@@ -248,12 +247,14 @@ namespace PersiaWar.Unity2D5D
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
             float radius = joystickRadius * scale;
             Vector2 defaultBase = new Vector2(120f * scale, Screen.height - 140f * scale);
-            Vector2 basePos = movePointerId >= 0 ? moveStartScreen : defaultBase;
+            Vector2 basePos = movePointerId >= 0
+                ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y)
+                : defaultBase;
             Vector2 firePos = new Vector2(Screen.width - 120f * scale, Screen.height - 140f * scale);
             Vector2 grenadePos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
 
             DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.34f));
-            DrawCircle(basePos + moveValue * radius, radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
+            DrawCircle(new Vector2(basePos.x, Screen.height - (basePos.y + moveValue.y * radius)), radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
 
             DrawCircle(firePos, radius * 0.72f, new Color(0.65f, 0.12f, 0.08f, firePointerId >= 0 ? 0.50f : 0.28f));
             DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
