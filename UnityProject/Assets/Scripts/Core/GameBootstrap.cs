@@ -7,6 +7,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private Camera gameplayCamera;
         [SerializeField] private float worldSize = 192f;
         [SerializeField] private int seed = 32025;
+        [SerializeField] private int enemyCount = 12;
 
         private Transform worldRoot;
         private Material groundMaterial;
@@ -31,9 +32,21 @@ namespace PersiaWar.Unity2D5D
                 player.transform.position = new Vector3(0f, 0f, -4f);
                 CameraFollow25D follow = gameplayCamera != null ? gameplayCamera.GetComponent<CameraFollow25D>() : null;
                 if (follow != null) follow.SetTarget(player.transform);
+                EnsureEnemySpawner(player.transform);
             }
 
             BuildWorld();
+        }
+
+        private void EnsureEnemySpawner(Transform player)
+        {
+            EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
+            if (spawner == null)
+            {
+                GameObject objectRoot = new GameObject("EnemySpawner");
+                spawner = objectRoot.AddComponent<EnemySpawner>();
+            }
+            spawner.Configure(player, enemyCount, 70f, 1.6f);
         }
 
         private void ConfigureCamera()
