@@ -49,20 +49,33 @@ jobs:
   build-android:
     name: Build Android APK
     needs: validate
-    # GitHub Actions does not expose secrets to repository code as plain text.
-    # When no Unity activation secret is configured, this job is intentionally skipped
-    # so source changes do not appear as broken builds. Configure a Unity Personal
-    # license in UNITY_LICENSE (plus UNITY_EMAIL/UNITY_PASSWORD) or a Professional
-    # serial in UNITY_SERIAL (plus UNITY_EMAIL/UNITY_PASSWORD) to enable the APK build.
-    if: ${{ secrets.UNITY_LICENSE != '' || (secrets.UNITY_SERIAL != '' && secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '') }}
     runs-on: ubuntu-latest
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
 
+      - name: Check Unity activation configuration
+        id: activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${UNITY_LICENSE}" || ( -n "${UNITY_SERIAL}" && -n "${UNITY_EMAIL}" && -n "${UNITY_PASSWORD}" ) ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'Unity activation configuration is present.'
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Unity activation is not configured. APK build is waiting for the repository Unity license secrets.'
+          fi
+
       - name: Cache Unity Library
+        if: steps.activation.outputs.ready == 'true'
         uses: actions/cache@v4
         with:
           path: UnityProject/Library
@@ -73,12 +86,8 @@ jobs:
             Library-
 
       - name: Build Unity project
+        if: steps.activation.outputs.ready == 'true'
         uses: game-ci/unity-builder@v4
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: UnityProject
           targetPlatform: Android
@@ -88,6 +97,7 @@ jobs:
           androidSymbolType: none
 
       - name: Verify APK
+        if: steps.activation.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -99,6 +109,7 @@ jobs:
           echo "Verified APK: $apk"
 
       - name: Upload APK
+        if: steps.activation.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: PersiaWar-Android-${{ github.sha }}
