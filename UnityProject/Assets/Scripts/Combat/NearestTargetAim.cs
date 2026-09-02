@@ -52,7 +52,8 @@ namespace PersiaWar.Unity2D5D
             foreach (Collider hit in hits)
             {
                 TargetHealth candidate = hit.GetComponentInParent<TargetHealth>();
-                if (candidate == null || !candidate.isActiveAndEnabled || !candidate.CompareTag("Enemy")) continue;
+                if (candidate == null || !candidate.isActiveAndEnabled) continue;
+                if (candidate.GetComponentInParent<EnemyChase>() == null) continue;
 
                 float distance = (candidate.transform.position - transform.position).sqrMagnitude;
                 if (distance >= bestDistance) continue;
@@ -76,7 +77,7 @@ namespace PersiaWar.Unity2D5D
                 return true;
 
             TargetHealth hitTarget = hit.collider.GetComponentInParent<TargetHealth>();
-            return hitTarget != null && hitTarget.CompareTag("Enemy");
+            return hitTarget != null && hitTarget.GetComponentInParent<EnemyChase>() != null;
         }
     }
 }
