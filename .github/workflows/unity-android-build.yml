@@ -118,6 +118,7 @@ jobs:
             Library-UnityProject-
             Library-
 
+      # Deliberately unconditional: a green build job must contain a real Unity build.
       - name: Build Unity project
         uses: game-ci/unity-builder@v4
         env:
