@@ -8,57 +8,152 @@ on:
         required: true
         default: 'unity-2.5d'
         type: string
+  push:
+    branches:
+      - unity-2.5d
+    paths:
+      - 'UnityProject/**'
+      - '.github/workflows/unity-android-build.yml'
+
+concurrency:
+  group: persiawar-unity-android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-android:
-    name: Build Unity Android APK
+  validate:
+    name: Validate Unity project
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout selected Unity branch
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.build_ref }}
-          fetch-depth: 1
+          lfs: true
 
-      - name: Validate Unity project
+      - name: Validate required Unity files
         shell: bash
         run: |
           set -euo pipefail
           test -f UnityProject/ProjectSettings/ProjectVersion.txt
-          test -d UnityProject/Assets
-          echo "Unity project detected"
-          grep -E '^m_EditorVersion:' UnityProject/ProjectSettings/ProjectVersion.txt || true
+          test -f UnityProject/ProjectSettings/EditorBuildSettings.asset
+          test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          test -f UnityProject/Assets/Resources/PersiaWarLit.shader
+          test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
+          test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
+          grep -q 'Assets/Scenes/PersiaWarPrototype.unity' UnityProject/ProjectSettings/EditorBuildSettings.asset
+          grep -q 'm_Name: GameRoot' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          grep -q 'm_Name: Main Camera' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          echo 'Unity project structure validation passed.'
+
+      - name: Report Unity version
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -E '^m_EditorVersion:' UnityProject/ProjectSettings/ProjectVersion.txt
+
+      - name: Check for tracked build outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(Library|Temp|Obj|Builds?)/' >/dev/null; then
+            echo 'Tracked Unity build/cache output detected.'
+            exit 1
+          fi
+          echo 'Repository hygiene validation passed.'
+
+  build-android:
+    name: Build Android APK
+    needs: validate
+    runs-on: ubuntu-latest
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.build_ref || github.ref }}
+          lfs: true
+
+      - name: Check Unity activation configuration
+        id: activation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_license=false
+          has_serial=false
+          has_email=false
+          has_password=false
+
+          [[ -n "${UNITY_LICENSE}" ]] && has_license=true
+          [[ -n "${UNITY_SERIAL}" ]] && has_serial=true
+          [[ -n "${UNITY_EMAIL}" ]] && has_email=true
+          [[ -n "${UNITY_PASSWORD}" ]] && has_password=true
+
+          echo "UNITY_LICENSE present: ${has_license}"
+          echo "UNITY_SERIAL present: ${has_serial}"
+          echo "UNITY_EMAIL present: ${has_email}"
+          echo "UNITY_PASSWORD present: ${has_password}"
+
+          if [[ "${has_license}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
+            echo 'Activation mode detected: Unity Personal/manual license.'
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          elif [[ "${has_serial}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
+            echo 'Activation mode detected: Unity serial license.'
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Activation configuration is incomplete.'
+            echo 'Required for Unity Personal CI: UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD.'
+            echo 'Required for serial licensing: UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD.'
+            echo 'No secret values are printed.'
+            exit 1
+          fi
+
+      - name: Cache Unity Library
+        if: success()
+        uses: actions/cache@v4
+        with:
+          path: UnityProject/Library
+          key: Library-UnityProject-Android-${{ hashFiles('UnityProject/Assets/**', 'UnityProject/Packages/**', 'UnityProject/ProjectSettings/**') }}
+          restore-keys: |
+            Library-UnityProject-Android-
+            Library-UnityProject-
+            Library-
 
       - name: Build Unity project
+        if: success()
         uses: game-ci/unity-builder@v4
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: UnityProject
           targetPlatform: Android
           versioning: Semantic
+          buildName: PersiaWar
           androidExportType: androidPackage
           androidSymbolType: none
 
-      - name: Locate APK
+      - name: Verify APK
+        if: success()
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/Android
-          found="$(find . -type f -name '*.apk' -print -quit)"
-          if [ -z "$found" ]; then
-            echo "No APK was produced"
-            exit 1
-          fi
-          echo "APK found: $found"
-          cp "$found" build/Android/PersiaWar-Unity.apk
+          test -d build/Android
+          apk=$(find build/Android -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$apk"
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          echo "Verified APK: $apk"
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PersiaWar-Unity-Android
-          path: build/Android/PersiaWar-Unity.apk
+          name: PersiaWar-Android-${{ github.sha }}
+          path: build/Android/*.apk
           if-no-files-found: error
