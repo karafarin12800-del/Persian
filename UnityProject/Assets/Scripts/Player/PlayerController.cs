@@ -17,11 +17,13 @@ namespace PersiaWar.Unity2D5D
         private NearestTargetAim aim;
         private TargetHealth health;
         private PlayerInventory inventory;
+        private GrenadeController grenadeController;
 
         public NearestTargetAim Aim => aim;
         public WeaponController Weapon => weapon;
         public TargetHealth Health => health;
         public PlayerInventory Inventory => inventory;
+        public GrenadeController Grenades => grenadeController;
         public int Shield => shield;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
@@ -71,6 +73,7 @@ namespace PersiaWar.Unity2D5D
             IsDefeated = true;
             input = Vector3.zero;
             enabled = false;
+            GameSession.Instance?.EndMission(false);
         }
 
         private void Update()
@@ -129,6 +132,9 @@ namespace PersiaWar.Unity2D5D
 
             inventory = GetComponent<PlayerInventory>();
             if (inventory == null) inventory = gameObject.AddComponent<PlayerInventory>();
+
+            grenadeController = GetComponent<GrenadeController>();
+            if (grenadeController == null) grenadeController = gameObject.AddComponent<GrenadeController>();
         }
 
         private void EnsurePlayerVisual()
