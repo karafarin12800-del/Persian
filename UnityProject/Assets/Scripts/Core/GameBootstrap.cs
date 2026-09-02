@@ -43,7 +43,8 @@ namespace PersiaWar.Unity2D5D
             gameplayCamera.fieldOfView = 52f;
             gameplayCamera.nearClipPlane = 0.1f;
             gameplayCamera.farClipPlane = 220f;
-            // Match the gameplay camera's normal 3D angle immediately on frame one.
+            gameplayCamera.allowHDR = false;
+            gameplayCamera.allowMSAA = true;
             gameplayCamera.transform.position = new Vector3(0f, 11f, -11f);
             gameplayCamera.transform.rotation = Quaternion.Euler(48f, 0f, 0f);
         }
@@ -65,7 +66,11 @@ namespace PersiaWar.Unity2D5D
                 sun = lightObject.AddComponent<Light>();
                 sun.type = LightType.Directional;
             }
+            sun.type = LightType.Directional;
             sun.intensity = 1.15f;
+            sun.color = new Color(1f, 0.93f, 0.82f);
+            sun.shadows = LightShadows.Soft;
+            sun.shadowStrength = 0.78f;
             sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
         }
 
@@ -228,10 +233,7 @@ namespace PersiaWar.Unity2D5D
 
         private Material MakeMaterial(string name, Color color)
         {
-            Shader shader = Shader.Find("Standard");
-            Material material = new Material(shader) { name = name, color = color };
-            material.enableInstancing = true;
-            return material;
+            return RuntimeMaterialFactory.Create(name, color);
         }
     }
 }
