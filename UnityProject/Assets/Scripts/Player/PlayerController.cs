@@ -30,7 +30,6 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
-            if (!CompareTag("Player")) gameObject.tag = "Player";
             EnsurePlayerVisual();
             EnsureGameplayComponents();
         }
