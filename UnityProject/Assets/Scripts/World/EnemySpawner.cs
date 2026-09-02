@@ -57,7 +57,7 @@ namespace PersiaWar.Unity2D5D
             int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
             int spawned = 0;
 
-            for (int i = 0; i < count * 2 && spawned < count; i++)
+            for (int i = 0; i < count * 3 && spawned < count; i++)
             {
                 float angle = Random.Range(0f, Mathf.PI * 2f);
                 float distance = Random.Range(spawnRadius * 0.72f, spawnRadius);
@@ -136,78 +136,6 @@ namespace PersiaWar.Unity2D5D
 
             PickupItem item = pickup.AddComponent<PickupItem>();
             item.Configure(type, amount);
-        }
-    }
-
-    public sealed class EnemyChase : MonoBehaviour
-    {
-        private Transform target;
-        private float speed;
-        private int damage;
-        private float attackDistance;
-        private float attackCooldown;
-        private float rangedCooldown;
-        private float nextAttackTime;
-        private float nextRangedTime;
-        private int archetype;
-
-        public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
-
-        public void Configure(Transform targetTransform, int enemyArchetype)
-        {
-            target = targetTransform;
-            archetype = enemyArchetype;
-            speed = archetype == 3 ? 3.5f : (archetype == 2 ? 3.0f : 2.5f);
-            damage = archetype == 3 ? 12 : (archetype == 2 ? 8 : 6);
-            attackDistance = archetype == 3 ? 2.7f : 2.35f;
-            attackCooldown = archetype == 3 ? 1.15f : (archetype == 2 ? 1.4f : 1.8f);
-            rangedCooldown = archetype == 3 ? 1.15f : (archetype == 2 ? 1.5f : 1.8f);
-        }
-
-        private void Update()
-        {
-            if (target == null) return;
-
-            Vector3 direction = target.position - transform.position;
-            direction.y = 0f;
-            float distance = direction.magnitude;
-            if (distance <= 0.01f) return;
-
-            Vector3 normalized = direction / distance;
-            transform.rotation = Quaternion.LookRotation(normalized, Vector3.up);
-
-            if (distance > attackDistance)
-                transform.position += normalized * speed * Time.deltaTime;
-
-            if (distance <= attackDistance && Time.time >= nextAttackTime)
-            {
-                PlayerController player = target.GetComponentInParent<PlayerController>();
-                if (player != null) player.ReceiveDamage(damage);
-                nextAttackTime = Time.time + attackCooldown;
-            }
-
-            if (distance <= 36f && Time.time >= nextRangedTime)
-            {
-                FireProjectile(normalized);
-                nextRangedTime = Time.time + rangedCooldown;
-            }
-        }
-
-        private void FireProjectile(Vector3 direction)
-        {
-            GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            projectile.name = "EnemyProjectile";
-            projectile.transform.position = transform.position + Vector3.up * 0.7f + direction * 0.8f;
-            projectile.transform.localScale = Vector3.one * 0.18f;
-
-            SphereCollider collider = projectile.GetComponent<SphereCollider>();
-            collider.isTrigger = true;
-            Rigidbody body = projectile.AddComponent<Rigidbody>();
-            body.isKinematic = true;
-            body.useGravity = false;
-
-            EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
-            shot.Configure(direction, archetype == 3 ? 12 : 8);
         }
     }
 }

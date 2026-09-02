@@ -25,9 +25,23 @@ namespace PersiaWar.Unity2D5D
 
         private void OnTriggerEnter(Collider other)
         {
+            if (other == null) return;
+
             PlayerController player = other.GetComponentInParent<PlayerController>();
-            if (player == null) return;
-            player.ReceiveDamage(damage);
+            if (player != null)
+            {
+                player.ReceiveDamage(damage);
+                Destroy(gameObject);
+                return;
+            }
+
+            if (other.GetComponentInParent<EnemyChase>() != null)
+                return;
+
+            if (other.GetComponentInParent<Projectile>() != null)
+                return;
+
+            // Enemy rounds stop on buildings, trees and other world geometry.
             Destroy(gameObject);
         }
     }

@@ -30,14 +30,21 @@ namespace PersiaWar.Unity2D5D
 
         private void OnTriggerEnter(Collider other)
         {
+            if (other == null) return;
             if (other.GetComponentInParent<PlayerController>() != null) return;
+            if (other.GetComponentInParent<Projectile>() != null) return;
+            if (other.GetComponentInParent<EnemyProjectile>() != null) return;
 
             TargetHealth target = other.GetComponentInParent<TargetHealth>();
             if (target != null && target.CompareTag("Enemy"))
             {
                 target.ApplyDamage(damage);
                 Destroy(gameObject);
+                return;
             }
+
+            // World geometry stops the shot; this prevents bullets passing through buildings and trees.
+            Destroy(gameObject);
         }
     }
 }
