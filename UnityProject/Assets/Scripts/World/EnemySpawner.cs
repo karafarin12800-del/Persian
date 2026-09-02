@@ -11,7 +11,6 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int maxPerWave = 15;
 
         private int wave = 1;
-        private float nextWaveTime;
         private bool spawning;
 
         public int CurrentWave => wave;
@@ -20,7 +19,7 @@ namespace PersiaWar.Unity2D5D
         {
             player = playerTransform;
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
-            spawnRadius = Mathf.Max(12f, radius);
+            spawnRadius = Mathf.Max(16f, radius);
         }
 
         private void Start()
@@ -30,7 +29,6 @@ namespace PersiaWar.Unity2D5D
                 PlayerController found = FindFirstObjectByType<PlayerController>();
                 if (found != null) player = found.transform;
             }
-
             if (player != null) SpawnWave();
         }
 
@@ -39,9 +37,8 @@ namespace PersiaWar.Unity2D5D
             if (player == null || spawning) return;
 
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
-            if (enemies.Length == 0 && Time.time >= nextWaveTime)
+            if (enemies.Length == 0)
             {
-                nextWaveTime = Time.time + nextWaveDelay;
                 spawning = true;
                 Invoke(nameof(SpawnNextWave), nextWaveDelay);
             }
@@ -50,46 +47,95 @@ namespace PersiaWar.Unity2D5D
         private void SpawnNextWave()
         {
             spawning = false;
+            if (player == null || player.GetComponent<PlayerController>()?.IsDefeated == true) return;
             wave++;
             SpawnWave();
         }
 
         private void SpawnWave()
         {
-            if (player == null) return;
-
             int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
-            for (int i = 0; i < count; i++)
+            int spawned = 0;
+
+            for (int i = 0; i < count * 2 && spawned < count; i++)
             {
-                float angle = (i / Mathf.Max(1f, count)) * Mathf.PI * 2f + Random.Range(-0.25f, 0.25f);
+                float angle = Random.Range(0f, Mathf.PI * 2f);
                 float distance = Random.Range(spawnRadius * 0.72f, spawnRadius);
-                Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
-                Vector3 spawnPosition = player.position + offset;
-                spawnPosition.y = 0f;
+                Vector3 position = player.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
+                position.y = 1f;
 
-                if (Physics.CheckSphere(spawnPosition + Vector3.up * 0.7f, 1f, ~0, QueryTriggerInteraction.Ignore))
-                    continue;
-
-                GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                enemy.name = $"Enemy_W{wave}_{i}";
-                enemy.tag = "Enemy";
-                enemy.transform.position = spawnPosition + Vector3.up * 1f;
-                enemy.transform.localScale = new Vector3(0.9f, 1f, 0.9f);
-
-                Renderer renderer = enemy.GetComponent<Renderer>();
-                if (renderer != null)
-                {
-                    int archetype = i % 7 == 0 ? 3 : (i % 3 == 0 ? 2 : 1);
-                    Color color = archetype == 3 ? new Color(0.28f, 0.06f, 0.05f) : (archetype == 2 ? new Color(0.40f, 0.12f, 0.08f) : new Color(0.48f, 0.18f, 0.12f));
-                    renderer.sharedMaterial = RuntimeMaterialFactory.Create(enemy.name + "Material", color);
-                }
-
-                TargetHealth health = enemy.AddComponent<TargetHealth>();
-                EnemyChase chase = enemy.AddComponent<EnemyChase>();
-                int type = i % 7 == 0 ? 3 : (i % 3 == 0 ? 2 : 1);
-                health.SetMaxHealth(type == 3 ? 160 : (type == 2 ? 120 : 100));
-                chase.Configure(player, type);
+                if (Physics.CheckSphere(position + Vector3.up * 0.7f, 0.85f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                SpawnEnemy(position, spawned, wave);
+                spawned++;
             }
+
+            if (GameSession.Instance != null)
+                GameSession.Instance.SetWave(wave);
+
+            SpawnWaveReward();
+        }
+
+        private void SpawnEnemy(Vector3 position, int index, int currentWave)
+        {
+            int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
+            GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            enemy.name = $"Enemy_W{currentWave}_{index}";
+            enemy.tag = "Enemy";
+            enemy.transform.position = position;
+            enemy.transform.localScale = new Vector3(0.9f, 1f, 0.9f);
+
+            Renderer renderer = enemy.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                Color color = archetype == 3 ? new Color(0.28f, 0.06f, 0.05f) : (archetype == 2 ? new Color(0.40f, 0.12f, 0.08f) : new Color(0.48f, 0.18f, 0.12f));
+                renderer.sharedMaterial = RuntimeMaterialFactory.Create(enemy.name + "Material", color);
+            }
+
+            TargetHealth health = enemy.AddComponent<TargetHealth>();
+            health.SetMaxHealth(archetype == 3 ? 160 : (archetype == 2 ? 120 : 100));
+
+            EnemyChase chase = enemy.AddComponent<EnemyChase>();
+            chase.Configure(player, archetype);
+        }
+
+        private void SpawnWaveReward()
+        {
+            if (player == null) return;
+            Vector3[] points =
+            {
+                player.position + new Vector3(7f, 0.5f, -5f),
+                player.position + new Vector3(-7f, 0.5f, 5f),
+                player.position + new Vector3(4f, 0.5f, 7f)
+            };
+
+            SpawnPickup(points[0], PickupItem.PickupType.Ammo, 30);
+            SpawnPickup(points[1], PickupItem.PickupType.Medkit, 35);
+            SpawnPickup(points[2], PickupItem.PickupType.Grenade, 1);
+        }
+
+        private void SpawnPickup(Vector3 position, PickupItem.PickupType type, int amount)
+        {
+            GameObject pickup = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            pickup.name = $"Pickup_{type}";
+            pickup.transform.position = position;
+            pickup.transform.localScale = Vector3.one * 0.65f;
+
+            Collider collider = pickup.GetComponent<Collider>();
+            if (collider != null)
+            {
+                collider.isTrigger = true;
+                collider.enabled = true;
+            }
+
+            Renderer renderer = pickup.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                Color color = type == PickupItem.PickupType.Ammo ? new Color(0.95f, 0.72f, 0.12f) : (type == PickupItem.PickupType.Medkit ? new Color(0.14f, 0.75f, 0.28f) : new Color(0.55f, 0.28f, 0.78f));
+                renderer.sharedMaterial = RuntimeMaterialFactory.Create(pickup.name + "Material", color);
+            }
+
+            PickupItem item = pickup.AddComponent<PickupItem>();
+            item.Configure(type, amount);
         }
     }
 
@@ -100,15 +146,22 @@ namespace PersiaWar.Unity2D5D
         private int damage;
         private float attackDistance;
         private float attackCooldown;
+        private float rangedCooldown;
         private float nextAttackTime;
+        private float nextRangedTime;
+        private int archetype;
 
-        public void Configure(Transform targetTransform, int archetype)
+        public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
+
+        public void Configure(Transform targetTransform, int enemyArchetype)
         {
             target = targetTransform;
+            archetype = enemyArchetype;
             speed = archetype == 3 ? 3.5f : (archetype == 2 ? 3.0f : 2.5f);
             damage = archetype == 3 ? 12 : (archetype == 2 ? 8 : 6);
             attackDistance = archetype == 3 ? 2.7f : 2.35f;
             attackCooldown = archetype == 3 ? 1.15f : (archetype == 2 ? 1.4f : 1.8f);
+            rangedCooldown = archetype == 3 ? 1.15f : (archetype == 2 ? 1.5f : 1.8f);
         }
 
         private void Update()
@@ -124,19 +177,37 @@ namespace PersiaWar.Unity2D5D
             transform.rotation = Quaternion.LookRotation(normalized, Vector3.up);
 
             if (distance > attackDistance)
-            {
-                Vector3 next = transform.position + normalized * speed * Time.deltaTime;
-                if (!Physics.CheckSphere(next + Vector3.up * 0.7f, 0.55f, ~0, QueryTriggerInteraction.Ignore) || Physics.CheckSphere(next + Vector3.up * 0.7f, 0.55f, LayerMask.GetMask("Player"), QueryTriggerInteraction.Ignore))
-                    transform.position = next;
-                return;
-            }
+                transform.position += normalized * speed * Time.deltaTime;
 
-            if (Time.time >= nextAttackTime)
+            if (distance <= attackDistance && Time.time >= nextAttackTime)
             {
                 PlayerController player = target.GetComponentInParent<PlayerController>();
                 if (player != null) player.ReceiveDamage(damage);
                 nextAttackTime = Time.time + attackCooldown;
             }
+
+            if (distance <= 36f && Time.time >= nextRangedTime)
+            {
+                FireProjectile(normalized);
+                nextRangedTime = Time.time + rangedCooldown;
+            }
+        }
+
+        private void FireProjectile(Vector3 direction)
+        {
+            GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            projectile.name = "EnemyProjectile";
+            projectile.transform.position = transform.position + Vector3.up * 0.7f + direction * 0.8f;
+            projectile.transform.localScale = Vector3.one * 0.18f;
+
+            SphereCollider collider = projectile.GetComponent<SphereCollider>();
+            collider.isTrigger = true;
+            Rigidbody body = projectile.AddComponent<Rigidbody>();
+            body.isKinematic = true;
+            body.useGravity = false;
+
+            EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
+            shot.Configure(direction, archetype == 3 ? 12 : 8);
         }
     }
 }
