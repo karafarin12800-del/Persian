@@ -5,12 +5,12 @@ public class GameSession : MonoBehaviour
 {
     public static GameSession Instance { get; private set; }
 
-    [Header("Mission")]
-    [SerializeField] private int enemiesRequired = 10;
+    [Header("Match")]
+    [SerializeField] private bool useMissionTimer = false;
     [SerializeField] private float missionTime = 300f;
 
     public int EnemiesDefeated { get; private set; }
-    public int EnemiesRequired => enemiesRequired;
+    public int Score { get; private set; }
     public float TimeRemaining { get; private set; }
     public bool IsRunning { get; private set; }
     public bool IsFinished { get; private set; }
@@ -23,15 +23,17 @@ public class GameSession : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
         Instance = this;
         DontDestroyOnLoad(gameObject);
         TimeRemaining = missionTime;
         IsRunning = true;
+        Time.timeScale = 1f;
     }
 
     private void Update()
     {
-        if (!IsRunning || IsFinished) return;
+        if (!IsRunning || IsFinished || !useMissionTimer) return;
         TimeRemaining = Mathf.Max(0f, TimeRemaining - Time.deltaTime);
         if (TimeRemaining <= 0f) EndMission(false);
     }
@@ -40,7 +42,13 @@ public class GameSession : MonoBehaviour
     {
         if (IsFinished) return;
         EnemiesDefeated++;
-        if (EnemiesDefeated >= enemiesRequired) EndMission(true);
+        Score += 10;
+    }
+
+    public void AddScore(int value)
+    {
+        if (IsFinished) return;
+        Score += Mathf.Max(0, value);
     }
 
     public void EndMission(bool won)
