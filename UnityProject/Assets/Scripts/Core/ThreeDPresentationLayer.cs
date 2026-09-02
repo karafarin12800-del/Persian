@@ -77,9 +77,11 @@ namespace PersiaWar.Unity2D5D
             camera.fieldOfView = Mathf.Clamp(camera.fieldOfView, 48f, 54f);
             camera.nearClipPlane = 0.08f;
             camera.farClipPlane = 240f;
-            camera.allowHDR = true;
+            camera.allowHDR = false;
             camera.allowMSAA = true;
-            camera.depthTextureMode |= DepthTextureMode.Depth;
+            camera.depthTextureMode = DepthTextureMode.None;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.055f, 0.07f, 0.085f, 1f);
         }
 
         private static void UpgradeSceneRenderers()
@@ -103,9 +105,6 @@ namespace PersiaWar.Unity2D5D
 
                 if (material.HasProperty("_Metallic"))
                     material.SetFloat("_Metallic", MaterialMetallic(renderer.gameObject.name));
-
-                if (material.HasProperty("_BumpScale"))
-                    material.SetFloat("_BumpScale", 0.35f);
             }
         }
 
