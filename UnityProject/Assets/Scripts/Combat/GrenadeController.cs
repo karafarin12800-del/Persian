@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
@@ -16,27 +17,35 @@ namespace PersiaWar.Unity2D5D
 
         public bool Throw(Vector2 direction)
         {
-            if (grenades <= 0) return false;
+            if (grenades <= 0 || direction.sqrMagnitude < 0.0001f)
+                return false;
+
             grenades--;
             Vector3 origin = throwOrigin != null ? throwOrigin.position : transform.position;
-            Vector3 target = origin + new Vector3(direction.x, 0f, direction.y).normalized * throwDistance;
-            if (grenadePrefab != null)
-            {
-                GameObject grenade = Instantiate(grenadePrefab, target, Quaternion.identity);
-                Destroy(grenade, fuse);
-            }
-            Invoke(nameof(Explode), fuse);
+            Vector2 normalized = direction.normalized;
+            Vector3 target = origin + new Vector3(normalized.x, 0f, normalized.y) * throwDistance;
+            StartCoroutine(ResolveThrow(target));
             return true;
         }
 
-        private void Explode()
+        private IEnumerator ResolveThrow(Vector3 target)
         {
-            Collider[] hits = Physics.OverlapSphere(transform.position, explosionRadius);
+            GameObject grenade = null;
+            if (grenadePrefab != null)
+                grenade = Instantiate(grenadePrefab, target, Quaternion.identity);
+
+            yield return new WaitForSeconds(fuse);
+
+            Collider[] hits = Physics.OverlapSphere(target, explosionRadius, ~0, QueryTriggerInteraction.Collide);
             foreach (Collider hit in hits)
             {
                 TargetHealth health = hit.GetComponentInParent<TargetHealth>();
-                if (health != null && hit.CompareTag("Enemy")) health.ApplyDamage(damage);
+                if (health != null && hit.CompareTag("Enemy"))
+                    health.ApplyDamage(damage);
             }
+
+            if (grenade != null)
+                Destroy(grenade);
         }
     }
 }
