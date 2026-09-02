@@ -72,14 +72,14 @@ namespace PersiaWar.Unity2D5D
             foreach (Collider hit in hits)
             {
                 TargetHealth health = hit.GetComponentInParent<TargetHealth>();
-                if (health != null && health.CompareTag("Enemy"))
-                {
-                    Vector3 delta = health.transform.position - target;
-                    float distance = delta.magnitude;
-                    int scaledDamage = Mathf.RoundToInt(damage * Mathf.Clamp01(1f - distance / explosionRadius));
-                    if (distance <= explosionRadius)
-                        health.ApplyDamage(Mathf.Max(1, scaledDamage));
-                }
+                EnemyChase enemy = hit.GetComponentInParent<EnemyChase>();
+                if (health == null || enemy == null) continue;
+
+                float distance = (health.transform.position - target).magnitude;
+                if (distance > explosionRadius) continue;
+
+                int scaledDamage = Mathf.RoundToInt(damage * Mathf.Clamp01(1f - distance / explosionRadius));
+                health.ApplyDamage(Mathf.Max(1, scaledDamage));
             }
 
             if (grenade != null)
