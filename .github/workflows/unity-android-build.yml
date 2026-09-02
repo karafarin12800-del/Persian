@@ -2,6 +2,12 @@ name: Unity Android Build
 
 on:
   workflow_dispatch:
+    inputs:
+      build_ref:
+        description: 'Unity branch or commit to build'
+        required: true
+        default: 'unity-2.5d'
+        type: string
   push:
     branches:
       - unity-2.5d
@@ -20,6 +26,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Validate required Unity files
         shell: bash
@@ -35,6 +43,12 @@ jobs:
           grep -q 'm_Name: GameRoot' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           grep -q 'm_Name: Main Camera' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           echo 'Unity project structure validation passed.'
+
+      - name: Report Unity version
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -E '^m_EditorVersion:' UnityProject/ProjectSettings/ProjectVersion.txt
 
       - name: Check for tracked build outputs
         shell: bash
@@ -59,6 +73,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.build_ref || github.ref }}
           lfs: true
 
       - name: Check Unity activation configuration
@@ -83,14 +98,21 @@ jobs:
           echo "UNITY_PASSWORD present: ${has_password}"
 
           if [[ "${has_license}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
-            echo 'Activation mode detected: Personal/manual license (UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD).'
+            echo 'Activation mode detected: Unity Personal/manual license.'
             echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'mode=personal' >> "$GITHUB_OUTPUT"
           elif [[ "${has_serial}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
-            echo 'Activation mode detected: Professional/serial (UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD).'
+            echo 'Activation mode detected: Unity serial license.'
             echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'mode=serial' >> "$GITHUB_OUTPUT"
           else
-            echo 'Activation configuration is incomplete; Unity build will be skipped.'
+            echo 'Activation configuration is incomplete.'
+            echo 'Required for Unity Personal CI: UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD.'
+            echo 'Required for serial licensing: UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD.'
+            echo 'No secret values are printed.'
             echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'mode=missing' >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
       - name: Cache Unity Library
@@ -107,6 +129,11 @@ jobs:
       - name: Build Unity project
         if: steps.activation.outputs.ready == 'true'
         uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: UnityProject
           targetPlatform: Android
