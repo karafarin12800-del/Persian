@@ -175,7 +175,6 @@ jobs:
         with:
           projectPath: UnityProject
           targetPlatform: Android
-          targetPlatform: Android
           androidTargetSdkVersion: '35'
           versioning: Semantic
           buildName: PersiaWar
