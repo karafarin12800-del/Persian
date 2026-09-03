@@ -96,7 +96,6 @@ jobs:
     env:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -104,57 +103,87 @@ jobs:
           ref: ${{ inputs.build_ref || github.ref }}
           lfs: true
 
-      - name: Check Unity Personal activation configuration
+      - name: Normalize Unity Personal license for GameCI
         shell: bash
-        run: |
-          set -euo pipefail
-          [[ -n "${UNITY_LICENSE}" ]]
-          [[ -n "${UNITY_EMAIL}" ]]
-          [[ -n "${UNITY_PASSWORD}" ]]
-          echo 'Unity Personal activation secrets are available to GameCI.'
-
-      - name: Validate UNITY_LICENSE format without exposing it
-        shell: bash
+        env:
+          UNITY_LICENSE_INPUT: ${{ secrets.UNITY_LICENSE }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import base64
+          import json
           import os
           import xml.etree.ElementTree as ET
 
-          value = os.environ.get('UNITY_LICENSE', '')
-          if not value.strip():
-              raise SystemExit('UNITY_LICENSE is empty')
+          raw = os.environ.get('UNITY_LICENSE_INPUT', '')
+          if not raw.strip():
+              raise SystemExit('UNITY_LICENSE secret is empty')
+
+          def valid_ulf(value):
+              try:
+                  root = ET.fromstring(value)
+              except ET.ParseError:
+                  return False
+              if root.tag != 'root':
+                  return False
+              licenses = root.findall('License')
+              if len(licenses) != 1 or licenses[0].get('id') != 'Terms':
+                  return False
+              signature = any(e.tag.rsplit('}', 1)[-1] == 'Signature' for e in root.iter())
+              if not signature:
+                  return False
+              if licenses[0].find('SerialMasked') is None:
+                  return False
+              if licenses[0].find('Entitlements') is None:
+                  return False
+              return True
+
+          candidates = [('raw-xml', raw.strip())]
+
+          stripped = raw.strip()
+          if (stripped.startswith('"') and stripped.endswith('"')) or (stripped.startswith("'") and stripped.endswith("'")):
+              candidates.append(('quoted-xml', stripped[1:-1]))
 
           try:
-              root = ET.fromstring(value)
-          except ET.ParseError as exc:
-              raise SystemExit(f'UNITY_LICENSE is not valid XML: line {exc.position[0]}, column {exc.position[1]}')
+              decoded_json = json.loads(stripped)
+              if isinstance(decoded_json, str):
+                  candidates.append(('json-string-xml', decoded_json))
+          except Exception:
+              pass
 
-          if root.tag != 'root':
-              raise SystemExit(f'UNITY_LICENSE XML root is unexpected: {root.tag!r}')
+          try:
+              decoded_b64 = base64.b64decode(stripped, validate=True).decode('utf-8')
+              candidates.append(('base64-xml', decoded_b64))
+          except Exception:
+              pass
 
-          license_nodes = root.findall('License')
-          if len(license_nodes) != 1:
-              raise SystemExit('UNITY_LICENSE must contain exactly one License element')
+          selected = None
+          for kind, candidate in candidates:
+              candidate = candidate.lstrip('\ufeff').strip()
+              if valid_ulf(candidate):
+                  selected = (kind, candidate)
+                  break
 
-          license_node = license_nodes[0]
-          if license_node.get('id') != 'Terms':
-              raise SystemExit('UNITY_LICENSE License element does not have id="Terms"')
+          if selected is None:
+              raise SystemExit('UNITY_LICENSE is not a valid Unity .ulf license file. The secret must contain the full .ulf XML content, not an .alf request, filename, serial, or unrelated text.')
 
-          has_signature = any(
-              element.tag.rsplit('}', 1)[-1] == 'Signature'
-              for element in root.iter()
-          )
-          if not has_signature:
-              raise SystemExit('UNITY_LICENSE is missing the XML Signature element')
+          kind, value = selected
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8', newline='\n') as fh:
+              fh.write('UNITY_LICENSE<<__UNITY_LICENSE_EOF__\n')
+              fh.write(value)
+              fh.write('\n__UNITY_LICENSE_EOF__\n')
 
-          if license_node.find('SerialMasked') is None:
-              raise SystemExit('UNITY_LICENSE is missing SerialMasked')
-          if license_node.find('Entitlements') is None:
-              raise SystemExit('UNITY_LICENSE is missing Entitlements')
-
-          print(f'UNITY_LICENSE XML structure: valid (chars={len(value)})')
+          print(f'UNITY_LICENSE normalization: {kind}; XML structure valid; chars={len(value)}')
           PY
+
+      - name: Confirm normalized activation environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${UNITY_EMAIL}" ]]
+          [[ -n "${UNITY_PASSWORD}" ]]
+          [[ -n "${UNITY_LICENSE}" ]]
+          echo 'Unity Personal activation environment is ready for GameCI.'
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -171,7 +200,6 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           projectPath: UnityProject
           targetPlatform: Android
