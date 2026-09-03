@@ -68,7 +68,6 @@ jobs:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
       UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,37 +75,31 @@ jobs:
           ref: ${{ inputs.build_ref || github.ref }}
           lfs: true
 
-      - name: Check Unity activation configuration
+      - name: Check Unity Personal activation configuration
         id: activation
         shell: bash
         run: |
           set -euo pipefail
 
           has_license=false
-          has_serial=false
           has_email=false
           has_password=false
 
           [[ -n "${UNITY_LICENSE}" ]] && has_license=true
-          [[ -n "${UNITY_SERIAL}" ]] && has_serial=true
           [[ -n "${UNITY_EMAIL}" ]] && has_email=true
           [[ -n "${UNITY_PASSWORD}" ]] && has_password=true
 
           echo "UNITY_LICENSE present: ${has_license}"
-          echo "UNITY_SERIAL present: ${has_serial}"
           echo "UNITY_EMAIL present: ${has_email}"
           echo "UNITY_PASSWORD present: ${has_password}"
 
-          if [[ "${has_license}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
-            echo 'Activation mode detected: Unity Personal/manual license.'
-          elif [[ "${has_serial}" == "true" && "${has_email}" == "true" && "${has_password}" == "true" ]]; then
-            echo 'Activation mode detected: Unity serial license.'
-          else
-            echo 'Activation configuration is incomplete.'
-            echo 'For Unity Personal CI, set UNITY_LICENSE, UNITY_EMAIL and UNITY_PASSWORD repository secrets.'
-            echo 'No secret values are printed.'
+          if [[ "${has_license}" != "true" || "${has_email}" != "true" || "${has_password}" != "true" ]]; then
+            echo 'Unity Personal activation configuration is incomplete.'
+            echo 'Required repository secrets: UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD.'
             exit 1
           fi
+
+          echo 'Unity Personal activation secrets are available to GameCI.'
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -118,16 +111,15 @@ jobs:
             Library-UnityProject-
             Library-
 
-      # Deliberately unconditional: a green build job must contain a real Unity build.
       - name: Build Unity project
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@v4.8.1
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: UnityProject
+          unityVersion: 2022.3.62f1
           targetPlatform: Android
           versioning: Semantic
           buildName: PersiaWar
