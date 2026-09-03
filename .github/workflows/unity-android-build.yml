@@ -101,6 +101,45 @@ jobs:
 
           echo 'Unity Personal activation secrets are available to GameCI.'
 
+      - name: Validate UNITY_LICENSE format without exposing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          value = os.environ.get('UNITY_LICENSE', '')
+          if not value.strip():
+              raise SystemExit('UNITY_LICENSE is empty')
+
+          try:
+              root = ET.fromstring(value)
+          except ET.ParseError as exc:
+              raise SystemExit(f'UNITY_LICENSE is not valid XML: line {exc.position[0]}, column {exc.position[1]}')
+
+          if root.tag != 'root':
+              raise SystemExit(f'UNITY_LICENSE XML root is unexpected: {root.tag!r}')
+
+          license_nodes = root.findall('License')
+          if len(license_nodes) != 1:
+              raise SystemExit('UNITY_LICENSE must contain exactly one License element')
+
+          license_node = license_nodes[0]
+          if license_node.get('id') != 'Terms':
+              raise SystemExit('UNITY_LICENSE License element does not have id="Terms"')
+
+          if root.find('Signature') is None:
+              raise SystemExit('UNITY_LICENSE is missing the XML Signature element')
+
+          serial_masked = license_node.find('SerialMasked')
+          entitlements = license_node.find('Entitlements')
+          if serial_masked is None or entitlements is None:
+              raise SystemExit('UNITY_LICENSE is missing expected Personal license fields')
+
+          print(f'UNITY_LICENSE XML structure: valid (chars={len(value)})')
+          PY
+
       - name: Cache Unity Library
         uses: actions/cache@v4
         with:
@@ -112,7 +151,7 @@ jobs:
             Library-
 
       - name: Build Unity project
-        uses: game-ci/unity-builder@v4.8.1
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
