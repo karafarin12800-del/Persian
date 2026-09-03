@@ -38,7 +38,6 @@ PlayerSettings:
   m_ActiveColorSpace: 1
   m_MTRendering: 1
   mipStripping: 0
-  numberOfMipsStripped: 0
   m_StackTraceTypes: 010000000100000001000000010000000100000001000000
   iosShowActivityIndicatorOnLoading: -1
   androidShowActivityIndicatorOnLoading: -1
@@ -65,7 +64,6 @@ PlayerSettings:
   captureSingleScreen: 0
   muteOtherAudioSources: 0
   Prepare IOS For Recording: 0
-  Force IOS Speakers When Recording: 0
   deferSystemGesturesMode: 0
   hideHomeButton: 0
   submitAnalytics: 1
@@ -107,8 +105,8 @@ PlayerSettings:
     tvOS: 0
   overrideDefaultApplicationIdentifier: 1
   AndroidBundleVersionCode: 1
-  AndroidMinSdkVersion: 22
-  AndroidTargetSdkVersion: 0
+  AndroidMinSdkVersion: 23
+  AndroidTargetSdkVersion: 35
   AndroidPreferredInstallLocation: 1
   aotOptions:
   stripEngineCode: 1
@@ -122,7 +120,6 @@ PlayerSettings:
   iPhoneSdkVersion: 988
   iOSTargetOSVersionString: 12.0
   uIPrerenderedIcon: 0
-  uIRequiresPersistentWiFi: 0
   uIRequiresFullScreen: 1
   uIStatusBarHidden: 1
   uIStatusBarStyle: 0
@@ -133,23 +130,19 @@ PlayerSettings:
     serializedVersion: 2
     rgba: 0
   iOSLaunchScreenFillPct: 100
-  iOSLaunchScreenSize: 100
   iOSDeviceRequirements: []
   iOSURLSchemes: []
   macOSURLSchemes: []
   iOSBackgroundModes: 0
   iOSAutomaticallyDetectAndAddCapabilities: 1
   appleEnableAutomaticSigning: 0
-  iOSRequireARKit: 0
   shaderPrecisionModel: 0
   useCustomMainManifest: 0
   useCustomLauncherManifest: 0
-  useCustomMainGradleTemplate: 0
-  useCustomLauncherGradleManifest: 0
   useCustomBaseGradleTemplate: 0
   useCustomGradlePropertiesTemplate: 0
   useCustomProguardFile: 0
-  AndroidTargetArchitectures: 1
+  AndroidTargetArchitectures: 2
   AndroidTargetDevices: 0
   AndroidSplashScreenScale: 0
   androidSplashScreen: {fileID: 0}
