@@ -1,21 +1,160 @@
-name: Unity License Activation File
+name: Unity Activation Diagnostic
 
 on:
   workflow_dispatch:
 
 jobs:
   activation:
-    name: Request Unity activation file
-    runs-on: ubuntu-latest
-    steps:
-      - name: Request manual activation file
-        id: getManualLicenseFile
-        uses: game-ci/unity-request-activation-file@v2
-        with:
-          unityVersion: '2022.3.62f1'
+    name: Generate and inspect Unity activation file
+    # The runner must have Unity 2022.3.62f1 installed.
+    # Add the label `unity` to the self-hosted runner, or remove it below if
+    # the runner uses only the default self-hosted labels.
+    runs-on: [self-hosted, linux, x64, unity]
+    timeout-minutes: 15
+    env:
+      UNITY_VERSION: '2022.3.62f1'
+      UNITY_PROJECT_PATH: 'UnityProject'
 
-      - name: Upload activation file
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          ref: unity-2.5d
+          lfs: true
+
+      - name: Locate Unity executable
+        id: unity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          candidates=(
+            "${UNITY_PATH:-}"
+            "/opt/Unity/Editor/Unity"
+            "/opt/Unity/Editor/Unity-${UNITY_VERSION}"
+            "/opt/Unity/Hub/Editor/${UNITY_VERSION}/Editor/Unity"
+            "/opt/unity/Editor/Unity"
+            "/opt/unity/Hub/Editor/${UNITY_VERSION}/Editor/Unity"
+          )
+
+          for candidate in "${candidates[@]}"; do
+            if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+              echo "unity_path=$candidate" >> "$GITHUB_OUTPUT"
+              "$candidate" -version
+              exit 0
+            fi
+          done
+
+          if command -v unity >/dev/null 2>&1; then
+            UNITY_BIN="$(command -v unity)"
+            echo "unity_path=$UNITY_BIN" >> "$GITHUB_OUTPUT"
+            "$UNITY_BIN" -version
+            exit 0
+          fi
+
+          if command -v Unity >/dev/null 2>&1; then
+            UNITY_BIN="$(command -v Unity)"
+            echo "unity_path=$UNITY_BIN" >> "$GITHUB_OUTPUT"
+            "$UNITY_BIN" -version
+            exit 0
+          fi
+
+          echo 'Unity executable was not found on this self-hosted runner.' >&2
+          echo 'Set the UNITY_PATH runner environment variable or install Unity 2022.3.62f1.' >&2
+          exit 1
+
+      - name: Check Unity license state
+        id: license
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNITY_BIN="${{ steps.unity.outputs.unity_path }}"
+          LOG="$RUNNER_TEMP/unity-license.log"
+
+          set +e
+          "$UNITY_BIN" -batchmode -nographics -quit -logFile "$LOG" -version
+          VERSION_RC=$?
+          set -e
+
+          echo '--- Unity startup/license log ---'
+          cat "$LOG" || true
+
+          if grep -Eiq 'license.*(valid|activated|professional|personal)|successfully.*activat|activation.*succeed' "$LOG"; then
+            echo 'status=activated' >> "$GITHUB_OUTPUT"
+          elif grep -Eiq 'license.*(invalid|expired|missing|not activated)|no valid license|returning license|activation failed' "$LOG"; then
+            echo 'status=not-activated' >> "$GITHUB_OUTPUT"
+          else
+            echo 'status=unknown' >> "$GITHUB_OUTPUT"
+          fi
+
+          # A version command can return non-zero for a damaged installation;
+          # preserve the diagnostic log and fail so the runner can be fixed.
+          if [ "$VERSION_RC" -ne 0 ]; then
+            echo "Unity exited with code $VERSION_RC while checking the installation." >&2
+            exit "$VERSION_RC"
+          fi
+
+      - name: Generate Unity activation file (.alf)
+        id: activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNITY_BIN="${{ steps.unity.outputs.unity_path }}"
+          REQUEST_DIR="$RUNNER_TEMP/unity-activation"
+          LOG="$REQUEST_DIR/activation.log"
+          mkdir -p "$REQUEST_DIR"
+
+          "$UNITY_BIN" \
+            -batchmode \
+            -nographics \
+            -quit \
+            -projectPath "$GITHUB_WORKSPACE/${UNITY_PROJECT_PATH}" \
+            -createManualActivationFile \
+            -logFile "$LOG"
+
+          ALF="$(find "$REQUEST_DIR" "$GITHUB_WORKSPACE" -maxdepth 4 -type f -name '*.alf' -print -quit 2>/dev/null || true)"
+          if [ -z "$ALF" ]; then
+            # Unity normally writes the file in its current working directory.
+            ALF="$(find "$GITHUB_WORKSPACE" -type f -name '*.alf' -print -quit 2>/dev/null || true)"
+          fi
+
+          if [ -z "$ALF" ]; then
+            echo 'Unity did not produce a .alf activation request.' >&2
+            cat "$LOG" || true
+            exit 1
+          fi
+
+          cp "$ALF" "$RUNNER_TEMP/unity-activation/Unity-${UNITY_VERSION}.alf"
+          echo "file=$RUNNER_TEMP/unity-activation/Unity-${UNITY_VERSION}.alf" >> "$GITHUB_OUTPUT"
+
+          echo '--- Activation request summary ---'
+          file "$ALF" || true
+          wc -c "$ALF"
+          grep -E '<(License|MachineBindings|MachineIdentification|UnityVersion)' "$ALF" | head -20 || true
+
+      - name: Validate activation file and report status
+        shell: bash
+        run: |
+          set -euo pipefail
+          ALF="${{ steps.activation.outputs.file }}"
+          LICENSE_STATUS="${{ steps.license.outputs.status }}"
+
+          test -s "$ALF"
+          grep -q '<' "$ALF"
+          grep -qiE 'Unity|Machine|License' "$ALF"
+
+          echo "Unity version: $UNITY_VERSION"
+          echo "Runner license state before request: $LICENSE_STATUS"
+          echo "Activation request: VALID .alf generated"
+          echo "Activation request path: $ALF"
+
+      - name: Upload activation diagnostic artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Unity-2022.3.62f1-activation
-          path: ${{ steps.getManualLicenseFile.outputs.filePath }}
+          name: Unity-${{ env.UNITY_VERSION }}-activation-diagnostic
+          path: |
+            ${{ steps.activation.outputs.file }}
+            ${{ runner.temp }}/unity-activation/activation.log
+            ${{ runner.temp }}/unity-license.log
+          if-no-files-found: error
+          retention-days: 7
