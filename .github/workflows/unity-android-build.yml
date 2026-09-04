@@ -1,0 +1,228 @@
+name: Unity Android Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_ref:
+        description: 'Unity branch or commit to build'
+        required: true
+        default: 'unity-2.5d'
+        type: string
+  push:
+    branches:
+      - unity-2.5d
+    paths:
+      - 'UnityProject/**'
+      - '.github/workflows/unity-android-build.yml'
+
+concurrency:
+  group: persiawar-unity-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Unity project
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Validate required Unity files and settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f UnityProject/ProjectSettings/ProjectVersion.txt
+          test -f UnityProject/ProjectSettings/ProjectSettings.asset
+          test -f UnityProject/ProjectSettings/EditorBuildSettings.asset
+          test -f UnityProject/Packages/manifest.json
+          test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity.meta
+          test -f UnityProject/Assets/Resources/PersiaWarLit.shader
+          test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
+          test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
+          grep -q 'Assets/Scenes/PersiaWarPrototype.unity' UnityProject/ProjectSettings/EditorBuildSettings.asset
+          grep -q 'm_Name: GameRoot' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          grep -q 'm_Name: Main Camera' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
+          grep -q '^  AndroidMinSdkVersion: 23$' UnityProject/ProjectSettings/ProjectSettings.asset
+          grep -q '^  AndroidTargetSdkVersion: 35$' UnityProject/ProjectSettings/ProjectSettings.asset
+          grep -q '^  AndroidTargetArchitectures: 2$' UnityProject/ProjectSettings/ProjectSettings.asset
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          json.loads(Path('UnityProject/Packages/manifest.json').read_text(encoding='utf-8'))
+          print('Packages/manifest.json: valid JSON')
+          PY
+          scene_guid=$(awk '/^guid: / {print $2; exit}' UnityProject/Assets/Scenes/PersiaWarPrototype.unity.meta)
+          build_guid=$(awk '/path: Assets\/Scenes\/PersiaWarPrototype.unity$/{getline; if ($0 ~ /guid:/) {print $2}}' UnityProject/ProjectSettings/EditorBuildSettings.asset)
+          test -n "${scene_guid}"
+          test -n "${build_guid}"
+          test "${scene_guid}" = "${build_guid}"
+          missing_meta=0
+          while IFS= read -r -d '' file; do
+            if [[ "${file}" == *.meta ]]; then
+              continue
+            fi
+            if [[ ! -f "${file}.meta" ]]; then
+              echo "Missing Unity .meta file: ${file}"
+              missing_meta=1
+            fi
+          done < <(find UnityProject/Assets -type f -print0)
+          test "${missing_meta}" -eq 0
+          echo 'Unity project structure/settings validation passed.'
+
+      - name: Report Unity version
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -E '^m_EditorVersion:' UnityProject/ProjectSettings/ProjectVersion.txt
+
+      - name: Check for tracked build outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(Library|Temp|Obj|Builds?)/' >/dev/null; then
+            echo 'Tracked Unity build/cache output detected.'
+            exit 1
+          fi
+          echo 'Repository hygiene validation passed.'
+
+  build-android:
+    name: Build Android APK
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.build_ref || github.ref }}
+          lfs: true
+
+      - name: Normalize Unity Personal license for GameCI
+        shell: bash
+        env:
+          UNITY_LICENSE_INPUT: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+
+          raw = os.environ.get('UNITY_LICENSE_INPUT', '')
+          if not raw.strip():
+              raise SystemExit('UNITY_LICENSE secret is empty')
+
+          def valid_ulf(value):
+              try:
+                  root = ET.fromstring(value)
+              except ET.ParseError:
+                  return False
+              if root.tag != 'root':
+                  return False
+              licenses = root.findall('License')
+              if len(licenses) != 1 or licenses[0].get('id') != 'Terms':
+                  return False
+              signature = any(e.tag.rsplit('}', 1)[-1] == 'Signature' for e in root.iter())
+              if not signature:
+                  return False
+              if licenses[0].find('SerialMasked') is None:
+                  return False
+              if licenses[0].find('Entitlements') is None:
+                  return False
+              return True
+
+          candidates = [('raw-xml', raw.strip())]
+
+          stripped = raw.strip()
+          if (stripped.startswith('"') and stripped.endswith('"')) or (stripped.startswith("'") and stripped.endswith("'")):
+              candidates.append(('quoted-xml', stripped[1:-1]))
+
+          try:
+              decoded_json = json.loads(stripped)
+              if isinstance(decoded_json, str):
+                  candidates.append(('json-string-xml', decoded_json))
+          except Exception:
+              pass
+
+          try:
+              decoded_b64 = base64.b64decode(stripped, validate=True).decode('utf-8')
+              candidates.append(('base64-xml', decoded_b64))
+          except Exception:
+              pass
+
+          selected = None
+          for kind, candidate in candidates:
+              candidate = candidate.lstrip('\ufeff').strip()
+              if valid_ulf(candidate):
+                  selected = (kind, candidate)
+                  break
+
+          if selected is None:
+              raise SystemExit('UNITY_LICENSE is not a valid Unity .ulf license file. The secret must contain the full .ulf XML content, not an .alf request, filename, serial, or unrelated text.')
+
+          kind, value = selected
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8', newline='\n') as fh:
+              fh.write('UNITY_LICENSE<<__UNITY_LICENSE_EOF__\n')
+              fh.write(value)
+              fh.write('\n__UNITY_LICENSE_EOF__\n')
+
+          print(f'UNITY_LICENSE normalization: {kind}; XML structure valid; chars={len(value)}')
+          PY
+
+      - name: Confirm normalized activation environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${UNITY_EMAIL}" ]]
+          [[ -n "${UNITY_PASSWORD}" ]]
+          [[ -n "${UNITY_LICENSE}" ]]
+          echo 'Unity Personal activation environment is ready for GameCI.'
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: UnityProject/Library
+          key: Library-UnityProject-Android-${{ hashFiles('UnityProject/Assets/**', 'UnityProject/Packages/**', 'UnityProject/ProjectSettings/**') }}
+          restore-keys: |
+            Library-UnityProject-Android-
+            Library-UnityProject-
+            Library-
+
+      - name: Build Unity project
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: UnityProject
+          targetPlatform: Android
+          androidTargetSdkVersion: '35'
+          versioning: Semantic
+          buildName: PersiaWar
+          androidExportType: androidPackage
+          androidSymbolType: none
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d build/Android
+          apk=$(find build/Android -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$apk"
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          echo "Verified APK: $apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PersiaWar-Android-${{ github.sha }}
+          path: build/Android/*.apk
+          if-no-files-found: error
