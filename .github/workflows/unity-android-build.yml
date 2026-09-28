@@ -103,10 +103,11 @@ jobs:
           ref: ${{ inputs.build_ref || github.ref }}
           lfs: true
 
-      - name: Normalize Unity Personal license for GameCI
+      - name: Prepare Unity activation for GameCI
         shell: bash
         env:
           UNITY_LICENSE_INPUT: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL_INPUT: ${{ secrets.UNITY_SERIAL }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -116,8 +117,14 @@ jobs:
           import xml.etree.ElementTree as ET
 
           raw = os.environ.get('UNITY_LICENSE_INPUT', '')
+          serial = os.environ.get('UNITY_SERIAL_INPUT', '').strip()
           if not raw.strip():
-              raise SystemExit('UNITY_LICENSE secret is empty')
+              if serial:
+                  with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as fh:
+                      fh.write('UNITY_SERIAL<<EOF\n' + serial + '\nEOF\n')
+                  print('UNITY_SERIAL is present; using serial activation.')
+                  raise SystemExit(0)
+              raise SystemExit('No Unity activation credential is available: set UNITY_LICENSE or UNITY_SERIAL.')
 
           def local_name(tag):
               return tag.rsplit('}', 1)[-1]
@@ -192,7 +199,12 @@ jobs:
                   break
 
           if selected is None:
-              raise SystemExit('UNITY_LICENSE is not a valid Unity .ulf license file. The secret must contain the full .ulf XML content, not an .alf request, filename, serial, or unrelated text.')
+              if serial:
+                  with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as fh:
+                      fh.write('UNITY_SERIAL<<EOF\n' + serial + '\nEOF\n')
+                  print('UNITY_LICENSE is invalid; falling back to UNITY_SERIAL activation.')
+                  raise SystemExit(0)
+              raise SystemExit('UNITY_LICENSE is not a valid .ulf and UNITY_SERIAL is not set.')
 
           kind, value = selected
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8', newline='\n') as fh:
@@ -209,8 +221,13 @@ jobs:
           set -euo pipefail
           [[ -n "${UNITY_EMAIL}" ]]
           [[ -n "${UNITY_PASSWORD}" ]]
-          [[ -n "${UNITY_LICENSE}" ]]
-          echo 'Unity Personal activation environment is ready for GameCI.'
+          if [[ -n "${UNITY_SERIAL:-}" ]]; then
+            echo 'Unity serial activation environment is ready for GameCI.'
+          elif [[ -n "${UNITY_LICENSE:-}" ]]; then
+            echo 'Unity Personal license activation environment is ready for GameCI.'
+          else
+            exit 1
+          fi
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -227,6 +244,8 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ env.UNITY_SERIAL }}
         with:
           projectPath: UnityProject
           targetPlatform: Android
