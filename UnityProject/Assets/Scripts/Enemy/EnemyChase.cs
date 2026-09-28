@@ -5,20 +5,22 @@ namespace PersiaWar.Unity2D5D
     public sealed class EnemyChase : MonoBehaviour
     {
         [SerializeField] private Transform target;
-        [SerializeField] private float moveSpeed = 2.5f;
-        [SerializeField] private float stopDistance = 2.35f;
+        [SerializeField] private float moveSpeed = 2.8f;
+        [SerializeField] private float stopDistance = 8f;
+        [SerializeField] private float meleeDistance = 2.7f;
         [SerializeField] private int meleeDamage = 6;
-        [SerializeField] private float meleeCooldown = 1.8f;
-        [SerializeField] private float rangedCooldown = 1.8f;
-        [SerializeField] private float rangedRange = 36f;
+        [SerializeField] private float meleeCooldown = 1.5f;
+        [SerializeField] private float rangedCooldown = 1.25f;
+        [SerializeField] private float rangedRange = 34f;
         [SerializeField] private int rangedDamage = 8;
-        [SerializeField] private float retargetInterval = 0.25f;
+        [SerializeField] private float retargetInterval = 0.12f;
 
         private float nextRetargetTime;
         private float nextAttackTime;
         private float nextRangedTime;
         private int archetype = 1;
         private float collisionRadius = 0.55f;
+        private StylizedCharacterVisual visual;
 
         public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
 
@@ -27,19 +29,27 @@ namespace PersiaWar.Unity2D5D
             target = targetTransform;
             archetype = Mathf.Clamp(enemyArchetype, 1, 3);
 
-            moveSpeed = archetype == 3 ? 3.5f : (archetype == 2 ? 3.0f : 2.5f);
-            meleeDamage = archetype == 3 ? 12 : (archetype == 2 ? 8 : 6);
-            rangedDamage = archetype == 3 ? 12 : 8;
-            stopDistance = archetype == 3 ? 2.7f : 2.35f;
-            meleeCooldown = archetype == 3 ? 1.15f : (archetype == 2 ? 1.4f : 1.8f);
-            rangedCooldown = archetype == 3 ? 1.15f : (archetype == 2 ? 1.5f : 1.8f);
+            moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
+            meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
+            rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
+            stopDistance = archetype == 3 ? 10.5f : (archetype == 2 ? 9f : 7.5f);
+            rangedRange = archetype == 3 ? 46f : (archetype == 2 ? 40f : 34f);
+            meleeCooldown = archetype == 3 ? 1.05f : (archetype == 2 ? 1.25f : 1.5f);
+            rangedCooldown = archetype == 3 ? 0.90f : (archetype == 2 ? 1.10f : 1.35f);
+
+            if (visual != null)
+                visual.Configure(false, archetype);
         }
 
         private void Awake()
         {
             CapsuleCollider capsule = GetComponent<CapsuleCollider>();
             if (capsule != null)
-                collisionRadius = Mathf.Max(0.35f, capsule.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
+                collisionRadius = Mathf.Max(
+                    0.35f,
+                    capsule.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
+
+            visual = StylizedCharacterVisual.Attach(transform, false, archetype);
         }
 
         private void Update()
@@ -56,7 +66,11 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             Vector3 direction = delta / distance;
-            transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+            if (visual != null)
+            {
+                visual.SetFacing(direction);
+                visual.SetMoving(distance > stopDistance);
+            }
 
             if (distance > stopDistance)
             {
@@ -68,24 +82,34 @@ namespace PersiaWar.Unity2D5D
                     transform.position = nextPosition;
             }
 
-            if (distance <= stopDistance && Time.time >= nextAttackTime)
+            PlayerController player = target.GetComponentInParent<PlayerController>();
+            if (player == null)
+                return;
+
+            if (distance <= meleeDistance && Time.time >= nextAttackTime && HasLineOfSightToPlayer(player))
             {
-                PlayerController player = target.GetComponentInParent<PlayerController>();
-                if (player != null && HasLineOfSightToPlayer(player))
-                    player.ReceiveDamage(meleeDamage);
+                player.ReceiveDamage(meleeDamage);
                 nextAttackTime = Time.time + meleeCooldown;
             }
 
             if (distance <= rangedRange && Time.time >= nextRangedTime)
             {
-                FireProjectile(direction);
-                nextRangedTime = Time.time + rangedCooldown;
+                if (HasLineOfSightToPlayer(player))
+                {
+                    FireProjectile(direction);
+                    nextRangedTime = Time.time + rangedCooldown;
+                }
             }
         }
 
         private bool CanMoveTo(Vector3 position)
         {
-            Collider[] hits = Physics.OverlapSphere(position + Vector3.up * 0.75f, collisionRadius, ~0, QueryTriggerInteraction.Ignore);
+            Collider[] hits = Physics.OverlapSphere(
+                position + Vector3.up * 0.75f,
+                collisionRadius,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
             foreach (Collider hit in hits)
             {
                 if (hit == null || hit.transform == transform || hit.transform.IsChildOf(transform))
@@ -106,10 +130,14 @@ namespace PersiaWar.Unity2D5D
 
         private bool HasLineOfSightToPlayer(PlayerController player)
         {
-            Vector3 origin = transform.position + Vector3.up * 0.8f;
-            Vector3 targetPoint = player.transform.position + Vector3.up * 0.7f;
+            Vector3 origin = visual != null && visual.Muzzle != null
+                ? visual.Muzzle.position
+                : transform.position + Vector3.up * 1.0f;
+
+            Vector3 targetPoint = player.transform.position + Vector3.up * 0.75f;
             Vector3 direction = targetPoint - origin;
             float distance = direction.magnitude;
+
             if (distance <= 0.01f)
                 return true;
 
@@ -124,32 +152,52 @@ namespace PersiaWar.Unity2D5D
             if (target == null)
                 return;
 
-            Vector3 origin = transform.position + Vector3.up * 0.75f + direction * 0.8f;
-            Vector3 targetPoint = target.position + Vector3.up * 0.7f;
+            Vector3 origin = visual != null && visual.Muzzle != null
+                ? visual.Muzzle.position
+                : transform.position + Vector3.up * 0.9f;
+
+            Vector3 targetPoint = target.position + Vector3.up * 0.75f;
             Vector3 shotDirection = targetPoint - origin;
             shotDirection.y = 0f;
+
             if (shotDirection.sqrMagnitude < 0.001f)
                 return;
 
-            PlayerController player = target.GetComponentInParent<PlayerController>();
-            if (player == null || !HasLineOfSightToPlayer(player))
-                return;
+            shotDirection.Normalize();
 
-            GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             projectile.name = "EnemyProjectile";
-            projectile.transform.position = origin;
-            projectile.transform.localScale = Vector3.one * 0.18f;
+            projectile.transform.position = origin + shotDirection * 0.16f;
+            projectile.transform.rotation = Quaternion.LookRotation(shotDirection, Vector3.up);
+            projectile.transform.localScale = new Vector3(0.08f, 0.26f, 0.08f);
 
-            SphereCollider collider = projectile.GetComponent<SphereCollider>();
-            collider.isTrigger = true;
+            SphereCollider sphere = projectile.GetComponent<SphereCollider>();
+            if (sphere != null)
+                Destroy(sphere);
+
+            CapsuleCollider collider = projectile.GetComponent<CapsuleCollider>();
+            if (collider != null)
+            {
+                collider.isTrigger = true;
+                collider.radius = 0.5f;
+                collider.height = 2f;
+                collider.direction = 1;
+            }
 
             Rigidbody body = projectile.AddComponent<Rigidbody>();
             body.isKinematic = true;
             body.useGravity = false;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
+            Renderer renderer = projectile.GetComponent<Renderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = RuntimeMaterialFactory.Create("EnemyProjectileMaterial", new Color(0.92f, 0.18f, 0.10f));
+
             EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
-            shot.Configure(shotDirection.normalized, rangedDamage);
+            shot.Configure(shotDirection, rangedDamage);
+
+            if (visual != null)
+                visual.PlayFire();
         }
     }
 }
