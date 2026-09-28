@@ -2,10 +2,6 @@ using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
 {
-    /// <summary>
-    /// Provides a build-safe lit material shader for runtime-generated 3D objects.
-    /// The shader lives under Resources so Android builds cannot lose it to shader stripping.
-    /// </summary>
     public static class RuntimeMaterialFactory
     {
         private static Shader cachedShader;
@@ -25,6 +21,21 @@ namespace PersiaWar.Unity2D5D
                 color = color,
                 enableInstancing = true
             };
+            return material;
+        }
+
+        public static Material CreateTextured(string materialName, Color tint, Texture2D texture, float tiling)
+        {
+            Material material = Create(materialName, tint);
+            if (material == null || texture == null)
+                return material;
+
+            if (material.HasProperty("_MainTex"))
+            {
+                material.mainTexture = texture;
+                material.mainTextureScale = Vector2.one * Mathf.Max(0.01f, tiling);
+            }
+
             return material;
         }
 
