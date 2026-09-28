@@ -2,23 +2,37 @@ name: Acquire Unity activation file
 
 on:
   workflow_dispatch: {}
-  push:
-    branches:
-      - unity-2.5d
-    paths:
-      - '.github/workflows/activation.yml'
 
 jobs:
   activation:
-    name: Request manual activation file
+    name: Generate Unity 2022.3.62f1 activation file
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Request manual activation file
-        id: getManualLicenseFile
-        uses: game-ci/unity-request-activation-file@v2
+      - name: Generate .alf with the exact Unity editor version
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p activation
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/activation:/work" \
+            -w /work \
+            unityci/editor:ubuntu-2022.3.62f1-base-3 \
+            /opt/unity/Editor/Unity \
+              -batchmode \
+              -nographics \
+              -quit \
+              -createManualActivationFile \
+              -logFile /dev/stdout
+          alf=$(find activation -maxdepth 1 -type f -name '*.alf' -print -quit)
+          test -n "${alf}"
+          test -s "${alf}"
+          echo "Generated activation file: ${alf}"
+          cp "${alf}" activation/Unity_v2022.3.62f1.alf
 
-      - name: Expose activation file as artifact
+      - name: Upload .alf artifact
         uses: actions/upload-artifact@v4
         with:
-          name: unity-activation-file
-          path: $\{\{ steps.getManualLicenseFile.outputs.filePath \}\}
+          name: Unity-v2022.3.62f1-activation
+          path: activation/Unity_v2022.3.62f1.alf
+          if-no-files-found: error
