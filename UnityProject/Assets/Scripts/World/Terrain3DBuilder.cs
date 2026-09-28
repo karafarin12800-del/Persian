@@ -73,8 +73,50 @@ namespace PersiaWar.Unity2D5D
             collider.sharedMesh = null;
             collider.sharedMesh = mesh;
 
-            Material material = RuntimeMaterialFactory.Create("Terrain3D", new Color(0.28f, 0.56f, 0.16f));
-            if (material != null) renderer.sharedMaterial = material;
+            Texture2D grassTexture = BuildGrassTexture(96, seed);
+            Material material = RuntimeMaterialFactory.CreateTextured(
+                "Terrain3D",
+                new Color(0.72f, 0.82f, 0.62f),
+                grassTexture,
+                7.0f);
+
+            if (material != null)
+                renderer.sharedMaterial = material;
+        }
+
+        private Texture2D BuildGrassTexture(int resolution, int textureSeed)
+        {
+            Texture2D texture = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            texture.name = "ProceduralGrassDetail";
+            texture.wrapMode = TextureWrapMode.Repeat;
+            texture.filterMode = FilterMode.Bilinear;
+            texture.anisoLevel = 4;
+
+            for (int y = 0; y < resolution; y++)
+            {
+                for (int x = 0; x < resolution; x++)
+                {
+                    float nx = (float)x / resolution;
+                    float ny = (float)y / resolution;
+
+                    float broad = Mathf.PerlinNoise(nx * 5.2f + textureSeed * 0.013f, ny * 5.2f + textureSeed * 0.017f);
+                    float fine = Mathf.PerlinNoise(nx * 19.0f + textureSeed * 0.007f, ny * 19.0f + textureSeed * 0.011f);
+                    float speck = Mathf.PerlinNoise(nx * 43.0f + 7.3f, ny * 43.0f + 3.1f);
+
+                    float variation = (broad - 0.5f) * 0.28f + (fine - 0.5f) * 0.12f + (speck - 0.5f) * 0.06f;
+                    Color baseTone = new Color(0.47f, 0.62f, 0.23f, 1f);
+                    Color tone = new Color(
+                        Mathf.Clamp01(baseTone.r + variation),
+                        Mathf.Clamp01(baseTone.g + variation * 0.75f),
+                        Mathf.Clamp01(baseTone.b + variation * 0.35f),
+                        1f);
+
+                    texture.SetPixel(x, y, tone);
+                }
+            }
+
+            texture.Apply(false, true);
+            return texture;
         }
     }
 }
