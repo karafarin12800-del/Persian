@@ -19,21 +19,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p activation
-          docker run --rm \
-            -v "${GITHUB_WORKSPACE}/activation:/work" \
-            -w /work \
-            unityci/editor:ubuntu-2022.3.62f1-base-3 \
-            /opt/unity/Editor/Unity \
-              -batchmode \
-              -nographics \
-              -quit \
-              -createManualActivationFile \
-              -logFile /dev/stdout
+          docker run --rm             -v "${GITHUB_WORKSPACE}/activation:/work"             -w /work             unityci/editor:ubuntu-2022.3.62f1-base-3             /opt/unity/Editor/Unity               -batchmode               -nographics               -quit               -createManualActivationFile               -logFile /dev/stdout
           alf=$(find activation -maxdepth 1 -type f -name '*.alf' -print -quit)
           test -n "${alf}"
           test -s "${alf}"
           echo "Generated activation file: ${alf}"
-          cp "${alf}" activation/Unity_v2022.3.62f1.alf
+          if [ "${alf}" != "activation/Unity_v2022.3.62f1.alf" ]; then
+            cp "${alf}" activation/Unity_v2022.3.62f1.alf
+          fi
+          test -s activation/Unity_v2022.3.62f1.alf
 
       - name: Upload .alf artifact
         uses: actions/upload-artifact@v4
