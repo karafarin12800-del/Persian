@@ -194,7 +194,7 @@ namespace PersiaWar.Unity2D5D
                 renderer.sharedMaterial = RuntimeMaterialFactory.Create("EnemyProjectileMaterial", new Color(0.92f, 0.18f, 0.10f));
 
             EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
-            shot.Configure(shotDirection, rangedDamage);
+            shot.Configure(shotDirection, rangedDamage, transform);
 
             if (visual != null)
                 visual.PlayFire();
