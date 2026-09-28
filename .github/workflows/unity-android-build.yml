@@ -119,43 +119,70 @@ jobs:
           if not raw.strip():
               raise SystemExit('UNITY_LICENSE secret is empty')
 
+          def local_name(tag):
+              return tag.rsplit('}', 1)[-1]
+
           def valid_ulf(value):
               try:
                   root = ET.fromstring(value)
               except ET.ParseError:
                   return False
-              if root.tag != 'root':
-                  return False
-              licenses = root.findall('License')
-              if len(licenses) != 1 or licenses[0].get('id') != 'Terms':
-                  return False
-              signature = any(e.tag.rsplit('}', 1)[-1] == 'Signature' for e in root.iter())
-              if not signature:
-                  return False
-              if licenses[0].find('SerialMasked') is None:
-                  return False
-              if licenses[0].find('Entitlements') is None:
-                  return False
-              return True
 
-          candidates = [('raw-xml', raw.strip())]
+              if local_name(root.tag) != 'root':
+                  return False
 
-          stripped = raw.strip()
+              licenses = [
+                  e for e in root.iter()
+                  if local_name(e.tag) == 'License' and e.get('id') == 'Terms'
+              ]
+              if len(licenses) != 1:
+                  return False
+
+              license_node = licenses[0]
+              children = {local_name(e.tag) for e in license_node.iter()}
+              return (
+                  'Signature' in children
+                  and 'SerialMasked' in children
+                  and 'Entitlements' in children
+              )
+
+          def clean_text(value):
+              value = value.lstrip('\ufeff').strip()
+
+              if value.startswith('\x60\x60\x60'):
+                  lines = value.splitlines()
+                  lines = lines[1:] if lines else lines
+                  if lines and lines[-1].strip().startswith('\x60\x60\x60'):
+                      lines = lines[:-1]
+                  value = '\n'.join(lines).strip()
+
+              if value.startswith('UNITY_LICENSE='):
+                  value = value.split('=', 1)[1].strip()
+
+              return value
+
+          candidates = [('raw-xml', clean_text(raw))]
+
+          stripped = clean_text(raw)
           if (stripped.startswith('"') and stripped.endswith('"')) or (stripped.startswith("'") and stripped.endswith("'")):
-              candidates.append(('quoted-xml', stripped[1:-1]))
+              candidates.append(('quoted-xml', clean_text(stripped[1:-1])))
 
           try:
               decoded_json = json.loads(stripped)
               if isinstance(decoded_json, str):
-                  candidates.append(('json-string-xml', decoded_json))
+                  candidates.append(('json-string-xml', clean_text(decoded_json)))
           except Exception:
               pass
 
           try:
-              decoded_b64 = base64.b64decode(stripped, validate=True).decode('utf-8')
-              candidates.append(('base64-xml', decoded_b64))
+              compact_b64 = ''.join(stripped.split())
+              decoded_b64 = base64.b64decode(compact_b64, validate=True).decode('utf-8')
+              candidates.append(('base64-xml', clean_text(decoded_b64)))
           except Exception:
               pass
+
+          if '\\n' in stripped and '<' in stripped:
+              candidates.append(('escaped-xml', clean_text(stripped.replace('\\n', '\n').replace('\\r', ''))))
 
           selected = None
           for kind, candidate in candidates:
