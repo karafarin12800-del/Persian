@@ -4,8 +4,8 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class WorldBuilder : MonoBehaviour
     {
-        [SerializeField] private float worldSize = 1056f;
-        [SerializeField] private float roadWidth = 8f;
+        [SerializeField] private float worldSize = 220f;
+        [SerializeField] private float roadWidth = 9.5f;
         [SerializeField] private int roadCount = 5;
         [SerializeField] private float roadCoverage = 0.72f;
         [SerializeField] private Material groundMaterial;
