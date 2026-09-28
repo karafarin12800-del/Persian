@@ -125,9 +125,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 300001}
   offset: {x: 0, y: 14, z: -14}
-  followSpeed: 10
-  pitch: 45
-  yaw: 0
+  followSpeed: 12
+  pitch: 52
+  yaw: 32
 --- !u!1 &300000
 GameObject:
   m_ObjectHideFlags: 0
@@ -172,7 +172,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4299265828c134e867cdef0b7b7c22c8fc8c0c88, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 6
+  moveSpeed: 7.2
 --- !u!135 &300003
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -273,7 +273,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ad23c10f125532a9ceed54da2047d80, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  size: {x: 1056, y: 1056}
+  size: {x: 220, y: 220}
   target: {fileID: 300001}
 --- !u!1 &600000
 GameObject:
