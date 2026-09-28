@@ -4,11 +4,12 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class Projectile : MonoBehaviour
     {
-        [SerializeField] private float speed = 45f;
-        [SerializeField] private float lifetime = 2.2f;
+        [SerializeField] private float speed = 48f;
+        [SerializeField] private float lifetime = 2.4f;
         [SerializeField] private int damage = 30;
 
         private Vector3 direction;
+        private float remainingLife;
 
         public void SetDefaults(float projectileSpeed, float projectileLifetime, int projectileDamage)
         {
@@ -20,12 +21,19 @@ namespace PersiaWar.Unity2D5D
         public void Launch(Vector3 worldDirection)
         {
             direction = worldDirection.normalized;
-            Destroy(gameObject, lifetime);
+            remainingLife = lifetime;
+
+            if (direction.sqrMagnitude > 0.001f)
+                transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
         }
 
         private void Update()
         {
             transform.position += direction * speed * Time.deltaTime;
+            remainingLife -= Time.deltaTime;
+
+            if (remainingLife <= 0f)
+                Destroy(gameObject);
         }
 
         private void OnTriggerEnter(Collider other)
