@@ -259,8 +259,8 @@ namespace PersiaWar.Unity2D5D
                 Mathf.Clamp01((screen.y - mapRect.y) / mapRect.height));
 
             // Keep the drop point inside the existing 192x192 gameplay world and away from the edge.
-            float x = Mathf.Lerp(-78f, 78f, uv.x);
-            float z = Mathf.Lerp(78f, -78f, uv.y);
+            float x = Mathf.Lerp(-96f, 96f, uv.x);
+            float z = Mathf.Lerp(96f, -96f, uv.y);
             spawnWorld = new Vector2(x, z);
             spawnChosen = true;
         }
@@ -315,8 +315,8 @@ namespace PersiaWar.Unity2D5D
 
         private Vector2 WorldToMap(Vector2 world, Rect rect)
         {
-            float x = Mathf.InverseLerp(-78f, 78f, world.x);
-            float y = Mathf.InverseLerp(78f, -78f, world.y);
+            float x = Mathf.InverseLerp(-96f, 96f, world.x);
+            float y = Mathf.InverseLerp(96f, -96f, world.y);
             return new Vector2(rect.x + x * rect.width, rect.y + y * rect.height);
         }
 
