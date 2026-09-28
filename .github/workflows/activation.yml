@@ -2,6 +2,11 @@ name: Acquire Unity activation file
 
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - unity-2.5d
+    paths:
+      - '.github/workflows/activation.yml'
 
 jobs:
   activation:
