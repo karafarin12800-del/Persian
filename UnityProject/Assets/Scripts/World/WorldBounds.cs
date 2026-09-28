@@ -10,6 +10,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            if (size.x > 400f || size.y > 400f)
+                size = new Vector2(220f, 220f);
+
             if (target == null)
             {
                 PlayerController player = FindFirstObjectByType<PlayerController>();
