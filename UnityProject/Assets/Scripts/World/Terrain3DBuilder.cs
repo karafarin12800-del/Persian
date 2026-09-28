@@ -8,8 +8,8 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public sealed class Terrain3DBuilder : MonoBehaviour
     {
-        [SerializeField] private float size = 192f;
-        [SerializeField] private int subdivisions = 32;
+        [SerializeField] private float size = 220f;
+        [SerializeField] private int subdivisions = 40;
         [SerializeField] private float height = 0.65f;
         [SerializeField] private float baseY = -0.35f;
         [SerializeField] private int seed = 32025;
