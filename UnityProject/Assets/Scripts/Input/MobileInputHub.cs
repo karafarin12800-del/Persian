@@ -159,18 +159,21 @@ namespace PersiaWar.Unity2D5D
 
         private void FireAtNearestTarget()
         {
-            if (player == null || player.IsDefeated || player.Aim == null) return;
-            if (Time.time < nextFireTime) return;
+            if (player == null || player.IsDefeated || player.Aim == null)
+                return;
+
+            if (Time.time < nextFireTime)
+                return;
 
             TargetHealth target = player.Aim.CurrentTarget;
-            if (target != null && player.Aim.FireAt(target.transform.position))
-            {
+            bool fired = target != null
+                ? player.Aim.FireAt(target.transform.position)
+                : player.Aim.FireForward(player.FacingDirection);
+
+            if (fired)
                 nextFireTime = Time.time + fireRepeatInterval;
-            }
             else if (player.Weapon != null && player.Weapon.Magazine <= 0)
-            {
                 player.Weapon.Reload();
-            }
         }
 
         private void ThrowGrenadeAtTarget()
