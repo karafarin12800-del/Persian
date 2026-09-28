@@ -172,6 +172,24 @@ namespace PersiaWar.Unity2D5D
                 for (float x = -half + 3f; x < half; x += 8f)
                     CreateBox("RoadMark", new Vector3(x, 0.081f, z), new Vector3(3.0f, 0.04f, 0.32f), marking, false);
             }
+
+            // Crosswalks at the busiest grid intersections.
+            for (int i = -2; i <= 2; i++)
+            {
+                float road = i * 24f;
+                for (int stripe = -2; stripe <= 2; stripe++)
+                {
+                    float offset = stripe * 1.15f;
+                    CreateBox("CrosswalkH", new Vector3(road + offset, 0.085f, 4.9f),
+                        new Vector3(0.72f, 0.045f, 2.2f), marking, false);
+                    CreateBox("CrosswalkH", new Vector3(road + offset, 0.085f, -4.9f),
+                        new Vector3(0.72f, 0.045f, 2.2f), marking, false);
+                    CreateBox("CrosswalkV", new Vector3(4.9f, 0.086f, road + offset),
+                        new Vector3(2.2f, 0.045f, 0.72f), marking, false);
+                    CreateBox("CrosswalkV", new Vector3(-4.9f, 0.086f, road + offset),
+                        new Vector3(2.2f, 0.045f, 0.72f), marking, false);
+                }
+            }
         }
 
         private void BuildSidewalks(float roadWidth)
@@ -289,7 +307,7 @@ namespace PersiaWar.Unity2D5D
         {
             for (int i = 0; i < 22; i++)
             {
-                float x = Random.Range(-84f, 84f);
+                float x = Random.Range(-100f, 100f);
                 float z = Random.Range(-84f, 84f);
                 if (Mathf.Abs(Mathf.Repeat(x + 4f, 24f) - 12f) < 4f || Mathf.Abs(Mathf.Repeat(z + 4f, 24f) - 12f) < 4f) continue;
                 CreateTree(new Vector3(x, 0f, z));
