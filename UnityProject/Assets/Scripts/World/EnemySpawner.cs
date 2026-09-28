@@ -72,8 +72,8 @@ namespace PersiaWar.Unity2D5D
                     0f,
                     Mathf.Sin(angle)) * distance;
 
-                position.x = Mathf.Clamp(position.x, -88f, 88f);
-                position.z = Mathf.Clamp(position.z, -88f, 88f);
+                position.x = Mathf.Clamp(position.x, -104f, 104f);
+                position.z = Mathf.Clamp(position.z, -104f, 104f);
                 position.y = 0f;
 
                 if (Physics.CheckSphere(position + Vector3.up * 0.7f, 0.85f, ~0, QueryTriggerInteraction.Ignore))
