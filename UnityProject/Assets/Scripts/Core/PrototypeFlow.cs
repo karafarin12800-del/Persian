@@ -258,7 +258,7 @@ namespace PersiaWar.Unity2D5D
                 Mathf.Clamp01((screen.x - mapRect.x) / mapRect.width),
                 Mathf.Clamp01((screen.y - mapRect.y) / mapRect.height));
 
-            // Keep the drop point inside the existing 192x192 gameplay world and away from the edge.
+            // Keep the drop point inside the 220x220 gameplay world and away from the edge.
             float x = Mathf.Lerp(-96f, 96f, uv.x);
             float z = Mathf.Lerp(96f, -96f, uv.y);
             spawnWorld = new Vector2(x, z);
