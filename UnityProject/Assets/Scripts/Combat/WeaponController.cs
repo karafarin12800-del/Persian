@@ -101,6 +101,14 @@ namespace PersiaWar.Unity2D5D
             return TryFireDirection(direction.normalized);
         }
 
+        private void Start()
+        {
+            if (visual == null)
+                visual = GetComponentInChildren<StylizedCharacterVisual>();
+
+            EnsureMuzzle();
+        }
+
         public bool TryFireDirection(Vector3 worldDirection)
         {
             IsMelee = false;
@@ -135,6 +143,7 @@ namespace PersiaWar.Unity2D5D
             Vector3 origin = Muzzle.position + worldDirection * 0.15f;
             Projectile projectile = Object.Instantiate(projectilePrefab, origin, Quaternion.LookRotation(worldDirection, Vector3.up));
             projectile.gameObject.SetActive(true);
+            projectile.SetOwner(transform);
             projectile.Launch(worldDirection);
             return true;
         }
