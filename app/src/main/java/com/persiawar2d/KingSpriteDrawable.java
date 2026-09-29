@@ -11,7 +11,14 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import java.io.InputStream;
 
-/** Player sprite renderer: 6 actions x 4 directions, 3 frames per 1024x1024 action cell. */
+/** Player sprite renderer.
+ *
+ * Sheet layout used by the Persian king artwork:
+ * 6 action columns x 4 direction rows, with 3 animation frames stacked
+ * vertically inside each action/direction cell.  The previous renderer
+ * incorrectly split those 3 frames horizontally, which displayed three
+ * copies of the character at once.
+ */
 public final class KingSpriteDrawable extends Drawable {
     public static final int ACTION_IDLE=0, ACTION_WALK=1, ACTION_RUN=2, ACTION_ATTACK=3, ACTION_HURT=4, ACTION_DIE=5;
     public static final int FRAME_COUNT=3;
@@ -28,49 +35,96 @@ public final class KingSpriteDrawable extends Drawable {
     }
 
     public void setState(int direction,int action,int frameIndex){
-        direction=clamp(direction,0,DIRECTION_COUNT-1);action=clamp(action,0,ACTION_COUNT-1);frameIndex=clamp(frameIndex,0,FRAME_COUNT-1);
+        direction=clamp(direction,0,DIRECTION_COUNT-1);
+        action=clamp(action,0,ACTION_COUNT-1);
+        frameIndex=clamp(frameIndex,0,FRAME_COUNT-1);
         if(decoder==null)return;
         if(frames[direction][action][frameIndex]==null)decodeFrame(direction,action,frameIndex);
-        frame=frames[direction][action][frameIndex];invalidateSelf();
+        frame=frames[direction][action][frameIndex];
+        invalidateSelf();
     }
     public void setState(int direction,int frameIndex){setState(direction,ACTION_WALK,frameIndex);}
 
     private void decodeFrame(int direction,int action,int frameIndex){
         int sw=decoder.getWidth(),sh=decoder.getHeight();
-        int cellW=sw/ACTION_COUNT,cellH=sh/DIRECTION_COUNT;
-        int left=action*cellW+Math.round(frameIndex*cellW/(float)FRAME_COUNT);
-        int right=action*cellW+Math.round((frameIndex+1)*cellW/(float)FRAME_COUNT);
-        Rect region=new Rect(left,direction*cellH,right,direction*cellH+cellH);
-        BitmapFactory.Options o=new BitmapFactory.Options();o.inScaled=false;o.inPreferredConfig=Bitmap.Config.ARGB_8888;
-        Bitmap raw=decoder.decodeRegion(region,o);if(raw==null)return;
-        Bitmap clean=removeEdgeBlackMatte(raw);if(clean!=raw&&!raw.isRecycled())raw.recycle();
+        int cellW=sw/ACTION_COUNT;
+        int cellH=sh/DIRECTION_COUNT;
+        // The three frames are stacked vertically inside each cell.
+        int frameH=cellH/FRAME_COUNT;
+        int left=action*cellW;
+        int top=direction*cellH+frameIndex*frameH;
+        int right=(action+1)*cellW;
+        int bottom=(frameIndex==FRAME_COUNT-1)?(direction+1)*cellH:top+frameH;
+        Rect region=new Rect(left,top,right,bottom);
+        BitmapFactory.Options o=new BitmapFactory.Options();
+        o.inScaled=false;
+        o.inPreferredConfig=Bitmap.Config.ARGB_8888;
+        Bitmap raw=decoder.decodeRegion(region,o);
+        if(raw==null)return;
+        Bitmap clean=removeEdgeBlackMatte(raw);
+        if(clean!=raw&&!raw.isRecycled())raw.recycle();
         Rect b=foregroundBounds(clean);
-        if(b==null||b.width()<8||b.height()<20){frames[direction][action][frameIndex]=clean;return;}
-        int pad=14;int l=Math.max(0,b.left-pad),t=Math.max(0,b.top-pad),r=Math.min(clean.getWidth(),b.right+pad),bot=Math.min(clean.getHeight(),b.bottom+pad);
-        Bitmap cropped=Bitmap.createBitmap(clean,l,t,r-l,bot-t);if(clean!=cropped&&!clean.isRecycled())clean.recycle();
+        if(b==null||b.width()<8||b.height()<20){
+            frames[direction][action][frameIndex]=clean;
+            return;
+        }
+        int pad=Math.max(6,Math.min(clean.getWidth(),clean.getHeight())/30);
+        int l=Math.max(0,b.left-pad),t=Math.max(0,b.top-pad);
+        int r=Math.min(clean.getWidth(),b.right+pad),bot=Math.min(clean.getHeight(),b.bottom+pad);
+        Bitmap cropped=Bitmap.createBitmap(clean,l,t,r-l,bot-t);
+        if(clean!=cropped&&!clean.isRecycled())clean.recycle();
         frames[direction][action][frameIndex]=cropped;
     }
 
     private Bitmap removeEdgeBlackMatte(Bitmap src){
-        Bitmap b=src.copy(Bitmap.Config.ARGB_8888,true);if(b==null)return src;
-        int w=b.getWidth(),h=b.getHeight();int[] px=new int[w*h];b.getPixels(px,0,w,0,0,w,h);
-        boolean[] cut=new boolean[px.length];int[] q=new int[px.length];int head=0,tail=0;
-        for(int x=0;x<w;x++){int a=x,z=(h-1)*w+x;if(isMatte(px[a])){cut[a]=true;q[tail++]=a;}if(isMatte(px[z])&&!cut[z]){cut[z]=true;q[tail++]=z;}}
-        for(int y=1;y<h-1;y++){int a=y*w,z=a+w-1;if(isMatte(px[a])&&!cut[a]){cut[a]=true;q[tail++]=a;}if(isMatte(px[z])&&!cut[z]){cut[z]=true;q[tail++]=z;}}
-        while(head<tail){int i=q[head++],x=i%w,y=i/w;
+        Bitmap b=src.copy(Bitmap.Config.ARGB_8888,true);
+        if(b==null)return src;
+        int w=b.getWidth(),h=b.getHeight();
+        int[] px=new int[w*h];b.getPixels(px,0,w,0,0,w,h);
+        boolean[] cut=new boolean[px.length];
+        int[] q=new int[px.length];int head=0,tail=0;
+        for(int x=0;x<w;x++){
+            int a=x,z=(h-1)*w+x;
+            if(isMatte(px[a])){cut[a]=true;q[tail++]=a;}
+            if(isMatte(px[z])&&!cut[z]){cut[z]=true;q[tail++]=z;}
+        }
+        for(int y=1;y<h-1;y++){
+            int a=y*w,z=a+w-1;
+            if(isMatte(px[a])&&!cut[a]){cut[a]=true;q[tail++]=a;}
+            if(isMatte(px[z])&&!cut[z]){cut[z]=true;q[tail++]=z;}
+        }
+        while(head<tail){
+            int i=q[head++],x=i%w,y=i/w;
             if(x>0){int n=i-1;if(!cut[n]&&isMatte(px[n])){cut[n]=true;q[tail++]=n;}}
             if(x+1<w){int n=i+1;if(!cut[n]&&isMatte(px[n])){cut[n]=true;q[tail++]=n;}}
             if(y>0){int n=i-w;if(!cut[n]&&isMatte(px[n])){cut[n]=true;q[tail++]=n;}}
             if(y+1<h){int n=i+w;if(!cut[n]&&isMatte(px[n])){cut[n]=true;q[tail++]=n;}}
         }
-        for(int i=0;i<px.length;i++)if(cut[i])px[i]=Color.TRANSPARENT;b.setPixels(px,0,w,0,0,w,h);return b;
+        for(int i=0;i<px.length;i++)if(cut[i])px[i]=Color.TRANSPARENT;
+        b.setPixels(px,0,w,0,0,w,h);
+        return b;
     }
-    private Rect foregroundBounds(Bitmap src){int w=src.getWidth(),h=src.getHeight();int[] px=new int[w*h];src.getPixels(px,0,w,0,0,w,h);int minX=w,minY=h,maxX=-1,maxY=-1;for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(isForeground(px[y*w+x])){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;}return maxX<0?null:new Rect(minX,minY,maxX+1,maxY+1);}
+
+    private Rect foregroundBounds(Bitmap src){
+        int w=src.getWidth(),h=src.getHeight();
+        int[] px=new int[w*h];src.getPixels(px,0,w,0,0,w,h);
+        int minX=w,minY=h,maxX=-1,maxY=-1;
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+            if(isForeground(px[y*w+x])){
+                if(x<minX)minX=x;if(x>maxX)maxX=x;
+                if(y<minY)minY=y;if(y>maxY)maxY=y;
+            }
+        }
+        return maxX<0?null:new Rect(minX,minY,maxX+1,maxY+1);
+    }
     private boolean isMatte(int c){return Color.alpha(c)>0&&Color.red(c)<28&&Color.green(c)<28&&Color.blue(c)<28;}
     private boolean isForeground(int c){return Color.alpha(c)>0&&!isMatte(c);}
     private int clamp(int v,int a,int b){return Math.max(a,Math.min(b,v));}
     @Override public void draw(Canvas c){if(frame!=null){paint.setAlpha(255);c.drawBitmap(frame,null,getBounds(),paint);}}
-    @Override public void setAlpha(int a){paint.setAlpha(a);}@Override public int getAlpha(){return paint.getAlpha();}
-    @Override public void setColorFilter(android.graphics.ColorFilter f){paint.setColorFilter(f);}@Override public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}
-    @Override public int getIntrinsicWidth(){return 342;}@Override public int getIntrinsicHeight(){return 1024;}
+    @Override public void setAlpha(int a){paint.setAlpha(a);}
+    @Override public int getAlpha(){return paint.getAlpha();}
+    @Override public void setColorFilter(android.graphics.ColorFilter f){paint.setColorFilter(f);}
+    @Override public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}
+    @Override public int getIntrinsicWidth(){return 342;}
+    @Override public int getIntrinsicHeight(){return 1024;}
 }
