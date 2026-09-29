@@ -174,6 +174,8 @@ public final class GameCore {
         int n=Math.min(12-player.ammo,player.reserveAmmo);player.ammo+=n;player.reserveAmmo-=n;
     }
 
+    public void melee(){melee(null);}
+
     public void melee(Input in){
         if(gameOver||player.dead||swordCd>0)return;
         Enemy t=(in!=null&&in.aimActive)?getManualAimTarget(in):getAutoAimTarget();
