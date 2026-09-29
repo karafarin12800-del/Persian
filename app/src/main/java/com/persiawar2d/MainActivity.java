@@ -529,7 +529,7 @@ public final class MainActivity extends Activity {
             p.setColor(pressed?0xE05C6A55:0xA94A4038);
             c.drawCircle(x,y,r,p);
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(3f,3f*controlScale()));
+            p.setStrokeWidth(Math.max(dp(3f),3f*dp(1f)));
             p.setColor(0xDDD9C889);
             c.drawCircle(x,y,r,p);
             p.setStyle(Paint.Style.FILL);
