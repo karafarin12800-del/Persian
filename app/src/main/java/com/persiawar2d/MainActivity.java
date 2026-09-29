@@ -142,40 +142,63 @@ public final class MainActivity extends Activity {
         private void drawBuildings(Canvas c){
             float s=sc();
             for(WorldMap.Building b:world.buildings()){
-                if(Math.abs(b.x+b.w*.5f-core.player().x)>2400||Math.abs(b.y+b.h*.5f-core.player().y)>1350)continue;
+                if(Math.abs(b.x+b.w*.5f-core.player().x)>2050||Math.abs(b.y+b.h*.5f-core.player().y)>1200)continue;
                 float l=sx(b.x),r=sx(b.x+b.w),base=sy(b.y+b.h),back=sy(b.y);
-                float lift=(92+(b.style%5)*14)*s;
+                float lift=(78+(b.style%4)*12)*s;
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(0x44000000);
-                c.drawRoundRect(new RectF(l+7,back+8,r+10,base+10),10*s,10*s,p);
 
-                p.setColor((b.style%5==0)?0xFF5D4534:0xFF715440);
+                // Ground shadow and raised Persian masonry block.
+                p.setColor(0x55000000);
+                c.drawRoundRect(new RectF(l+8,back+10,r+12,base+12),9*s,9*s,p);
+                p.setColor((b.style%5==0)?0xFF7A6047:(b.style%5==1?0xFF80664C:0xFF725844));
                 c.drawRect(l,back-lift,r,base,p);
 
-                p.setColor((b.style%3==0)?0xFF2D2018:0xFF3C2A1D);
+                // Roof/parapet silhouette.
                 path.reset();
-                path.moveTo(l-6*s,back-lift);path.lineTo((l+r)*.5f,back-lift-20*s);
-                path.lineTo(r+6*s,back-lift);path.lineTo(r,back-lift+8*s);path.lineTo(l,back-lift+8*s);path.close();
+                path.moveTo(l-7*s,back-lift+5*s);
+                path.lineTo((l+r)*.5f,back-lift-18*s);
+                path.lineTo(r+7*s,back-lift+5*s);
+                path.lineTo(r,back-lift+12*s);
+                path.lineTo(l,back-lift+12*s);
+                path.close();
+                p.setColor((b.style%3==0)?0xFF3D2D24:0xFF4A3528);
                 c.drawPath(path,p);
 
-                p.setColor(0xFFD2A95E);
-                if(b.style%6==0){
-                    for(float x=l+20*s;x<r-12*s;x+=42*s){
-                        c.drawRect(x,back-lift+6*s,x+8*s,base-18*s,p);
-                        p.setColor(0xFF8E6A38);c.drawRect(x+2*s,back-lift+6*s,x+6*s,base-18*s,p);p.setColor(0xFFD2A95E);
-                    }
-                    p.setColor(0xFFCBB07A);
-                    c.drawRect((l+r)*.5f-20*s,base-68*s,(l+r)*.5f+20*s,base,p);
-                    p.setColor(0xFF5C3E27);c.drawRect((l+r)*.5f-13*s,base-60*s,(l+r)*.5f+13*s,base,p);
-                }else{
-                    int cols=Math.max(2,Math.min(4,(int)(b.w/115)));
-                    for(int i=0;i<cols;i++){
-                        float x=l+26*s+i*(r-l-52*s)/Math.max(1,cols-1);
-                        float y=back-lift+(base-(back-lift))*.45f;
-                        p.setColor(0xFFD6B66B);c.drawRoundRect(new RectF(x-8*s,y-10*s,x+8*s,y+10*s),3*s,3*s,p);
-                        p.setColor(0xFF243238);c.drawRoundRect(new RectF(x-5*s,y-7*s,x+5*s,y+7*s),2*s,2*s,p);
-                    }
-                    p.setColor(0xFF9C7042);c.drawRect((l+r)*.5f-12*s,base-45*s,(l+r)*.5f+12*s,base,p);
+                // Persian facade band.
+                p.setColor(0xFFD2B16B);
+                c.drawRect(l,back-lift+14*s,r,back-lift+20*s,p);
+                p.setColor(0x668B6A42);
+                c.drawRect(l,base-15*s,r,base-10*s,p);
+
+                int cols=Math.max(2,Math.min(5,(int)(b.w/100)));
+                for(int i=0;i<cols;i++){
+                    float x=l+26*s+i*(r-l-52*s)/Math.max(1,cols-1);
+                    float y=back-lift+(base-(back-lift))*.48f;
+                    // Arched window.
+                    p.setColor(0xFFBFA46A);
+                    c.drawRoundRect(new RectF(x-10*s,y-18*s,x+10*s,y+14*s),9*s,9*s,p);
+                    p.setColor((b.style%2==0)?0xFF25404A:0xFF2C3840);
+                    c.drawRoundRect(new RectF(x-7*s,y-14*s,x+7*s,y+10*s),7*s,7*s,p);
+                    p.setColor(0x66E6C96E);
+                    c.drawRect(x-1*s,y-13*s,x+1*s,y+9*s,p);
+                }
+
+                // Central doorway and small entrance canopy.
+                float dx=(l+r)*.5f;
+                p.setColor(0xFFD0AD67);
+                c.drawRoundRect(new RectF(dx-19*s,base-62*s,dx+19*s,base+1*s),12*s,12*s,p);
+                p.setColor(0xFF4B3022);
+                c.drawRoundRect(new RectF(dx-13*s,base-54*s,dx+13*s,base+1*s),9*s,9*s,p);
+
+                // Small Persian roof ornament / finial.
+                p.setColor(0xFFD5B45E);
+                c.drawCircle(dx,back-lift-20*s,3.5f*s,p);
+                c.drawRect(dx-1.5f*s,back-lift-29*s,dx+1.5f*s,back-lift-20*s,p);
+
+                // Occasional blue tile strip.
+                if(b.style%4==1){
+                    p.setColor(0xFF3C7180);
+                    c.drawRect(l+18*s,back-lift+27*s,r-18*s,back-lift+31*s,p);
                 }
             }
         }
