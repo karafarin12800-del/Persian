@@ -17,3 +17,6 @@ The project uses Android SDK 35, Java 17 and Gradle 8.7. GitHub Actions builds a
 
 ## Latest test branch
 The `unity-2.5d` branch is the active integration/test branch for the current Android gameplay build.
+
+## CI
+Android CI uses the committed Gradle Wrapper and current Android SDK package names.
