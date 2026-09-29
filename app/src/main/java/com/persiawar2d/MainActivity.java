@@ -8,6 +8,9 @@ import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.LinearGradient;
+import android.graphics.RadialGradient;
+import android.graphics.Shader;
 import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.View;
@@ -107,241 +110,357 @@ public final class MainActivity extends Activity {
         }
 
         private void drawGround(Canvas c){
-            float s=sc();
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.rgb(74,66,51));
-            c.drawRect(0,HUD,getWidth(),getHeight(),p);
+    float s=sc();
+    float t=(System.nanoTime()%12000000000L)/1e9f;
+    p.setStyle(Paint.Style.FILL);
+    p.setShader(new LinearGradient(0,HUD,0,getHeight(),
+            0xFF6B6654,0xFF2F3530,Shader.TileMode.CLAMP));
+    c.drawRect(0,HUD,getWidth(),getHeight(),p);
+    p.setShader(null);
 
-            p.setStrokeWidth(1);
-            p.setColor(0x142F3A2D);
-            float step=240;
-            float startX=(float)Math.floor((core.player().x-1400)/step)*step;
-            float startY=(float)Math.floor((core.player().y-900)/step)*step;
-            for(float x=startX;x<core.player().x+1400;x+=step)c.drawLine(sx(x),HUD,sx(x),getHeight(),p);
-            for(float y=startY;y<core.player().y+900;y+=step)c.drawLine(0,sy(y),getWidth(),sy(y),p);
+    // Large paving panels give the battlefield a deliberate urban material language.
+    float step=240f;
+    float startX=(float)Math.floor((core.player().x-1600)/step)*step;
+    float startY=(float)Math.floor((core.player().y-1100)/step)*step;
+    p.setStyle(Paint.Style.STROKE);
+    p.setStrokeWidth(Math.max(1f,0.9f*s));
+    p.setColor(0x253A403A);
+    for(float x=startX;x<core.player().x+1700;x+=step)c.drawLine(sx(x),HUD,sx(x),getHeight(),p);
+    for(float y=startY;y<core.player().y+1150;y+=step)c.drawLine(0,sy(y),getWidth(),sy(y),p);
 
-            p.setColor(0x1DCEB06A);
-            for(int i=0;i<world.grass().size();i+=3){
-                WorldMap.Prop g=world.grass().get(i);
-                if(Math.abs(g.x-core.player().x)>2100||Math.abs(g.y-core.player().y)>1250)continue;
-                c.drawCircle(sx(g.x),sy(g.y),Math.max(1.2f,g.size*s*.12f),p);
-            }
+    // Fine concrete/grit texture, deterministically distributed in world space.
+    p.setStyle(Paint.Style.FILL);
+    for(int gx=-18;gx<=18;gx++){
+        for(int gy=-9;gy<=9;gy++){
+            float wx=((float)Math.floor(core.player().x/95f)+gx)*95f+17f*((gy&3)-1);
+            float wy=((float)Math.floor(core.player().y/95f)+gy)*95f+11f*((gx&3)-1);
+            if(Math.abs(wx-core.player().x)>1650||Math.abs(wy-core.player().y)>1050)continue;
+            int n=(int)Math.abs(wx*31+wy*17);
+            float a=8f+(n%10);
+            p.setColor((n%3==0?0x16000000:0x10FFFFFF)|(((int)a)&0xFF)<<24);
+            c.drawCircle(sx(wx),sy(wy),Math.max(.7f,(n%4+1)*.65f*s),p);
         }
+    }
+
+    // Dry grass, stones and dust flecks around non-road terrain.
+    p.setColor(0x2CBCD28C);
+    for(int i=0;i<world.grass().size();i+=2){
+        WorldMap.Prop g=world.grass().get(i);
+        if(Math.abs(g.x-core.player().x)>2100||Math.abs(g.y-core.player().y)>1250)continue;
+        float x=sx(g.x),y=sy(g.y),r=Math.max(1f,g.size*s*.10f);
+        c.drawLine(x-r,y+r*1.6f,x,y-r,p); c.drawLine(x,y-r,x+r,y+r*1.6f,p);
+    }
+
+    // Subtle moving dust light keeps the scene from feeling static.
+    p.setShader(new RadialGradient(cx()+Math.sin(t*.35f)*getWidth()*.32f,
+            HUD+(getHeight()-HUD)*.48f,
+            Math.max(getWidth(),getHeight())*.55f,
+            new int[]{0x18FFE4A3,0x05000000,0x00000000},
+            new float[]{0f,.55f,1f},Shader.TileMode.CLAMP));
+    c.drawRect(0,HUD,getWidth(),getHeight(),p);
+    p.setShader(null);
+
+    // Bottom vignette.
+    p.setShader(new LinearGradient(0,getHeight()-getHeight()*.28f,0,getHeight(),
+            0x00000000,0x5A101613,Shader.TileMode.CLAMP));
+    c.drawRect(0,HUD,getWidth(),getHeight(),p);
+    p.setShader(null);
+}
 
         private void drawRoads(Canvas c){
-            float s=sc();
-            for(WorldMap.Road r:world.roads()){
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(0xFF2D302D);
-                if(r.horizontal){
-                    c.drawRect(sx(r.x1),sy(r.y1-r.width*.5f),sx(r.x2),sy(r.y1+r.width*.5f),p);
-                    p.setColor(0xFFB08B55);
-                    c.drawRect(sx(r.x1),sy(r.y1-r.width*.5f+8),sx(r.x2),sy(r.y1-r.width*.5f+12),p);
-                    p.setColor(0x66E9D493);
-                    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,4*s));
-                    p.setPathEffect(new DashPathEffect(new float[]{18*s,22*s},0));
-                    c.drawLine(sx(r.x1),sy(r.y1),sx(r.x2),sy(r.y2),p);
-                    p.setPathEffect(null);
-                }else{
-                    c.drawRect(sx(r.x1-r.width*.5f),sy(r.y1),sx(r.x1+r.width*.5f),sy(r.y2),p);
-                    p.setColor(0xFFB08B55);
-                    c.drawRect(sx(r.x1-r.width*.5f+8),sy(r.y1),sx(r.x1-r.width*.5f+12),sy(r.y2),p);
-                    p.setColor(0x66E9D493);
-                    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,4*s));
-                    p.setPathEffect(new DashPathEffect(new float[]{18*s,22*s},0));
-                    c.drawLine(sx(r.x1),sy(r.y1),sx(r.x2),sy(r.y2),p);
-                    p.setPathEffect(null);
-                }
-                p.setStyle(Paint.Style.FILL);
-            }
+    float s=sc();
+    for(WorldMap.Road r:world.roads()){
+        p.setStyle(Paint.Style.FILL);
+        if(r.horizontal){
+            float l=sx(r.x1), rr=sx(r.x2);
+            float top=sy(r.y1-r.width*.5f), bot=sy(r.y1+r.width*.5f);
+            p.setColor(0x60000000); c.drawRect(l+5*s,top+7*s,rr+8*s,bot+8*s,p);
+            p.setShader(new LinearGradient(0,top,0,bot,0xFF3B403D,0xFF272B2A,Shader.TileMode.CLAMP));
+            c.drawRect(l,top,rr,bot,p); p.setShader(null);
+            p.setColor(0xFFB79D63); c.drawRect(l,top,rr,top+4*s,p);
+            p.setColor(0xFF6F6048); c.drawRect(l,bot-3*s,rr,bot,p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(2.2f,4*s)); p.setPathEffect(new DashPathEffect(new float[]{26*s,24*s},0));
+            p.setColor(0xC6D7C38B); c.drawLine(sx(r.x1),sy(r.y1),sx(r.x2),sy(r.y2),p); p.setPathEffect(null);
+            // Center glints / wear.
+            p.setStrokeWidth(Math.max(1f,1.6f*s)); p.setColor(0x22FFFFFF);
+            c.drawLine(l,top+9*s,rr,top+9*s,p);
+        }else{
+            float l=sx(r.x1-r.width*.5f), rr=sx(r.x1+r.width*.5f);
+            float top=sy(r.y1), bot=sy(r.y2);
+            p.setColor(0x60000000); c.drawRect(l+5*s,top+6*s,rr+8*s,bot+8*s,p);
+            p.setShader(new LinearGradient(l,0,rr,0,0xFF3B403D,0xFF252928,Shader.TileMode.CLAMP));
+            c.drawRect(l,top,rr,bot,p); p.setShader(null);
+            p.setColor(0xFFB79D63); c.drawRect(l,top,l+4*s,bot,p);
+            p.setColor(0xFF6F6048); c.drawRect(rr-3*s,top,rr,bot,p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(2.2f,4*s)); p.setPathEffect(new DashPathEffect(new float[]{26*s,24*s},0));
+            p.setColor(0xC6D7C38B); c.drawLine(sx(r.x1),sy(r.y1),sx(r.x2),sy(r.y2),p); p.setPathEffect(null);
+            p.setStrokeWidth(Math.max(1f,1.6f*s)); p.setColor(0x22FFFFFF);
+            c.drawLine(l+9*s,top, l+9*s,bot,p);
         }
+
+        // Small road furniture accents at endpoints make intersections read more naturally.
+        float ex=r.horizontal?sx(r.x2):sx(r.x1), ey=r.horizontal?sy(r.y2):sy(r.y2);
+        p.setStyle(Paint.Style.FILL); p.setColor(0x77504738);
+        c.drawCircle(ex,ey,Math.max(2,5*s),p);
+    }
+}
 
         private void drawBuildings(Canvas c){
-            float s=sc();
-            for(WorldMap.Building b:world.buildings()){
-                if(Math.abs(b.x+b.w*.5f-core.player().x)>2050||Math.abs(b.y+b.h*.5f-core.player().y)>1200)continue;
-                float l=sx(b.x),r=sx(b.x+b.w),base=sy(b.y+b.h),back=sy(b.y);
-                float lift=(78+(b.style%4)*12)*s;
-                p.setStyle(Paint.Style.FILL);
+    float s=sc();
+    for(WorldMap.Building b:world.buildings()){
+        if(Math.abs(b.x+b.w*.5f-core.player().x)>2050||Math.abs(b.y+b.h*.5f-core.player().y)>1200)continue;
+        float l=sx(b.x),r=sx(b.x+b.w),base=sy(b.y+b.h),back=sy(b.y);
+        float lift=(82+(b.style%4)*13)*s;
 
-                // Ground shadow and raised Persian masonry block.
-                p.setColor(0x55000000);
-                c.drawRoundRect(new RectF(l+8,back+10,r+12,base+12),9*s,9*s,p);
-                p.setColor((b.style%5==0)?0xFF7A6047:(b.style%5==1?0xFF80664C:0xFF725844));
-                c.drawRect(l,back-lift,r,base,p);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0x5F000000);
+        c.drawRoundRect(new RectF(l+11*s,back-lift+13*s,r+15*s,base+15*s),10*s,10*s,p);
 
-                // Roof/parapet silhouette.
-                path.reset();
-                path.moveTo(l-7*s,back-lift+5*s);
-                path.lineTo((l+r)*.5f,back-lift-18*s);
-                path.lineTo(r+7*s,back-lift+5*s);
-                path.lineTo(r,back-lift+12*s);
-                path.lineTo(l,back-lift+12*s);
-                path.close();
-                p.setColor((b.style%3==0)?0xFF3D2D24:0xFF4A3528);
-                c.drawPath(path,p);
+        // Main facade with directional light gradient.
+        int dark=(b.style%5==0)?0xFF514337:(b.style%5==1?0xFF5C4A38:0xFF4C4036);
+        int light=(b.style%5==0)?0xFF947457:(b.style%5==1?0xFF9A7B5A:0xFF876B53);
+        p.setShader(new LinearGradient(l,0,r,0,light,dark,Shader.TileMode.CLAMP));
+        c.drawRoundRect(new RectF(l,back-lift,r,base),7*s,7*s,p); p.setShader(null);
 
-                // Persian facade band.
-                p.setColor(0xFFD2B16B);
-                c.drawRect(l,back-lift+14*s,r,back-lift+20*s,p);
-                p.setColor(0x668B6A42);
-                c.drawRect(l,base-15*s,r,base-10*s,p);
+        // Roof slab + parapet.
+        path.reset();
+        path.moveTo(l-8*s,back-lift+7*s);
+        path.lineTo(l+6*s,back-lift-8*s);
+        path.lineTo(r-6*s,back-lift-18*s);
+        path.lineTo(r+8*s,back-lift+5*s);
+        path.lineTo(r-1*s,back-lift+13*s);
+        path.lineTo(l+2*s,back-lift+14*s);
+        path.close();
+        p.setColor((b.style%3==0)?0xFF2E2824:0xFF362C27); c.drawPath(path,p);
+        p.setColor(0xFFD0B16F); c.drawRect(l,back-lift+13*s,r,back-lift+18*s,p);
+        p.setColor(0x55302822); c.drawRect(l,base-13*s,r,base-8*s,p);
 
-                int cols=Math.max(2,Math.min(5,(int)(b.w/100)));
-                for(int i=0;i<cols;i++){
-                    float x=l+26*s+i*(r-l-52*s)/Math.max(1,cols-1);
-                    float y=back-lift+(base-(back-lift))*.48f;
-                    // Arched window.
-                    p.setColor(0xFFBFA46A);
-                    c.drawRoundRect(new RectF(x-10*s,y-18*s,x+10*s,y+14*s),9*s,9*s,p);
-                    p.setColor((b.style%2==0)?0xFF25404A:0xFF2C3840);
-                    c.drawRoundRect(new RectF(x-7*s,y-14*s,x+7*s,y+10*s),7*s,7*s,p);
-                    p.setColor(0x66E6C96E);
-                    c.drawRect(x-1*s,y-13*s,x+1*s,y+9*s,p);
-                }
-
-                // Central doorway and small entrance canopy.
-                float dx=(l+r)*.5f;
-                p.setColor(0xFFD0AD67);
-                c.drawRoundRect(new RectF(dx-19*s,base-62*s,dx+19*s,base+1*s),12*s,12*s,p);
-                p.setColor(0xFF4B3022);
-                c.drawRoundRect(new RectF(dx-13*s,base-54*s,dx+13*s,base+1*s),9*s,9*s,p);
-
-                // Small Persian roof ornament / finial.
-                p.setColor(0xFFD5B45E);
-                c.drawCircle(dx,back-lift-20*s,3.5f*s,p);
-                c.drawRect(dx-1.5f*s,back-lift-29*s,dx+1.5f*s,back-lift-20*s,p);
-
-                // Occasional blue tile strip.
-                if(b.style%4==1){
-                    p.setColor(0xFF3C7180);
-                    c.drawRect(l+18*s,back-lift+27*s,r-18*s,back-lift+31*s,p);
-                }
+        int cols=Math.max(2,Math.min(6,(int)(b.w/90)));
+        int rows=Math.max(1,Math.min(2,(int)(b.h/120)));
+        for(int row=0;row<rows;row++){
+            for(int i=0;i<cols;i++){
+                float frac=(i+.5f)/cols;
+                float x=l+frac*(r-l);
+                float fy=(row+.9f)/(rows+1.2f);
+                float y=(back-lift)+(base-(back-lift))*fy;
+                float ww=11*s,hh=17*s;
+                p.setColor((b.style+i+row)%4==0?0xFFE0C37B:0xFFB48F5B);
+                c.drawRoundRect(new RectF(x-ww,y-hh,x+ww,y+hh),7*s,7*s,p);
+                p.setShader(new LinearGradient(x-ww, y-hh, x+ww, y+hh,
+                        0xFF263D45,0xFF10191C,Shader.TileMode.CLAMP));
+                c.drawRoundRect(new RectF(x-ww+3*s,y-hh+3*s,x+ww-3*s,y+hh-2*s),5*s,5*s,p);
+                p.setShader(null);
+                p.setColor(0x35FFE8A8);
+                c.drawRect(x-2*s,y-hh+4*s,x+2*s,y+hh-3*s,p);
             }
         }
+
+        // Door + canopy + tile band.
+        float dx=(l+r)*.5f;
+        p.setColor(0xFFD1B36C); c.drawRoundRect(new RectF(dx-21*s,base-66*s,dx+21*s,base+2*s),12*s,12*s,p);
+        p.setColor(0xFF342720); c.drawRoundRect(new RectF(dx-14*s,base-57*s,dx+14*s,base+2*s),9*s,9*s,p);
+        p.setColor(0xFF3A7D84); c.drawRect(l+16*s,back-lift+26*s,r-16*s,back-lift+31*s,p);
+        p.setColor(0x66E9D59A); c.drawRect(l+17*s,back-lift+32*s,r-17*s,back-lift+34*s,p);
+
+        // Rooftop mechanicals: tank, vents and small satellite/antenna shapes.
+        p.setColor(0xFF4C514D);
+        c.drawRoundRect(new RectF(l+18*s,back-lift-3*s,l+34*s,back-lift+10*s),3*s,3*s,p);
+        p.setColor(0xFF9C8F70); c.drawRect(l+22*s,back-lift-8*s,l+30*s,back-lift-2*s,p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1.3f,2*s)); p.setColor(0xFFAAA18B);
+        c.drawLine(r-22*s,back-lift+7*s,r-22*s,back-lift-13*s,p);
+        c.drawCircle(r-22*s,back-lift-15*s,4*s,p);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0xFFD5B45E); c.drawCircle(dx,back-lift-20*s,3.3f*s,p);
+    }
+}
 
         private void drawVehicles(Canvas c){
-            float s=sc();
-            for(WorldMap.Vehicle v:world.vehicles()){
-                if(Math.abs(v.x-core.player().x)>1900||Math.abs(v.y-core.player().y)>1100)continue;
-                float x=sx(v.x),y=sy(v.y);
-                c.save();c.rotate(v.angle,x,y);
-                p.setStyle(Paint.Style.FILL);p.setColor(0xFF33454A);c.drawRoundRect(new RectF(x-v.w*s*.5f,y-v.h*s*.5f,x+v.w*s*.5f,y+v.h*s*.5f),8*s,8*s,p);
-                p.setColor(0xFF132027);c.drawRoundRect(new RectF(x-v.w*s*.22f,y-v.h*s*.30f,x+v.w*s*.22f,y+v.h*s*.30f),4*s,4*s,p);
-                p.setColor(0xFF8E6A42);
-                c.drawRect(x-v.w*s*.42f,y-v.h*s*.48f,x-v.w*s*.34f,y-v.h*s*.28f,p);
-                c.drawRect(x+v.w*s*.34f,y+v.h*s*.28f,x+v.w*s*.42f,y+v.h*s*.48f,p);
-                c.restore();
-            }
-        }
+    float s=sc();
+    for(WorldMap.Vehicle v:world.vehicles()){
+        if(Math.abs(v.x-core.player().x)>1900||Math.abs(v.y-core.player().y)>1100)continue;
+        float x=sx(v.x),y=sy(v.y);
+        float w=v.w*s,h=v.h*s;
+        c.save(); c.rotate(v.angle,x,y);
+
+        p.setStyle(Paint.Style.FILL); p.setColor(0x65000000);
+        c.drawRoundRect(new RectF(x-w*.55f,y-h*.35f,x+w*.55f,y+h*.50f),10*s,10*s,p);
+        p.setShader(new LinearGradient(x-w*.5f,y-h*.5f,x+w*.5f,y+h*.5f,
+                0xFF50615F,0xFF1E282A,Shader.TileMode.CLAMP));
+        c.drawRoundRect(new RectF(x-w*.5f,y-h*.5f,x+w*.5f,y+h*.5f),9*s,9*s,p); p.setShader(null);
+
+        p.setColor(0xFF182126); c.drawRoundRect(new RectF(x-w*.22f,y-h*.31f,x+w*.22f,y+h*.05f),4*s,4*s,p);
+        p.setColor(0xFF7C8E8C); c.drawRect(x-w*.05f,y-h*.48f,x+w*.05f,y-h*.34f,p);
+        p.setColor(0xFFA56B3A); c.drawRect(x-w*.42f,y-h*.47f,x-w*.31f,y-h*.24f,p);
+        p.setColor(0xFFD8C166); c.drawRect(x+w*.31f,y-h*.47f,x+w*.42f,y-h*.24f,p);
+        p.setColor(0xFF111616);
+        c.drawOval(new RectF(x-w*.42f,y+h*.22f,x-w*.27f,y+h*.55f),p);
+        c.drawOval(new RectF(x+w*.27f,y+h*.22f,x+w*.42f,y+h*.55f),p);
+        p.setColor(0xFFD9D4C5);
+        c.drawCircle(x-w*.34f,y+h*.21f,Math.max(1.5f,2.2f*s),p);
+        c.drawCircle(x+w*.34f,y+h*.21f,Math.max(1.5f,2.2f*s),p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1.2f,1.7f*s)); p.setColor(0x557BC9C1);
+        c.drawRoundRect(new RectF(x-w*.43f,y-h*.46f,x+w*.43f,y+h*.42f),7*s,7*s,p);
+        p.setStyle(Paint.Style.FILL);
+        c.restore();
+    }
+}
 
         private void drawFences(Canvas c){
-            float s=sc();
-            for(WorldMap.Fence f:world.fences()){
-                if(Math.abs((f.x1+f.x2)*.5f-core.player().x)>1900||Math.abs((f.y1+f.y2)*.5f-core.player().y)>1100)continue;
-                float x1=sx(f.x1),y1=sy(f.y1),x2=sx(f.x2),y2=sy(f.y2);
-                p.setColor(0xFF8B6A43);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(3,7*s));
-                c.drawLine(x1,y1,x2,y2,p);
-                p.setStyle(Paint.Style.FILL);
-                c.drawCircle(x1,y1,5*s,p);c.drawCircle(x2,y2,5*s,p);
-            }
-        }
+    float s=sc();
+    for(WorldMap.Fence f:world.fences()){
+        if(Math.abs((f.x1+f.x2)*.5f-core.player().x)>1900||Math.abs((f.y1+f.y2)*.5f-core.player().y)>1100)continue;
+        float x1=sx(f.x1),y1=sy(f.y1),x2=sx(f.x2),y2=sy(f.y2);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeCap(Paint.Cap.ROUND);
+        p.setStrokeWidth(Math.max(5,7*s)); p.setColor(0x71000000); c.drawLine(x1+2*s,y1+4*s,x2+2*s,y2+4*s,p);
+        p.setStrokeWidth(Math.max(3,5*s)); p.setColor(0xFF70593E); c.drawLine(x1,y1,x2,y2,p);
+        p.setStrokeWidth(Math.max(1.2f,1.8f*s)); p.setColor(0xFFD2AF66); c.drawLine(x1,y1-2*s,x2,y2-2*s,p);
+        p.setStyle(Paint.Style.FILL); p.setColor(0xFF493C30);
+        c.drawCircle(x1,y1,5*s,p); c.drawCircle(x2,y2,5*s,p);
+        p.setColor(0xFFD0AD63); c.drawCircle(x1,y1-2*s,2*s,p); c.drawCircle(x2,y2-2*s,2*s,p);
+        p.setStrokeCap(Paint.Cap.BUTT);
+    }
+}
 
         private void drawNature(Canvas c){
-            float s=sc();
-            int treeStep=Math.max(1,world.trees().size()/84);
-            for(int i=0;i<world.trees().size();i+=treeStep){
-                WorldMap.Prop t=world.trees().get(i);
-                if(Math.abs(t.x-core.player().x)>1800||Math.abs(t.y-core.player().y)>1050)continue;
-                float x=sx(t.x),y=sy(t.y),r=(18+t.size*.58f)*s;
-                p.setColor(0x44000000);c.drawOval(new RectF(x-r*.75f,y+r*.18f,x+r*.75f,y+r*.65f),p);
-                p.setColor(0xFF70472E);c.drawRoundRect(new RectF(x-4*s,y-r*.05f,x+4*s,y+r*.46f),3*s,3*s,p);
-                p.setColor(0xFF1F5539);c.drawCircle(x,y-r*.18f,r,p);
-                p.setColor(0xFF34784A);c.drawCircle(x-r*.34f,y-r*.35f,r*.67f,p);
-                p.setColor(0xFF4B9560);c.drawCircle(x+r*.32f,y-r*.38f,r*.55f,p);
-            }
-            int bushStep=Math.max(1,world.bushes().size()/70);
-            for(int i=0;i<world.bushes().size();i+=bushStep){
-                WorldMap.Prop b=world.bushes().get(i);
-                if(Math.abs(b.x-core.player().x)>1800||Math.abs(b.y-core.player().y)>1050)continue;
-                float x=sx(b.x),y=sy(b.y),r=Math.max(3,b.size*.75f*s);
-                p.setColor(0x44352C20);c.drawOval(new RectF(x-r,y+r*.15f,x+r,y+r*.55f),p);
-                p.setColor(0xFF2C6841);c.drawCircle(x,y,r,p);
-                p.setColor(0xFF438A56);c.drawCircle(x-r*.38f,y-r*.25f,r*.62f,p);
-                c.drawCircle(x+r*.35f,y-r*.18f,r*.55f,p);
-            }
-        }
+    float s=sc();
+    int treeStep=Math.max(1,world.trees().size()/88);
+    for(int i=0;i<world.trees().size();i+=treeStep){
+        WorldMap.Prop t=world.trees().get(i);
+        if(Math.abs(t.x-core.player().x)>1800||Math.abs(t.y-core.player().y)>1050)continue;
+        float x=sx(t.x),y=sy(t.y),r=(18+t.size*.58f)*s;
+        p.setStyle(Paint.Style.FILL); p.setColor(0x5A000000);
+        c.drawOval(new RectF(x-r*.95f,y+r*.20f,x+r*.95f,y+r*.72f),p);
+        p.setColor(0xFF5C3D2C); c.drawRoundRect(new RectF(x-5*s,y-r*.1f,x+5*s,y+r*.53f),3*s,3*s,p);
+        p.setColor(0xFF183A2B); c.drawCircle(x,y-r*.16f,r,p);
+        p.setShader(new RadialGradient(x-r*.18f,y-r*.43f,r*.92f,
+                new int[]{0xFF5A9B62,0xFF2D6E46,0xFF173B2B},
+                new float[]{0f,.58f,1f},Shader.TileMode.CLAMP));
+        c.drawCircle(x,y-r*.20f,r,p); p.setShader(null);
+        p.setColor(0x6099C970); c.drawCircle(x-r*.35f,y-r*.42f,r*.38f,p);
+        p.setColor(0x4AFFFFFF); c.drawCircle(x-r*.24f,y-r*.53f,r*.16f,p);
+    }
+
+    int bushStep=Math.max(1,world.bushes().size()/76);
+    for(int i=0;i<world.bushes().size();i+=bushStep){
+        WorldMap.Prop b=world.bushes().get(i);
+        if(Math.abs(b.x-core.player().x)>1800||Math.abs(b.y-core.player().y)>1050)continue;
+        float x=sx(b.x),y=sy(b.y),r=Math.max(3,b.size*.75f*s);
+        p.setColor(0x4B000000); c.drawOval(new RectF(x-r,y+r*.08f,x+r,y+r*.55f),p);
+        p.setShader(new RadialGradient(x-r*.2f,y-r*.2f,Math.max(4,r),
+                new int[]{0xFF619A5D,0xFF2C6844,0xFF163929},
+                new float[]{0f,.62f,1f},Shader.TileMode.CLAMP));
+        c.drawCircle(x,y,r,p); p.setShader(null);
+        p.setColor(0x70FFFFFF); c.drawCircle(x-r*.28f,y-r*.27f,r*.16f,p);
+    }
+
+    // Small rubble stones around the scene.
+    for(int i=0;i<world.grass().size();i+=7){
+        WorldMap.Prop g=world.grass().get(i);
+        if(Math.abs(g.x-core.player().x)>1750||Math.abs(g.y-core.player().y)>1000)continue;
+        int n=(int)Math.abs(g.x*13+g.y*7);
+        float rr=(1.5f+n%4)*s, x=sx(g.x+12), y=sy(g.y+9);
+        p.setColor(0x55362E26); c.drawOval(new RectF(x-rr,y-rr*.45f,x+rr,y+rr*.55f),p);
+        p.setColor(0x806E6252); c.drawCircle(x-rr*.2f,y-rr*.15f,Math.max(1,rr*.45f),p);
+    }
+}
 
         private void drawCombat(Canvas c){
-            float s=sc();
+    float s=sc();
+    float t=(System.nanoTime()%10000000000L)/1e9f;
 
-            // Ground pickups: custom illustrated objects instead of flat lettered squares.
-            for(GameCore.Pickup item:core.pickups()){
-                float x=sx(item.x),y=sy(item.y);
-                if(x<-70||x>getWidth()+70||y<HUD-90||y>getHeight()+100)continue;
-                drawPickupIcon(c,x,y,s,item.type);
-            }
+    for(GameCore.Pickup item:core.pickups()){
+        float x=sx(item.x),y=sy(item.y);
+        if(x<-80||x>getWidth()+80||y<HUD-100||y>getHeight()+110)continue;
+        float pulse=1f+.06f*(float)Math.sin(t*3f+item.x*.01f);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0x25000000); c.drawCircle(x,y,28*s,p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1.5f,2*s));
+        p.setColor(item.type==GameCore.PickupType.AMMO?0x7070D7A2:
+                item.type==GameCore.PickupType.MEDKIT?0x70FF7770:
+                item.type==GameCore.PickupType.GRENADE?0x7066B17D:0x707CCBFF);
+        c.drawCircle(x,y,20*s*pulse,p); p.setStyle(Paint.Style.FILL);
+        drawPickupIcon(c,x,y,s,item.type);
+    }
 
-            // Flying grenades: compact 3D orb with cap, pin and highlight.
-            for(GameCore.Grenade g:core.grenades()){
-                float x=sx(g.x),y=sy(g.y);
-                float r=Math.max(dp(6f),12*s);
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(0x4A000000);
-                c.drawOval(new RectF(x-r*.9f,y+r*.45f,x+r*.9f,y+r*.9f),p);
-                p.setColor(0xFF394C40);
-                c.drawCircle(x,y,r,p);
-                p.setColor(0xFF1E2A24);
-                c.drawRoundRect(new RectF(x-r*.18f,y-r*.95f,x+r*.18f,y-r*.58f),r*.12f,r*.12f,p);
-                p.setColor(0xFFD1AE5F);
-                c.drawCircle(x-r*.05f,y-r*.87f,r*.13f,p);
-                p.setColor(0x83B5D69E);
-                c.drawCircle(x-r*.32f,y-r*.35f,r*.28f,p);
-            }
+    for(GameCore.Grenade g:core.grenades()){
+        float x=sx(g.x),y=sy(g.y),r=Math.max(dp(6f),12*s);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1f,2*s)); p.setColor(0x4DFFE09A);
+        c.drawCircle(x,y,r*1.7f,p);
+        p.setStyle(Paint.Style.FILL); p.setColor(0x42000000);
+        c.drawOval(new RectF(x-r*1.15f,y+r*.50f,x+r*1.15f,y+r*.92f),p);
+        p.setShader(new RadialGradient(x-r*.35f,y-r*.38f,r*1.2f,
+                new int[]{0xFF687C69,0xFF33463B,0xFF18231E},
+                new float[]{0f,.55f,1f},Shader.TileMode.CLAMP));
+        c.drawCircle(x,y,r,p); p.setShader(null);
+        p.setColor(0xFFE2C978); c.drawCircle(x,y-r*.82f,r*.13f,p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1.3f,2*s)); c.drawLine(x,y-r*.72f,x+r*.65f,y-r*1.05f,p);
+        p.setStyle(Paint.Style.FILL); p.setColor(0x95D7E9C6); c.drawCircle(x-r*.28f,y-r*.30f,r*.22f,p);
+    }
 
-            // Projectiles: layered tracer, bright tip and fading tail.
-            for(GameCore.Projectile b:core.projectiles()){
-                float x=sx(b.x),y=sy(b.y);
-                float ox=sx(b.x-b.vx*.04f),oy=sy(b.y-b.vy*.04f);
-                p.setStyle(Paint.Style.STROKE);
-                p.setStrokeCap(Paint.Cap.ROUND);
-                p.setStrokeWidth(Math.max(dp(3f),5.5f*s));
-                p.setColor(b.fromPlayer?0x55FFE08A:0x55FF756B);
-                c.drawLine(ox,oy,x,y,p);
-                p.setStrokeWidth(Math.max(dp(1.4f),2.8f*s));
-                p.setColor(b.fromPlayer?0xFFFFD86A:0xFFFF7168);
-                c.drawLine(ox,oy,x,y,p);
-                p.setStyle(Paint.Style.FILL);
-                c.drawCircle(x,y,Math.max(dp(2f),3.6f*s),p);
-                p.setColor(0xFFFFFFFF);
-                c.drawCircle(x,y,Math.max(1.2f,1.5f*s),p);
-                p.setStrokeCap(Paint.Cap.BUTT);
-            }
+    for(GameCore.Projectile b:core.projectiles()){
+        float x=sx(b.x),y=sy(b.y);
+        float ox=sx(b.x-b.vx*.055f),oy=sy(b.y-b.vy*.055f);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeCap(Paint.Cap.ROUND);
+        p.setStrokeWidth(Math.max(dp(5f),7*s)); p.setColor(b.fromPlayer?0x308FF3FF:0x30FF5C56); c.drawLine(ox,oy,x,y,p);
+        p.setStrokeWidth(Math.max(dp(2f),3.2f*s)); p.setColor(b.fromPlayer?0xFFE8D37A:0xFFFF6F63); c.drawLine(ox,oy,x,y,p);
+        p.setStyle(Paint.Style.FILL);
+        p.setShader(new RadialGradient(x,y,Math.max(dp(7f),7*s),
+                0xB8FFFFFF,b.fromPlayer?0x00FFE17A:0x00FF5B50,Shader.TileMode.CLAMP));
+        c.drawCircle(x,y,Math.max(dp(5f),7*s),p); p.setShader(null);
+        p.setColor(Color.WHITE); c.drawCircle(x,y,Math.max(1f,1.5f*s),p); p.setStrokeCap(Paint.Cap.BUTT);
+    }
 
-            for(GameCore.Enemy e:core.enemies()){
-                float x=sx(e.x),y=sy(e.y);if(x<-110||x>getWidth()+110||y<HUD-100||y>getHeight()+110)continue;
-                if(e.dead){drawDeath(c,x,y,s,e);continue;}
-                drawWarrior(c,x,y,s,e.type,e.hp<e.maxHp?0xFFD9A56A:e.state==GameCore.EnemyState.ATTACK?0xFFB8423E:0xFF8B3340,false);
-                if(e.hp<e.maxHp){
-                    p.setColor(0x66000000);c.drawRoundRect(new RectF(x-25*s,y-50*s,x+25*s,y-44*s),3*s,3*s,p);
-                    p.setColor(0xFFD85952);c.drawRoundRect(new RectF(x-25*s,y-50*s,x-25*s+50*s*e.hp/e.maxHp,y-44*s),3*s,3*s,p);
-                }
-            }
-
-            drawPlayer(c);
-            for(GameCore.Explosion ex:core.explosions()){
-                float x=sx(ex.x),y=sy(ex.y),progress=1-ex.life/.38f,r=ex.radius*s*(.18f+progress*.82f);
-                p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(3,8*s*(1-progress)));
-                p.setColor(0xFFFFA43B);
-                c.drawCircle(x,y,r,p);
-                p.setColor(0x55FFE36C);
-                p.setStyle(Paint.Style.FILL);
-                c.drawCircle(x,y,r*.58f,p);
-            }
-
-            drawAim(c);
+    for(GameCore.Enemy e:core.enemies()){
+        float x=sx(e.x),y=sy(e.y);
+        if(x<-120||x>getWidth()+120||y<HUD-110||y>getHeight()+120)continue;
+        if(e.dead){drawDeath(c,x,y,s,e);continue;}
+        float bob=(float)Math.sin(t*5.2f+e.x*.008f+e.y*.006f)*1.5f*s;
+        if(e.state==GameCore.EnemyState.ATTACK){
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1.5f,2.5f*s));p.setColor(0x65FF6A5B);
+            c.drawCircle(x,y,31*s,bob==0?new Paint():p);
         }
+        drawWarrior(c,x,y+bob,s,e.type,e.hp<e.maxHp?0xFFD9A56A:e.state==GameCore.EnemyState.ATTACK?0xFFB8423E:0xFF8B3340,false);
+        if(e.hp<e.maxHp){
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0x8A141816);c.drawRoundRect(new RectF(x-28*s,y-54*s,x+28*s,y-47*s),4*s,4*s,p);
+            p.setColor(0xFFE05A51);c.drawRoundRect(new RectF(x-28*s,y-54*s,x-28*s+56*s*e.hp/e.maxHp,y-47*s),4*s,4*s,p);
+            p.setColor(0xA8F3E0B0);c.drawRect(x-28*s,y-54*s,x-28*s+56*s*e.hp/e.maxHp,y-51*s,p);
+        }
+    }
+
+    drawPlayer(c);
+
+    for(GameCore.Explosion ex:core.explosions()){
+        float x=sx(ex.x),y=sy(ex.y),age=1-ex.life/.38f;
+        age=Math.max(0,Math.min(1,age));
+        float r=ex.radius*s*(.22f+age*.95f);
+
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0x5B000000); c.drawOval(new RectF(x-r*.85f,y+r*.35f,x+r*.85f,y+r*.72f),p);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,10*s*(1-age)));
+        p.setColor(0xFFFFC34D);c.drawCircle(x,y,r,p);
+        p.setStrokeWidth(Math.max(1,5*s*(1-age)));p.setColor(0xFFFF7347);c.drawCircle(x,y,r*.66f,p);
+
+        p.setStyle(Paint.Style.FILL);
+        p.setShader(new RadialGradient(x,y,r*.85f,
+                new int[]{0xF7FFE18A,0xD9FF8D45,0x66E6382B,0x001A100E},
+                new float[]{0f,.30f,.62f,1f},Shader.TileMode.CLAMP));
+        c.drawCircle(x,y,r*.78f,p);p.setShader(null);
+
+        // Smoke lobes expand upward while the blast fades.
+        for(int i=0;i<5;i++){
+            double a=i*Math.PI*2/5.0+t*.35;
+            float sr=r*(.16f+.10f*i)*(1-age*.25f);
+            float xx=x+(float)Math.cos(a)*r*.42f;
+            float yy=y+(float)Math.sin(a)*r*.30f-r*age*.20f;
+            p.setColor(0x2D20201D);c.drawCircle(xx,yy,sr,p);
+        }
+    }
+
+    drawAim(c);
+}
 
         private void drawPickupIcon(Canvas c,float x,float y,float s,GameCore.PickupType type){
             float r=Math.max(dp(11f),17*s);
@@ -711,14 +830,21 @@ public final class MainActivity extends Activity {
         }
 
         private void drawZone(Canvas c){
-            float s=sc(),zx=sx(WorldMap.SIZE*.5f),zy=sy(WorldMap.SIZE*.5f),rx=core.zoneRadius()*s,ry=rx*PITCH;
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0x4D9AD8FF);p.setPathEffect(new DashPathEffect(new float[]{22*s,18*s},0));c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
-            p.setPathEffect(null);
-            if(core.zoneRadius()<1550){
-                p.setStrokeWidth(Math.max(2,4*s));p.setColor(0xA8F05A52);c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
-            }
-            p.setStyle(Paint.Style.FILL);
-        }
+    float s=sc(),zx=sx(WorldMap.SIZE*.5f),zy=sy(WorldMap.SIZE*.5f),rx=core.zoneRadius()*s,ry=rx*PITCH;
+    float pulse=1f+.025f*(float)Math.sin((System.nanoTime()%5000000000L)/1e9f*2.2f);
+    p.setStyle(Paint.Style.STROKE);
+    p.setStrokeWidth(Math.max(2,7*s));
+    p.setColor(0x1737B7FF);c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
+    p.setStrokeWidth(Math.max(1.5f,3*s));
+    p.setPathEffect(new DashPathEffect(new float[]{30*s,20*s},(float)((System.nanoTime()/1000000)%5000)/80f));
+    p.setColor(0xA0A7D8F6);c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
+    p.setPathEffect(null);
+    if(core.zoneRadius()<1550){
+        p.setStrokeWidth(Math.max(2,5*s));
+        p.setColor(0xD4F06B61);c.drawOval(new RectF(zx-rx*pulse,zy-ry*pulse,zx+rx*pulse,zy+ry*pulse),p);
+    }
+    p.setStyle(Paint.Style.FILL);
+}
 
         private void drawAim(Canvas c){
             GameCore.Enemy target=core.getAutoAimTarget();
@@ -853,107 +979,137 @@ public final class MainActivity extends Activity {
 
 
         private void drawHud(Canvas c){
-            float w=getWidth(),h=getHeight(),s=Math.max(.75f,Math.min(1f,h/720f));
-            p.setStyle(Paint.Style.FILL);p.setColor(0xE21B2520);c.drawRoundRect(new RectF(12,10,w-12,HUD-8),15,15,p);
-            GameCore.Player pl=core.player();
-            p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.LEFT);p.setTextSize(19*s);p.setColor(0xFFF0D178);
-            c.drawText("PERSIA WAR",28,36*s,p);
-            p.setTypeface(null);p.setTextSize(13*s);p.setColor(0xFFF2F2EC);
-            c.drawText(pl.skin.toUpperCase(),28,58*s,p);
+    float w=getWidth(),h=getHeight(),s=Math.max(.78f,Math.min(1.08f,h/720f));
+    float t=(System.nanoTime()%8000000000L)/1e9f;
+    p.setStyle(Paint.Style.FILL);
+    p.setShader(new LinearGradient(0,10*s,0,(HUD-6)*s,0xF01B2522,0xC20D1514,Shader.TileMode.CLAMP));
+    c.drawRoundRect(new RectF(10,8,w-10,HUD-6),16*s,16*s,p); p.setShader(null);
+    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1.2f,1.5f*s));p.setColor(0x8AD1B96D);
+    c.drawRoundRect(new RectF(10,8,w-10,HUD-6),16*s,16*s,p);p.setStyle(Paint.Style.FILL);
 
-            float barL=150*s,barW=250*s;
-            p.setColor(0x55333333);c.drawRoundRect(new RectF(barL,24*s,barL+barW,38*s),7,7,p);
-            p.setColor(0xFFE0544C);c.drawRoundRect(new RectF(barL,24*s,barL+barW*pl.hp/pl.maxHp,38*s),7,7,p);
-            p.setColor(Color.WHITE);p.setTextSize(12*s);c.drawText("HP "+pl.hp+"/"+pl.maxHp,barL+8*s,35*s,p);
+    GameCore.Player pl=core.player();
+    p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.LEFT);
+    p.setTextSize(18*s);p.setColor(0xFFF2D47D);c.drawText("PERSIA WAR",28,34*s,p);
+    p.setTypeface(null);p.setTextSize(11*s);p.setColor(0xFFBFC8C2);c.drawText(pl.skin.toUpperCase()+" • CITY OF KINGS",28,53*s,p);
 
-            p.setColor(0x55333333);c.drawRoundRect(new RectF(barL,44*s,barL+barW,56*s),6,6,p);
-            p.setColor(0xFF61A4D4);c.drawRoundRect(new RectF(barL,44*s,barL+barW*Math.min(1,pl.shield/100f),56*s),6,6,p);
-            c.drawText("SHIELD "+pl.shield,barL+8*s,54*s,p);
+    float barL=158*s,barW=Math.min(270*s,w*.24f);
+    p.setColor(0x65101816);c.drawRoundRect(new RectF(barL,18*s,barL+barW,33*s),8*s,8*s,p);
+    p.setShader(new LinearGradient(barL,18*s,barL+barW,18*s,0xFFE86A58,0xFF9D2E3A,Shader.TileMode.CLAMP));
+    c.drawRoundRect(new RectF(barL,18*s,barL+barW*Math.max(0,pl.hp/(float)Math.max(1,pl.maxHp)),33*s),8*s,8*s,p);p.setShader(null);
+    p.setColor(0xFFDDE5DE);p.setTextSize(10*s);c.drawText("HP  "+pl.hp+"/"+pl.maxHp,barL+8*s,29*s,p);
 
-            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(PaintCompat.BOLD);p.setTextSize(16*s);p.setColor(0xFFF4F1E8);
-            c.drawText("KILLS "+core.kills(),w*.50f,34*s,p);
-            p.setTypeface(null);p.setTextSize(12*s);c.drawText("SURVIVE THE CITY",w*.50f,56*s,p);
+    p.setColor(0x65101816);c.drawRoundRect(new RectF(barL,39*s,barL+barW,53*s),8*s,8*s,p);
+    p.setShader(new LinearGradient(barL,39*s,barL+barW,39*s,0xFF76C6E8,0xFF2E659B,Shader.TileMode.CLAMP));
+    c.drawRoundRect(new RectF(barL,39*s,barL+barW*Math.min(1,Math.max(0,pl.shield/100f)),53*s),8*s,8*s,p);p.setShader(null);
+    c.drawText("SHIELD  "+pl.shield,barL+8*s,50*s,p);
 
-            p.setTextAlign(Paint.Align.RIGHT);p.setTypeface(PaintCompat.BOLD);p.setTextSize(15*s);p.setColor(0xFFEAD28C);
-            c.drawText("AMMO "+pl.ammo+"/"+pl.reserveAmmo+"   BOMB "+pl.grenades,w-28,35*s,p);
-            p.setTypeface(null);p.setTextSize(11*s);p.setColor(0xFFDEE4DF);
-            c.drawText(core.zoneRadius()<1550?"ZONE CLOSING":"ZONE STABLE",w-28,56*s,p);
-        }
+    p.setTextAlign(Paint.Align.CENTER);p.setTypeface(PaintCompat.BOLD);p.setTextSize(16*s);p.setColor(0xFFF4EFE3);
+    c.drawText("KILLS  "+core.kills(),w*.50f,31*s,p);
+    p.setTypeface(null);p.setTextSize(10*s);p.setColor(0xFFAEB7B0);c.drawText("TACTICAL SECTOR 07",w*.50f,50*s,p);
+
+    p.setTextAlign(Paint.Align.RIGHT);p.setTypeface(PaintCompat.BOLD);p.setTextSize(14*s);p.setColor(0xFFE7CC78);
+    c.drawText("AMMO  "+pl.ammo+"/"+pl.reserveAmmo+"   •   BOMB  "+pl.grenades,w-26,31*s,p);
+    p.setTypeface(null);p.setTextSize(10*s);p.setColor(0xFFBDC6C0);
+    c.drawText(core.zoneRadius()<1550?"ZONE CLOSING":"ZONE STABLE",w-26,50*s,p);
+
+    // Animated tactical status light.
+    p.setColor(0xFF72CDA7);c.drawCircle(w-18,18*s,3.2f*s,p);
+    p.setColor(0x3072CDA7);c.drawCircle(w-18,18*s,(7+2*(float)Math.sin(t*3f))*s,p);
+}
 
         private void drawControls(Canvas c){
-            float w=getWidth(),h=getHeight(),jr=joystickRadius();
+    float w=getWidth(),h=getHeight(),jr=joystickRadius();
 
-            // Always show a subtle joystick landing zone; touching the left side makes
-            // it float to the exact finger-down position.
-            float drawBaseX=joyActive?joyBaseX:idleJoyX();
-            float drawBaseY=joyActive?joyBaseY:idleJoyY();
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(0x2D151C19);
-            c.drawCircle(drawBaseX,drawBaseY,jr+14,p);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(dp(3f),3f*dp(1f)));
-            p.setColor(joyActive?0xB8D9C889:0x707B7667);
-            c.drawCircle(drawBaseX,drawBaseY,jr+10,p);
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(joyActive?0xA5C1A45B:0x557A775D);
-            c.drawCircle(joyActive?joyX:drawBaseX,joyActive?joyY:drawBaseY,jr*.43f,p);
-            p.setColor(0xE8FFFFFF);
-            p.setTypeface(PaintCompat.BOLD);
-            p.setTextSize(Math.max(dp(10f),jr*.15f));
-            p.setTextAlign(Paint.Align.CENTER);
-            c.drawText("MOVE",drawBaseX,drawBaseY+jr+dp(24f),p);
+    float drawBaseX=joyActive?joyBaseX:idleJoyX();
+    float drawBaseY=joyActive?joyBaseY:idleJoyY();
 
-            button(c,fireX(),fireY(),fireVisualRadius(),"FIRE",firePointer>=0);
-            button(c,swordX(),actionY(),actionVisualRadius(),"SWORD",swordPointer>=0);
-            button(c,bombX(),actionY(),actionVisualRadius(),"BOMB",grenadePointer>=0);
-            button(c,reloadX(),actionY(),actionVisualRadius(),"RELOAD",reloadPointer>=0);
+    p.setStyle(Paint.Style.FILL);
+    p.setShader(new RadialGradient(drawBaseX,drawBaseY,jr+20,
+            0x651A221F,0x10101816,Shader.TileMode.CLAMP));
+    c.drawCircle(drawBaseX,drawBaseY,jr+17,p);p.setShader(null);
+    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2.5f,3*s()));
+    p.setColor(joyActive?0xD7D9C981:0x707C806E);c.drawCircle(drawBaseX,drawBaseY,jr+8,p);
+    p.setStyle(Paint.Style.FILL);
+    p.setColor(0x482F3A33);c.drawCircle(drawBaseX,drawBaseY,jr*.78f,p);
+    p.setColor(joyActive?0xB9AD9A5D:0x6C66705B);
+    c.drawCircle(joyActive?joyX:drawBaseX,joyActive?joyY:drawBaseY,jr*.38f,p);
+    p.setColor(0xA5EFE8D4);c.drawCircle(joyActive?joyX-4*s():drawBaseX-4*s(),joyActive?joyY-4*s():drawBaseY-4*s(),jr*.12f,p);
+    p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(Math.max(dp(9f),jr*.14f));p.setColor(0xE8FFFFFF);
+    c.drawText("MOVE",drawBaseX,drawBaseY+jr+23*s(),p);
 
-            if(input.aimActive){
-                p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(dp(2f),2.5f*dp(1f)));
-                p.setColor(0x668DCCFF);
-                float rr=dp(28f);
-                float arm=dp(42f);
-                c.drawCircle(aimTouchX,aimTouchY,rr,p);
-                c.drawLine(aimTouchX-arm,aimTouchY,aimTouchX-rr,aimTouchY,p);
-                c.drawLine(aimTouchX+rr,aimTouchY,aimTouchX+arm,aimTouchY,p);
-                c.drawLine(aimTouchX,aimTouchY-arm,aimTouchX,aimTouchY-rr,p);
-                c.drawLine(aimTouchX,aimTouchY+rr,aimTouchX,aimTouchY+arm,p);
-                p.setStyle(Paint.Style.FILL);
-            }
-        }
+    button(c,fireX(),fireY(),fireVisualRadius(),"FIRE",firePointer>=0);
+    button(c,swordX(),actionY(),actionVisualRadius(),"SWORD",swordPointer>=0);
+    button(c,bombX(),actionY(),actionVisualRadius(),"BOMB",grenadePointer>=0);
+    button(c,reloadX(),actionY(),actionVisualRadius(),"RELOAD",reloadPointer>=0);
+
+    if(input.aimActive){
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(dp(2f),2.5f*s()));
+        p.setColor(0x7399D6E8);float rr=dp(27f),arm=dp(41f);
+        c.drawCircle(aimTouchX,aimTouchY,rr,p);
+        c.drawLine(aimTouchX-arm,aimTouchY,aimTouchX-rr,aimTouchY,p);
+        c.drawLine(aimTouchX+rr,aimTouchY,aimTouchX+arm,aimTouchY,p);
+        c.drawLine(aimTouchX,aimTouchY-arm,aimTouchX,aimTouchY-rr,p);
+        c.drawLine(aimTouchX,aimTouchY+rr,aimTouchX,aimTouchY+arm,p);
+        p.setStyle(Paint.Style.FILL);p.setColor(0xB6D7ECF1);c.drawCircle(aimTouchX,aimTouchY,3*s(),p);
+    }
+}
 
         private void button(Canvas c,float x,float y,float r,String text,boolean pressed){
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(pressed?0xE05C6A55:0xA94A4038);
-            c.drawCircle(x,y,r,p);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(dp(3f),3f*dp(1f)));
-            p.setColor(0xDDD9C889);
-            c.drawCircle(x,y,r,p);
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.WHITE);
-            p.setTypeface(PaintCompat.BOLD);
-            p.setTextAlign(Paint.Align.CENTER);
-            p.setTextSize(Math.max(dp(10f),r*.22f));
-            c.drawText(text,x,y+dp(4f),p);
-            p.setTypeface(null);
-        }
+    p.setStyle(Paint.Style.FILL);
+    p.setShader(new RadialGradient(x-r*.25f,y-r*.35f,r*1.25f,
+            pressed?0xD97F8C68:0xB86E6960,
+            pressed?0xB6263029:0x7A181E1B,Shader.TileMode.CLAMP));
+    c.drawCircle(x,y,r,p);p.setShader(null);
+    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(dp(2.5f),3*s()));
+    p.setColor(pressed?0xF0F0D789:0xC9D1C083);c.drawCircle(x,y,r,p);
+    p.setStrokeWidth(Math.max(1f,1.4f*s));p.setColor(0x55FFFFFF);c.drawCircle(x,y,r-dp(6f),p);
+
+    p.setStyle(Paint.Style.FILL);p.setColor(0xFFEFE7D0);
+    p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.CENTER);
+    float iconY=y-r*.18f;
+    path.reset();
+    if(text.equals("FIRE")){
+        c.drawCircle(x,iconY,Math.max(4,s*5),p);
+        p.setColor(0xFFFFC45D);c.drawCircle(x+2*s,iconY-2*s,Math.max(2,s*2.5f),p);
+    }else if(text.equals("SWORD")){
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(3*s,3));p.setStrokeCap(Paint.Cap.ROUND);
+        c.drawLine(x-7*s,iconY+7*s,x+7*s,iconY-7*s,p);c.drawLine(x-9*s,iconY-1*s,x+1*s,iconY+9*s,p);p.setStrokeCap(Paint.Cap.BUTT);
+        p.setStyle(Paint.Style.FILL);
+    }else if(text.equals("BOMB")){
+        c.drawCircle(x,iconY,7*s,p);p.setColor(0xFF27372D);c.drawCircle(x,iconY,4*s,p);
+        p.setColor(0xFFE9D17A);c.drawLine(x+4*s,iconY-5*s,x+8*s,iconY-9*s,p);
+    }else{
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2.2f*s,2));p.setColor(0xFFEFE7D0);
+        c.drawArc(new RectF(x-8*s,iconY-8*s,x+8*s,iconY+8*s),220,260,false,p);
+        c.drawLine(x+8*s,iconY-2*s,x+4*s,iconY-8*s,p);p.setStyle(Paint.Style.FILL);
+    }
+    p.setColor(0xFFEFE7D0);p.setTextSize(Math.max(dp(9f),r*.20f));c.drawText(text,x,y+r*.50f,p);
+    p.setTypeface(null);
+}
 
         private void drawPause(Canvas c){
-            p.setStyle(Paint.Style.FILL);p.setColor(0xB9000000);c.drawRect(0,0,getWidth(),getHeight(),p);
-            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(PaintCompat.BOLD);p.setTextSize(40);p.setColor(0xFFF0D17B);
-            c.drawText("PAUSED",getWidth()*.5f,getHeight()*.43f,p);p.setTypeface(null);p.setTextSize(18);p.setColor(Color.WHITE);
-            c.drawText("TAP TO RESUME",getWidth()*.5f,getHeight()*.52f,p);
-        }
+    p.setStyle(Paint.Style.FILL);
+    p.setShader(new LinearGradient(0,0,getWidth(),getHeight(),0xB5000000,0xE90B1010,Shader.TileMode.CLAMP));
+    c.drawRect(0,0,getWidth(),getHeight(),p);p.setShader(null);
+    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.5f);p.setColor(0xBBD0B56A);
+    c.drawRoundRect(new RectF(getWidth()*.28f,getHeight()*.34f,getWidth()*.72f,getHeight()*.64f),18,18,p);
+    p.setStyle(Paint.Style.FILL);p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(38);p.setColor(0xFFF1D47A);
+    c.drawText("PAUSED",getWidth()*.5f,getHeight()*.46f,p);p.setTypeface(null);p.setTextSize(15);p.setColor(0xFFE9EAE4);
+    c.drawText("TAP ANYWHERE TO RESUME",getWidth()*.5f,getHeight()*.54f,p);
+}
 
         private void drawGameOver(Canvas c){
-            p.setStyle(Paint.Style.FILL);p.setColor(0xC3130B0B);c.drawRect(0,0,getWidth(),getHeight(),p);
-            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(PaintCompat.BOLD);p.setTextSize(42);p.setColor(0xFFFF9A72);
-            c.drawText("GAME OVER",getWidth()*.5f,getHeight()*.43f,p);p.setTypeface(null);p.setTextSize(20);p.setColor(Color.WHITE);
-            c.drawText("KILLS "+core.kills()+"   SCORE "+core.player().score,getWidth()*.5f,getHeight()*.51f,p);
-            p.setTextSize(17);c.drawText("TAP CENTER TO RESTART",getWidth()*.5f,getHeight()*.60f,p);
-        }
+    p.setStyle(Paint.Style.FILL);
+    p.setShader(new LinearGradient(0,0,0,getHeight(),0xC5000000,0xF1160C0C,Shader.TileMode.CLAMP));
+    c.drawRect(0,0,getWidth(),getHeight(),p);p.setShader(null);
+    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xC9E08B64);
+    c.drawRoundRect(new RectF(getWidth()*.24f,getHeight()*.30f,getWidth()*.76f,getHeight()*.70f),20,20,p);
+    p.setStyle(Paint.Style.FILL);p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(40);p.setColor(0xFFFF9C78);
+    c.drawText("GAME OVER",getWidth()*.5f,getHeight()*.43f,p);
+    p.setTypeface(null);p.setTextSize(18);p.setColor(0xFFF4EEE1);
+    c.drawText("KILLS  "+core.kills()+"   •   SCORE  "+core.player().score,getWidth()*.5f,getHeight()*.51f,p);
+    p.setTextSize(15);p.setColor(0xFFD9D8CF);c.drawText("TAP CENTER TO RESTART",getWidth()*.5f,getHeight()*.60f,p);
+}
 
         private boolean inside(float x,float y,float cx,float cy,float r){return Math.hypot(x-cx,y-cy)<=r;}
         private void beginPointer(MotionEvent e,int index){
