@@ -5,10 +5,10 @@ namespace PersiaWar.Unity2D5D
     public sealed class GameBootstrap : MonoBehaviour
     {
         [SerializeField] private Camera gameplayCamera;
-        [SerializeField] private float worldSize = 220f;
+        [SerializeField] private float worldSize = 192f;
         [SerializeField] private int seed = 32025;
-        [SerializeField] private int enemyCount = 10;
-        [SerializeField] private float enemySpawnRadius = 48f;
+        [SerializeField] private int enemyCount = 8;
+        [SerializeField] private float enemySpawnRadius = 44f;
 
         private Transform worldRoot;
         private Material groundMaterial;
@@ -16,11 +16,6 @@ namespace PersiaWar.Unity2D5D
         private Material buildingMaterial;
         private Material roofMaterial;
         private Material accentMaterial;
-        private Material windowMaterial;
-        private Material sidewalkMaterial;
-        private Material alleyMaterial;
-        private Material streetMetalMaterial;
-        private Material lampMaterial;
 
         private void Awake()
         {
@@ -130,31 +125,23 @@ namespace PersiaWar.Unity2D5D
             roadMaterial = MakeMaterial("Road", new Color(0.18f, 0.20f, 0.22f));
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
             roofMaterial = MakeMaterial("Roof", new Color(0.24f, 0.28f, 0.34f));
-            accentMaterial = MakeMaterial("Accent", new Color(0.92f, 0.38f, 0.10f));
-            windowMaterial = MakeMaterial("Window", new Color(0.10f, 0.22f, 0.28f));
-            sidewalkMaterial = MakeMaterial("Sidewalk", new Color(0.58f, 0.57f, 0.52f));
-            alleyMaterial = MakeMaterial("Alley", new Color(0.16f, 0.17f, 0.18f));
-            streetMetalMaterial = MakeMaterial("StreetMetal", new Color(0.16f, 0.18f, 0.20f));
-            lampMaterial = MakeMaterial("LampGlow", new Color(1.00f, 0.80f, 0.38f));
+            accentMaterial = MakeMaterial("Accent", new Color(1.00f, 0.46f, 0.12f));
 
             GameObject terrainObject = new GameObject("Terrain3D");
             terrainObject.transform.SetParent(worldRoot, true);
             Terrain3DBuilder terrain = terrainObject.AddComponent<Terrain3DBuilder>();
             terrain.Build();
 
-            const float roadWidth = 9.5f;
+            const float roadWidth = 8f;
             for (float x = -worldSize * 0.5f + roadWidth * 0.5f; x <= worldSize * 0.5f; x += 24f)
                 CreateBox("RoadX", new Vector3(x, -0.05f, 0f), new Vector3(roadWidth, 0.18f, worldSize), roadMaterial, false);
             for (float z = -worldSize * 0.5f + roadWidth * 0.5f; z <= worldSize * 0.5f; z += 24f)
                 CreateBox("RoadZ", new Vector3(0f, -0.04f, z), new Vector3(worldSize, 0.18f, roadWidth), roadMaterial, false);
 
             BuildRoadMarkings(roadWidth);
-            BuildSidewalks(roadWidth);
-            BuildAlleys();
             BuildCityBlocks(roadWidth);
             BuildLandmarks();
             BuildStreetProps();
-            BuildStreetFurniture();
             BuildRuinedQuarter();
         }
 
@@ -171,71 +158,6 @@ namespace PersiaWar.Unity2D5D
             {
                 for (float x = -half + 3f; x < half; x += 8f)
                     CreateBox("RoadMark", new Vector3(x, 0.081f, z), new Vector3(3.0f, 0.04f, 0.32f), marking, false);
-            }
-
-            // Crosswalks at the busiest grid intersections.
-            for (int i = -2; i <= 2; i++)
-            {
-                float road = i * 24f;
-                for (int stripe = -2; stripe <= 2; stripe++)
-                {
-                    float offset = stripe * 1.15f;
-                    CreateBox("CrosswalkH", new Vector3(road + offset, 0.085f, 4.9f),
-                        new Vector3(0.72f, 0.045f, 2.2f), marking, false);
-                    CreateBox("CrosswalkH", new Vector3(road + offset, 0.085f, -4.9f),
-                        new Vector3(0.72f, 0.045f, 2.2f), marking, false);
-                    CreateBox("CrosswalkV", new Vector3(4.9f, 0.086f, road + offset),
-                        new Vector3(2.2f, 0.045f, 0.72f), marking, false);
-                    CreateBox("CrosswalkV", new Vector3(-4.9f, 0.086f, road + offset),
-                        new Vector3(2.2f, 0.045f, 0.72f), marking, false);
-                }
-            }
-        }
-
-        private void BuildSidewalks(float roadWidth)
-        {
-            float half = worldSize * 0.5f;
-            float spacing = 24f;
-            float sidewalkWidth = 1.35f;
-
-            for (float x = -half + roadWidth * 0.5f; x <= half; x += spacing)
-            {
-                CreateBox("SidewalkL", new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0.04f, 0f),
-                    new Vector3(sidewalkWidth, 0.10f, worldSize), sidewalkMaterial, false);
-                CreateBox("SidewalkR", new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0.041f, 0f),
-                    new Vector3(sidewalkWidth, 0.10f, worldSize), sidewalkMaterial, false);
-            }
-
-            for (float z = -half + roadWidth * 0.5f; z <= half; z += spacing)
-            {
-                CreateBox("SidewalkB", new Vector3(0f, 0.042f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
-                    new Vector3(worldSize, 0.10f, sidewalkWidth), sidewalkMaterial, false);
-                CreateBox("SidewalkT", new Vector3(0f, 0.043f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
-                    new Vector3(worldSize, 0.10f, sidewalkWidth), sidewalkMaterial, false);
-            }
-        }
-
-        private void BuildAlleys()
-        {
-            float half = worldSize * 0.5f - 12f;
-            int index = 0;
-
-            for (float x = -half; x <= half; x += 24f)
-            {
-                for (float z = -half + 12f; z <= half; z += 48f)
-                {
-                    CreateBox("AlleyVertical_" + index++, new Vector3(x + 7f, 0.055f, z),
-                        new Vector3(2.4f, 0.035f, 12f), alleyMaterial, false);
-                }
-            }
-
-            for (float z = -half; z <= half; z += 24f)
-            {
-                for (float x = -half + 12f; x <= half; x += 48f)
-                {
-                    CreateBox("AlleyHorizontal_" + index++, new Vector3(x, 0.056f, z + 7f),
-                        new Vector3(12f, 0.035f, 2.4f), alleyMaterial, false);
-                }
             }
         }
 
@@ -272,26 +194,10 @@ namespace PersiaWar.Unity2D5D
             if (Random.value > 0.35f)
                 CreateBox("Door", position + new Vector3(0f, 0.9f, -size.z * 0.51f), new Vector3(1.0f, 1.8f, 0.12f), accentMaterial, false);
 
-            if (Random.value > 0.20f)
+            if (Random.value > 0.45f)
             {
                 for (int side = -1; side <= 1; side += 2)
-                {
-                    CreateBox("WindowFront", position + new Vector3(side * size.x * 0.28f, size.y * 0.58f, -size.z * 0.51f),
-                        new Vector3(1.25f, 0.85f, 0.08f), windowMaterial, false);
-                    CreateBox("WindowBack", position + new Vector3(side * size.x * 0.28f, size.y * 0.58f, size.z * 0.51f),
-                        new Vector3(1.25f, 0.85f, 0.08f), windowMaterial, false);
-                }
-
-                CreateBox("WindowSideL", position + new Vector3(-size.x * 0.51f, size.y * 0.58f, 0f),
-                    new Vector3(0.08f, 0.85f, 1.25f), windowMaterial, false);
-                CreateBox("WindowSideR", position + new Vector3(size.x * 0.51f, size.y * 0.58f, 0f),
-                    new Vector3(0.08f, 0.85f, 1.25f), windowMaterial, false);
-            }
-
-            if (size.y > 5.4f)
-            {
-                CreateBox("RoofUnit", position + new Vector3(size.x * 0.24f, size.y + 0.5f, size.z * 0.15f),
-                    new Vector3(1.4f, 0.7f, 0.9f), roofMaterial, true);
+                    CreateBox("Window", position + new Vector3(side * size.x * 0.28f, size.y * 0.58f, -size.z * 0.51f), new Vector3(1.25f, 0.85f, 0.08f), accentMaterial, false);
             }
         }
 
@@ -307,7 +213,7 @@ namespace PersiaWar.Unity2D5D
         {
             for (int i = 0; i < 22; i++)
             {
-                float x = Random.Range(-100f, 100f);
+                float x = Random.Range(-84f, 84f);
                 float z = Random.Range(-84f, 84f);
                 if (Mathf.Abs(Mathf.Repeat(x + 4f, 24f) - 12f) < 4f || Mathf.Abs(Mathf.Repeat(z + 4f, 24f) - 12f) < 4f) continue;
                 CreateTree(new Vector3(x, 0f, z));
@@ -319,44 +225,6 @@ namespace PersiaWar.Unity2D5D
                 float z = Random.Range(-84f, 84f);
                 CreateVehicle(new Vector3(x, 0.18f, z), Random.value > 0.55f);
             }
-        }
-
-        private void BuildStreetFurniture()
-        {
-            float half = worldSize * 0.5f - 12f;
-            int lampIndex = 0;
-
-            for (float x = -half; x <= half; x += 24f)
-            {
-                for (float z = -half + 6f; z <= half; z += 24f)
-                {
-                    if ((lampIndex++ % 2) != 0) continue;
-                    CreateStreetLamp(new Vector3(x + 5.8f, 0f, z));
-                }
-            }
-
-            // Benches and barricades make the otherwise empty blocks read as a real town.
-            for (int i = 0; i < 14; i++)
-            {
-                float x = Random.Range(-half, half);
-                float z = Random.Range(-half, half);
-                if (Mathf.Abs(Mathf.Repeat(x + 5f, 24f) - 12f) < 5f ||
-                    Mathf.Abs(Mathf.Repeat(z + 5f, 24f) - 12f) < 5f)
-                    continue;
-
-                CreateBox("Bench", new Vector3(x, 0.35f, z),
-                    new Vector3(1.6f, 0.18f, 0.42f), streetMetalMaterial, false);
-            }
-        }
-
-        private void CreateStreetLamp(Vector3 position)
-        {
-            CreateBox("LampPost", position + Vector3.up * 1.35f,
-                new Vector3(0.16f, 2.7f, 0.16f), streetMetalMaterial, false);
-            CreateBox("LampHead", position + Vector3.up * 2.75f,
-                new Vector3(0.55f, 0.18f, 0.35f), streetMetalMaterial, false);
-            CreateBox("LampGlow", position + Vector3.up * 2.56f,
-                new Vector3(0.24f, 0.16f, 0.24f), lampMaterial, false);
         }
 
         private void BuildRuinedQuarter()
