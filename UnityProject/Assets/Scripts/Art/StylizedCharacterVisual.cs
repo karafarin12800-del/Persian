@@ -3,59 +3,45 @@ using UnityEngine;
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// Replaces the old capsule/primitive placeholders with a compact low-poly character rig.
-    /// The rig rotates independently from gameplay colliders so aiming never spins the player root.
+    /// Presentation-only character layer.
+    /// Gameplay scripts keep owning movement, aiming, health and combat; this component
+    /// only selects a character texture, billboards it toward the camera and provides
+    /// a stable weapon muzzle transform.
     /// </summary>
     public sealed class StylizedCharacterVisual : MonoBehaviour
     {
-        private Transform torso;
-        private Transform head;
-        private Transform leftArm;
-        private Transform rightArm;
-        private Transform leftLeg;
-        private Transform rightLeg;
-        private Transform weaponPivot;
-        private Transform muzzle;
-        private Transform backpack;
-        private Transform crest;
-        private Transform leftShoulder;
-        private Transform rightShoulder;
-        private GameObject muzzleFlash;
+        private const string HeroResource = "PersianCharacters/Hero";
 
-        private Material skinMaterial;
-        private Material clothMaterial;
-        private Material armorMaterial;
-        private Material accentMaterial;
-        private Material darkMaterial;
-        private Material weaponMaterial;
+        private Transform artRoot;
+        private Transform muzzle;
+        private SpriteRenderer sprite;
+        private ParticleSystem muzzleFlash;
+
         private bool moving;
         private bool playerCharacter;
-        private int archetype;
+        private int archetype = 1;
         private float phase;
-        private float fireFlashUntil;
+        private float fireUntil;
         private Vector3 lastFacing = Vector3.forward;
-        private Vector3 baseTorsoPosition = new Vector3(0f, 0.86f, 0f);
+        private Vector3 baseLocalPosition;
 
         public Transform Muzzle => muzzle;
 
         public static StylizedCharacterVisual Attach(Transform owner, bool isPlayer, int characterArchetype)
         {
-            Transform existing = owner.Find("PlayerVisual");
-            if (!isPlayer)
-                existing = owner.Find("EnemyVisual");
-
+            string objectName = isPlayer ? "PlayerVisual" : "EnemyVisual";
+            Transform existing = owner.Find(objectName);
             StylizedCharacterVisual visual = existing != null
                 ? existing.GetComponent<StylizedCharacterVisual>()
                 : null;
 
             if (visual == null)
             {
-                GameObject rootObject = new GameObject(isPlayer ? "PlayerVisual" : "EnemyVisual");
-                rootObject.transform.SetParent(owner, false);
-                visual = rootObject.AddComponent<StylizedCharacterVisual>();
+                GameObject root = new GameObject(objectName);
+                root.transform.SetParent(owner, false);
+                visual = root.AddComponent<StylizedCharacterVisual>();
             }
 
-            visual.playerCharacter = isPlayer;
             visual.Configure(isPlayer, characterArchetype);
             return visual;
         }
@@ -64,45 +50,32 @@ namespace PersiaWar.Unity2D5D
         {
             playerCharacter = isPlayer;
             archetype = Mathf.Clamp(characterArchetype, 1, 3);
-            phase = Random.Range(0f, Mathf.PI * 2f);
 
-            if (torso == null)
-                BuildModel();
-
-            ApplyPalette();
+            EnsurePresentation();
+            LoadCharacterSprite();
+            ApplyScale();
         }
 
         public void ConfigurePlayerHero(int heroIndex)
         {
             playerCharacter = true;
             archetype = 1;
-            if (torso == null)
-                BuildModel();
+
+            EnsurePresentation();
+            LoadCharacterSprite();
 
             int index = Mathf.Clamp(heroIndex, 0, 4);
-            Color[] cloth =
+            Color[] variants =
             {
-                new Color(0.46f, 0.11f, 0.08f),
-                new Color(0.06f, 0.28f, 0.40f),
-                new Color(0.10f, 0.36f, 0.20f),
-                new Color(0.31f, 0.10f, 0.38f),
-                new Color(0.39f, 0.24f, 0.06f)
-            };
-            Color[] accent =
-            {
-                new Color(0.92f, 0.65f, 0.10f),
-                new Color(0.76f, 0.84f, 0.90f),
-                new Color(0.70f, 0.84f, 0.20f),
-                new Color(0.95f, 0.28f, 0.20f),
-                new Color(0.92f, 0.66f, 0.16f)
+                new Color(1.00f, 1.00f, 1.00f, 1.00f),
+                new Color(0.86f, 0.95f, 1.00f, 1.00f),
+                new Color(0.86f, 1.00f, 0.90f, 1.00f),
+                new Color(1.00f, 0.89f, 0.93f, 1.00f),
+                new Color(1.00f, 0.96f, 0.84f, 1.00f)
             };
 
-            clothMaterial = RuntimeMaterialFactory.Create("PlayerCloth", cloth[index]);
-            accentMaterial = RuntimeMaterialFactory.Create("PlayerAccent", accent[index]);
-            if (torso != null) torso.GetComponent<Renderer>().sharedMaterial = clothMaterial;
-            if (crest != null) crest.GetComponent<Renderer>().sharedMaterial = accentMaterial;
-            if (leftShoulder != null) leftShoulder.GetComponent<Renderer>().sharedMaterial = accentMaterial;
-            if (rightShoulder != null) rightShoulder.GetComponent<Renderer>().sharedMaterial = accentMaterial;
+            if (sprite != null)
+                sprite.color = variants[index];
         }
 
         public void SetFacing(Vector3 worldDirection)
@@ -126,160 +99,158 @@ namespace PersiaWar.Unity2D5D
 
         public void PlayFire()
         {
-            fireFlashUntil = Time.time + 0.055f;
-            if (muzzleFlash != null)
-                muzzleFlash.SetActive(true);
+            fireUntil = Time.time + 0.07f;
+            if (muzzleFlash == null)
+                return;
+
+            muzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            muzzleFlash.Play();
+        }
+
+        private void Awake()
+        {
+            EnsurePresentation();
         }
 
         private void Update()
         {
-            if (torso == null)
+            if (sprite == null)
                 return;
 
-            float speed = moving ? 11f : 3.2f;
-            float wave = Mathf.Sin(Time.time * speed + phase);
-            float stride = moving ? wave : 0f;
-
-            torso.localPosition = baseTorsoPosition + Vector3.up * (moving ? Mathf.Abs(wave) * 0.045f : Mathf.Sin(Time.time * 2.2f + phase) * 0.018f);
-            if (head != null)
-                head.localRotation = Quaternion.Euler(0f, 0f, moving ? wave * 2.0f : Mathf.Sin(Time.time * 1.7f + phase) * 1.2f);
-
-            if (leftArm != null)
-                leftArm.localRotation = Quaternion.Euler(0f, 0f, -12f - stride * 18f);
-            if (rightArm != null)
-                rightArm.localRotation = Quaternion.Euler(0f, 0f, 12f + stride * 18f);
-            if (leftLeg != null)
-                leftLeg.localRotation = Quaternion.Euler(stride * 18f, 0f, 0f);
-            if (rightLeg != null)
-                rightLeg.localRotation = Quaternion.Euler(-stride * 18f, 0f, 0f);
-
-            if (weaponPivot != null)
-                weaponPivot.localPosition = new Vector3(0.38f, 1.03f, 0.42f + (Time.time < fireFlashUntil ? -0.055f : 0f));
-
-            if (muzzleFlash != null && Time.time >= fireFlashUntil)
-                muzzleFlash.SetActive(false);
-
-            if (backpack != null)
-                backpack.localPosition = new Vector3(0f, 1.02f + (moving ? Mathf.Abs(stride) * 0.025f : 0f), -0.30f);
-        }
-
-        private void BuildModel()
-        {
-            foreach (Transform child in transform)
-                Destroy(child.gameObject);
-
-            skinMaterial = RuntimeMaterialFactory.Create(playerCharacter ? "PlayerSkin" : "EnemySkin", new Color(0.68f, 0.43f, 0.28f));
-            clothMaterial = RuntimeMaterialFactory.Create(playerCharacter ? "PlayerCloth" : "EnemyCloth", new Color(0.18f, 0.24f, 0.30f));
-            armorMaterial = RuntimeMaterialFactory.Create(playerCharacter ? "PlayerArmor" : "EnemyArmor", new Color(0.09f, 0.12f, 0.16f));
-            accentMaterial = RuntimeMaterialFactory.Create(playerCharacter ? "PlayerAccent" : "EnemyAccent", new Color(0.84f, 0.54f, 0.12f));
-            darkMaterial = RuntimeMaterialFactory.Create(playerCharacter ? "PlayerDark" : "EnemyDark", new Color(0.055f, 0.065f, 0.08f));
-            weaponMaterial = RuntimeMaterialFactory.Create(playerCharacter ? "PlayerWeapon" : "EnemyWeapon", new Color(0.12f, 0.14f, 0.16f));
-
-            torso = CreatePart(PrimitiveType.Capsule, "Body", baseTorsoPosition, new Vector3(0.62f, 0.78f, 0.50f), clothMaterial);
-            head = CreatePart(PrimitiveType.Sphere, "Head", new Vector3(0f, 1.72f, 0f), new Vector3(0.48f, 0.48f, 0.48f), skinMaterial);
-            CreatePart(PrimitiveType.Cylinder, "NeckGuard", new Vector3(0f, 1.49f, 0f), new Vector3(0.24f, 0.10f, 0.24f), armorMaterial);
-            CreatePart(PrimitiveType.Cylinder, "Crown", new Vector3(0f, 2.02f, 0f), new Vector3(0.53f, 0.17f, 0.53f), accentMaterial);
-            crest = CreatePart(PrimitiveType.Cube, "Crest", new Vector3(0f, 2.17f, -0.02f), new Vector3(0.12f, 0.34f, 0.06f), accentMaterial);
-
-            leftShoulder = CreatePart(PrimitiveType.Sphere, "ShoulderArmor", new Vector3(-0.48f, 1.24f, 0f), new Vector3(0.31f, 0.22f, 0.31f), armorMaterial);
-            rightShoulder = CreatePart(PrimitiveType.Sphere, "RightShoulderArmor", new Vector3(0.48f, 1.24f, 0f), new Vector3(0.31f, 0.22f, 0.31f), armorMaterial);
-
-            leftArm = CreatePart(PrimitiveType.Capsule, "LeftArm", new Vector3(-0.48f, 0.94f, 0f), new Vector3(0.18f, 0.46f, 0.18f), armorMaterial);
-            rightArm = CreatePart(PrimitiveType.Capsule, "RightArm", new Vector3(0.48f, 0.94f, 0.10f), new Vector3(0.18f, 0.46f, 0.18f), armorMaterial);
-            CreatePart(PrimitiveType.Sphere, "LeftHand", new Vector3(-0.50f, 0.54f, 0.10f), new Vector3(0.18f, 0.18f, 0.18f), skinMaterial);
-            CreatePart(PrimitiveType.Sphere, "RightHand", new Vector3(0.50f, 0.54f, 0.30f), new Vector3(0.18f, 0.18f, 0.18f), skinMaterial);
-
-            leftLeg = CreatePart(PrimitiveType.Capsule, "LeftLeg", new Vector3(-0.20f, 0.31f, 0f), new Vector3(0.19f, 0.46f, 0.19f), clothMaterial);
-            rightLeg = CreatePart(PrimitiveType.Capsule, "RightLeg", new Vector3(0.20f, 0.31f, 0f), new Vector3(0.19f, 0.46f, 0.19f), clothMaterial);
-            CreatePart(PrimitiveType.Cube, "LeftBoot", new Vector3(-0.20f, 0.05f, 0.12f), new Vector3(0.28f, 0.18f, 0.42f), darkMaterial);
-            CreatePart(PrimitiveType.Cube, "RightBoot", new Vector3(0.20f, 0.05f, 0.12f), new Vector3(0.28f, 0.18f, 0.42f), darkMaterial);
-
-            CreatePart(PrimitiveType.Cube, "ChestPlate", new Vector3(0f, 0.96f, 0.25f), new Vector3(0.48f, 0.53f, 0.08f), armorMaterial);
-            CreatePart(PrimitiveType.Cube, "Belt", new Vector3(0f, 0.63f, 0.15f), new Vector3(0.50f, 0.10f, 0.34f), accentMaterial);
-            backpack = CreatePart(PrimitiveType.Cube, "Backpack", new Vector3(0f, 1.02f, -0.30f), new Vector3(0.46f, 0.58f, 0.22f), darkMaterial);
-
-            weaponPivot = new GameObject("WeaponPivot").transform;
-            weaponPivot.SetParent(transform, false);
-            weaponPivot.localPosition = new Vector3(0.38f, 1.03f, 0.42f);
-
-            CreatePartUnder(weaponPivot, PrimitiveType.Cube, "GunBody", new Vector3(0f, 0f, 0.34f), new Vector3(0.20f, 0.14f, 0.52f), weaponMaterial);
-            CreatePartUnder(weaponPivot, PrimitiveType.Cylinder, "GunBarrel", new Vector3(0f, 0f, 0.78f), new Vector3(0.075f, 0.34f, 0.075f), darkMaterial, Quaternion.Euler(90f, 0f, 0f));
-            CreatePartUnder(weaponPivot, PrimitiveType.Cube, "Magazine", new Vector3(0f, -0.16f, 0.31f), new Vector3(0.13f, 0.25f, 0.16f), darkMaterial);
-
-            muzzle = new GameObject("WeaponMuzzle").transform;
-            muzzle.SetParent(weaponPivot, false);
-            muzzle.localPosition = new Vector3(0f, 0f, 1.08f);
-            muzzle.localRotation = Quaternion.identity;
-
-            muzzleFlash = CreatePartUnder(weaponPivot, PrimitiveType.Sphere, "MuzzleFlash", new Vector3(0f, 0f, 1.10f), Vector3.one * 0.24f, accentMaterial).gameObject;
-            muzzleFlash.SetActive(false);
-
-            Vector3 visualScale = archetype == 3 ? new Vector3(1.16f, 1.16f, 1.16f)
-                : archetype == 2 ? new Vector3(1.05f, 1.05f, 1.05f)
-                : Vector3.one;
-            transform.localScale = visualScale;
-        }
-
-        private void ApplyPalette()
-        {
-            if (playerCharacter)
+            Camera cam = Camera.main;
+            if (cam != null && artRoot != null)
             {
-                clothMaterial = RuntimeMaterialFactory.Create("PlayerCloth", new Color(0.12f, 0.27f, 0.38f));
-                armorMaterial = RuntimeMaterialFactory.Create("PlayerArmor", new Color(0.08f, 0.12f, 0.17f));
-                accentMaterial = RuntimeMaterialFactory.Create("PlayerAccent", new Color(0.90f, 0.64f, 0.12f));
-            }
-            else
-            {
-                Color cloth = archetype == 3 ? new Color(0.32f, 0.06f, 0.06f)
-                    : archetype == 2 ? new Color(0.06f, 0.24f, 0.34f)
-                    : new Color(0.38f, 0.12f, 0.09f);
-                Color armor = archetype == 3 ? new Color(0.13f, 0.09f, 0.08f)
-                    : archetype == 2 ? new Color(0.10f, 0.17f, 0.21f)
-                    : new Color(0.16f, 0.12f, 0.10f);
-                Color accent = archetype == 3 ? new Color(0.88f, 0.65f, 0.12f)
-                    : archetype == 2 ? new Color(0.36f, 0.74f, 0.82f)
-                    : new Color(0.82f, 0.30f, 0.12f);
-
-                clothMaterial = RuntimeMaterialFactory.Create("EnemyCloth", cloth);
-                armorMaterial = RuntimeMaterialFactory.Create("EnemyArmor", armor);
-                accentMaterial = RuntimeMaterialFactory.Create("EnemyAccent", accent);
+                Vector3 toCamera = cam.transform.position - artRoot.position;
+                toCamera.y = 0f;
+                if (toCamera.sqrMagnitude > 0.001f)
+                    artRoot.rotation = Quaternion.LookRotation(toCamera.normalized, Vector3.up);
             }
 
-            if (torso != null) torso.GetComponent<Renderer>().sharedMaterial = clothMaterial;
-            if (leftArm != null) leftArm.GetComponent<Renderer>().sharedMaterial = armorMaterial;
-            if (rightArm != null) rightArm.GetComponent<Renderer>().sharedMaterial = armorMaterial;
-            if (leftShoulder != null) leftShoulder.GetComponent<Renderer>().sharedMaterial = accentMaterial;
-            if (rightShoulder != null) rightShoulder.GetComponent<Renderer>().sharedMaterial = accentMaterial;
-            if (crest != null) crest.GetComponent<Renderer>().sharedMaterial = accentMaterial;
+            float t = Time.time + phase;
+            float bob = moving ? Mathf.Abs(Mathf.Sin(t * 11f)) * 0.045f : Mathf.Sin(t * 2.2f) * 0.015f;
+            sprite.transform.localPosition = new Vector3(0f, bob, 0f);
+
+            float squash = moving
+                ? 1f + Mathf.Sin(t * 11f) * 0.018f
+                : 1f + Mathf.Sin(t * 2.2f) * 0.008f;
+
+            sprite.transform.localScale = new Vector3(
+                transform.localScale.x * squash,
+                transform.localScale.y * (2f - squash),
+                1f);
+
+            if (muzzle != null && Time.time < fireUntil)
+                muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.62f);
+            else if (muzzle != null)
+                muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.56f);
         }
 
-        private Transform CreatePart(PrimitiveType primitive, string partName, Vector3 localPosition, Vector3 localScale, Material material)
+        private void EnsurePresentation()
         {
-            return CreatePartUnder(transform, primitive, partName, localPosition, localScale, material, Quaternion.identity);
-        }
-
-        private Transform CreatePartUnder(Transform parent, PrimitiveType primitive, string partName, Vector3 localPosition, Vector3 localScale, Material material, Quaternion rotation = default)
-        {
-            GameObject part = GameObject.CreatePrimitive(primitive);
-            part.name = partName;
-            part.transform.SetParent(parent, false);
-            part.transform.localPosition = localPosition;
-            part.transform.localRotation = rotation;
-            part.transform.localScale = localScale;
-
-            Collider collider = part.GetComponent<Collider>();
-            if (collider != null)
-                Destroy(collider);
-
-            Renderer renderer = part.GetComponent<Renderer>();
-            if (renderer != null)
+            if (artRoot == null)
             {
-                renderer.sharedMaterial = material;
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                renderer.receiveShadows = true;
+                GameObject art = new GameObject("Art");
+                art.transform.SetParent(transform, false);
+                artRoot = art.transform;
             }
 
-            return part.transform;
+            if (sprite == null)
+            {
+                sprite = artRoot.GetComponent<SpriteRenderer>();
+                if (sprite == null)
+                    sprite = artRoot.gameObject.AddComponent<SpriteRenderer>();
+
+                sprite.sortingOrder = 20;
+                sprite.maskInteraction = SpriteMaskInteraction.None;
+                baseLocalPosition = Vector3.zero;
+            }
+
+            if (muzzle == null)
+            {
+                GameObject muzzleObject = new GameObject("WeaponMuzzle");
+                muzzleObject.transform.SetParent(transform, false);
+                muzzle = muzzleObject.transform;
+                muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.56f);
+            }
+
+            if (muzzleFlash == null)
+                muzzleFlash = CreateMuzzleFlash();
+        }
+
+        private void LoadCharacterSprite()
+        {
+            string resource = playerCharacter
+                ? HeroResource
+                : $"PersianCharacters/Enemy_0{archetype}";
+
+            Texture2D texture = Resources.Load<Texture2D>(resource);
+            if (texture == null)
+            {
+                Debug.LogError($"Missing character art resource: Resources/{resource}.png");
+                sprite.sprite = null;
+                return;
+            }
+
+            sprite.sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.08f),
+                64f,
+                0,
+                SpriteMeshType.Tight);
+
+            sprite.color = Color.white;
+            ApplyScale();
+        }
+
+        private void ApplyScale()
+        {
+            float scale = archetype == 3 ? 1.16f : archetype == 2 ? 1.05f : 1f;
+            transform.localScale = playerCharacter
+                ? Vector3.one * 1.06f
+                : Vector3.one * scale;
+        }
+
+        private ParticleSystem CreateMuzzleFlash()
+        {
+            GameObject go = new GameObject("MuzzleFlash");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = new Vector3(0.42f, 1.05f, 0.66f);
+
+            ParticleSystem ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.loop = false;
+            main.playOnAwake = false;
+            main.duration = 0.06f;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.035f, 0.055f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.35f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.16f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.maxParticles = 6;
+
+            var emission = ps.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 3, 4) });
+
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Sphere;
+            shape.radius = 0.03f;
+
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+
+            var colorOverLifetime = ps.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            Gradient gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(new Color(1f, 0.75f, 0.18f), 0f), new GradientColorKey(new Color(1f, 0.2f, 0.03f), 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+            colorOverLifetime.color = gradient;
+
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            return ps;
         }
     }
 }
