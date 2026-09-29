@@ -718,6 +718,34 @@ public final class MainActivity extends Activity {
                 c.drawRoundRect(new RectF(x+16*u,y-39*u,x+21*u,y-25*u),2*u,2*u,p);
             }
 
+            // Player-only Persian visual pass: lamellar collar, cloak tabs, crest and arm guards.
+            // Render-only: gameplay state, hitboxes, controls and weapon logic remain unchanged.
+            if(player){
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(0xFF9B8050);
+                path.reset();
+                path.moveTo(x-15*u,y-20*u);path.lineTo(x-25*u,y-7*u);path.lineTo(x-19*u,y+2*u);path.lineTo(x-12*u,y-10*u);path.close();c.drawPath(path,p);
+                path.reset();
+                path.moveTo(x+15*u,y-20*u);path.lineTo(x+25*u,y-7*u);path.lineTo(x+19*u,y+2*u);path.lineTo(x+12*u,y-10*u);path.close();c.drawPath(path,p);
+                p.setColor(0xFFD0B16A);
+                for(int row=0;row<3;row++){
+                    float yy=y-4*u+row*6*u;
+                    c.drawRoundRect(new RectF(x-10*u,yy,x-2*u,yy+4*u),1.5f*u,1.5f*u,p);
+                    c.drawRoundRect(new RectF(x+2*u,yy,x+10*u,yy+4*u),1.5f*u,1.5f*u,p);
+                }
+                p.setColor(0xFF355B52);
+                path.reset();path.moveTo(x-27*u,y-5*u);path.lineTo(x-34*u,y+20*u);path.lineTo(x-20*u,y+15*u);path.lineTo(x-17*u,y-8*u);path.close();c.drawPath(path,p);
+                path.reset();path.moveTo(x+27*u,y-5*u);path.lineTo(x+34*u,y+20*u);path.lineTo(x+20*u,y+15*u);path.lineTo(x+17*u,y-8*u);path.close();c.drawPath(path,p);
+                p.setColor(0xFFB68C43);
+                path.reset();path.moveTo(x-2*u,y-45*u);path.quadTo(x-10*u,y-58*u,x-1*u,y-66*u);path.quadTo(x+7*u,y-57*u,x+3*u,y-45*u);path.close();c.drawPath(path,p);
+                p.setColor(0xFFE0C06B);c.drawOval(new RectF(x-2*u,y-60*u,x+3*u,y-48*u),p);
+                p.setColor(0xFF9E8250);
+                c.drawRoundRect(new RectF(x-29*u,y-2*u,x-23*u,y+12*u),2*u,2*u,p);
+                c.drawRoundRect(new RectF(x+23*u,y-2*u,x+29*u,y+12*u),2*u,2*u,p);
+                p.setColor(0xFFD6B96D);c.drawCircle(x,y+19*u,3.5f*u,p);
+                p.setColor(0xFF6E5833);c.drawCircle(x,y+19*u,1.5f*u,p);
+            }
+
             // Arm geometry follows existing facing only; no gameplay state is changed.
             float fx=player?core.player().facingX:1f;
             float fy=player?core.player().facingY*PITCH:0f;
