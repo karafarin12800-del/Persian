@@ -64,9 +64,9 @@ public final class GameCore {
 
     public void reset(){
         enemies.clear();projectiles.clear();grenades.clear();pickups.clear();explosions.clear();
-        fireCd=swordCd=grenadeCd=0;reinforceCd=24;zoneTimer=0;damageCarry=0;zoneRadius=2450;kills=0;gameOver=false;
+        fireCd=swordCd=grenadeCd=0;reinforceCd=22;zoneTimer=0;damageCarry=0;zoneRadius=2050;kills=0;gameOver=false;
         setProfile();player.x=WORLD_SIZE*.5f;player.y=WORLD_SIZE*.5f;player.facingX=1;player.facingY=0;player.dead=false;
-        spawnEnemies(12);spawnStartingLoot();
+        spawnEnemies(10);spawnStartingLoot();
     }
 
     private void setProfile(){
@@ -80,7 +80,7 @@ public final class GameCore {
     private void spawnEnemies(int n){
         for(int i=0;i<n;i++){
             Enemy e=new Enemy();e.type=i%6==0?3:(i%3==0?2:1);e.maxHp=e.hp=e.type==3?150:e.type==2?90:55;
-            float a=random.nextFloat()*(float)Math.PI*2,d=900+random.nextFloat()*1250;
+            float a=random.nextFloat()*(float)Math.PI*2,d=620+random.nextFloat()*720;
             e.x=clamp(player.x+(float)Math.cos(a)*d,130,WORLD_SIZE-130);
             e.y=clamp(player.y+(float)Math.sin(a)*d,130,WORLD_SIZE-130);
             if(world.isBlocked(e.x,e.y,50)){
@@ -110,7 +110,7 @@ public final class GameCore {
         reinforceCd-=dt;zoneTimer+=dt;movePlayer(dt,in.moveX,in.moveY);updateFacing(in);
         if(in.reload)reload();if(in.sword)melee();if(in.grenade)throwGrenade(in);if(in.fire)fire(in);
         updateProjectiles(dt);updateGrenades(dt);updateExplosions(dt);updateEnemies(dt);collectPickups();updateZone(dt);
-        if(reinforceCd<=0&&aliveCount()<6){spawnEnemies(3);reinforceCd=28;}cleanupDead();
+        if(reinforceCd<=0&&aliveCount()<5){spawnEnemies(3);reinforceCd=26;}cleanupDead();
     }
 
     private void updateFacing(Input in){
