@@ -63,23 +63,23 @@ public final class MainActivity extends Activity {
         private float sy(float y){return cy()+(y-core.player().y)*sc()*PITCH;}
         private float minDim(){return Math.min(getWidth(),getHeight());}
 
-        private float controlScale(){
-            return Math.max(.82f,Math.min(1.18f,minDim()/720f));
-        }
-        private float joystickRadius(){return 78f*controlScale();}
-        private float fireRadius(){return 78f*controlScale();}
-        private float actionRadius(){return 54f*controlScale();}
-        private float fireX(){return getWidth()-110f*controlScale();}
-        private float fireY(){return getHeight()-205f*controlScale();}
-        private float actionY(){return getHeight()-80f*controlScale();}
-        private float swordX(){return getWidth()-238f*controlScale();}
-        private float bombX(){return getWidth()-134f*controlScale();}
-        private float reloadX(){return getWidth()-78f*controlScale();}
-        private float idleJoyX(){return getWidth()*.16f;}
-        private float idleJoyY(){return getHeight()-105f*controlScale();}
+        private float dp(float v){return v*getResources().getDisplayMetrics().density;}
+        private float joystickRadius(){return dp(72f);}
+        private float fireVisualRadius(){return dp(58f);}
+        private float fireHitRadius(){return dp(72f);}
+        private float actionVisualRadius(){return dp(48f);}
+        private float actionHitRadius(){return dp(60f);}
+        private float fireX(){return getWidth()-dp(110f);}
+        private float fireY(){return getHeight()-dp(205f);}
+        private float actionY(){return getHeight()-dp(80f);}
+        private float swordX(){return getWidth()-dp(238f);}
+        private float bombX(){return getWidth()-dp(134f);}
+        private float reloadX(){return getWidth()-dp(78f);}
+        private float idleJoyX(){return dp(120f);}
+        private float idleJoyY(){return getHeight()-dp(105f);}
 
         @Override protected void onSizeChanged(int w,int h,int ow,int oh){
-            joyBaseX=w*.16f;joyBaseY=h-105f*controlScale();joyX=joyBaseX;joyY=joyBaseY;
+            joyBaseX=dp(120f);joyBaseY=h-dp(105f);joyX=joyBaseX;joyY=joyBaseY;
         }
 
         @Override protected void onDraw(Canvas c){
@@ -492,7 +492,7 @@ public final class MainActivity extends Activity {
             p.setColor(0x2D151C19);
             c.drawCircle(drawBaseX,drawBaseY,jr+14,p);
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(3f,3f*controlScale()));
+            p.setStrokeWidth(Math.max(dp(3f),3f*dp(1f)));
             p.setColor(joyActive?0xB8D9C889:0x707B7667);
             c.drawCircle(drawBaseX,drawBaseY,jr+10,p);
             p.setStyle(Paint.Style.FILL);
@@ -500,21 +500,21 @@ public final class MainActivity extends Activity {
             c.drawCircle(joyActive?joyX:drawBaseX,joyActive?joyY:drawBaseY,jr*.43f,p);
             p.setColor(0xE8FFFFFF);
             p.setTypeface(PaintCompat.BOLD);
-            p.setTextSize(Math.max(10f,jr*.15f));
+            p.setTextSize(Math.max(dp(10f),jr*.15f));
             p.setTextAlign(Paint.Align.CENTER);
-            c.drawText("MOVE",drawBaseX,drawBaseY+jr+24*controlScale(),p);
+            c.drawText("MOVE",drawBaseX,drawBaseY+jr+dp(24f),p);
 
-            button(c,fireX(),fireY(),fireRadius(),"FIRE",firePointer>=0);
-            button(c,swordX(),actionY(),actionRadius(),"SWORD",swordPointer>=0);
-            button(c,bombX(),actionY(),actionRadius(),"BOMB",grenadePointer>=0);
-            button(c,reloadX(),actionY(),actionRadius(),"RELOAD",reloadPointer>=0);
+            button(c,fireX(),fireY(),fireVisualRadius(),"FIRE",firePointer>=0);
+            button(c,swordX(),actionY(),actionVisualRadius(),"SWORD",swordPointer>=0);
+            button(c,bombX(),actionY(),actionVisualRadius(),"BOMB",grenadePointer>=0);
+            button(c,reloadX(),actionY(),actionVisualRadius(),"RELOAD",reloadPointer>=0);
 
             if(input.aimActive){
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(2f,2.5f*controlScale()));
+                p.setStrokeWidth(Math.max(dp(2f),2.5f*dp(1f)));
                 p.setColor(0x668DCCFF);
-                float rr=32f*controlScale();
-                float arm=48f*controlScale();
+                float rr=dp(28f);
+                float arm=dp(42f);
                 c.drawCircle(aimTouchX,aimTouchY,rr,p);
                 c.drawLine(aimTouchX-arm,aimTouchY,aimTouchX-rr,aimTouchY,p);
                 c.drawLine(aimTouchX+rr,aimTouchY,aimTouchX+arm,aimTouchY,p);
@@ -536,8 +536,8 @@ public final class MainActivity extends Activity {
             p.setColor(Color.WHITE);
             p.setTypeface(PaintCompat.BOLD);
             p.setTextAlign(Paint.Align.CENTER);
-            p.setTextSize(Math.max(10f,r*.22f));
-            c.drawText(text,x,y+5f*controlScale(),p);
+            p.setTextSize(Math.max(dp(10f),r*.22f));
+            c.drawText(text,x,y+dp(4f),p);
             p.setTypeface(null);
         }
 
@@ -560,22 +560,22 @@ public final class MainActivity extends Activity {
         private void beginPointer(MotionEvent e,int index){
             float x=e.getX(index),y=e.getY(index);
             int id=e.getPointerId(index);
-            if(inside(x,y,fireX(),fireY(),fireRadius())&&firePointer<0){
+            if(inside(x,y,fireX(),fireY(),fireHitRadius())&&firePointer<0){
                 firePointer=id;
                 input.fire=true;
                 return;
             }
-            if(inside(x,y,swordX(),actionY(),actionRadius())&&swordPointer<0){
+            if(inside(x,y,swordX(),actionY(),actionHitRadius())&&swordPointer<0){
                 swordPointer=id;
                 input.sword=true;
                 return;
             }
-            if(inside(x,y,bombX(),actionY(),actionRadius())&&grenadePointer<0){
+            if(inside(x,y,bombX(),actionY(),actionHitRadius())&&grenadePointer<0){
                 grenadePointer=id;
                 input.grenade=true;
                 return;
             }
-            if(inside(x,y,reloadX(),actionY(),actionRadius())&&reloadPointer<0){
+            if(inside(x,y,reloadX(),actionY(),actionHitRadius())&&reloadPointer<0){
                 reloadPointer=id;
                 input.reload=true;
                 return;
