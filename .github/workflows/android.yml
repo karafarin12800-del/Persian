@@ -2,7 +2,7 @@ name: PersiaWar2D Android CI
 
 on:
   push:
-    branches: [main, unity-2.5d]
+    branches: [main, unity-2.5d, graphics-player-v1]
   pull_request:
     branches: [main]
   workflow_dispatch:
