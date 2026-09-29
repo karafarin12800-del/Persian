@@ -152,7 +152,7 @@ public final class MainActivity extends Activity {
     }
 
     // Subtle moving dust light keeps the scene from feeling static.
-    p.setShader(new RadialGradient(cx()+Math.sin(t*.35f)*getWidth()*.32f,
+    p.setShader(new RadialGradient((float)(cx()+Math.sin(t*.35f)*getWidth()*.32f),
             HUD+(getHeight()-HUD)*.48f,
             Math.max(getWidth(),getHeight())*.55f,
             new int[]{0x18FFE4A3,0x05000000,0x00000000},
@@ -1055,6 +1055,7 @@ public final class MainActivity extends Activity {
 }
 
         private void button(Canvas c,float x,float y,float r,String text,boolean pressed){
+    float s=sc();
     p.setStyle(Paint.Style.FILL);
     p.setShader(new RadialGradient(x-r*.25f,y-r*.35f,r*1.25f,
             pressed?0xD97F8C68:0xB86E6960,
