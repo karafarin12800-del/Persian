@@ -165,7 +165,11 @@ public final class GameCore {
             }
         }
         float[] dir=new float[2];getFireDirection(in,dir);
-        projectiles.add(new Projectile(player.x+dir[0]*62,player.y+dir[1]*62,dir[0]*1380,dir[1]*1380,30,2.2f,true));
+        // Keep the weapon, muzzle flash and projectile on the same firing vector.
+        player.facingX=dir[0];player.facingY=dir[1];
+        final float muzzleOffset=154f;
+        projectiles.add(new Projectile(player.x+dir[0]*muzzleOffset,player.y+dir[1]*muzzleOffset,
+                dir[0]*1380,dir[1]*1380,30,2.2f,true));
         player.ammo--;fireCd=.16f;
     }
 
