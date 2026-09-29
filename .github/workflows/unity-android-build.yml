@@ -103,78 +103,50 @@ jobs:
           ref: ${{ inputs.build_ref || github.ref }}
           lfs: true
 
-      - name: Prepare Unity activation for GameCI
+      - name: Validate Unity activation configuration
         shell: bash
         env:
           UNITY_LICENSE_INPUT: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL_INPUT: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL_INPUT: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD_INPUT: ${{ secrets.UNITY_PASSWORD }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import os
-          import re
 
-          raw = os.environ.get('UNITY_LICENSE_INPUT', '').lstrip('\ufeff').strip()
-          serial = os.environ.get('UNITY_SERIAL_INPUT', '').strip()
+          [[ -n "${UNITY_EMAIL_INPUT}" ]] || { echo "::error::UNITY_EMAIL secret is missing."; exit 1; }
+          [[ -n "${UNITY_PASSWORD_INPUT}" ]] || { echo "::error::UNITY_PASSWORD secret is missing."; exit 1; }
 
-          def clean(value):
-              value = value.lstrip('\ufeff').strip()
-              if value.startswith('UNITY_LICENSE='):
-                  value = value.split('=', 1)[1].strip()
-              if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
-                  value = value[1:-1].strip()
-              if '\\n' in value and '<' in value:
-                  value = value.replace('\\n', '\n').replace('\\r', '')
-              return value.strip()
+          license="${UNITY_LICENSE_INPUT#$'\\ufeff'}"
+          license="$(printf '%s' "$license" | sed 's/^ *//; s/ *$//')"
+          serial="$(printf '%s' "${UNITY_SERIAL_INPUT}" | sed 's/^ *//; s/ *$//')"
 
-          raw = clean(raw)
-          serial = clean(serial)
-          serial_pattern = re.compile(r'^(?:[A-Z]{2}/[A-Z]{2}/[A-Z0-9-]+|[A-Z0-9]{2}-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3,5})$')
+          if [[ -n "$serial" ]]; then
+            echo "Unity activation mode: professional/serial (UNITY_SERIAL is configured)."
+            echo "UNITY_LICENSE is not required when UNITY_SERIAL is configured."
+            exit 0
+          fi
 
-          if serial:
-              with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as fh:
-                  fh.write('UNITY_SERIAL<<__UNITY_SERIAL_EOF__\n')
-                  fh.write(serial + '\n')
-                  fh.write('__UNITY_SERIAL_EOF__\n')
-              print('Unity serial activation selected from UNITY_SERIAL.')
-              raise SystemExit(0)
-
-          if not raw:
-              raise SystemExit('No Unity activation credential is available. Set UNITY_LICENSE (ULF) or UNITY_SERIAL.')
-
-          if serial_pattern.fullmatch(raw) and '<' not in raw:
-              with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as fh:
-                  fh.write('UNITY_SERIAL<<__UNITY_SERIAL_EOF__\n')
-                  fh.write(raw + '\n')
-                  fh.write('__UNITY_SERIAL_EOF__\n')
-              print('UNITY_LICENSE contains a serial-shaped value; using it as UNITY_SERIAL.')
-              raise SystemExit(0)
-
-          lowered = raw.lower()
-          if '<' in raw and any(tag in lowered for tag in ('machineidentification', 'licenserequest', 'activationrequest')):
-              raise SystemExit('UNITY_LICENSE contains a Unity activation request (.alf), not a downloaded license (.ulf). Replace the UNITY_LICENSE secret with the contents of the .ulf license file from Unity.')
-
-          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8', newline='\n') as fh:
-              fh.write('UNITY_LICENSE<<__UNITY_LICENSE_EOF__\n')
-              fh.write(raw)
-              fh.write('\n__UNITY_LICENSE_EOF__\n')
-
-          print('Unity license payload prepared for GameCI.')
-          PY
-
-      - name: Confirm normalized activation environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ -n "${UNITY_EMAIL}" ]]
-          [[ -n "${UNITY_PASSWORD}" ]]
-          if [[ -n "${UNITY_SERIAL:-}" ]]; then
-            echo 'Unity serial activation environment is ready for GameCI.'
-          elif [[ -n "${UNITY_LICENSE:-}" ]]; then
-            echo 'Unity Personal license activation environment is ready for GameCI.'
-          else
+          if [[ -z "$license" ]]; then
+            echo "::error::No Unity activation secret found. Configure UNITY_LICENSE with the complete .ulf file contents, or UNITY_SERIAL for a paid license."
             exit 1
           fi
+
+          if printf '%s' "$license" | grep -Eq '^([A-Z0-9]{2}-[A-Z0-9]{4})(-[A-Z0-9]{4}){3,5}$'; then
+            echo "::error::UNITY_LICENSE contains a serial-like value. Put that value in the UNITY_SERIAL secret instead."
+            exit 1
+          fi
+
+          if ! printf '%s' "$license" | grep -q '<UnityLicense'; then
+            if printf '%s' "$license" | grep -Eiq '<(MachineIdentification|MachineBindings|LicenseRequest|ActivationRequest|root)'; then
+              echo "::error::UNITY_LICENSE appears to contain an activation request (.alf), not a Unity license (.ulf). Replace it with the downloaded .ulf license contents."
+            else
+              echo "::error::UNITY_LICENSE is not recognized as a Unity .ulf license payload. Keep the secret as the exact contents of the .ulf file, including its XML."
+            fi
+            exit 1
+          fi
+
+          echo "Unity activation mode: Personal license (.ulf)."
+          echo "Unity .ulf payload detected; the secret will be passed directly to GameCI."
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -191,8 +163,8 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ env.UNITY_SERIAL }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: UnityProject
           targetPlatform: Android
