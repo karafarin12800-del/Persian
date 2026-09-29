@@ -781,7 +781,7 @@ public final class MainActivity extends Activity {
         void togglePause(){paused=!paused;if(paused)clearInput();}
     }
 
-    /** Avoids Android's Typeface constants leaking into the rendering helpers. */
+    // Player art pass v2: detailed layered 2.5D soldier rendering.\n    /** Avoids Android's Typeface constants leaking into the rendering helpers. */
     private static final class PaintCompat {
         static final android.graphics.Typeface BOLD=android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);
         private PaintCompat(){}
