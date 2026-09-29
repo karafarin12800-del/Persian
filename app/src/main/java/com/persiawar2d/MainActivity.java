@@ -816,7 +816,7 @@ public final class MainActivity extends Activity {
 
             // Existing fire input only controls this visual flash.
             if(player && input.fire){
-                float mx=x+fx*70*u,my=y+fy*70*u;
+                float mx=x+fx*77*u,my=y+fy*77*u;
                 p.setColor(0xFFFFDA70);
                 path.reset();
                 path.moveTo(mx,my);
