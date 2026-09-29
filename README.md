@@ -20,3 +20,6 @@ The `unity-2.5d` branch is the active integration/test branch for the current An
 
 ## CI
 Android CI uses the committed Gradle Wrapper and current Android SDK package names.
+
+## Build verification
+The current CI run is used to verify the latest gameplay revision before the APK is handed off for phone testing.
