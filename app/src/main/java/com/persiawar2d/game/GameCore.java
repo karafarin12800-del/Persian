@@ -17,7 +17,7 @@ public final class GameCore {
         public boolean aimActive,fire,sword,grenade,reload;
     }
     public static final class Player{
-        public float x,y,speed,facingX=1,facingY=0,walkPhase,walkBlend;
+        public float x,y,speed,facingX=1,facingY=0,walkPhase,walkBlend,bodyBob,weaponKick;
         public int hp,maxHp,shield,ammo,reserveAmmo,grenades,score;
         public String skin;
         public boolean dead;
@@ -106,7 +106,7 @@ public final class GameCore {
 
     public void update(float dt,Input in){
         if(gameOver)return;
-        dt=Math.min(.05f,Math.max(.001f,dt));fireCd=Math.max(0,fireCd-dt);swordCd=Math.max(0,swordCd-dt);grenadeCd=Math.max(0,grenadeCd-dt);
+        dt=Math.min(.05f,Math.max(.001f,dt));fireCd=Math.max(0,fireCd-dt);swordCd=Math.max(0,swordCd-dt);grenadeCd=Math.max(0,grenadeCd-dt);player.weaponKick=Math.max(0,player.weaponKick-dt*7.5f);
         reinforceCd-=dt;zoneTimer+=dt;movePlayer(dt,in.moveX,in.moveY);updateFacing(in);updateWalkAnimation(dt,in.moveX,in.moveY);
         if(in.reload)reload();if(in.sword)melee(in);if(in.grenade)throwGrenade(in);if(in.fire)fire(in);
         updateProjectiles(dt);updateGrenades(dt);updateExplosions(dt);updateEnemies(dt);collectPickups();updateZone(dt);
@@ -118,6 +118,7 @@ public final class GameCore {
         float target=len>.08f?1f:0f;
         walkBlend += (target-walkBlend)*Math.min(1f,dt*10f);
         if(len>.08f) walkPhase += dt*(7.5f+Math.min(2f,player.speed/220f));
+        bodyBob += dt*(2.2f+walkBlend*7.0f);
     }
 
     private void updateFacing(Input in){
@@ -182,7 +183,7 @@ public final class GameCore {
         }
         float[] dir=new float[2];getFireDirection(in,dir);
         projectiles.add(new Projectile(player.x+dir[0]*62,player.y+dir[1]*62,dir[0]*1380,dir[1]*1380,30,2.2f,true));
-        player.ammo--;fireCd=.16f;
+        player.ammo--;fireCd=.16f;player.weaponKick=1f;
     }
 
     public void reload(){
