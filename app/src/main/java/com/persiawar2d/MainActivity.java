@@ -99,7 +99,7 @@ public class MainActivity extends Activity {
         }
         void addPickup(int type,float x,float y){if(!world.isBlocked(x,y,45))pickups.add(new Pickup(x,y,type));}
         @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){joyBaseX=w*.17f;joyBaseY=h*.80f;joyX=joyBaseX;joyY=joyBaseY;}
-        float cameraScale(){return Math.min(getWidth()/1900f,Math.max(.72f,(getHeight()-HUD_H)/1000f));}
+        float cameraScale(){return Math.min(getWidth()/2200f,Math.max(.62f,(getHeight()-HUD_H)/1180f));}
 
         @Override protected void onDraw(Canvas canvas){
             long now=System.currentTimeMillis();
@@ -192,23 +192,87 @@ public class MainActivity extends Activity {
             if(System.currentTimeMillis()<explosionUntil)drawExplosion(c,s);c.restore();world.drawForeground(c,px,py,s,getWidth(),getHeight(),HUD_H);c.restore();
         }
         void drawPlayer(Canvas c,float s){
-            float x=px*s,y=py*s;p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(x-40*s,y+45*s,x+40*s,y+62*s,p);
-            king.setState(playerDir,playerAction,playerFrame);king.setAlpha(255);int width=Math.max(92,Math.round(116*s)),height=Math.max(154,Math.round(210*s));int halfW=width/2,halfH=height/2;
-            c.save();c.translate(x,y-8*s);c.scale(1f,1f/CAMERA_PITCH);king.setBounds(-halfW,-halfH,halfW,halfH);king.draw(c);c.restore();
-            if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawOval(x-56*s,y-78*s,x+56*s,y+58*s,p);p.setStyle(Paint.Style.FILL);}
+            float x=px*s,y=py*s;
+            float bob=(joystickDown?3f:1.2f)*(float)Math.sin(System.currentTimeMillis()/110.0);
+            float dx=aimX-px,dy=aimY-py,angle=(float)Math.atan2(dy,dx);
+            p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawOval(x-48*s,y+46*s,x+48*s,y+68*s,p);
+            c.save();c.translate(x,y+bob*s);c.scale(1f,1f/CAMERA_PITCH);
+            p.setColor(0xFF25221E);c.drawRoundRect(-22*s,34*s,-4*s,73*s,6*s,6*s,p);c.drawRoundRect(4*s,34*s,22*s,73*s,6*s,6*s,p);
+            p.setColor(0xFF111111);c.drawRoundRect(-27*s,65*s,1*s,77*s,5*s,5*s,p);c.drawRoundRect(-1*s,65*s,27*s,77*s,5*s,5*s,p);
+            p.setColor(0xFFC6923B);c.drawRoundRect(-34*s,-12*s,34*s,48*s,14*s,14*s,p);
+            p.setColor(0xFF174D5A);c.drawRect(-34*s,8*s,34*s,18*s,p);p.setColor(0xFFE0B95B);c.drawRect(-28*s,15*s,28*s,21*s,p);
+            p.setColor(0xFF8A5A25);c.drawCircle(-31*s,-2*s,8*s,p);c.drawCircle(31*s,-2*s,8*s,p);
+            p.setStrokeWidth(12*s);p.setStrokeCap(Paint.Cap.ROUND);p.setColor(0xFFC88F65);c.drawLine(-25*s,2*s,-43*s,29*s,p);c.drawLine(25*s,2*s,43*s,29*s,p);
+            p.setColor(0xFFC88F65);c.drawCircle(0,-42*s,25*s,p);p.setColor(0xFF33251E);c.drawArc(-18*s,-43*s,18*s,-13*s,0,180,true,p);
+            p.setColor(0xFFD4A43E);c.drawRoundRect(-27*s,-66*s,27*s,-48*s,9*s,9*s,p);p.setColor(0xFF8C672B);c.drawRect(-31*s,-51*s,31*s,-45*s,p);
+            p.setColor(0xFF241D19);c.drawCircle(-9*s,-43*s,3*s,p);c.drawCircle(9*s,-43*s,3*s,p);
+            c.save();c.rotate(angle*57.29578f);p.setStrokeWidth(9*s);p.setStrokeCap(Paint.Cap.SQUARE);p.setColor(0xFF292724);c.drawLine(28*s,8*s,92*s,8*s,p);
+            p.setStrokeWidth(4*s);p.setColor(0xFFD3A63E);c.drawLine(50*s,8*s,83*s,8*s,p);c.restore();p.setStrokeCap(Paint.Cap.BUTT);c.restore();
+            if(shield>0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0xAA52DFFF);c.drawOval(x-58*s,y-80*s,x+58*s,y+58*s,p);p.setStyle(Paint.Style.FILL);}
         }
         void drawEnemy(Canvas c,Enemy e,float s){
-            if(enemyArt==null)return;float x=e.x*s,y=e.y*s;int size=Math.round((e.type==3?146:(e.type==2?130:116))*s),half=size/2;
-            c.save();c.translate(x,y);c.scale(1f,1f/CAMERA_PITCH);enemyArt.setAlpha(255);enemyArt.setBounds(-half,-half,half,half);enemyArt.draw(c);c.restore();
-            float bw=68*s,bh=Math.max(5,7*s),left=x-bw*.5f,top=(e.y-88)*s;p.setStyle(Paint.Style.FILL);p.setColor(0xB4141414);c.drawRoundRect(left,top,left+bw,top+bh,bh,bh,p);float max=e.type==3?120:(e.type==2?70:45);p.setColor(Color.rgb(196,55,45));c.drawRoundRect(left,top,left+bw*Math.max(0,e.hp/max),top+bh,bh,bh,p);
+            float x=e.x*s,y=e.y*s,bob=1.5f*(float)Math.sin((System.currentTimeMillis()+e.type*90)/125.0);
+            float dx=px-e.x,dy=py-e.y,angle=(float)Math.atan2(dy,dx);
+            p.setStyle(Paint.Style.FILL);p.setColor(0x50000000);c.drawOval(x-42*s,y+42*s,x+42*s,y+62*s,p);
+            c.save();c.translate(x,y+bob*s);c.scale(1f,1f/CAMERA_PITCH);
+            int tunic=e.type==3?0xFF6D2630:(e.type==2?0xFF9A4A2D:0xFFB33A2F);
+            p.setColor(0xFF22201D);c.drawRoundRect(-21*s,32*s,-4*s,68*s,5*s,5*s,p);c.drawRoundRect(4*s,32*s,21*s,68*s,5*s,5*s,p);
+            p.setColor(0xFF111111);c.drawRoundRect(-25*s,61*s,1*s,72*s,4*s,4*s,p);c.drawRoundRect(-1*s,61*s,25*s,72*s,4*s,4*s,p);
+            p.setColor(tunic);c.drawRoundRect(-31*s,-9*s,31*s,43*s,12*s,12*s,p);p.setColor(0xFF5D3B27);c.drawRect(-31*s,8*s,31*s,15*s,p);p.setColor(0xFFB98C3C);c.drawRect(-25*s,14*s,25*s,19*s,p);
+            p.setStrokeWidth(11*s);p.setStrokeCap(Paint.Cap.ROUND);p.setColor(0xFFB97955);c.drawLine(-23*s,1*s,-42*s,26*s,p);c.drawLine(23*s,1*s,42*s,26*s,p);
+            p.setColor(0xFFB97955);c.drawCircle(0,-37*s,22*s,p);p.setColor(0xFF241B18);c.drawArc(-17*s,-38*s,17*s,-12*s,0,180,true,p);
+            p.setColor(e.type==3?0xFFD2A44A:0xFF6C7770);c.drawRoundRect(-24*s,-58*s,24*s,-43*s,7*s,7*s,p);p.setColor(0xFF1E1E1C);c.drawRect(-27*s,-45*s,27*s,-40*s,p);
+            c.save();c.rotate(angle*57.29578f);p.setStrokeWidth(e.type==3?10*s:8*s);p.setStrokeCap(Paint.Cap.SQUARE);p.setColor(0xFF252525);c.drawLine(27*s,7*s,88*s,7*s,p);
+            p.setStrokeWidth(3*s);p.setColor(e.type==3?0xFFD4B05A:0xFF9E3C32);c.drawLine(52*s,7*s,82*s,7*s,p);c.restore();p.setStrokeCap(Paint.Cap.BUTT);c.restore();
+            float max=e.type==3?120:(e.type==2?70:45),pct=Math.max(0,Math.min(1,e.hp/max));
+            float bw=(e.type==3?88:70)*s,bh=7*s,left=x-bw*.5f,top=(e.y-92)*s;
+            p.setColor(0xB51A1917);c.drawRoundRect(left,top,left+bw,top+bh,4*s,4*s,p);
+            p.setColor(e.type==3?0xFFE0A943:0xFFE14A3E);c.drawRoundRect(left+2*s,top+2*s,left+2*s+(bw-4*s)*pct,top+bh-2*s,3*s,3*s,p);
         }
-        void drawBullet(Canvas c,Bullet b,float s){float x=b.x*s,y=b.y*s;p.setStyle(Paint.Style.FILL);p.setColor(b.player?Color.rgb(255,218,87):Color.rgb(255,80,65));c.drawCircle(x,y,Math.max(4,6*s),p);}
+        void drawBullet(Canvas c,Bullet b,float s){
+            float x=b.x*s,y=b.y*s,len=Math.max(18*s,Math.min(46*s,(float)Math.hypot(b.vx,b.vy)*.018f*s));
+            float d=Math.max(1f,(float)Math.hypot(b.vx,b.vy)),ex=x-b.vx/d*len,ey=y-b.vy/d*len;
+            p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeWidth(Math.max(7*s,10*s));p.setColor(b.player?0x4432D9FF:0x44FF3C35);c.drawLine(ex,ey,x,y,p);
+            p.setStrokeWidth(Math.max(3*s,5*s));p.setColor(b.player?0xFFFFD66B:0xFFFF594D);c.drawLine(ex,ey,x,y,p);
+            p.setStrokeCap(Paint.Cap.BUTT);p.setStyle(Paint.Style.FILL);c.drawCircle(x,y,Math.max(3*s,5*s),p);
+        }
         void drawPickup(Canvas c,Pickup item,float s){float x=item.x*s,y=item.y*s,pulse=1f+.08f*(float)Math.sin(System.currentTimeMillis()/180.0+item.type);p.setStyle(Paint.Style.FILL);p.setColor(0x3D000000);c.drawOval(x-26*s,y+20*s,x+26*s,y+31*s,p);if(item.type==Pickup.AMMO){p.setColor(Color.rgb(218,177,70));c.drawRoundRect(x-18*s,y-20*s,x+18*s,y+20*s,8*s,8*s,p);p.setColor(Color.rgb(87,69,41));c.drawRect(x-8*s,y-12*s,x-3*s,y+12*s,p);c.drawRect(x+4*s,y-12*s,x+9*s,y+12*s,p);}else if(item.type==Pickup.GRENADE){p.setColor(Color.rgb(55,92,58));c.drawCircle(x,y,18*s*pulse,p);p.setColor(Color.rgb(214,180,78));c.drawRect(x+4*s,y-18*s,x+11*s,y-8*s,p);}else{p.setColor(Color.rgb(205,63,58));c.drawRoundRect(x-20*s,y-16*s,x+20*s,y+16*s,8*s,8*s,p);p.setColor(Color.WHITE);c.drawRect(x-6*s,y-12*s,x+6*s,y+12*s,p);c.drawRect(x-12*s,y-6*s,x+12*s,y+6*s,p);}}
         void drawThrownGrenade(Canvas c,ThrownGrenade g,float s){p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(61,99,62));c.drawCircle(g.x*s,g.y*s,12*s,p);}
         void drawExplosion(Canvas c,float s){float left=Math.max(0,explosionUntil-System.currentTimeMillis()),alpha=left/360f;p.setStyle(Paint.Style.FILL);p.setColor((int)(120*alpha)<<24|0xF2B84B);c.drawCircle(explosionX*s,explosionY*s,170*s*(1f-alpha*.35f),p);p.setColor((int)(170*alpha)<<24|0xFFE5A1);c.drawCircle(explosionX*s,explosionY*s,85*s*(1f-alpha*.2f),p);}
 
-        void drawHud(Canvas c){p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(228,14,22,20));c.drawRect(0,0,getWidth(),HUD_H,p);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.LEFT);p.setTextSize(23);p.setColor(Color.rgb(244,208,113));c.drawText("PERSIA WAR 2.5D",20,30,p);p.setTypeface(Typeface.DEFAULT);p.setTextSize(16);p.setColor(Color.WHITE);c.drawText("WAVE "+wave+"   SCORE "+score,20,62,p);float barW=Math.min(290,getWidth()*.34f),barX=getWidth()-barW-22,barY=17;p.setColor(0xFF2A332D);c.drawRoundRect(barX,barY,barX+barW,barY+26,13,13,p);float hpW=barW*hp/(float)maxHp;p.setColor(hp>35?Color.rgb(80,177,92):Color.rgb(204,74,61));c.drawRoundRect(barX+3,barY+3,barX+Math.max(6,hpW-3),barY+23,10,10,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);p.setColor(0xE8CFC990);c.drawRoundRect(barX,barY,barX+barW,barY+26,13,13,p);p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(14);p.setColor(Color.WHITE);c.drawText("HP "+hp+"%",barX+barW/2f,barY+18,p);p.setTextAlign(Paint.Align.RIGHT);p.setTextSize(14);c.drawText("AMMO "+ammo+"/"+reserve+"   G "+grenades+(weapon==1?"   SWORD":"   FIREARM"),getWidth()-22,70,p);p.setTextAlign(Paint.Align.LEFT);}
-        void drawControls(Canvas c){long age=Math.max(0,joystickVisibleUntil-System.currentTimeMillis());int alpha=joystickDown?240:(int)Math.max(35,Math.min(220,70+age/10));float jx=joyBaseX,jy=joyBaseY;p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0x405149);c.drawCircle(jx,jy,106,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(4);p.setColor((alpha<<24)|0xD5C584);c.drawCircle(jx,jy,106,p);p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0xC4AF63);c.drawCircle(joyX,joyY,43,p);float br=Math.max(92,Math.min(132,getHeight()*.14f));float fireX=getWidth()*.83f,fireY=getHeight()*.72f,grenadeX=getWidth()*.67f,grenadeY=getHeight()*.72f,reloadX=getWidth()*.78f,reloadY=getHeight()*.91f,weaponX=getWidth()*.91f,weaponY=getHeight()*.91f,swordX=getWidth()*.63f,swordY=getHeight()*.55f;actionButton(c,fireX,fireY,br*1.10f,0xD19D4A3E,"F",28);actionButton(c,grenadeX,grenadeY,br*.68f,0xC058704E,"G",24);actionButton(c,reloadX,reloadY,br*.54f,0xB0455B55,"R",18);actionButton(c,weaponX,weaponY,br*.54f,0xB0455B55,"W",18);actionButton(c,swordX,swordY,br*.58f,0xB05B503D,"S",22);}
+        void drawHud(Canvas c){
+            p.setStyle(Paint.Style.FILL);p.setColor(0xE8171A18);c.drawRect(0,0,getWidth(),HUD_H,p);
+            p.setColor(0xCC2A2924);c.drawRoundRect(14,9,300,HUD_H-9,18,18,p);
+            p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.LEFT);p.setTextSize(20);p.setColor(0xFFF0C86A);c.drawText("PERSIA WAR",30,31,p);
+            p.setTypeface(Typeface.DEFAULT);p.setTextSize(12);p.setColor(0xFFD8D1BF);c.drawText("ROYAL GUARD  •  2.5D",30,51,p);
+            p.setTextSize(14);p.setColor(Color.WHITE);c.drawText("KILLS  "+score,30,70,p);
+            float cx=getWidth()*.5f;p.setColor(0xCC2A2924);c.drawRoundRect(cx-180,9,cx+180,HUD_H-9,18,18,p);
+            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(15);p.setColor(0xFFEAD9AE);c.drawText("WAVE  "+wave,cx,30,p);
+            float bw=220,bx=cx-bw/2f,by=43;p.setColor(0xFF151714);c.drawRoundRect(bx,by,bx+bw,by+15,8,8,p);
+            p.setColor(hp>35?0xFF5BC46A:0xFFE05247);c.drawRoundRect(bx+2,by+2,bx+2+(bw-4)*hp/(float)maxHp,by+13,6,6,p);
+            p.setTextSize(11);p.setColor(Color.WHITE);c.drawText("HP  "+hp+" / "+maxHp,cx,68,p);
+            float rx=getWidth()-314;p.setTextAlign(Paint.Align.LEFT);p.setColor(0xCC2A2924);c.drawRoundRect(rx,9,getWidth()-14,HUD_H-9,18,18,p);
+            p.setTextSize(12);p.setColor(0xFFBEB7A6);c.drawText(weapon==0?"ROYAL BOW":"ROYAL BLADE",rx+16,29,p);
+            p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(21);p.setColor(0xFFFFD56A);c.drawText(ammo+" / "+reserve,rx+16,53,p);
+            p.setTypeface(Typeface.DEFAULT);p.setTextSize(11);p.setColor(0xFFD8D1BF);c.drawText("AMMO     GRENADES  "+grenades,rx+112,53,p);
+            p.setTextSize(11);p.setColor(0xFF8FAEA0);c.drawText("AUTO-AIM READY",rx+112,29,p);p.setTextAlign(Paint.Align.LEFT);
+        }
+        void drawControls(Canvas c){
+            long age=Math.max(0,joystickVisibleUntil-System.currentTimeMillis());int alpha=joystickDown?235:(int)Math.max(42,Math.min(185,70+age/10));
+            float jx=getWidth()*.16f,jy=getHeight()*.80f;p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0x26322F);c.drawCircle(jx,jy,86,p);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor((alpha<<24)|0xD8C98E);c.drawCircle(jx,jy,86,p);
+            p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0xC7A955);c.drawCircle(joyX,joyY,34,p);
+            p.setStyle(Paint.Style.STROKE);p.setColor((alpha<<24)|0xFFF1D98A);c.drawCircle(joyX,joyY,34,p);
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(11);p.setColor(0xCCFFFFFF);c.drawText("MOVE",jx,jy+116,p);
+            float br=Math.max(78,Math.min(112,getHeight()*.125f));float fireX=getWidth()*.84f,fireY=getHeight()*.79f;
+            actionButton(c,fireX,fireY,br,0xD17D302B,"FIRE",20);actionButton(c,getWidth()*.68f,getHeight()*.69f,br*.52f,0xB35B684B,"GRENADE",12);
+            actionButton(c,getWidth()*.76f,getHeight()*.91f,br*.48f,0xB04B5651,"RELOAD",11);actionButton(c,getWidth()*.90f,getHeight()*.91f,br*.48f,0xB04B5651,"WEAPON",10);
+            Enemy target=nearestEnemy();if(target!=null){float dx=(target.x-px)*cameraScale(),dy=(target.y-py)*cameraScale(),tx=getWidth()*.5f+dx,ty=HUD_H+(getHeight()-HUD_H)*.5f+dy;
+                if(tx>30&&tx<getWidth()-30&&ty>HUD_H+20&&ty<getHeight()-30){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xD7E5C05C);
+                    c.drawCircle(tx,ty,25,p);c.drawLine(tx-34,ty,tx-18,ty,p);c.drawLine(tx+18,ty,tx+34,ty,p);c.drawLine(tx,ty-34,tx,ty-18,p);c.drawLine(tx,ty+18,tx,ty+34,p);}
+            }
+            p.setStyle(Paint.Style.FILL);p.setTypeface(Typeface.DEFAULT);p.setTextAlign(Paint.Align.LEFT);
+        }
         void actionButton(Canvas c,float x,float y,float r,int fill,String label,float textSize){p.setStyle(Paint.Style.FILL);p.setColor(0x33000000);c.drawCircle(x,y+7,r+4,p);p.setColor(fill);c.drawCircle(x,y,r,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xD7E7D29A);c.drawCircle(x,y,r,p);p.setStyle(Paint.Style.FILL);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(textSize);p.setColor(Color.WHITE);c.drawText(label,x,y+textSize*.34f,p);p.setTypeface(Typeface.DEFAULT);}
         void drawGameOver(Canvas c){p.setStyle(Paint.Style.FILL);p.setColor(0xDD000000);c.drawRect(0,0,getWidth(),getHeight(),p);centeredText(c,"GAME OVER",getWidth()/2f,getHeight()/2f-25,Color.WHITE,52);centeredText(c,"TAP TO RESTART",getWidth()/2f,getHeight()/2f+30,Color.rgb(238,210,150),22);}
         void centeredText(Canvas c,String text,float x,float y,int color,float size){p.setStyle(Paint.Style.FILL);p.setColor(color);p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(size);c.drawText(text,x,y,p);p.setTypeface(Typeface.DEFAULT);}
