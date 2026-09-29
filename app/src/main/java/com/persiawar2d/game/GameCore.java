@@ -17,7 +17,7 @@ public final class GameCore {
         public boolean aimActive,fire,sword,grenade,reload;
     }
     public static final class Player{
-        public float x,y,speed,facingX=1,facingY=0,walkPhase,walkBlend,bodyBob,weaponKick;
+        public float x,y,speed,facingX=1,facingY=0,moveX,moveY,walkPhase,walkBlend,bodyBob,weaponKick;
         public int hp,maxHp,shield,ammo,reserveAmmo,grenades,score;
         public String skin;
         public boolean dead;
@@ -115,6 +115,7 @@ public final class GameCore {
 
     private void updateWalkAnimation(float dt,float mx,float my){
         float len=(float)Math.hypot(mx,my);
+        if(len>.08f){player.moveX=mx/len;player.moveY=my/len;}else{player.moveX*=Math.max(0,1-dt*10f);player.moveY*=Math.max(0,1-dt*10f);}
         float target=len>.08f?1f:0f;
         walkBlend += (target-walkBlend)*Math.min(1f,dt*10f);
         if(len>.08f) walkPhase += dt*(7.5f+Math.min(2f,player.speed/220f));
