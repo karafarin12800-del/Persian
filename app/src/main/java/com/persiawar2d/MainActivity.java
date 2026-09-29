@@ -335,7 +335,7 @@ public final class MainActivity extends Activity {
                 float tx=sx(target.x),ty=sy(target.y),r=30*sc()+10;
                 p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*sc()));p.setColor(0xCCFFE08A);
                 c.drawCircle(tx,ty,r,p);c.drawLine(tx-r-9,ty,tx-r+3,ty,p);c.drawLine(tx+r-3,ty,tx+r+9,ty,p);
-                c.drawLine(tx,ty-r-9,tx,ty-r+3,p);c.drawLine(tx,ty+r-3,tx,ty+r+9,ty,p);p.setStyle(Paint.Style.FILL);
+                c.drawLine(tx,ty-r-9,tx,ty-r+3,p);c.drawLine(tx,ty+r-3,tx,ty+r+9,p);p.setStyle(Paint.Style.FILL);
             }
         }
 
