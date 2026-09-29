@@ -28,12 +28,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK
+      - name: Accept Android SDK licenses
         shell: bash
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
