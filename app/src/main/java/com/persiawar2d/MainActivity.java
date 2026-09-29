@@ -70,8 +70,8 @@ public final class MainActivity extends Activity {
         private float actionVisualRadius(){return dp(48f);}
         private float actionHitRadius(){return dp(44f);}
         private float fireX(){return getWidth()-dp(110f);}
-        private float fireY(){return getHeight()-dp(225f);}
-        private float actionY(){return getHeight()-dp(80f);}
+        private float fireY(){return getHeight()-dp(350f);}
+        private float actionY(){return getHeight()-dp(230f);}
         private float swordX(){return getWidth()-dp(280f);}
         private float bombX(){return getWidth()-dp(175f);}
         private float reloadX(){return getWidth()-dp(70f);}
@@ -435,7 +435,7 @@ public final class MainActivity extends Activity {
         private void drawMiniMap(Canvas c){
             float size=Math.min(getWidth()*.30f,250),left=getWidth()-size-16,top=HUD+12;
             p.setStyle(Paint.Style.FILL);p.setColor(0xD91C241F);c.drawRoundRect(new RectF(left,top,left+size,top+size*.82f),16,16,p);
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.5f);p.setColor(0xD7D9C889);c.drawRoundRect(new RectF(left,top,left+size,top+size*.78f),16,16,p);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.5f);p.setColor(0xD7D9C889);c.drawRoundRect(new RectF(left,top,left+size,top+size*.82f),16,16,p);
             float mx=size/WorldMap.SIZE,my=size*.82f/WorldMap.SIZE;
             for(WorldMap.Road r:world.roads()){
                 p.setColor(0x997D7565);p.setStrokeWidth(Math.max(1.5f,r.width*mx*.42f));
