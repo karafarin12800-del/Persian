@@ -40,6 +40,8 @@ public final class MainActivity extends Activity {
         private long lastNanos=System.nanoTime();
         private float joyBaseX,joyBaseY,joyX,joyY;
         private int joyPointer=-1,firePointer=-1,aimPointer=-1;
+        private int swordPointer=-1,grenadePointer=-1,reloadPointer=-1;
+        private boolean joyActive;
         private boolean paused;
         private float aimTouchX,aimTouchY;
 
@@ -61,8 +63,23 @@ public final class MainActivity extends Activity {
         private float sy(float y){return cy()+(y-core.player().y)*sc()*PITCH;}
         private float minDim(){return Math.min(getWidth(),getHeight());}
 
+        private float controlScale(){
+            return Math.max(.82f,Math.min(1.18f,minDim()/720f));
+        }
+        private float joystickRadius(){return 78f*controlScale();}
+        private float fireRadius(){return 78f*controlScale();}
+        private float actionRadius(){return 54f*controlScale();}
+        private float fireX(){return getWidth()-110f*controlScale();}
+        private float fireY(){return getHeight()-205f*controlScale();}
+        private float actionY(){return getHeight()-80f*controlScale();}
+        private float swordX(){return getWidth()-238f*controlScale();}
+        private float bombX(){return getWidth()-134f*controlScale();}
+        private float reloadX(){return getWidth()-78f*controlScale();}
+        private float idleJoyX(){return getWidth()*.16f;}
+        private float idleJoyY(){return getHeight()-105f*controlScale();}
+
         @Override protected void onSizeChanged(int w,int h,int ow,int oh){
-            joyBaseX=w*.15f;joyBaseY=h*.80f;joyX=joyBaseX;joyY=joyBaseY;
+            joyBaseX=w*.16f;joyBaseY=h-105f*controlScale();joyX=joyBaseX;joyY=joyBaseY;
         }
 
         @Override protected void onDraw(Canvas c){
@@ -305,10 +322,20 @@ public final class MainActivity extends Activity {
         }
 
         private void drawPlayer(Canvas c){
-            float s=sc(),x=cx(),y=cy(),angle=(float)Math.toDegrees(Math.atan2(core.player().facingY,core.player().facingX));
-            c.save();c.rotate(angle+90,x,y);
+            float s=sc(),x=cx(),y=cy();
+            // Keep the body upright; communicate facing with the weapon instead of
+            // rotating the whole character every frame.
+            float fx=core.player().facingX, fy=core.player().facingY*PITCH;
+            float len=Math.max(1f,(float)Math.hypot(fx,fy));
+            fx/=len;fy/=len;
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeWidth(Math.max(4f,7f*s));
+            p.setColor(0xFFD8C27A);
+            c.drawLine(x+fx*18f*s,y+fy*18f*s,x+fx*48f*s,y+fy*48f*s,p);
+            p.setStrokeCap(Paint.Cap.BUTT);
+            p.setStyle(Paint.Style.FILL);
             drawWarrior(c,x,y,s,0,0xFFD4B35E,true);
-            c.restore();
         }
 
         private void drawWarrior(Canvas c,float x,float y,float s,int type,int armor,boolean player){
@@ -455,30 +482,63 @@ public final class MainActivity extends Activity {
         }
 
         private void drawControls(Canvas c){
-            float w=getWidth(),h=getHeight(),r=minDim()*.125f;
-            p.setStyle(Paint.Style.FILL);p.setColor(0x33151C19);c.drawCircle(joyBaseX,joyBaseY,r+14,p);
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xB8D9C889);c.drawCircle(joyBaseX,joyBaseY,r+10,p);
-            p.setStyle(Paint.Style.FILL);p.setColor(0xA5C1A45B);c.drawCircle(joyX,joyY,r*.43f,p);
-            p.setColor(Color.WHITE);p.setTypeface(PaintCompat.BOLD);p.setTextSize(Math.max(9,r*.15f));p.setTextAlign(Paint.Align.CENTER);c.drawText("MOVE",joyBaseX,joyBaseY+r+24,p);
+            float w=getWidth(),h=getHeight(),jr=joystickRadius();
 
-            button(c,w*.83f,h*.73f,minDim()*.092f,"FIRE",input.fire);
-            button(c,w*.67f,h*.90f,minDim()*.069f,"SWORD",input.sword);
-            button(c,w*.78f,h*.90f,minDim()*.069f,"BOMB",input.grenade);
-            button(c,w*.89f,h*.90f,minDim()*.069f,"RELOAD",input.reload);
+            // Always show a subtle joystick landing zone; touching the left side makes
+            // it float to the exact finger-down position.
+            float drawBaseX=joyActive?joyBaseX:idleJoyX();
+            float drawBaseY=joyActive?joyBaseY:idleJoyY();
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0x2D151C19);
+            c.drawCircle(drawBaseX,drawBaseY,jr+14,p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(3f,3f*controlScale()));
+            p.setColor(joyActive?0xB8D9C889:0x707B7667);
+            c.drawCircle(drawBaseX,drawBaseY,jr+10,p);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(joyActive?0xA5C1A45B:0x557A775D);
+            c.drawCircle(joyActive?joyX:drawBaseX,joyActive?joyY:drawBaseY,jr*.43f,p);
+            p.setColor(0xE8FFFFFF);
+            p.setTypeface(PaintCompat.BOLD);
+            p.setTextSize(Math.max(10f,jr*.15f));
+            p.setTextAlign(Paint.Align.CENTER);
+            c.drawText("MOVE",drawBaseX,drawBaseY+jr+24*controlScale(),p);
+
+            button(c,fireX(),fireY(),fireRadius(),"FIRE",firePointer>=0);
+            button(c,swordX(),actionY(),actionRadius(),"SWORD",swordPointer>=0);
+            button(c,bombX(),actionY(),actionRadius(),"BOMB",grenadePointer>=0);
+            button(c,reloadX(),actionY(),actionRadius(),"RELOAD",reloadPointer>=0);
 
             if(input.aimActive){
-                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);p.setColor(0x668DCCFF);
-                c.drawCircle(aimTouchX,aimTouchY,28,p);c.drawLine(aimTouchX-42,aimTouchY,aimTouchX-18,aimTouchY,p);c.drawLine(aimTouchX+18,aimTouchY,aimTouchX+42,aimTouchY,p);
-                c.drawLine(aimTouchX,aimTouchY-42,aimTouchX,aimTouchY-18,p);c.drawLine(aimTouchX,aimTouchY+18,aimTouchX,aimTouchY+42,p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(2f,2.5f*controlScale()));
+                p.setColor(0x668DCCFF);
+                float rr=32f*controlScale();
+                float arm=48f*controlScale();
+                c.drawCircle(aimTouchX,aimTouchY,rr,p);
+                c.drawLine(aimTouchX-arm,aimTouchY,aimTouchX-rr,aimTouchY,p);
+                c.drawLine(aimTouchX+rr,aimTouchY,aimTouchX+arm,aimTouchY,p);
+                c.drawLine(aimTouchX,aimTouchY-arm,aimTouchX,aimTouchY-rr,p);
+                c.drawLine(aimTouchX,aimTouchY+rr,aimTouchX,aimTouchY+arm,p);
                 p.setStyle(Paint.Style.FILL);
             }
         }
 
         private void button(Canvas c,float x,float y,float r,String text,boolean pressed){
-            p.setStyle(Paint.Style.FILL);p.setColor(pressed?0xE05C6A55:0xA94A4038);c.drawCircle(x,y,r,p);
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xDDD9C889);c.drawCircle(x,y,r,p);
-            p.setStyle(Paint.Style.FILL);p.setColor(Color.WHITE);p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.CENTER);
-            p.setTextSize(Math.max(10,r*.23f));c.drawText(text,x,y+5,p);p.setTypeface(null);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(pressed?0xE05C6A55:0xA94A4038);
+            c.drawCircle(x,y,r,p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(3f,3f*controlScale()));
+            p.setColor(0xDDD9C889);
+            c.drawCircle(x,y,r,p);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.WHITE);
+            p.setTypeface(PaintCompat.BOLD);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTextSize(Math.max(10f,r*.22f));
+            c.drawText(text,x,y+5f*controlScale(),p);
+            p.setTypeface(null);
         }
 
         private void drawPause(Canvas c){
@@ -498,16 +558,41 @@ public final class MainActivity extends Activity {
 
         private boolean inside(float x,float y,float cx,float cy,float r){return Math.hypot(x-cx,y-cy)<=r;}
         private void beginPointer(MotionEvent e,int index){
-            float x=e.getX(index),y=e.getY(index),w=getWidth(),h=getHeight();
+            float x=e.getX(index),y=e.getY(index);
             int id=e.getPointerId(index);
-            float fireR=minDim()*.115f,swordR=minDim()*.085f;
-            if(inside(x,y,w*.83f,h*.73f,fireR)){firePointer=id;input.fire=true;return;}
-            if(inside(x,y,w*.67f,h*.90f,swordR)){input.sword=true;return;}
-            if(inside(x,y,w*.78f,h*.90f,swordR)){input.grenade=true;return;}
-            if(inside(x,y,w*.89f,h*.90f,swordR)){input.reload=true;return;}
-            if(x<w*.43f&&y>HUD){joyPointer=id;joyX=joyBaseX=x;joyY=joyBaseY=y;input.moveX=0;input.moveY=0;return;}
-            if(x>w*.43f&&y>HUD){
-                aimPointer=id;input.aimActive=true;setAim(x,y);return;
+            if(inside(x,y,fireX(),fireY(),fireRadius())&&firePointer<0){
+                firePointer=id;
+                input.fire=true;
+                return;
+            }
+            if(inside(x,y,swordX(),actionY(),actionRadius())&&swordPointer<0){
+                swordPointer=id;
+                input.sword=true;
+                return;
+            }
+            if(inside(x,y,bombX(),actionY(),actionRadius())&&grenadePointer<0){
+                grenadePointer=id;
+                input.grenade=true;
+                return;
+            }
+            if(inside(x,y,reloadX(),actionY(),actionRadius())&&reloadPointer<0){
+                reloadPointer=id;
+                input.reload=true;
+                return;
+            }
+            if(x<getWidth()*.48f&&y>HUD&&joyPointer<0){
+                joyPointer=id;
+                joyActive=true;
+                joyX=joyBaseX=x;
+                joyY=joyBaseY=y;
+                input.moveX=0;
+                input.moveY=0;
+                return;
+            }
+            if(x>getWidth()*.48f&&y>HUD&&aimPointer<0){
+                aimPointer=id;
+                input.aimActive=true;
+                setAim(x,y);
             }
         }
 
@@ -519,26 +604,39 @@ public final class MainActivity extends Activity {
         }
 
         private void setJoy(float x,float y){
-            float max=minDim()*.125f,dx=x-joyBaseX,dy=y-joyBaseY,l=(float)Math.hypot(dx,dy),u=Math.min(max,l);
-            if(l>0){joyX=joyBaseX+dx/l*u;joyY=joyBaseY+dy/l*u;}
-            input.moveX=(joyX-joyBaseX)/max;input.moveY=(joyY-joyBaseY)/max;
+            float max=joystickRadius(),dx=x-joyBaseX,dy=y-joyBaseY,l=(float)Math.hypot(dx,dy),u=Math.min(max,l);
+            if(l>0){
+                joyX=joyBaseX+dx/l*u;
+                joyY=joyBaseY+dy/l*u;
+            }
+            input.moveX=(joyX-joyBaseX)/max;
+            input.moveY=(joyY-joyBaseY)/max;
         }
 
         @Override public boolean onTouchEvent(MotionEvent e){
             int a=e.getActionMasked();
             if(core.gameOver()){
-                if(a==MotionEvent.ACTION_DOWN&&e.getX()>getWidth()*.30f&&e.getX()<getWidth()*.70f&&e.getY()>getHeight()*.45f&&e.getY()<getHeight()*.72f){
-                    core.reset();paused=false;clearInput();
+                if(a==MotionEvent.ACTION_DOWN&&e.getX()>getWidth()*.30f&&e.getX()<getWidth()*.70f
+                        &&e.getY()>getHeight()*.45f&&e.getY()<getHeight()*.72f){
+                    core.reset();
+                    paused=false;
+                    clearInput();
                 }
                 return true;
             }
             if(paused){
-                if(a==MotionEvent.ACTION_DOWN){paused=false;clearInput();}
+                if(a==MotionEvent.ACTION_DOWN){
+                    paused=false;
+                    clearInput();
+                }
                 return true;
             }
+
             if(a==MotionEvent.ACTION_DOWN||a==MotionEvent.ACTION_POINTER_DOWN){
-                beginPointer(e,e.getActionIndex());return true;
+                beginPointer(e,e.getActionIndex());
+                return true;
             }
+
             if(a==MotionEvent.ACTION_MOVE){
                 for(int i=0;i<e.getPointerCount();i++){
                     int id=e.getPointerId(i);
@@ -547,20 +645,55 @@ public final class MainActivity extends Activity {
                 }
                 return true;
             }
-            if(a==MotionEvent.ACTION_UP||a==MotionEvent.ACTION_POINTER_UP||a==MotionEvent.ACTION_CANCEL){
+
+            if(a==MotionEvent.ACTION_UP||a==MotionEvent.ACTION_POINTER_UP){
                 int id=e.getPointerId(e.getActionIndex());
-                if(id==joyPointer){joyPointer=-1;joyX=joyBaseX;joyY=joyBaseY;input.moveX=input.moveY=0;}
-                if(id==aimPointer){aimPointer=-1;input.aimActive=false;input.aimX=input.aimY=0;}
-                if(id==firePointer){firePointer=-1;input.fire=false;}
-                input.sword=false;input.grenade=false;input.reload=false;
+                if(id==joyPointer){
+                    joyPointer=-1;
+                    joyActive=false;
+                    joyX=joyBaseX;
+                    joyY=joyBaseY;
+                    input.moveX=input.moveY=0;
+                }
+                if(id==aimPointer){
+                    aimPointer=-1;
+                    input.aimActive=false;
+                    input.aimX=input.aimY=0;
+                }
+                if(id==firePointer){
+                    firePointer=-1;
+                    input.fire=false;
+                }
+                if(id==swordPointer){
+                    swordPointer=-1;
+                    input.sword=false;
+                }
+                if(id==grenadePointer){
+                    grenadePointer=-1;
+                    input.grenade=false;
+                }
+                if(id==reloadPointer){
+                    reloadPointer=-1;
+                    input.reload=false;
+                }
+                return true;
+            }
+
+            if(a==MotionEvent.ACTION_CANCEL){
+                clearInput();
                 return true;
             }
             return true;
         }
 
         private void clearInput(){
-            joyPointer=firePointer=aimPointer=-1;joyX=joyBaseX;joyY=joyBaseY;
-            input.moveX=input.moveY=input.aimX=input.aimY=0;input.aimActive=false;
+            joyPointer=firePointer=aimPointer=-1;
+            swordPointer=grenadePointer=reloadPointer=-1;
+            joyActive=false;
+            joyX=joyBaseX;
+            joyY=joyBaseY;
+            input.moveX=input.moveY=input.aimX=input.aimY=0;
+            input.aimActive=false;
             input.fire=input.sword=input.grenade=input.reload=false;
         }
 
