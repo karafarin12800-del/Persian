@@ -23,3 +23,6 @@ Android CI uses the committed Gradle Wrapper and current Android SDK package nam
 
 ## Build verification
 The current CI run is used to verify the latest gameplay revision before the APK is handed off for phone testing.
+
+## Visual overhaul
+The latest gameplay revision uses the redesigned Persian city, character silhouettes, combat feedback, HUD and touch controls.
