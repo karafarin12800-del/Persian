@@ -66,15 +66,15 @@ public final class MainActivity extends Activity {
         private float dp(float v){return v*getResources().getDisplayMetrics().density;}
         private float joystickRadius(){return dp(72f);}
         private float fireVisualRadius(){return dp(58f);}
-        private float fireHitRadius(){return dp(72f);}
+        private float fireHitRadius(){return dp(64f);}
         private float actionVisualRadius(){return dp(48f);}
-        private float actionHitRadius(){return dp(60f);}
+        private float actionHitRadius(){return dp(44f);}
         private float fireX(){return getWidth()-dp(110f);}
-        private float fireY(){return getHeight()-dp(205f);}
+        private float fireY(){return getHeight()-dp(225f);}
         private float actionY(){return getHeight()-dp(80f);}
-        private float swordX(){return getWidth()-dp(238f);}
-        private float bombX(){return getWidth()-dp(134f);}
-        private float reloadX(){return getWidth()-dp(78f);}
+        private float swordX(){return getWidth()-dp(280f);}
+        private float bombX(){return getWidth()-dp(175f);}
+        private float reloadX(){return getWidth()-dp(70f);}
         private float idleJoyX(){return dp(120f);}
         private float idleJoyY(){return getHeight()-dp(105f);}
 
@@ -433,10 +433,10 @@ public final class MainActivity extends Activity {
         }
 
         private void drawMiniMap(Canvas c){
-            float size=Math.min(getWidth()*.24f,190),left=getWidth()-size-18,top=HUD+14;
-            p.setStyle(Paint.Style.FILL);p.setColor(0xD91C241F);c.drawRoundRect(new RectF(left,top,left+size,top+size*.78f),16,16,p);
+            float size=Math.min(getWidth()*.30f,250),left=getWidth()-size-16,top=HUD+12;
+            p.setStyle(Paint.Style.FILL);p.setColor(0xD91C241F);c.drawRoundRect(new RectF(left,top,left+size,top+size*.82f),16,16,p);
             p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.5f);p.setColor(0xD7D9C889);c.drawRoundRect(new RectF(left,top,left+size,top+size*.78f),16,16,p);
-            float mx=size/WorldMap.SIZE,my=size*.78f/WorldMap.SIZE;
+            float mx=size/WorldMap.SIZE,my=size*.82f/WorldMap.SIZE;
             for(WorldMap.Road r:world.roads()){
                 p.setColor(0x997D7565);p.setStrokeWidth(Math.max(1.5f,r.width*mx*.42f));
                 c.drawLine(left+r.x1*mx,top+r.y1*my,left+r.x2*mx,top+r.y2*my,p);
