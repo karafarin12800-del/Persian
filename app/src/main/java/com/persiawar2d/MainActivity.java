@@ -737,22 +737,22 @@ public final class MainActivity extends Activity {
         }
 
         private void drawMiniMap(Canvas c){
-            // Larger tactical map: readable at phone scale, but still leaves gameplay visible.
-            float size=Math.min(getWidth()*.37f,dp(330f));
+            // Compact tactical map: roughly half the previous footprint, with a translucent HUD treatment.
+            float size=Math.min(getWidth()*.19f,dp(170f));
             float mapH=size*.86f;
-            float left=getWidth()-size-dp(14f),top=HUD+dp(10f);
-            float radius=dp(18f);
+            float left=getWidth()-size-dp(10f),top=HUD+dp(8f);
+            float radius=dp(12f);
 
-            // Outer shadow / frame.
+            // Soft transparent shadow and glass frame.
             p.setStyle(Paint.Style.FILL);
-            p.setColor(0x65000000);
-            c.drawRoundRect(new RectF(left+dp(4f),top+dp(5f),left+size+dp(4f),top+mapH+dp(5f)),radius,radius,p);
-            p.setColor(0xE318211D);
+            p.setColor(0x35000000);
+            c.drawRoundRect(new RectF(left+dp(3f),top+dp(4f),left+size+dp(3f),top+mapH+dp(4f)),radius,radius,p);
+            p.setColor(0x7A18211D);
             c.drawRoundRect(new RectF(left,top,left+size,top+mapH),radius,radius,p);
 
-            // Inner map surface.
-            p.setColor(0xFF25322C);
-            c.drawRoundRect(new RectF(left+dp(7f),top+dp(7f),left+size-dp(7f),top+mapH-dp(7f)),radius*.75f,radius*.75f,p);
+            // Translucent map surface so the battlefield remains visible underneath.
+            p.setColor(0x6E25322C);
+            c.drawRoundRect(new RectF(left+dp(5f),top+dp(5f),left+size-dp(5f),top+mapH-dp(5f)),radius*.72f,radius*.72f,p);
 
             float innerL=left+dp(10f),innerT=top+dp(27f),innerW=size-dp(20f),innerH=mapH-dp(36f);
             float mx=innerW/WorldMap.SIZE,my=innerH/WorldMap.SIZE;
@@ -836,17 +836,17 @@ public final class MainActivity extends Activity {
             p.setColor(0xFFF0D178);
             p.setTypeface(PaintCompat.BOLD);
             p.setTextAlign(Paint.Align.LEFT);
-            p.setTextSize(dp(13f));
-            c.drawText("TACTICAL MAP",left+dp(14f),top+dp(18f),p);
+            p.setTextSize(dp(9f));
+            c.drawText("TACTICAL MAP",left+dp(9f),top+dp(13f),p);
             p.setColor(0xFFDCE5DF);
             p.setTypeface(null);
             p.setTextSize(dp(9f));
-            c.drawText("CITY GRID",left+dp(14f),top+dp(29f),p);
+            c.drawText("CITY GRID",left+dp(9f),top+dp(22f),p);
             p.setTextAlign(Paint.Align.RIGHT);
             p.setTypeface(PaintCompat.BOLD);
-            p.setTextSize(dp(10f));
-            c.drawText("N",left+size-dp(15f),top+dp(18f),p);
-            c.drawText("ZONE",left+size-dp(15f),top+dp(30f),p);
+            p.setTextSize(dp(8f));
+            c.drawText("N",left+size-dp(9f),top+dp(13f),p);
+            c.drawText("ZONE",left+size-dp(9f),top+dp(22f),p);
             p.setTypeface(null);
             p.setTextAlign(Paint.Align.LEFT);
         }
