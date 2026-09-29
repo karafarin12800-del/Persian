@@ -71,7 +71,7 @@ public final class GameCore {
 
     private void setProfile(){
         player.skin=skin;player.maxHp=100;player.hp=100;player.shield=20;player.speed=360;
-        player.ammo=12;player.reserveAmmo=90;player.grenades=3;player.score=0;
+        player.ammo=24;player.reserveAmmo=180;player.grenades=3;player.score=0;
         if("blue".equals(skin)){player.maxHp=105;player.hp=105;player.shield=35;player.speed=335;}
         else if("red".equals(skin)){player.maxHp=95;player.hp=95;player.shield=10;player.speed=390;}
         else if("darius".equals(skin)){player.maxHp=120;player.hp=120;player.shield=45;player.speed=345;}
@@ -170,8 +170,8 @@ public final class GameCore {
     }
 
     public void reload(){
-        if(player.ammo>=12||player.reserveAmmo<=0||player.dead)return;
-        int n=Math.min(12-player.ammo,player.reserveAmmo);player.ammo+=n;player.reserveAmmo-=n;
+        if(player.ammo>=24||player.reserveAmmo<=0||player.dead)return;
+        int n=Math.min(24-player.ammo,player.reserveAmmo);player.ammo+=n;player.reserveAmmo-=n;
     }
 
     public void melee(){melee(null);}
@@ -294,7 +294,7 @@ public final class GameCore {
         for(Iterator<Pickup>it=pickups.iterator();it.hasNext();){
             Pickup p=it.next();if(dist(player.x,player.y,p.x,p.y)>85)continue;
             switch(p.type){
-                case AMMO:player.reserveAmmo=Math.min(180,player.reserveAmmo+36);break;
+                case AMMO:player.reserveAmmo=Math.min(360,player.reserveAmmo+60);break;
                 case MEDKIT:player.hp=Math.min(player.maxHp,player.hp+35);break;
                 case GRENADE:player.grenades=Math.min(9,player.grenades+1);break;
                 case SHIELD:player.shield=Math.min(100,player.shield+30);break;
