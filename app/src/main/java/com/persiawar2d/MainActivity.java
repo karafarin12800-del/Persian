@@ -347,17 +347,20 @@ public final class MainActivity extends Activity {
             p.setColor(0xFFD2B56E);
             c.drawCircle(x+12.5f*u,y-5*u,3*u,p);
 
-            // Legs: layered tactical trousers, knee guards, boots.
+            // Legs: layered tactical trousers, knee guards, boots. Walking phase shifts each leg
+            // independently so movement reads as a real stride rather than sliding.
+            float stride=player?Math.sin(core.player().walkPhase)*7.5f*core.player().walkBlend:0f;
+            float stride2=player?Math.sin(core.player().walkPhase+Math.PI)*7.5f*core.player().walkBlend:0f;
             int pants=player?0xFF273D3A:(type==3?0xFF332628:type==2?0xFF403A50:0xFF3A2C35);
             p.setColor(pants);
-            c.drawRoundRect(new RectF(x-14*u,y+13*u,x-2*u,y+38*u),4*u,4*u,p);
-            c.drawRoundRect(new RectF(x+2*u,y+13*u,x+14*u,y+38*u),4*u,4*u,p);
+            c.drawRoundRect(new RectF(x-14*u+stride*u,y+13*u+stride2*u,x-2*u+stride*u,y+38*u+stride2*u),4*u,4*u,p);
+            c.drawRoundRect(new RectF(x+2*u+stride2*u,y+13*u+stride*u,x+14*u+stride2*u,y+38*u+stride*u),4*u,4*u,p);
             p.setColor(0xFF151A19);
-            c.drawRoundRect(new RectF(x-17*u,y+34*u,x-1*u,y+44*u),5*u,5*u,p);
-            c.drawRoundRect(new RectF(x+1*u,y+34*u,x+17*u,y+44*u),5*u,5*u,p);
+            c.drawRoundRect(new RectF(x-17*u+stride*u,y+34*u+stride2*u,x-1*u+stride*u,y+44*u+stride2*u),5*u,5*u,p);
+            c.drawRoundRect(new RectF(x+1*u+stride2*u,y+34*u+stride*u,x+17*u+stride2*u,y+44*u+stride*u),5*u,5*u,p);
             p.setColor(player?0xFF526963:0xFF59525A);
-            c.drawRoundRect(new RectF(x-13*u,y+22*u,x-4*u,y+30*u),3*u,3*u,p);
-            c.drawRoundRect(new RectF(x+4*u,y+22*u,x+13*u,y+30*u),3*u,3*u,p);
+            c.drawRoundRect(new RectF(x-13*u+stride*u,y+22*u+stride2*u,x-4*u+stride*u,y+30*u+stride2*u),3*u,3*u,p);
+            c.drawRoundRect(new RectF(x+4*u+stride2*u,y+22*u+stride*u,x+13*u+stride2*u,y+30*u+stride*u),3*u,3*u,p);
             p.setColor(0xFF9B845C);
             c.drawRect(x-11*u,y+25*u,x-5*u,y+27*u,p);
             c.drawRect(x+5*u,y+25*u,x+11*u,y+27*u,p);
@@ -428,8 +431,9 @@ public final class MainActivity extends Activity {
             c.drawCircle(x+16*u,y-27*u,3.2f*u,p);
 
             // Arms are aimed with the weapon; the torso itself remains stable.
-            float fx=player?core.player().facingX:1f;
-            float fy=player?core.player().facingY*PITCH:0f;
+            float[] weaponDir=player?core.getWeaponAimDirection():new float[]{core.player().facingX,core.player().facingY};
+            float fx=player?weaponDir[0]:1f;
+            float fy=player?weaponDir[1]*PITCH:0f;
             float fl=Math.max(.001f,(float)Math.hypot(fx,fy));
             fx/=fl;fy/=fl;
             float px=-fy,py=fx;
