@@ -232,16 +232,26 @@ public final class MainActivity extends Activity {
 
         private void drawNature(Canvas c){
             float s=sc();
-            int treeStep=Math.max(1,world.trees().size()/72);
+            int treeStep=Math.max(1,world.trees().size()/84);
             for(int i=0;i<world.trees().size();i+=treeStep){
                 WorldMap.Prop t=world.trees().get(i);
-                if(Math.abs(t.x-core.player().x)>1900||Math.abs(t.y-core.player().y)>1100)continue;
+                if(Math.abs(t.x-core.player().x)>1800||Math.abs(t.y-core.player().y)>1050)continue;
                 float x=sx(t.x),y=sy(t.y),r=(18+t.size*.58f)*s;
-                p.setColor(0x44000000);c.drawOval(new RectF(x-r*.7f,y+r*.15f,x+r*.7f,y+r*.65f),p);
-                p.setColor(0xFF70472E);c.drawRoundRect(new RectF(x-4*s,y-r*.12f,x+4*s,y+r*.42f),3*s,3*s,p);
-                p.setColor(0xFF24563A);c.drawCircle(x,y-r*.15f,r,p);
-                p.setColor(0xFF33744A);c.drawCircle(x-r*.35f,y-r*.35f,r*.68f,p);
-                p.setColor(0xFF43895A);c.drawCircle(x+r*.32f,y-r*.38f,r*.58f,p);
+                p.setColor(0x44000000);c.drawOval(new RectF(x-r*.75f,y+r*.18f,x+r*.75f,y+r*.65f),p);
+                p.setColor(0xFF70472E);c.drawRoundRect(new RectF(x-4*s,y-r*.05f,x+4*s,y+r*.46f),3*s,3*s,p);
+                p.setColor(0xFF1F5539);c.drawCircle(x,y-r*.18f,r,p);
+                p.setColor(0xFF34784A);c.drawCircle(x-r*.34f,y-r*.35f,r*.67f,p);
+                p.setColor(0xFF4B9560);c.drawCircle(x+r*.32f,y-r*.38f,r*.55f,p);
+            }
+            int bushStep=Math.max(1,world.bushes().size()/70);
+            for(int i=0;i<world.bushes().size();i+=bushStep){
+                WorldMap.Prop b=world.bushes().get(i);
+                if(Math.abs(b.x-core.player().x)>1800||Math.abs(b.y-core.player().y)>1050)continue;
+                float x=sx(b.x),y=sy(b.y),r=Math.max(3,b.size*.75f*s);
+                p.setColor(0x44352C20);c.drawOval(new RectF(x-r,y+r*.15f,x+r,y+r*.55f),p);
+                p.setColor(0xFF2C6841);c.drawCircle(x,y,r,p);
+                p.setColor(0xFF438A56);c.drawCircle(x-r*.38f,y-r*.25f,r*.62f,p);
+                c.drawCircle(x+r*.35f,y-r*.18f,r*.55f,p);
             }
         }
 
@@ -304,36 +314,68 @@ public final class MainActivity extends Activity {
         private void drawWarrior(Canvas c,float x,float y,float s,int type,int armor,boolean player){
             float k=player?1.45f:(type==3?1.52f:type==2?1.38f:1.28f);
             p.setStyle(Paint.Style.FILL);
-            p.setColor(0x52000000);c.drawOval(new RectF(x-22*s*k,y+22*s*k,x+22*s*k,y+34*s*k),p);
 
-            p.setColor(player?0xFF4F6F66:(type==3?0xFF5B3030:type==2?0xFF493D55:0xFF6C3037));
-            c.drawRoundRect(new RectF(x-17*s*k,y-13*s*k,x+17*s*k,y+26*s*k),8*s*k,8*s*k,p);
+            // Ground shadow.
+            p.setColor(0x66000000);
+            c.drawOval(new RectF(x-25*s*k,y+22*s*k,x+25*s*k,y+36*s*k),p);
 
+            // Legs and boots.
+            p.setColor(player?0xFF263C3A:(type==3?0xFF2C2020:0xFF33252A));
+            c.drawRoundRect(new RectF(x-13*s*k,y+15*s*k,x-3*s*k,y+39*s*k),4*s*k,4*s*k,p);
+            c.drawRoundRect(new RectF(x+3*s*k,y+15*s*k,x+13*s*k,y+39*s*k),4*s*k,4*s*k,p);
+            p.setColor(0xFF1B1D1C);
+            c.drawRoundRect(new RectF(x-16*s*k,y+33*s*k,x-2*s*k,y+42*s*k),4*s*k,4*s*k,p);
+            c.drawRoundRect(new RectF(x+2*s*k,y+33*s*k,x+16*s*k,y+42*s*k),4*s*k,4*s*k,p);
+
+            // Tunic / cuirass.
+            p.setColor(player?0xFF4F756C:(type==3?0xFF653431:type==2?0xFF514264:0xFF763B43));
+            c.drawRoundRect(new RectF(x-19*s*k,y-13*s*k,x+19*s*k,y+25*s*k),9*s*k,9*s*k,p);
             p.setColor(armor);
-            c.drawRect(x-14*s*k,y-4*s*k,x+14*s*k,y+9*s*k,p);
+            c.drawRoundRect(new RectF(x-16*s*k,y-4*s*k,x+16*s*k,y+10*s*k),3*s*k,3*s*k,p);
+            p.setColor(0xFFB78A49);
+            c.drawRect(x-15*s*k,y+10*s*k,x+15*s*k,y+13*s*k,p);
 
-            p.setColor(player?0xFFD6B86E:0xFFE2C39A);
-            c.drawCircle(x,y-29*s*k,14*s*k,p);
+            // Shoulder guards.
+            p.setColor(player?0xFFC5A55C:0xFF8D6A45);
+            c.drawCircle(x-18*s*k,y-5*s*k,7*s*k,p);
+            c.drawCircle(x+18*s*k,y-5*s*k,7*s*k,p);
 
+            // Head and Persian helmet.
+            p.setColor(player?0xFFD6B27A:0xFFE0BE93);
+            c.drawCircle(x,y-29*s*k,15*s*k,p);
             p.setColor(0xFF34261C);
-            c.drawRect(x-16*s*k,y-38*s*k,x+16*s*k,y-30*s*k,p);
-            path.reset();path.moveTo(x-4*s*k,y-47*s*k);path.lineTo(x+3*s*k,y-68*s*k);path.lineTo(x+10*s*k,y-46*s*k);path.close();
-            p.setColor(player?0xFFC99B4E:0xFF6C4830);c.drawPath(path,p);
+            c.drawRect(x-17*s*k,y-38*s*k,x+17*s*k,y-30*s*k,p);
+            path.reset();
+            path.moveTo(x-14*s*k,y-38*s*k);
+            path.lineTo(x-5*s*k,y-52*s*k);
+            path.lineTo(x+3*s*k,y-46*s*k);
+            path.lineTo(x+10*s*k,y-54*s*k);
+            path.lineTo(x+16*s*k,y-37*s*k);
+            path.close();
+            p.setColor(player?0xFFC99B4E:(type==3?0xFF9A7540:0xFF6C4830));
+            c.drawPath(path,p);
+            p.setColor(0xFF2A201A);
+            c.drawCircle(x-5*s*k,y-28*s*k,2*s*k,p);c.drawCircle(x+5*s*k,y-28*s*k,2*s*k,p);
 
-            p.setColor(player?0xFFB9C7C5:0xFF8B96A0);
-            c.drawRoundRect(new RectF(x-28*s*k,y-7*s*k,x-18*s*k,y+18*s*k),5*s*k,5*s*k,p);
-            p.setColor(0xFFD0B56B);c.drawRect(x-26*s*k,y+3*s*k,x-20*s*k,y+16*s*k,p);
+            // Shield / forearm.
+            p.setColor(player?0xFF9EB8B0:0xFF7E8B91);
+            c.drawRoundRect(new RectF(x-31*s*k,y-8*s*k,x-18*s*k,y+21*s*k),6*s*k,6*s*k,p);
+            p.setColor(0xFFD1B267);
+            c.drawCircle(x-24*s*k,y+7*s*k,5*s*k,p);
 
-            p.setColor(type==2&&!player?0xFFD4B05B:0xFFB9C1C1);
-            float weaponY=14*s*k;
-            c.drawRect(x+13*s*k,y+weaponY,x+18*s*k,y+weaponY+34*s*k,p);
-            p.setColor(0xFF5B3D28);c.drawRect(x+12*s*k,y+8*s*k,x+19*s*k,y+22*s*k,p);
+            // Weapon.
+            p.setColor(type==2&&!player?0xFFD4B05B:0xFFC1C7C6);
+            float weaponY=10*s*k;
+            c.drawRoundRect(new RectF(x+14*s*k,y+weaponY,x+20*s*k,y+weaponY+36*s*k),3*s*k,3*s*k,p);
+            p.setColor(0xFF5B3D28);
+            c.drawRoundRect(new RectF(x+12*s*k,y+5*s*k,x+21*s*k,y+20*s*k),3*s*k,3*s*k,p);
 
             if(type==2&&!player){
                 p.setColor(0xFF8F6236);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,2.5f*s));
-                c.drawArc(new RectF(x+10*s*k,y-1*s*k,x+36*s*k,y+29*s*k),-70,140,false,p);p.setStyle(Paint.Style.FILL);
+                c.drawArc(new RectF(x+10*s*k,y-1*s*k,x+38*s*k,y+31*s*k),-70,140,false,p);p.setStyle(Paint.Style.FILL);
             }else if(type==3&&!player){
-                p.setColor(0xFF9B6A3A);c.drawRoundRect(new RectF(x+14*s*k,y+1*s*k,x+22*s*k,y+42*s*k),3*s*k,3*s*k,p);
+                p.setColor(0xFF9B6A3A);
+                c.drawRoundRect(new RectF(x+14*s*k,y+1*s*k,x+23*s*k,y+43*s*k),3*s*k,3*s*k,p);
             }
         }
 
