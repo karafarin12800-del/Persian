@@ -25,3 +25,6 @@
 رندر، ورودی و منطق بازی از هم جدا هستند تا بعداً سیستم Inventory، مرحله، مأموریت و Multiplayer بدون شکستن هسته اضافه شوند.
 
 جزئیات در `ARCHITECTURE.md` ثبت شده است.
+
+
+<!-- CI art validation: player art v2 build. -->
