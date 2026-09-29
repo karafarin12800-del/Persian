@@ -70,8 +70,8 @@ public final class MainActivity extends Activity {
         private float actionVisualRadius(){return dp(48f);}
         private float actionHitRadius(){return dp(44f);}
         private float fireX(){return getWidth()-dp(110f);}
-        private float fireY(){return getHeight()-dp(350f);}
-        private float actionY(){return getHeight()-dp(230f);}
+        private float fireY(){return getHeight()-dp(205f);}
+        private float actionY(){return getHeight()-dp(80f);}
         private float swordX(){return getWidth()-dp(280f);}
         private float bombX(){return getWidth()-dp(175f);}
         private float reloadX(){return getWidth()-dp(70f);}
