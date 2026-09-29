@@ -3,6 +3,8 @@ name: PersiaWar2D Android CI
 on:
   push:
     branches: [main, unity-2.5d]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
