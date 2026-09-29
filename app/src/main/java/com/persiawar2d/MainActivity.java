@@ -351,8 +351,8 @@ public final class MainActivity extends Activity {
 
             // Legs: layered tactical trousers, knee guards, boots. Walking phase shifts each leg
             // independently so movement reads as a real stride rather than sliding.
-            float stride=player?Math.sin(core.player().walkPhase)*7.5f*core.player().walkBlend:0f;
-            float stride2=player?Math.sin(core.player().walkPhase+Math.PI)*7.5f*core.player().walkBlend:0f;
+            float stride=player?(float)Math.sin(core.player().walkPhase)*7.5f*core.player().walkBlend:0f;
+            float stride2=player?(float)Math.sin(core.player().walkPhase+Math.PI)*7.5f*core.player().walkBlend:0f;
             float mfx=player?core.player().facingX:0f, mfy=player?core.player().facingY:0f;
             float fpx=-mfy, fpy=mfx;
             float leg1x=mfx*stride, leg1y=mfy*stride*PITCH;
@@ -447,7 +447,7 @@ public final class MainActivity extends Activity {
             float px=-fy,py=fx;
 
             // Forearms and gloves. A subtle counter-swing keeps the upper body alive while walking.
-            float armSwing=player?Math.sin(core.player().walkPhase+Math.PI)*3.2f*core.player().walkBlend:0f;
+            float armSwing=player?(float)Math.sin(core.player().walkPhase+Math.PI)*3.2f*core.player().walkBlend:0f;
             p.setStrokeCap(Paint.Cap.ROUND);
             p.setStrokeWidth(Math.max(7f,9f*u));
             p.setColor(player?0xFF4C625D:0xFF51454C);
