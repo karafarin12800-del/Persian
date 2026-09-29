@@ -329,6 +329,8 @@ public final class MainActivity extends Activity {
         private void drawWarrior(Canvas c,float x,float y,float s,int type,int armor,boolean player){
             final float k=player?1.50f:(type==3?1.46f:type==2?1.38f:1.30f);
             final float u=s*k;
+            float bob=player?(float)Math.sin(core.player().bodyBob)*(.75f+core.player().walkBlend*1.6f)*u:0f;
+            y+=bob;
             p.setStyle(Paint.Style.FILL);
 
             // Deep, soft contact shadow gives the soldier a real 2.5D footprint.
@@ -351,16 +353,22 @@ public final class MainActivity extends Activity {
             // independently so movement reads as a real stride rather than sliding.
             float stride=player?Math.sin(core.player().walkPhase)*7.5f*core.player().walkBlend:0f;
             float stride2=player?Math.sin(core.player().walkPhase+Math.PI)*7.5f*core.player().walkBlend:0f;
+            float mfx=player?core.player().moveX:0f, mfy=player?core.player().moveY:0f;
+            float fpx=-mfy, fpy=mfx;
+            float leg1x=mfx*stride, leg1y=mfy*stride*PITCH;
+            float leg2x=mfx*stride2, leg2y=mfy*stride2*PITCH;
+            float side=5.5f;
+            float l1sx=fpx*side,l1sy=fpy*side*PITCH,l2sx=-fpx*side,l2sy=-fpy*side*PITCH;
             int pants=player?0xFF273D3A:(type==3?0xFF332628:type==2?0xFF403A50:0xFF3A2C35);
             p.setColor(pants);
-            c.drawRoundRect(new RectF(x-14*u+stride*u,y+13*u+stride2*u,x-2*u+stride*u,y+38*u+stride2*u),4*u,4*u,p);
-            c.drawRoundRect(new RectF(x+2*u+stride2*u,y+13*u+stride*u,x+14*u+stride2*u,y+38*u+stride*u),4*u,4*u,p);
+            c.drawRoundRect(new RectF(x-14*u+leg1x+l1sx*u,y+13*u+leg1y+l1sy*u,x-2*u+leg1x+l1sx*u,y+38*u+leg1y+l1sy*u),4*u,4*u,p);
+            c.drawRoundRect(new RectF(x+2*u+leg2x+l2sx*u,y+13*u+leg2y+l2sy*u,x+14*u+leg2x+l2sx*u,y+38*u+leg2y+l2sy*u),4*u,4*u,p);
             p.setColor(0xFF151A19);
-            c.drawRoundRect(new RectF(x-17*u+stride*u,y+34*u+stride2*u,x-1*u+stride*u,y+44*u+stride2*u),5*u,5*u,p);
-            c.drawRoundRect(new RectF(x+1*u+stride2*u,y+34*u+stride*u,x+17*u+stride2*u,y+44*u+stride*u),5*u,5*u,p);
+            c.drawRoundRect(new RectF(x-17*u+leg1x+l1sx*u,y+34*u+leg1y+l1sy*u,x-1*u+leg1x+l1sx*u,y+44*u+leg1y+l1sy*u),5*u,5*u,p);
+            c.drawRoundRect(new RectF(x+1*u+leg2x+l2sx*u,y+34*u+leg2y+l2sy*u,x+17*u+leg2x+l2sx*u,y+44*u+leg2y+l2sy*u),5*u,5*u,p);
             p.setColor(player?0xFF526963:0xFF59525A);
-            c.drawRoundRect(new RectF(x-13*u+stride*u,y+22*u+stride2*u,x-4*u+stride*u,y+30*u+stride2*u),3*u,3*u,p);
-            c.drawRoundRect(new RectF(x+4*u+stride2*u,y+22*u+stride*u,x+13*u+stride2*u,y+30*u+stride*u),3*u,3*u,p);
+            c.drawRoundRect(new RectF(x-13*u+leg1x+l1sx*u,y+22*u+leg1y+l1sy*u,x-4*u+leg1x+l1sx*u,y+30*u+leg1y+l1sy*u),3*u,3*u,p);
+            c.drawRoundRect(new RectF(x+4*u+leg2x+l2sx*u,y+22*u+leg2y+l2sy*u,x+13*u+leg2x+l2sx*u,y+30*u+leg2y+l2sy*u),3*u,3*u,p);
             p.setColor(0xFF9B845C);
             c.drawRect(x-11*u,y+25*u,x-5*u,y+27*u,p);
             c.drawRect(x+5*u,y+25*u,x+11*u,y+27*u,p);
@@ -438,12 +446,13 @@ public final class MainActivity extends Activity {
             fx/=fl;fy/=fl;
             float px=-fy,py=fx;
 
-            // Forearms and gloves.
+            // Forearms and gloves. A subtle counter-swing keeps the upper body alive while walking.
+            float armSwing=player?Math.sin(core.player().walkPhase+Math.PI)*3.2f*core.player().walkBlend:0f;
             p.setStrokeCap(Paint.Cap.ROUND);
             p.setStrokeWidth(Math.max(7f,9f*u));
             p.setColor(player?0xFF4C625D:0xFF51454C);
-            c.drawLine(x+px*14*u,y-2*u+py*14*u,x+fx*24*u+px*5*u,y+fy*24*u+py*5*u,p);
-            c.drawLine(x-px*14*u,y-2*u-py*14*u,x+fx*22*u-px*5*u,y+fy*22*u-py*5*u,p);
+            c.drawLine(x+px*(14+armSwing)*u,y-2*u+py*(14+armSwing)*u,x+fx*24*u+px*5*u,y+fy*24*u+py*5*u,p);
+            c.drawLine(x-px*(14-armSwing)*u,y-2*u-py*(14-armSwing)*u,x+fx*22*u-px*5*u,y+fy*22*u-py*5*u,p);
             p.setStrokeWidth(Math.max(4f,6f*u));
             p.setColor(0xFF171B1A);
             c.drawCircle(x+fx*25*u+px*5*u,y+fy*25*u+py*5*u,4*u,p);
@@ -454,7 +463,8 @@ public final class MainActivity extends Activity {
             float angle=(float)Math.toDegrees(Math.atan2(fy,fx));
             c.save();
             c.rotate(angle,x+fx*7*u,y+fy*7*u);
-            float wx=x+fx*7*u,wy=y+fy*7*u;
+            float kick=player?core.player().weaponKick*4.5f:0f;
+            float wx=x+fx*(7-kick)*u,wy=y+fy*(7-kick)*u;
             p.setStrokeCap(Paint.Cap.ROUND);
             p.setStrokeWidth(Math.max(4f,7*u));
             p.setColor(0xFF1A1F1E);
@@ -464,6 +474,13 @@ public final class MainActivity extends Activity {
             c.drawLine(wx+18*u,wy-1*u,wx+59*u,wy-1*u,p);
             p.setColor(0xFF0F1413);
             c.drawLine(wx-24*u,wy+7*u,wx+1*u,wy+7*u,p);
+            // Enlarged receiver, magazine, trigger housing and textured handguard.
+            p.setColor(0xFF2C3431);
+            c.drawRoundRect(new RectF(wx+5*u,wy-3*u,wx+25*u,wy+9*u),2.5f*u,2.5f*u,p);
+            p.setColor(0xFF111615);
+            path.reset();path.moveTo(wx+8*u,wy+8*u);path.lineTo(wx+19*u,wy+8*u);path.lineTo(wx+16*u,wy+20*u);path.lineTo(wx+9*u,wy+18*u);path.close();c.drawPath(path,p);
+            p.setColor(0xFF202725);
+            for(int gi=0;gi<4;gi++)c.drawRect(wx+26*u+gi*5*u,wy-4*u,wx+29*u+gi*5*u,wy+6*u,p);
             p.setStyle(Paint.Style.FILL);
             c.drawRoundRect(new RectF(wx+2*u,wy+2*u,wx+18*u,wy+12*u),3*u,3*u,p);
             p.setColor(0xFF8C6239);
@@ -471,12 +488,20 @@ public final class MainActivity extends Activity {
             c.drawRoundRect(new RectF(wx+24*u,wy+2*u,wx+40*u,wy+11*u),3*u,3*u,p);
             p.setColor(0xFFD6B45D);
             c.drawRect(wx+54*u,wy-3*u,wx+64*u,wy+2*u,p);
+            p.setColor(0xFFB7C0B9);
+            c.drawRect(wx+62*u,wy-5*u,wx+66*u,wy+5*u,p);
+            p.setColor(0xFF4D5651);
+            c.drawRect(wx-7*u,wy+18*u,wx+4*u,wy+20*u,p);
             p.setStrokeCap(Paint.Cap.BUTT);
             // Sight + charging handle.
             p.setColor(0xFF303936);
             c.drawRect(wx+29*u,wy-7*u,wx+35*u,wy-2*u,p);
             c.drawRect(wx+38*u,wy-8*u,wx+43*u,wy-3*u,p);
             c.restore();
+
+            // Sling line adds a final equipment detail without obscuring the silhouette.
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1.2f,1.8f*u));p.setColor(0xAA8C7654);
+            c.drawLine(x-px*17*u,y-py*17*u,x+fx*43*u,y+fy*43*u,p);p.setStyle(Paint.Style.FILL);
 
             // Small muzzle flash when the trigger is held.
             if(player && input.fire){
