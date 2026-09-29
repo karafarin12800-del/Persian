@@ -272,3 +272,5 @@ jobs:
           name: PersiaWar-Android-${{ github.sha }}
           path: build/Android/*.apk
           if-no-files-found: error
+
+# Build trigger: 2026-09-29 APK test
