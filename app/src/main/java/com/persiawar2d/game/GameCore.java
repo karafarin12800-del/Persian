@@ -136,7 +136,7 @@ public final class GameCore {
 
     private Enemy getManualAimTarget(Input in){
         float len=(float)Math.hypot(in.aimX,in.aimY);if(len<.08f)return null;
-        float ax=in.aimX/len,ay=in.aimY/len;Enemy best=null,bestD=MAX_TARGET_DISTANCE,bestDot=.62f;
+        float ax=in.aimX/len,ay=in.aimY/len;Enemy best=null;float bestD=MAX_TARGET_DISTANCE,bestDot=.62f;
         for(Enemy e:enemies){
             if(e.dead||e.hp<=0)continue;float dx=e.x-player.x,dy=e.y-player.y,d=Math.max(1,dist(0,0,dx,dy));
             if(d>MAX_TARGET_DISTANCE||!world.hasLineOfSight(player.x,player.y,e.x,e.y))continue;
