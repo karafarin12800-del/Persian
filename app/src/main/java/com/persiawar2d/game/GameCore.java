@@ -108,7 +108,7 @@ public final class GameCore {
         if(gameOver)return;
         dt=Math.min(.05f,Math.max(.001f,dt));fireCd=Math.max(0,fireCd-dt);swordCd=Math.max(0,swordCd-dt);grenadeCd=Math.max(0,grenadeCd-dt);
         reinforceCd-=dt;zoneTimer+=dt;movePlayer(dt,in.moveX,in.moveY);updateFacing(in);
-        if(in.reload)reload();if(in.sword)melee();if(in.grenade)throwGrenade(in);if(in.fire)fire(in);
+        if(in.reload)reload();if(in.sword)melee(in);if(in.grenade)throwGrenade(in);if(in.fire)fire(in);
         updateProjectiles(dt);updateGrenades(dt);updateExplosions(dt);updateEnemies(dt);collectPickups();updateZone(dt);
         if(reinforceCd<=0&&aliveCount()<5){spawnEnemies(3);reinforceCd=26;}cleanupDead();
     }
@@ -174,9 +174,10 @@ public final class GameCore {
         int n=Math.min(12-player.ammo,player.reserveAmmo);player.ammo+=n;player.reserveAmmo-=n;
     }
 
-    public void melee(){
+    public void melee(Input in){
         if(gameOver||player.dead||swordCd>0)return;
-        Enemy t=getAutoAimTarget();if(t==null||dist(player.x,player.y,t.x,t.y)>210){swordCd=.25f;return;}
+        Enemy t=(in!=null&&in.aimActive)?getManualAimTarget(in):getAutoAimTarget();
+        if(t==null||dist(player.x,player.y,t.x,t.y)>210){swordCd=.25f;return;}
         float dx=t.x-player.x,dy=t.y-player.y,d=Math.max(1,dist(0,0,dx,dy));
         for(Enemy e:enemies){
             if(e.dead||e.hp<=0)continue;float ex=e.x-player.x,ey=e.y-player.y,ed=Math.max(1,dist(0,0,ex,ey));
@@ -205,7 +206,15 @@ public final class GameCore {
 
     private void updateGrenades(float dt){
         for(Iterator<Grenade>it=grenades.iterator();it.hasNext();){
-            Grenade g=it.next();g.x+=g.vx*dt;g.y+=g.vy*dt;g.life-=dt;if(g.life<=0){explode(g.x,g.y);it.remove();}
+            Grenade g=it.next();
+            float nx=g.x+g.vx*dt,ny=g.y+g.vy*dt;
+            if(world.isBlocked(nx,ny,8f)){
+                explode(g.x,g.y);
+                it.remove();
+                continue;
+            }
+            g.x=nx;g.y=ny;g.life-=dt;
+            if(g.life<=0){explode(g.x,g.y);it.remove();}
         }
     }
 
