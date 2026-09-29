@@ -54,7 +54,7 @@ public final class MainActivity extends Activity {
             setLayerType(View.LAYER_TYPE_HARDWARE,null);
         }
 
-        private float sc(){return Math.min(getWidth()/2400f,Math.max(.23f,(getHeight()-HUD)/1600f));}
+        private float sc(){return Math.min(getWidth()/1900f,Math.max(.34f,(getHeight()-HUD)/1250f));}
         private float cx(){return getWidth()*.5f;}
         private float cy(){return HUD+(getHeight()-HUD)*.52f;}
         private float sx(float x){return cx()+(x-core.player().x)*sc();}
@@ -279,7 +279,7 @@ public final class MainActivity extends Activity {
         }
 
         private void drawWarrior(Canvas c,float x,float y,float s,int type,int armor,boolean player){
-            float k=player?1.12f:(type==3?1.28f:type==2?1.08f:.96f);
+            float k=player?1.45f:(type==3?1.52f:type==2?1.38f:1.28f);
             p.setStyle(Paint.Style.FILL);
             p.setColor(0x52000000);c.drawOval(new RectF(x-22*s*k,y+22*s*k,x+22*s*k,y+34*s*k),p);
 
@@ -316,9 +316,10 @@ public final class MainActivity extends Activity {
 
         private void drawZone(Canvas c){
             float s=sc(),zx=sx(WorldMap.SIZE*.5f),zy=sy(WorldMap.SIZE*.5f),rx=core.zoneRadius()*s,ry=rx*PITCH;
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(3,5*s));p.setColor(0x669AD8FF);c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,3*s));p.setColor(0x4D9AD8FF);p.setPathEffect(new DashPathEffect(new float[]{22*s,18*s},0));c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
+            p.setPathEffect(null);
             if(core.zoneRadius()<1550){
-                p.setStrokeWidth(Math.max(2,7*s));p.setColor(0x88F05A52);c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
+                p.setStrokeWidth(Math.max(2,4*s));p.setColor(0xA8F05A52);c.drawOval(new RectF(zx-rx,zy-ry,zx+rx,zy+ry),p);
             }
             p.setStyle(Paint.Style.FILL);
         }
