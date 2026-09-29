@@ -18,8 +18,8 @@ namespace PersiaWar.Unity2D5D
         public void Configure(Transform playerTransform, int enemyCount, float radius, float unusedSpeed)
         {
             player = playerTransform;
-            startingCount = Mathf.Clamp(enemyCount, 4, maxPerWave);
-            spawnRadius = Mathf.Max(18f, radius);
+            startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
+            spawnRadius = Mathf.Max(16f, radius);
         }
 
         private void Start()
@@ -27,18 +27,14 @@ namespace PersiaWar.Unity2D5D
             if (player == null)
             {
                 PlayerController found = FindFirstObjectByType<PlayerController>();
-                if (found != null)
-                    player = found.transform;
+                if (found != null) player = found.transform;
             }
-
-            if (player != null)
-                SpawnWave();
+            if (player != null) SpawnWave();
         }
 
         private void Update()
         {
-            if (player == null || spawning)
-                return;
+            if (player == null || spawning) return;
 
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
             if (enemies.Length == 0)
@@ -51,9 +47,7 @@ namespace PersiaWar.Unity2D5D
         private void SpawnNextWave()
         {
             spawning = false;
-            if (player == null || player.GetComponent<PlayerController>()?.IsDefeated == true)
-                return;
-
+            if (player == null || player.GetComponent<PlayerController>()?.IsDefeated == true) return;
             wave++;
             SpawnWave();
         }
@@ -63,49 +57,37 @@ namespace PersiaWar.Unity2D5D
             int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
             int spawned = 0;
 
-            for (int i = 0; i < count * 4 && spawned < count; i++)
+            for (int i = 0; i < count * 3 && spawned < count; i++)
             {
                 float angle = Random.Range(0f, Mathf.PI * 2f);
                 float distance = Random.Range(spawnRadius * 0.72f, spawnRadius);
-                Vector3 position = player.position + new Vector3(
-                    Mathf.Cos(angle),
-                    0f,
-                    Mathf.Sin(angle)) * distance;
+                Vector3 position = player.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
+                position.y = 1f;
 
-                position.x = Mathf.Clamp(position.x, -104f, 104f);
-                position.z = Mathf.Clamp(position.z, -104f, 104f);
-                position.y = 0f;
-
-                if (Physics.CheckSphere(position + Vector3.up * 0.7f, 0.85f, ~0, QueryTriggerInteraction.Ignore))
-                    continue;
-
+                if (Physics.CheckSphere(position + Vector3.up * 0.7f, 0.85f, ~0, QueryTriggerInteraction.Ignore)) continue;
                 SpawnEnemy(position, spawned, wave);
                 spawned++;
             }
 
-            GameSession.Instance?.SetWave(wave);
+            if (GameSession.Instance != null)
+                GameSession.Instance.SetWave(wave);
+
             SpawnWaveReward();
         }
 
         private void SpawnEnemy(Vector3 position, int index, int currentWave)
         {
             int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
-
             GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             enemy.name = $"Enemy_W{currentWave}_{index}";
             enemy.transform.position = position;
-            enemy.transform.localScale = new Vector3(0.92f, 1.05f, 0.92f);
+            enemy.transform.localScale = new Vector3(0.9f, 1f, 0.9f);
 
-            Renderer placeholder = enemy.GetComponent<Renderer>();
-            if (placeholder != null)
-                placeholder.enabled = false;
-
-            CapsuleCollider capsule = enemy.GetComponent<CapsuleCollider>();
-            if (capsule != null)
+            Renderer renderer = enemy.GetComponent<Renderer>();
+            if (renderer != null)
             {
-                capsule.height = 1.9f;
-                capsule.radius = 0.58f;
-                capsule.center = new Vector3(0f, 0.95f, 0f);
+                Color color = archetype == 3 ? new Color(0.28f, 0.06f, 0.05f) : (archetype == 2 ? new Color(0.40f, 0.12f, 0.08f) : new Color(0.48f, 0.18f, 0.12f));
+                renderer.sharedMaterial = RuntimeMaterialFactory.Create(enemy.name + "Material", color);
             }
 
             TargetHealth health = enemy.AddComponent<TargetHealth>();
@@ -117,9 +99,7 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnWaveReward()
         {
-            if (player == null)
-                return;
-
+            if (player == null) return;
             Vector3[] points =
             {
                 player.position + new Vector3(7f, 0.5f, -5f),
@@ -149,12 +129,7 @@ namespace PersiaWar.Unity2D5D
             Renderer renderer = pickup.GetComponent<Renderer>();
             if (renderer != null)
             {
-                Color color = type == PickupItem.PickupType.Ammo
-                    ? new Color(0.95f, 0.72f, 0.12f)
-                    : (type == PickupItem.PickupType.Medkit
-                        ? new Color(0.14f, 0.75f, 0.28f)
-                        : new Color(0.55f, 0.28f, 0.78f));
-
+                Color color = type == PickupItem.PickupType.Ammo ? new Color(0.95f, 0.72f, 0.12f) : (type == PickupItem.PickupType.Medkit ? new Color(0.14f, 0.75f, 0.28f) : new Color(0.55f, 0.28f, 0.78f));
                 renderer.sharedMaterial = RuntimeMaterialFactory.Create(pickup.name + "Material", color);
             }
 
