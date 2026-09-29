@@ -329,7 +329,7 @@ public final class MainActivity extends Activity {
         private void drawWarrior(Canvas c,float x,float y,float s,int type,int armor,boolean player){
             final float k=player?1.50f:(type==3?1.46f:type==2?1.38f:1.30f);
             final float u=s*k;
-            float bob=player?(float)Math.sin(core.player().bodyBob)*(.75f+core.player().walkBlend*1.6f)*u:0f;
+            float bob=player?(float)Math.sin(core.player().walkPhase*0.31f)*(.75f+core.player().walkBlend*1.6f)*u:0f;
             y+=bob;
             p.setStyle(Paint.Style.FILL);
 
@@ -353,7 +353,7 @@ public final class MainActivity extends Activity {
             // independently so movement reads as a real stride rather than sliding.
             float stride=player?Math.sin(core.player().walkPhase)*7.5f*core.player().walkBlend:0f;
             float stride2=player?Math.sin(core.player().walkPhase+Math.PI)*7.5f*core.player().walkBlend:0f;
-            float mfx=player?core.player().moveX:0f, mfy=player?core.player().moveY:0f;
+            float mfx=player?core.player().facingX:0f, mfy=player?core.player().facingY:0f;
             float fpx=-mfy, fpy=mfx;
             float leg1x=mfx*stride, leg1y=mfy*stride*PITCH;
             float leg2x=mfx*stride2, leg2y=mfy*stride2*PITCH;
@@ -463,7 +463,7 @@ public final class MainActivity extends Activity {
             float angle=(float)Math.toDegrees(Math.atan2(fy,fx));
             c.save();
             c.rotate(angle,x+fx*7*u,y+fy*7*u);
-            float kick=player?core.player().weaponKick*4.5f:0f;
+            float kick=player && input.fire?4.5f:0f;
             float wx=x+fx*(7-kick)*u,wy=y+fy*(7-kick)*u;
             p.setStrokeCap(Paint.Cap.ROUND);
             p.setStrokeWidth(Math.max(4f,7*u));
