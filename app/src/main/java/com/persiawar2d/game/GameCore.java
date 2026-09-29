@@ -17,7 +17,7 @@ public final class GameCore {
         public boolean aimActive,fire,sword,grenade,reload;
     }
     public static final class Player{
-        public float x,y,speed,facingX=1,facingY=0;
+        public float x,y,speed,facingX=1,facingY=0,walkPhase,walkBlend;
         public int hp,maxHp,shield,ammo,reserveAmmo,grenades,score;
         public String skin;
         public boolean dead;
@@ -107,10 +107,17 @@ public final class GameCore {
     public void update(float dt,Input in){
         if(gameOver)return;
         dt=Math.min(.05f,Math.max(.001f,dt));fireCd=Math.max(0,fireCd-dt);swordCd=Math.max(0,swordCd-dt);grenadeCd=Math.max(0,grenadeCd-dt);
-        reinforceCd-=dt;zoneTimer+=dt;movePlayer(dt,in.moveX,in.moveY);updateFacing(in);
+        reinforceCd-=dt;zoneTimer+=dt;movePlayer(dt,in.moveX,in.moveY);updateFacing(in);updateWalkAnimation(dt,in.moveX,in.moveY);
         if(in.reload)reload();if(in.sword)melee(in);if(in.grenade)throwGrenade(in);if(in.fire)fire(in);
         updateProjectiles(dt);updateGrenades(dt);updateExplosions(dt);updateEnemies(dt);collectPickups();updateZone(dt);
         if(reinforceCd<=0&&aliveCount()<5){spawnEnemies(3);reinforceCd=26;}cleanupDead();
+    }
+
+    private void updateWalkAnimation(float dt,float mx,float my){
+        float len=(float)Math.hypot(mx,my);
+        float target=len>.08f?1f:0f;
+        walkBlend += (target-walkBlend)*Math.min(1f,dt*10f);
+        if(len>.08f) walkPhase += dt*(7.5f+Math.min(2f,player.speed/220f));
     }
 
     private void updateFacing(Input in){
@@ -125,6 +132,15 @@ public final class GameCore {
         float len=(float)Math.hypot(mx,my);if(len<.05)return;mx/=len;my/=len;float s=player.speed*dt;
         float nx=clamp(player.x+mx*s,70,WORLD_SIZE-70),ny=clamp(player.y+my*s,70,WORLD_SIZE-70);
         if(!world.isBlocked(nx,player.y,55))player.x=nx;if(!world.isBlocked(player.x,ny,55))player.y=ny;
+    }
+
+    public float[] getWeaponAimDirection(){
+        Enemy e=getAutoAimTarget();
+        float dx,dy;
+        if(e!=null){dx=e.x-player.x;dy=e.y-player.y;}
+        else {dx=player.facingX;dy=player.facingY;}
+        float l=Math.max(.001f,(float)Math.hypot(dx,dy));
+        return new float[]{dx/l,dy/l};
     }
 
     public Enemy getAutoAimTarget(){
