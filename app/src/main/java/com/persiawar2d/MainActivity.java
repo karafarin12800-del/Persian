@@ -419,7 +419,7 @@ public final class MainActivity extends Activity {
         float bob=(float)Math.sin(t*5.2f+e.x*.008f+e.y*.006f)*1.5f*s;
         if(e.state==GameCore.EnemyState.ATTACK){
             p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1.5f,2.5f*s));p.setColor(0x65FF6A5B);
-            c.drawCircle(x,y,31*s,bob==0?new Paint():p);
+            c.drawCircle(x,y+bob,31*s,p);
         }
         drawWarrior(c,x,y+bob,s,e.type,e.hp<e.maxHp?0xFFD9A56A:e.state==GameCore.EnemyState.ATTACK?0xFFB8423E:0xFF8B3340,false);
         if(e.hp<e.maxHp){
@@ -1027,15 +1027,15 @@ public final class MainActivity extends Activity {
     p.setShader(new RadialGradient(drawBaseX,drawBaseY,jr+20,
             0x651A221F,0x10101816,Shader.TileMode.CLAMP));
     c.drawCircle(drawBaseX,drawBaseY,jr+17,p);p.setShader(null);
-    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2.5f,3*s()));
+    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2.5f,3*sc()));
     p.setColor(joyActive?0xD7D9C981:0x707C806E);c.drawCircle(drawBaseX,drawBaseY,jr+8,p);
     p.setStyle(Paint.Style.FILL);
     p.setColor(0x482F3A33);c.drawCircle(drawBaseX,drawBaseY,jr*.78f,p);
     p.setColor(joyActive?0xB9AD9A5D:0x6C66705B);
     c.drawCircle(joyActive?joyX:drawBaseX,joyActive?joyY:drawBaseY,jr*.38f,p);
-    p.setColor(0xA5EFE8D4);c.drawCircle(joyActive?joyX-4*s():drawBaseX-4*s(),joyActive?joyY-4*s():drawBaseY-4*s(),jr*.12f,p);
+    p.setColor(0xA5EFE8D4);c.drawCircle(joyActive?joyX-4*sc():drawBaseX-4*sc(),joyActive?joyY-4*sc():drawBaseY-4*sc(),jr*.12f,p);
     p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(Math.max(dp(9f),jr*.14f));p.setColor(0xE8FFFFFF);
-    c.drawText("MOVE",drawBaseX,drawBaseY+jr+23*s(),p);
+    c.drawText("MOVE",drawBaseX,drawBaseY+jr+23*sc(),p);
 
     button(c,fireX(),fireY(),fireVisualRadius(),"FIRE",firePointer>=0);
     button(c,swordX(),actionY(),actionVisualRadius(),"SWORD",swordPointer>=0);
@@ -1043,14 +1043,14 @@ public final class MainActivity extends Activity {
     button(c,reloadX(),actionY(),actionVisualRadius(),"RELOAD",reloadPointer>=0);
 
     if(input.aimActive){
-        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(dp(2f),2.5f*s()));
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(dp(2f),2.5f*sc()));
         p.setColor(0x7399D6E8);float rr=dp(27f),arm=dp(41f);
         c.drawCircle(aimTouchX,aimTouchY,rr,p);
         c.drawLine(aimTouchX-arm,aimTouchY,aimTouchX-rr,aimTouchY,p);
         c.drawLine(aimTouchX+rr,aimTouchY,aimTouchX+arm,aimTouchY,p);
         c.drawLine(aimTouchX,aimTouchY-arm,aimTouchX,aimTouchY-rr,p);
         c.drawLine(aimTouchX,aimTouchY+rr,aimTouchX,aimTouchY+arm,p);
-        p.setStyle(Paint.Style.FILL);p.setColor(0xB6D7ECF1);c.drawCircle(aimTouchX,aimTouchY,3*s(),p);
+        p.setStyle(Paint.Style.FILL);p.setColor(0xB6D7ECF1);c.drawCircle(aimTouchX,aimTouchY,3*sc(),p);
     }
 }
 
@@ -1060,7 +1060,7 @@ public final class MainActivity extends Activity {
             pressed?0xD97F8C68:0xB86E6960,
             pressed?0xB6263029:0x7A181E1B,Shader.TileMode.CLAMP));
     c.drawCircle(x,y,r,p);p.setShader(null);
-    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(dp(2.5f),3*s()));
+    p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(dp(2.5f),3*sc()));
     p.setColor(pressed?0xF0F0D789:0xC9D1C083);c.drawCircle(x,y,r,p);
     p.setStrokeWidth(Math.max(1f,1.4f*s));p.setColor(0x55FFFFFF);c.drawCircle(x,y,r-dp(6f),p);
 
