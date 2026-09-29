@@ -274,30 +274,52 @@ public final class MainActivity extends Activity {
 
         private void drawCombat(Canvas c){
             float s=sc();
+
+            // Ground pickups: custom illustrated objects instead of flat lettered squares.
             for(GameCore.Pickup item:core.pickups()){
                 float x=sx(item.x),y=sy(item.y);
-                if(x<-50||x>getWidth()+50||y<HUD-50||y>getHeight()+50)continue;
-                p.setStyle(Paint.Style.FILL);p.setColor(0x55000000);c.drawCircle(x,y+8*s,16*s,p);
-                p.setColor(item.type==GameCore.PickupType.AMMO?0xFFE1BA57:item.type==GameCore.PickupType.MEDKIT?0xFFDE5B57:item.type==GameCore.PickupType.GRENADE?0xFF5DA675:0xFF63A6D3);
-                c.drawRoundRect(new RectF(x-14*s,y-14*s,x+14*s,y+14*s),5*s,5*s,p);
-                p.setColor(Color.WHITE);p.setTextSize(Math.max(11,15*s));p.setTextAlign(Paint.Align.CENTER);p.setTypeface(PaintCompat.BOLD);c.drawText(
-                        item.type==GameCore.PickupType.AMMO?"A":item.type==GameCore.PickupType.MEDKIT?"+":item.type==GameCore.PickupType.GRENADE?"B":"S",x,y+5*s,p);
-                p.setTypeface(null);
+                if(x<-70||x>getWidth()+70||y<HUD-90||y>getHeight()+100)continue;
+                drawPickupIcon(c,x,y,s,item.type);
             }
 
+            // Flying grenades: compact 3D orb with cap, pin and highlight.
             for(GameCore.Grenade g:core.grenades()){
-                float x=sx(g.x),y=sy(g.y);p.setColor(0xFF4B8A59);c.drawCircle(x,y,10*s,p);p.setColor(0xAAE4F2B4);c.drawCircle(x-3*s,y-3*s,3*s,p);
+                float x=sx(g.x),y=sy(g.y);
+                float r=Math.max(dp(6f),12*s);
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(0x4A000000);
+                c.drawOval(new RectF(x-r*.9f,y+r*.45f,x+r*.9f,y+r*.9f),p);
+                p.setColor(0xFF394C40);
+                c.drawCircle(x,y,r,p);
+                p.setColor(0xFF1E2A24);
+                c.drawRoundRect(new RectF(x-r*.18f,y-r*.95f,x+r*.18f,y-r*.58f),r*.12f,r*.12f,p);
+                p.setColor(0xFFD1AE5F);
+                c.drawCircle(x-r*.05f,y-r*.87f,r*.13f,p);
+                p.setColor(0x83B5D69E);
+                c.drawCircle(x-r*.32f,y-r*.35f,r*.28f,p);
             }
 
+            // Projectiles: layered tracer, bright tip and fading tail.
             for(GameCore.Projectile b:core.projectiles()){
-                float x=sx(b.x),y=sy(b.y),ox=sx(b.x-b.vx*.035f),oy=sy(b.y-b.vy*.035f);
-                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2.2f,4.5f*s));
-                p.setColor(b.fromPlayer?0xFFFFD66E:0xFFFF5C58);c.drawLine(ox,oy,x,y,p);
-                p.setStyle(Paint.Style.FILL);c.drawCircle(x,y,Math.max(2,4*s),p);
+                float x=sx(b.x),y=sy(b.y);
+                float ox=sx(b.x-b.vx*.04f),oy=sy(b.y-b.vy*.04f);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeCap(Paint.Cap.ROUND);
+                p.setStrokeWidth(Math.max(dp(3f),5.5f*s));
+                p.setColor(b.fromPlayer?0x55FFE08A:0x55FF756B);
+                c.drawLine(ox,oy,x,y,p);
+                p.setStrokeWidth(Math.max(dp(1.4f),2.8f*s));
+                p.setColor(b.fromPlayer?0xFFFFD86A:0xFFFF7168);
+                c.drawLine(ox,oy,x,y,p);
+                p.setStyle(Paint.Style.FILL);
+                c.drawCircle(x,y,Math.max(dp(2f),3.6f*s),p);
+                p.setColor(0xFFFFFFFF);
+                c.drawCircle(x,y,Math.max(1.2f,1.5f*s),p);
+                p.setStrokeCap(Paint.Cap.BUTT);
             }
 
             for(GameCore.Enemy e:core.enemies()){
-                float x=sx(e.x),y=sy(e.y);if(x<-90||x>getWidth()+90||y<HUD-80||y>getHeight()+90)continue;
+                float x=sx(e.x),y=sy(e.y);if(x<-110||x>getWidth()+110||y<HUD-100||y>getHeight()+110)continue;
                 if(e.dead){drawDeath(c,x,y,s,e);continue;}
                 drawWarrior(c,x,y,s,e.type,e.hp<e.maxHp?0xFFD9A56A:e.state==GameCore.EnemyState.ATTACK?0xFFB8423E:0xFF8B3340,false);
                 if(e.hp<e.maxHp){
@@ -309,11 +331,101 @@ public final class MainActivity extends Activity {
             drawPlayer(c);
             for(GameCore.Explosion ex:core.explosions()){
                 float x=sx(ex.x),y=sy(ex.y),progress=1-ex.life/.38f,r=ex.radius*s*(.18f+progress*.82f);
-                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(3,8*s*(1-progress)));p.setColor(0xFFFFA43B);c.drawCircle(x,y,r,p);
-                p.setColor(0x55FFE36C);p.setStyle(Paint.Style.FILL);c.drawCircle(x,y,r*.58f,p);p.setStyle(Paint.Style.FILL);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(3,8*s*(1-progress)));
+                p.setColor(0xFFFFA43B);
+                c.drawCircle(x,y,r,p);
+                p.setColor(0x55FFE36C);
+                p.setStyle(Paint.Style.FILL);
+                c.drawCircle(x,y,r*.58f,p);
             }
 
             drawAim(c);
+        }
+
+        private void drawPickupIcon(Canvas c,float x,float y,float s,GameCore.PickupType type){
+            float r=Math.max(dp(11f),17*s);
+
+            // Soft footprint + collectible halo.
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0x52000000);
+            c.drawOval(new RectF(x-r*1.05f,y+r*.70f,x+r*1.05f,y+r*1.15f),p);
+            p.setColor(type==GameCore.PickupType.AMMO?0x305FD8A0:
+                    type==GameCore.PickupType.MEDKIT?0x30FF827A:
+                    type==GameCore.PickupType.GRENADE?0x305FAF7A:0x306DBCE8);
+            c.drawCircle(x,y,r*1.22f,p);
+
+            if(type==GameCore.PickupType.AMMO){
+                // Compact brass ammo case with latch and cartridges.
+                p.setColor(0xFFB98C48);
+                c.drawRoundRect(new RectF(x-r,y-r*.72f,x+r,y+r*.68f),r*.16f,r*.16f,p);
+                p.setColor(0xFF2A332E);
+                c.drawRect(x-r*.86f,y-r*.56f,x+r*.86f,y-r*.44f,p);
+                p.setColor(0xFFD7B867);
+                c.drawRoundRect(new RectF(x-r*.18f,y-r*.92f,x+r*.18f,y-r*.64f),r*.07f,r*.07f,p);
+                for(int i=-2;i<=2;i++){
+                    p.setColor(0xFFE4C978);
+                    c.drawCircle(x+i*r*.25f,y-r*.08f,r*.09f,p);
+                    p.setColor(0xFF8A6037);
+                    c.drawRect(x+i*r*.25f-r*.035f,y-r*.02f,x+i*r*.25f+r*.035f,y+r*.48f,p);
+                }
+                p.setColor(0xFF6D512E);
+                c.drawRect(x-r*.65f,y+r*.52f,x+r*.65f,y+r*.63f,p);
+            }else if(type==GameCore.PickupType.MEDKIT){
+                // Field medkit with raised cross and side clips.
+                p.setColor(0xFF5A3030);
+                c.drawRoundRect(new RectF(x-r,y-r*.72f,x+r,y+r*.72f),r*.18f,r*.18f,p);
+                p.setColor(0xFFD9E1D4);
+                c.drawRoundRect(new RectF(x-r*.12f,y-r*.53f,x+r*.12f,y+r*.53f),r*.04f,r*.04f,p);
+                c.drawRoundRect(new RectF(x-r*.53f,y-r*.12f,x+r*.53f,y+r*.12f),r*.04f,r*.04f,p);
+                p.setColor(0xFFE6C76B);
+                c.drawRect(x-r*.72f,y-r*.84f,x+r*.72f,y-r*.74f,p);
+                c.drawCircle(x-r*.88f,y, r*.09f,p);
+                c.drawCircle(x+r*.88f,y, r*.09f,p);
+            }else if(type==GameCore.PickupType.GRENADE){
+                // Unique grenade pickup: body, safety lever and pin.
+                p.setColor(0xFF32483A);
+                c.drawCircle(x,y+r*.04f,r*.68f,p);
+                p.setColor(0xFF1D2923);
+                c.drawRoundRect(new RectF(x-r*.18f,y-r*.67f,x+r*.18f,y-r*.42f),r*.07f,r*.07f,p);
+                p.setColor(0xFFD4AF60);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1.2f,2*s));
+                c.drawArc(new RectF(x-r*.52f,y-r*.46f,x+r*.52f,y+r*.55f),210,120,false,p);
+                p.setStyle(Paint.Style.FILL);
+                c.drawCircle(x+r*.07f,y-r*.66f,r*.10f,p);
+                p.setColor(0x83B8D7A7);
+                c.drawCircle(x-r*.23f,y-r*.27f,r*.22f,p);
+            }else{
+                // Shield pickup: faceted energy badge, not a letter.
+                path.reset();
+                path.moveTo(x,y-r);
+                path.lineTo(x+r*.72f,y-r*.52f);
+                path.lineTo(x+r*.78f,y+r*.30f);
+                path.lineTo(x,y+r);
+                path.lineTo(x-r*.78f,y+r*.30f);
+                path.lineTo(x-r*.72f,y-r*.52f);
+                path.close();
+                p.setColor(0xFF3E79A5);
+                c.drawPath(path,p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1.7f,2.2f*s));
+                p.setColor(0xFFBFE7FF);
+                c.drawPath(path,p);
+                p.setStyle(Paint.Style.FILL);
+                path.reset();
+                path.moveTo(x,y-r*.67f);
+                path.lineTo(x+r*.47f,y-r*.35f);
+                path.lineTo(x+r*.49f,y+r*.18f);
+                path.lineTo(x,y+r*.67f);
+                path.lineTo(x-r*.49f,y+r*.18f);
+                path.lineTo(x-r*.47f,y-r*.35f);
+                path.close();
+                p.setColor(0x5570C3E5);
+                c.drawPath(path,p);
+                p.setColor(0xFFD9F2FF);
+                c.drawCircle(x-r*.20f,y-r*.28f,r*.10f,p);
+            }
         }
 
         private void drawDeath(Canvas c,float x,float y,float s,GameCore.Enemy e){
@@ -625,25 +737,120 @@ public final class MainActivity extends Activity {
         }
 
         private void drawMiniMap(Canvas c){
-            float size=Math.min(getWidth()*.30f,250),left=getWidth()-size-16,top=HUD+12;
-            p.setStyle(Paint.Style.FILL);p.setColor(0xD91C241F);c.drawRoundRect(new RectF(left,top,left+size,top+size*.82f),16,16,p);
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.5f);p.setColor(0xD7D9C889);c.drawRoundRect(new RectF(left,top,left+size,top+size*.82f),16,16,p);
-            float mx=size/WorldMap.SIZE,my=size*.82f/WorldMap.SIZE;
-            for(WorldMap.Road r:world.roads()){
-                p.setColor(0x997D7565);p.setStrokeWidth(Math.max(1.5f,r.width*mx*.42f));
-                c.drawLine(left+r.x1*mx,top+r.y1*my,left+r.x2*mx,top+r.y2*my,p);
+            // Larger tactical map: readable at phone scale, but still leaves gameplay visible.
+            float size=Math.min(getWidth()*.37f,dp(330f));
+            float mapH=size*.86f;
+            float left=getWidth()-size-dp(14f),top=HUD+dp(10f);
+            float radius=dp(18f);
+
+            // Outer shadow / frame.
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0x65000000);
+            c.drawRoundRect(new RectF(left+dp(4f),top+dp(5f),left+size+dp(4f),top+mapH+dp(5f)),radius,radius,p);
+            p.setColor(0xE318211D);
+            c.drawRoundRect(new RectF(left,top,left+size,top+mapH),radius,radius,p);
+
+            // Inner map surface.
+            p.setColor(0xFF25322C);
+            c.drawRoundRect(new RectF(left+dp(7f),top+dp(7f),left+size-dp(7f),top+mapH-dp(7f)),radius*.75f,radius*.75f,p);
+
+            float innerL=left+dp(10f),innerT=top+dp(27f),innerW=size-dp(20f),innerH=mapH-dp(36f);
+            float mx=innerW/WorldMap.SIZE,my=innerH/WorldMap.SIZE;
+
+            c.save();
+            c.clipRect(innerL,innerT,innerL+innerW,innerT+innerH);
+
+            // Fine tactical grid.
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(1f);
+            p.setColor(0x182C9C75);
+            float grid=WorldMap.SIZE/8f;
+            for(int i=0;i<=8;i++){
+                float gx=innerL+i*grid*mx,gy=innerT+i*grid*my;
+                c.drawLine(gx,innerT,gx,innerT+innerH,p);
+                c.drawLine(innerL,gy,innerL+innerW,gy,p);
             }
+
+            // Roads.
+            for(WorldMap.Road r:world.roads()){
+                p.setColor(0xAA5E6B63);
+                p.setStrokeWidth(Math.max(dp(2f),r.width*mx*.38f));
+                c.drawLine(innerL+r.x1*mx,innerT+r.y1*my,innerL+r.x2*mx,innerT+r.y2*my,p);
+                p.setColor(0x667F8D83);
+                p.setStrokeWidth(Math.max(1f,r.width*mx*.10f));
+                c.drawLine(innerL+r.x1*mx,innerT+r.y1*my,innerL+r.x2*mx,innerT+r.y2*my,p);
+            }
+
+            // Buildings as varied blocks.
             p.setStyle(Paint.Style.FILL);
             for(WorldMap.Building b:world.buildings()){
-                p.setColor(0xAA6B5542);c.drawRect(left+b.x*mx,top+b.y*my,left+(b.x+b.w)*mx,top+(b.y+b.h)*my,p);
+                int bc=(b.style%4==0)?0xB36A5949:(b.style%4==1?0xB36E624E:0xB35D5349);
+                p.setColor(bc);
+                c.drawRoundRect(new RectF(innerL+b.x*mx,innerT+b.y*my,
+                        innerL+(b.x+b.w)*mx,innerT+(b.y+b.h)*my),dp(1.5f),dp(1.5f),p);
             }
-            p.setColor(0xFF63E47A);c.drawCircle(left+core.player().x*mx,top+core.player().y*my,5,p);
+
+            // World-zone ring.
+            float zx=innerL+WorldMap.SIZE*.5f*mx,zy=innerT+WorldMap.SIZE*.5f*my;
+            float zr=core.zoneRadius()*mx;
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1.5f,dp(2f)));
+            p.setColor(0x8C83C8E8);
+            c.drawOval(new RectF(zx-zr,zy-zr*PITCH,zx+zr,zy+zr*PITCH),p);
+
+            // Pickups are deliberately visible on the minimap too.
+            for(GameCore.Pickup item:core.pickups()){
+                float ix=innerL+item.x*mx,iy=innerT+item.y*my;
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(item.type==GameCore.PickupType.AMMO?0xFFF0C85D:
+                        item.type==GameCore.PickupType.MEDKIT?0xFFE06B62:
+                        item.type==GameCore.PickupType.GRENADE?0xFF71B47E:0xFF72B6E2);
+                c.drawCircle(ix,iy,dp(2.7f),p);
+            }
+
+            // Enemy signals.
             for(GameCore.Enemy e:core.enemies())if(!e.dead){
-                p.setColor(e.type==3?0xFFFFA02C:0xFFF06565);c.drawCircle(left+e.x*mx,top+e.y*my,2.8f,p);
+                float ex=innerL+e.x*mx,ey=innerT+e.y*my;
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(e.type==3?0xFFFFAF45:e.type==2?0xFF7FC7E4:0xFFE66A63);
+                c.drawCircle(ex,ey,e.type==3?dp(3.2f):dp(2.5f),p);
             }
-            p.setColor(Color.WHITE);p.setTextSize(11);p.setTypeface(PaintCompat.BOLD);p.setTextAlign(Paint.Align.LEFT);
-            c.drawText("TACTICAL MAP",left+10,top+17,p);p.setTypeface(null);
+
+            // Player marker as a directional chevron.
+            float px=innerL+core.player().x*mx,py=innerT+core.player().y*my;
+            float fx=core.player().facingX,fy=core.player().facingY,fl=Math.max(.001f,(float)Math.hypot(fx,fy));
+            fx/=fl;fy/=fl;
+            float sideX=-fy,sideY=fx;
+            p.setColor(0xFF7CFF9A);
+            path.reset();
+            path.moveTo(px+fx*dp(8f),py+fy*dp(8f));
+            path.lineTo(px-sideX*dp(5f)-fx*dp(4f),py-sideY*dp(5f)-fy*dp(4f));
+            path.lineTo(px+sideX*dp(5f)-fx*dp(4f),py+sideY*dp(5f)-fy*dp(4f));
+            path.close();
+            c.drawPath(path,p);
+
+            c.restore();
+
+            // Header and compass.
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0xFFF0D178);
+            p.setTypeface(PaintCompat.BOLD);
+            p.setTextAlign(Paint.Align.LEFT);
+            p.setTextSize(dp(13f));
+            c.drawText("TACTICAL MAP",left+dp(14f),top+dp(18f),p);
+            p.setColor(0xFFDCE5DF);
+            p.setTypeface(null);
+            p.setTextSize(dp(9f));
+            c.drawText("CITY GRID",left+dp(14f),top+dp(29f),p);
+            p.setTextAlign(Paint.Align.RIGHT);
+            p.setTypeface(PaintCompat.BOLD);
+            p.setTextSize(dp(10f));
+            c.drawText("N",left+size-dp(15f),top+dp(18f),p);
+            c.drawText("ZONE",left+size-dp(15f),top+dp(30f),p);
+            p.setTypeface(null);
+            p.setTextAlign(Paint.Align.LEFT);
         }
+
 
         private void drawHud(Canvas c){
             float w=getWidth(),h=getHeight(),s=Math.max(.75f,Math.min(1f,h/720f));
