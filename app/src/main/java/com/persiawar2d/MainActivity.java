@@ -327,163 +327,225 @@ public final class MainActivity extends Activity {
         }
 
         private void drawWarrior(Canvas c,float x,float y,float s,int type,int armor,boolean player){
-            final float k=player?1.50f:(type==3?1.46f:type==2?1.38f:1.30f);
+            final float k=player?1.62f:(type==3?1.58f:type==2?1.50f:1.44f);
             final float u=s*k;
             p.setStyle(Paint.Style.FILL);
 
-            // Deep, soft contact shadow gives the soldier a real 2.5D footprint.
-            p.setColor(0x70000000);
-            c.drawOval(new RectF(x-27*u,y+27*u,x+27*u,y+40*u),p);
-            p.setColor(0x22000000);
-            c.drawOval(new RectF(x-34*u,y+21*u,x+34*u,y+37*u),p);
+            // Character footprint: layered shadow + grounded silhouette.
+            p.setColor(0x72000000);
+            c.drawOval(new RectF(x-31*u,y+30*u,x+31*u,y+45*u),p);
+            p.setColor(0x26000000);
+            c.drawOval(new RectF(x-39*u,y+20*u,x+39*u,y+39*u),p);
 
-            // Backpack and rear radio assembly.
-            p.setColor(player?0xFF253734:(type==3?0xFF302727:0xFF302B34));
-            c.drawRoundRect(new RectF(x-20*u,y-4*u,x+20*u,y+25*u),7*u,7*u,p);
-            p.setColor(player?0xFF3E5953:0xFF4A4045);
-            c.drawRoundRect(new RectF(x-16*u,y+2*u,x+16*u,y+21*u),5*u,5*u,p);
-            p.setColor(0xFF1B2524);
-            c.drawRect(x+10*u,y-2*u,x+15*u,y+13*u,p);
+            // Back plate / pack gives the sprite a readable 2.5D silhouette.
+            int pack=player?0xFF263C37:(type==3?0xFF3A2427:type==2?0xFF283640:0xFF2E3430);
+            p.setColor(pack);
+            c.drawRoundRect(new RectF(x-22*u,y-2*u,x+22*u,y+27*u),8*u,8*u,p);
+            p.setColor(player?0xFF42615A:(type==3?0xFF56343A:type==2?0xFF3D5460:0xFF46514C));
+            c.drawRoundRect(new RectF(x-17*u,y+3*u,x+17*u,y+23*u),5*u,5*u,p);
+
+            // Utility canister + compact radio/antenna detail.
+            p.setColor(0xFF171E1D);
+            c.drawRoundRect(new RectF(x+11*u,y-3*u,x+16*u,y+14*u),2*u,2*u,p);
+            p.setStrokeWidth(Math.max(1.2f,1.8f*u));
+            p.setStyle(Paint.Style.STROKE);
+            p.setColor(0xFF66766E);
+            c.drawLine(x+13*u,y-4*u,x+18*u,y-12*u,p);
+            p.setStyle(Paint.Style.FILL);
             p.setColor(0xFFD2B56E);
-            c.drawCircle(x+12.5f*u,y-5*u,3*u,p);
+            c.drawCircle(x+13.5f*u,y-5*u,2.7f*u,p);
 
-            // Legs: layered tactical trousers, knee guards, boots.
-            int pants=player?0xFF273D3A:(type==3?0xFF332628:type==2?0xFF403A50:0xFF3A2C35);
+            // Legs: armored combat trousers with separate shin/boot masses.
+            int pants=player?0xFF293E3A:(type==3?0xFF302427:type==2?0xFF34424A:0xFF363C3A);
             p.setColor(pants);
-            c.drawRoundRect(new RectF(x-14*u,y+13*u,x-2*u,y+38*u),4*u,4*u,p);
-            c.drawRoundRect(new RectF(x+2*u,y+13*u,x+14*u,y+38*u),4*u,4*u,p);
-            p.setColor(0xFF151A19);
-            c.drawRoundRect(new RectF(x-17*u,y+34*u,x-1*u,y+44*u),5*u,5*u,p);
-            c.drawRoundRect(new RectF(x+1*u,y+34*u,x+17*u,y+44*u),5*u,5*u,p);
-            p.setColor(player?0xFF526963:0xFF59525A);
-            c.drawRoundRect(new RectF(x-13*u,y+22*u,x-4*u,y+30*u),3*u,3*u,p);
-            c.drawRoundRect(new RectF(x+4*u,y+22*u,x+13*u,y+30*u),3*u,3*u,p);
-            p.setColor(0xFF9B845C);
-            c.drawRect(x-11*u,y+25*u,x-5*u,y+27*u,p);
-            c.drawRect(x+5*u,y+25*u,x+11*u,y+27*u,p);
+            c.drawRoundRect(new RectF(x-15*u,y+12*u,x-2*u,y+38*u),4*u,4*u,p);
+            c.drawRoundRect(new RectF(x+2*u,y+12*u,x+15*u,y+38*u),4*u,4*u,p);
 
-            // Torso / tactical vest.
-            int cloth=player?0xFF536F68:(type==3?0xFF6A3435:type==2?0xFF544A6A:0xFF6A3A45);
+            // Thigh seams.
+            p.setStrokeWidth(Math.max(1.5f,2f*u));
+            p.setColor(player?0xFF566A64:(type==2?0xFF657984:0xFF5B5E5B));
+            c.drawLine(x-10*u,y+15*u,x-10*u,y+35*u,p);
+            c.drawLine(x+10*u,y+15*u,x+10*u,y+35*u,p);
+
+            // Knee pads with hard edge.
+            p.setColor(player?0xFF657A73:(type==3?0xFF6D4D4E:type==2?0xFF60727B:0xFF666C67));
+            c.drawRoundRect(new RectF(x-14*u,y+23*u,x-3*u,y+31*u),3*u,3*u,p);
+            c.drawRoundRect(new RectF(x+3*u,y+23*u,x+14*u,y+31*u),3*u,3*u,p);
+            p.setColor(0xFF1B211F);
+            c.drawRoundRect(new RectF(x-17*u,y+34*u,x-1*u,y+45*u),5*u,5*u,p);
+            c.drawRoundRect(new RectF(x+1*u,y+34*u,x+17*u,y+45*u),5*u,5*u,p);
+            p.setColor(0xFFB79A5A);
+            c.drawRect(x-10*u,y+26*u,x-5*u,y+28*u,p);
+            c.drawRect(x+5*u,y+26*u,x+10*u,y+28*u,p);
+
+            // Waist / belt foundation.
+            int cloth=player?0xFF566F68:(type==3?0xFF603B40:type==2?0xFF51616B:0xFF525953);
             p.setColor(cloth);
-            c.drawRoundRect(new RectF(x-21*u,y-16*u,x+21*u,y+24*u),10*u,10*u,p);
+            c.drawRoundRect(new RectF(x-22*u,y-17*u,x+22*u,y+24*u),11*u,11*u,p);
+            p.setColor(0xFF202826);
+            c.drawRoundRect(new RectF(x-19*u,y+4*u,x+19*u,y+19*u),6*u,6*u,p);
 
-            // Shoulder-to-waist armor contour.
-            p.setColor(0xFF1E2A29);
-            c.drawRoundRect(new RectF(x-18*u,y-9*u,x+18*u,y+18*u),6*u,6*u,p);
-            p.setColor(player?0xFF6B857D:(type==3?0xFF80605C:0xFF6D616A));
-            c.drawRoundRect(new RectF(x-14*u,y-8*u,x+14*u,y+12*u),4*u,4*u,p);
-
-            // Central ballistic plate with Persian-inspired turquoise/gold emblem.
-            p.setColor(0xFF182321);
-            c.drawRoundRect(new RectF(x-10*u,y-8*u,x+10*u,y+10*u),4*u,4*u,p);
+            // Chest carrier and segmented ballistic plate.
+            p.setColor(player?0xFF667F77:(type==3?0xFF73545A:type==2?0xFF687A84:0xFF626964));
+            c.drawRoundRect(new RectF(x-15*u,y-12*u,x+15*u,y+12*u),5*u,5*u,p);
+            p.setColor(0xFF18211F);
+            c.drawRoundRect(new RectF(x-11*u,y-10*u,x+11*u,y+10*u),4*u,4*u,p);
             p.setColor(armor);
-            c.drawRect(x-1.5f*u,y-7*u,x+1.5f*u,y+9*u,p);
-            p.setColor(0xFF2A7A7A);
+            c.drawRoundRect(new RectF(x-2.5f*u,y-8*u,x+2.5f*u,y+8*u),1.5f*u,1.5f*u,p);
+
+            // Persian-inspired insignia.
+            p.setColor(player?0xFF2E8580:(type==3?0xFF8B4D4D:type==2?0xFF487A93:0xFF5A7770));
             path.reset();
-            path.moveTo(x,y-4*u);path.lineTo(x+4*u,y*u);path.lineTo(x,y+4*u);path.lineTo(x-4*u,y*u);path.close();
+            path.moveTo(x,y-5*u);
+            path.lineTo(x+5*u,y*u);
+            path.lineTo(x,y+5*u);
+            path.lineTo(x-5*u,y*u);
+            path.close();
             c.drawPath(path,p);
-            p.setColor(0xFFD9B75A);
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1.5f,1.8f*u));
-            c.drawLine(x-6*u,y+13*u,x+6*u,y+13*u,p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1.2f,1.7f*u));
+            p.setColor(0xFFE0C26D);
+            c.drawLine(x-7*u,y+14*u,x+7*u,y+14*u,p);
             p.setStyle(Paint.Style.FILL);
 
-            // Ammunition pouches and belt.
-            p.setColor(0xFF242A27);
-            c.drawRoundRect(new RectF(x-19*u,y+7*u,x-10*u,y+18*u),2*u,2*u,p);
-            c.drawRoundRect(new RectF(x+10*u,y+7*u,x+19*u,y+18*u),2*u,2*u,p);
-            c.drawRoundRect(new RectF(x-7*u,y+11*u,x+1*u,y+19*u),2*u,2*u,p);
-            c.drawRoundRect(new RectF(x+1*u,y+11*u,x+7*u,y+19*u),2*u,2*u,p);
-            p.setColor(0xFFC39B55);
-            c.drawRect(x-20*u,y+18*u,x+20*u,y+21*u,p);
+            // Magazine pouches / belt modules.
+            p.setColor(0xFF242D2A);
+            c.drawRoundRect(new RectF(x-21*u,y+7*u,x-11*u,y+19*u),2.5f*u,2.5f*u,p);
+            c.drawRoundRect(new RectF(x+11*u,y+7*u,x+21*u,y+19*u),2.5f*u,2.5f*u,p);
+            c.drawRoundRect(new RectF(x-8*u,y+12*u,x-1*u,y+21*u),2*u,2*u,p);
+            c.drawRoundRect(new RectF(x+1*u,y+12*u,x+8*u,y+21*u),2*u,2*u,p);
+            p.setColor(0xFFC4A15B);
+            c.drawRect(x-21*u,y+19*u,x+21*u,y+22*u,p);
 
-            // Shoulder guards.
-            p.setColor(player?0xFFAF9360:(type==3?0xFF96705E:0xFF806451));
-            c.drawOval(new RectF(x-25*u,y-12*u,x-13*u,y+2*u),p);
-            c.drawOval(new RectF(x+13*u,y-12*u,x+25*u,y+2*u),p);
-            p.setColor(0x55302A20);
-            c.drawOval(new RectF(x-24*u,y-8*u,x-15*u,y+1*u),p);
-            c.drawOval(new RectF(x+15*u,y-8*u,x+24*u,y+1*u),p);
+            // Broad shoulder armor with different silhouettes per class.
+            p.setColor(player?0xFFB39B62:(type==3?0xFF9A696A:type==2?0xFF788B95:0xFF7A817B));
+            c.drawOval(new RectF(x-26*u,y-13*u,x-12*u,y+3*u),p);
+            c.drawOval(new RectF(x+12*u,y-13*u,x+26*u,y+3*u),p);
+            if(type==3&&!player){
+                p.setColor(0xFFB58478);
+                c.drawRoundRect(new RectF(x-29*u,y-15*u,x-18*u,y-7*u),3*u,3*u,p);
+                c.drawRoundRect(new RectF(x+18*u,y-15*u,x+29*u,y-7*u),3*u,3*u,p);
+            }
 
-            // Neck and head.
-            p.setColor(player?0xFFC99B72:0xFFD5AD86);
+            // Neck and head, kept compact for a top-down tactical read.
+            p.setColor(player?0xFFC99B72:(type==3?0xFFB9866F:0xFFD0A27C));
             c.drawCircle(x,y-25*u,13*u,p);
-            p.setColor(0xFF33251E);
-            c.drawOval(new RectF(x-14*u,y-39*u,x+14*u,y-14*u),p);
-            p.setColor(player?0xFFC6A34F:(type==3?0xFF9F7B45:0xFF725036));
+            p.setColor(0xFF2B211C);
+            c.drawOval(new RectF(x-14*u,y-39*u,x+14*u,y-15*u),p);
+
+            // Headgear identity: player helmet, recon helmet, heavy helmet.
+            int helmet=player?0xFF73896E:(type==3?0xFF5B343A:type==2?0xFF4F6674:0xFF47524D);
+            p.setColor(helmet);
             c.drawOval(new RectF(x-16*u,y-42*u,x+16*u,y-27*u),p);
-            // Helmet rim / visor.
-            p.setColor(0xFF242A28);
-            c.drawRoundRect(new RectF(x-17*u,y-32*u,x+17*u,y-25*u),3*u,3*u,p);
-            p.setColor(player?0xFF6C876E:(type==3?0xFF735646:0xFF574A58));
-            c.drawRoundRect(new RectF(x-13*u,y-40*u,x+13*u,y-30*u),5*u,5*u,p);
-            p.setColor(0xFF111716);
-            c.drawRoundRect(new RectF(x-11*u,y-33*u,x+11*u,y-28*u),2*u,2*u,p);
-            p.setColor(0xFFD7BD72);
+            p.setColor(0xFF242B29);
+            c.drawRoundRect(new RectF(x-18*u,y-32*u,x+18*u,y-25*u),3*u,3*u,p);
+            p.setColor(0xFF101615);
+            c.drawRoundRect(new RectF(x-11*u,y-34*u,x+11*u,y-28*u),2*u,2*u,p);
+            p.setColor(0xFFD6B45F);
             c.drawRect(x-7*u,y-30*u,x-2*u,y-29*u,p);
             c.drawRect(x+2*u,y-30*u,x+7*u,y-29*u,p);
-            // Helmet rail + side headset.
-            p.setColor(0xFF3E4844);
-            c.drawRect(x-12*u,y-43*u,x+12*u,y-40*u,p);
-            c.drawCircle(x-16*u,y-27*u,3.2f*u,p);
-            c.drawCircle(x+16*u,y-27*u,3.2f*u,p);
 
-            // Arms are aimed with the weapon; the torso itself remains stable.
+            // Helmet rails / headset / class markers.
+            p.setColor(0xFF3B4541);
+            c.drawRect(x-12*u,y-44*u,x+12*u,y-41*u,p);
+            c.drawCircle(x-17*u,y-27*u,3.2f*u,p);
+            c.drawCircle(x+17*u,y-27*u,3.2f*u,p);
+            if(type==2&&!player){
+                p.setColor(0xFF7C99A5);
+                c.drawCircle(x,y-43*u,2.8f*u,p);
+                p.setColor(0xFFBFD0D5);
+                c.drawRect(x-1*u,y-49*u,x+1*u,y-43*u,p);
+            }
+            if(type==3&&!player){
+                p.setColor(0xFF9A6B42);
+                c.drawRoundRect(new RectF(x-19*u,y-39*u,x-14*u,y-25*u),2*u,2*u,p);
+                c.drawRoundRect(new RectF(x+14*u,y-39*u,x+19*u,y-25*u),2*u,2*u,p);
+            }
+
+            // Weapon is purely a rendered layer; gameplay direction remains untouched.
             float fx=player?core.player().facingX:1f;
             float fy=player?core.player().facingY*PITCH:0f;
             float fl=Math.max(.001f,(float)Math.hypot(fx,fy));
-            fx/=fl;fy/=fl;
+            fx/=fl; fy/=fl;
             float px=-fy,py=fx;
 
-            // Forearms and gloves.
+            // Shoulder-to-hand arms.
             p.setStrokeCap(Paint.Cap.ROUND);
-            p.setStrokeWidth(Math.max(7f,9f*u));
-            p.setColor(player?0xFF4C625D:0xFF51454C);
-            c.drawLine(x+px*14*u,y-2*u+py*14*u,x+fx*24*u+px*5*u,y+fy*24*u+py*5*u,p);
-            c.drawLine(x-px*14*u,y-2*u-py*14*u,x+fx*22*u-px*5*u,y+fy*22*u-py*5*u,p);
-            p.setStrokeWidth(Math.max(4f,6f*u));
-            p.setColor(0xFF171B1A);
-            c.drawCircle(x+fx*25*u+px*5*u,y+fy*25*u+py*5*u,4*u,p);
-            c.drawCircle(x+fx*23*u-px*5*u,y+fy*23*u-py*5*u,4*u,p);
+            p.setStrokeWidth(Math.max(8f,10f*u));
+            p.setColor(player?0xFF526762:(type==3?0xFF68494D:type==2?0xFF52636D:0xFF555B58));
+            c.drawLine(x+px*14*u,y-2*u+py*14*u,x+fx*25*u+px*5*u,y+fy*25*u+py*5*u,p);
+            c.drawLine(x-px*14*u,y-2*u-py*14*u,x+fx*23*u-px*5*u,y+fy*23*u-py*5*u,p);
+            p.setStrokeWidth(Math.max(4f,6*u));
+            p.setColor(0xFF151A19);
+            c.drawCircle(x+fx*26*u+px*5*u,y+fy*26*u+py*5*u,4.2f*u,p);
+            c.drawCircle(x+fx*24*u-px*5*u,y+fy*24*u-py*5*u,4.2f*u,p);
             p.setStrokeCap(Paint.Cap.BUTT);
 
-            // Modern assault rifle, rotated only as a weapon so the soldier does not spin.
+            // Class-specific weapon silhouette.
             float angle=(float)Math.toDegrees(Math.atan2(fy,fx));
             c.save();
-            c.rotate(angle,x+fx*7*u,y+fy*7*u);
-            float wx=x+fx*7*u,wy=y+fy*7*u;
-            p.setStrokeCap(Paint.Cap.ROUND);
-            p.setStrokeWidth(Math.max(4f,7*u));
-            p.setColor(0xFF1A1F1E);
-            c.drawLine(wx-12*u,wy+2*u,wx+42*u,wy+2*u,p);
-            p.setStrokeWidth(Math.max(2f,4*u));
-            p.setColor(0xFF7D8580);
-            c.drawLine(wx+18*u,wy-1*u,wx+59*u,wy-1*u,p);
-            p.setColor(0xFF0F1413);
-            c.drawLine(wx-24*u,wy+7*u,wx+1*u,wy+7*u,p);
+            c.rotate(angle,x+fx*8*u,y+fy*8*u);
+            float wx=x+fx*8*u,wy=y+fy*8*u;
             p.setStyle(Paint.Style.FILL);
-            c.drawRoundRect(new RectF(wx+2*u,wy+2*u,wx+18*u,wy+12*u),3*u,3*u,p);
-            p.setColor(0xFF8C6239);
-            c.drawRoundRect(new RectF(wx-2*u,wy+8*u,wx+7*u,wy+18*u),2*u,2*u,p);
-            c.drawRoundRect(new RectF(wx+24*u,wy+2*u,wx+40*u,wy+11*u),3*u,3*u,p);
-            p.setColor(0xFFD6B45D);
-            c.drawRect(wx+54*u,wy-3*u,wx+64*u,wy+2*u,p);
-            p.setStrokeCap(Paint.Cap.BUTT);
-            // Sight + charging handle.
-            p.setColor(0xFF303936);
-            c.drawRect(wx+29*u,wy-7*u,wx+35*u,wy-2*u,p);
-            c.drawRect(wx+38*u,wy-8*u,wx+43*u,wy-3*u,p);
+            p.setStrokeCap(Paint.Cap.ROUND);
+
+            if(type==3&&!player){
+                // Heavy rifle/LMG.
+                p.setColor(0xFF171C1B);
+                c.drawRoundRect(new RectF(wx-20*u,wy-1*u,wx+40*u,wy+10*u),3*u,3*u,p);
+                p.setColor(0xFF69716D);
+                c.drawRect(wx+30*u,wy+1*u,wx+68*u,wy+5*u,p);
+                p.setColor(0xFF111514);
+                c.drawRoundRect(new RectF(wx-2*u,wy+9*u,wx+11*u,wy+24*u),2*u,2*u,p);
+                p.setColor(0xFF3D4641);
+                c.drawRect(wx+13*u,wy-5*u,wx+29*u,wy-1*u,p);
+            }else if(type==2&&!player){
+                // Compact recon carbine.
+                p.setColor(0xFF18201E);
+                c.drawRoundRect(new RectF(wx-14*u,wy,wx+34*u,wy+9*u),3*u,3*u,p);
+                p.setColor(0xFF78837E);
+                c.drawRect(wx+24*u,wy-2*u,wx+58*u,wy+2*u,p);
+                p.setColor(0xFF8B5E38);
+                c.drawRoundRect(new RectF(wx-1*u,wy+7*u,wx+7*u,wy+17*u),2*u,2*u,p);
+                p.setColor(0xFF3B4843);
+                c.drawRect(wx+11*u,wy-6*u,wx+25*u,wy-2*u,p);
+            }else{
+                // Player / assault class rifle.
+                p.setColor(0xFF171C1B);
+                c.drawRoundRect(new RectF(wx-16*u,wy,wx+41*u,wy+10*u),3*u,3*u,p);
+                p.setColor(0xFF737C77);
+                c.drawRect(wx+20*u,wy-2*u,wx+63*u,wy+2*u,p);
+                p.setColor(0xFF0D1211);
+                c.drawRoundRect(new RectF(wx-2*u,wy+8*u,wx+8*u,wy+21*u),2*u,2*u,p);
+                p.setColor(0xFF8A5D36);
+                c.drawRoundRect(new RectF(wx+2*u,wy+7*u,wx+9*u,wy+16*u),2*u,2*u,p);
+                p.setColor(0xFF3D4844);
+                c.drawRect(wx+28*u,wy-7*u,wx+35*u,wy-2*u,p);
+                c.drawRect(wx+39*u,wy-8*u,wx+45*u,wy-3*u,p);
+                p.setColor(0xFFD5B15C);
+                c.drawRect(wx+57*u,wy-3*u,wx+65*u,wy+2*u,p);
+            }
+
+            // Universal weapon sling / lower silhouette.
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1.8f,2.4f*u));
+            p.setColor(0x88555B54);
+            c.drawLine(wx-8*u,wy+11*u,wx+31*u,wy+22*u,p);
+            p.setStyle(Paint.Style.FILL);
             c.restore();
 
-            // Small muzzle flash when the trigger is held.
+            // Small muzzle flash is visual-only and uses existing fire input.
             if(player && input.fire){
                 float mx=x+fx*67*u,my=y+fy*67*u;
-                p.setColor(0xFFFFD76A);
+                p.setColor(0xFFFFD66E);
                 path.reset();
                 path.moveTo(mx,my);
-                path.lineTo(mx+fx*15*u+px*6*u,my+fy*15*u+py*6*u);
-                path.lineTo(mx+fx*15*u-px*6*u,my+fy*15*u-py*6*u);
+                path.lineTo(mx+fx*16*u+px*7*u,my+fy*16*u+py*7*u);
+                path.lineTo(mx+fx*16*u-px*7*u,my+fy*16*u-py*7*u);
                 path.close();
                 c.drawPath(path,p);
+                p.setColor(0x66FFE38A);
+                c.drawCircle(mx,my,5*u,p);
             }
         }
 
