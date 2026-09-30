@@ -301,7 +301,17 @@ jobs:
 
           echo "=== Verifying Unity Personal entitlement ==="
           ENTITLEMENTS="$("$LICENSE_CLIENT" --showEntitlements 2>&1 || true)"
-          printf '%s\n' "$ENTITLE          echo "=== Building the existing Unity project ==="
+          printf '%s\n' "$ENTITLEMENTS" | sed 's/[[:space:]]*$//'
+          printf '%s\n' "$ENTITLEMENTS" | grep -q "Unity Personal" || {
+            echo "::error::Unity Personal entitlement was not activated."
+            "$LICENSE_CLIENT" --showContext 2>&1 || true
+            exit 1
+          }
+
+          test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
+          echo "Unity Personal license file is ready."
+
+          echo "=== Building the existing Unity project ==="
           cd /workspace
           set +e
           unity-editor \
