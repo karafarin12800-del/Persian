@@ -190,7 +190,7 @@ namespace PersiaWar.Unity2D5D
             Transform weapon = CreatePart(PrimitiveType.Cylinder, "Weapon", new Vector3(0.48f, 1.15f, 0.55f),
                 new Vector3(0.075f, 0.72f, 0.075f), new Color(0.08f, 0.10f, 0.12f));
             weapon.localRotation = Quaternion.Euler(18f, 0f, 8f);
-            Transform weaponTip = CreatePart(PrimitiveType.Cone, "WeaponTip", new Vector3(0.62f, 1.42f, 0.80f),
+            Transform weaponTip = CreatePart(PrimitiveType.Cylinder, "WeaponTip", new Vector3(0.62f, 1.42f, 0.80f),
                 new Vector3(0.12f, 0.22f, 0.12f), new Color(0.76f, 0.62f, 0.28f));
             weaponTip.localRotation = Quaternion.Euler(18f, 0f, 8f);
 
