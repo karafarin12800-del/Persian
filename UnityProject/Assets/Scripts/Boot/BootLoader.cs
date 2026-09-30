@@ -16,7 +16,6 @@ namespace PersiaWar.Unity2D5D
         private const float MinimumVisibleSeconds = 0.35f;
 
         private AsyncOperation loadOperation;
-        private Texture2D pixel;
         private GUIStyle titleStyle;
         private GUIStyle statusStyle;
         private GUIStyle percentStyle;
