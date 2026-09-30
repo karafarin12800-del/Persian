@@ -88,3 +88,5 @@ jobs:
           name: PersiaWar2D-debug-${{ github.ref_name }}-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+# CI validation: Android joystick/portrait visual fix build.
