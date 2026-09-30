@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
@@ -40,7 +41,28 @@ namespace PersiaWar.Unity2D5D
                 EnsureGameplayHUD(player);
             }
 
-            BuildWorld();
+            // Do not construct the entire city inside the first-scene Awake sequence.
+            // Unity documents Awake as part of first-scene loading; moving the expensive
+            // procedural world construction past the first rendered frame prevents the
+            // Android startup path from being blocked by hundreds of runtime primitives,
+            // colliders and shader/material allocations.
+            StartCoroutine(BuildWorldAfterStartup());
+        }
+
+        private IEnumerator BuildWorldAfterStartup()
+        {
+            yield return null;
+            BuildWorldBase();
+            yield return null;
+            BuildRoadMarkings(8f);
+            yield return null;
+            BuildCityBlocks(8f);
+            yield return null;
+            BuildLandmarks();
+            yield return null;
+            BuildStreetProps();
+            yield return null;
+            BuildRuinedQuarter();
         }
 
         private void EnsureGameSession()
@@ -79,7 +101,6 @@ namespace PersiaWar.Unity2D5D
             gameplayCamera.farClipPlane = 240f;
             gameplayCamera.allowHDR = false;
 #if UNITY_ANDROID
-            // Conservative mobile rendering path: avoid MSAA/HDR overhead during startup.
             gameplayCamera.allowMSAA = false;
 #else
             gameplayCamera.allowMSAA = true;
@@ -116,7 +137,6 @@ namespace PersiaWar.Unity2D5D
             sun.intensity = 1.15f;
             sun.color = new Color(1f, 0.93f, 0.82f);
 #if UNITY_ANDROID
-            // Keep the first frame deterministic on mobile GPUs; gameplay and geometry are unchanged.
             sun.shadows = LightShadows.None;
             sun.shadowStrength = 0f;
 #else
@@ -126,7 +146,7 @@ namespace PersiaWar.Unity2D5D
             sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
         }
 
-        private void BuildWorld()
+        private void BuildWorldBase()
         {
             GameObject legacyGround = GameObject.Find("Ground");
             if (legacyGround != null)
@@ -151,12 +171,6 @@ namespace PersiaWar.Unity2D5D
                 CreateBox("RoadX", new Vector3(x, -0.05f, 0f), new Vector3(roadWidth, 0.18f, worldSize), roadMaterial, false);
             for (float z = -worldSize * 0.5f + roadWidth * 0.5f; z <= worldSize * 0.5f; z += 24f)
                 CreateBox("RoadZ", new Vector3(0f, -0.04f, z), new Vector3(worldSize, 0.18f, roadWidth), roadMaterial, false);
-
-            BuildRoadMarkings(roadWidth);
-            BuildCityBlocks(roadWidth);
-            BuildLandmarks();
-            BuildStreetProps();
-            BuildRuinedQuarter();
         }
 
         private void BuildRoadMarkings(float roadWidth)
