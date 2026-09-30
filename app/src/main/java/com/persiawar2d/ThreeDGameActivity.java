@@ -44,14 +44,45 @@ public final class ThreeDGameActivity extends Activity {
             float w=getWidth(),h=getHeight(),pad=Math.max(18f,w*.018f);
             p.setStyle(Paint.Style.FILL);p.setColor(0xC918211D);c.drawRoundRect(pad,pad,w-pad,88,18,18,p);
             p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(19);p.setColor(Color.rgb(244,211,126));p.setTextAlign(Paint.Align.LEFT);c.drawText("PERSIA WAR  •  2.5D",pad+18,43,p);
-            p.setTypeface(Typeface.DEFAULT);p.setTextSize(15);p.setColor(Color.WHITE);c.drawText("KILLS  "+renderer.getKills(),pad+18,67,p);
+            p.setTypeface(Typeface.DEFAULT);p.setTextSize(15);p.setColor(Color.WHITE);c.drawText("KILLS  "+renderer.getKills()+"   WAVE "+renderer.getWave(),pad+18,67,p);
             float barX=w*.39f,barW=w*.27f;p.setColor(0xFF29332E);c.drawRoundRect(barX,30,barX+barW,54,12,12,p);p.setColor(renderer.getHp()>35?Color.rgb(73,178,92):Color.rgb(205,73,61));c.drawRoundRect(barX+3,33,barX+Math.max(6,barW*renderer.getHp()/100f-3),51,9,9,p);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(14);p.setColor(Color.WHITE);c.drawText("HP "+renderer.getHp(),barX+barW/2f,47,p);
-            p.setTextAlign(Paint.Align.RIGHT);p.setTextSize(16);c.drawText("AMMO "+renderer.getAmmo()+"/"+renderer.getReserve()+"   G "+renderer.getGrenades(),w-pad-18,47,p);
+            p.setTextAlign(Paint.Align.RIGHT);p.setTextSize(16);c.drawText("BOW  •  AMMO "+renderer.getAmmo()+"/"+renderer.getReserve()+"   G "+renderer.getGrenades(),w-pad-18,47,p);
             float joyX=w*.15f,joyY=h*.80f,fireX=w*.84f,fireY=h*.78f,r=Math.min(76f,h*.105f);
             p.setColor(0x4A405149);c.drawCircle(joyX,joyY,r+16,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xC8D7C58E);c.drawCircle(joyX,joyY,r+16,p);p.setStyle(Paint.Style.FILL);p.setColor(0xBFC1A85F);c.drawCircle(joyX,joyY,r*.42f,p);
             p.setColor(0xA54E433C);c.drawCircle(fireX,fireY,r*1.18f,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xD7E6D39B);c.drawCircle(fireX,fireY,r*1.18f,p);p.setStyle(Paint.Style.FILL);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(24);p.setColor(Color.WHITE);p.setTextAlign(Paint.Align.CENTER);c.drawText("FIRE",fireX,fireY+8,p);
             p.setTypeface(Typeface.DEFAULT);p.setTextSize(14);p.setColor(0xDDEEE8D8);c.drawText("MOVE",joyX,joyY+r+34,p);c.drawText("AIM / FIRE",fireX,fireY+r*1.18f+30,p);
+
+            float mini=Math.min(230f,w*.24f);
+            renderer.drawMinimap(c,w-mini-pad,100,mini);
+
+            float actionR=Math.min(58f,h*.078f);
+            actionButton(c,w*.67f,h*.88f,actionR,0xA85A6B4E,"G",18);
+            actionButton(c,w*.78f,h*.90f,actionR*.82f,0xA84B5651,"RELOAD",11);
+
+            if(renderer.isGameOver()){
+                p.setStyle(Paint.Style.FILL);p.setColor(0xB9000000);c.drawRect(0,0,w,h,p);
+                p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(48);p.setColor(Color.WHITE);c.drawText("GAME OVER",w*.5f,h*.5f-20,p);
+                p.setTextSize(22);p.setColor(Color.rgb(238,210,150));c.drawText("TAP TO RESTART",w*.5f,h*.5f+25,p);
+                p.setTypeface(Typeface.DEFAULT);p.setTextAlign(Paint.Align.LEFT);
+            }
         }
-        @Override public boolean onTouchEvent(MotionEvent event){return false;}
+        private void actionButton(Canvas c,float x,float y,float r,int fill,String label,float textSize){
+            p.setStyle(Paint.Style.FILL);p.setColor(0x44000000);c.drawCircle(x,y+5,r+3,p);
+            p.setColor(fill);c.drawCircle(x,y,r,p);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.5f);p.setColor(0xD7E6D39B);c.drawCircle(x,y,r,p);
+            p.setStyle(Paint.Style.FILL);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);p.setTextSize(textSize);p.setColor(Color.WHITE);c.drawText(label,x,y+textSize*.34f,p);
+            p.setTypeface(Typeface.DEFAULT);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event){
+            float x=event.getX(),y=event.getY(),w=getWidth(),h=getHeight();
+            if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
+                if(renderer.isGameOver()){renderer.resetBattle();invalidate();return true;}
+                float ar=Math.min(58f,h*.078f);
+                if(Math.hypot(x-w*.67f,y-h*.88f)<ar*1.15f){renderer.throwGrenade();invalidate();return true;}
+                if(Math.hypot(x-w*.78f,y-h*.90f)<ar){renderer.reload();invalidate();return true;}
+            }
+            return false;
+        }
     }
 }
