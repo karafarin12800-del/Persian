@@ -166,10 +166,12 @@ jobs:
           mkdir -p UnityProject/Assets/Editor
           cat > UnityProject/Assets/Editor/PersiaWarCiBuild.cs <<'CS'
           using System;
+          using System;
           using System.IO;
-          using UnityEngine;
           using UnityEditor;
+          using UnityEditor.Build;
           using UnityEditor.Build.Reporting;
+          using UnityEngine;
 
           public static class PersiaWarCiBuild
           {
@@ -182,20 +184,37 @@ jobs:
                   if (!File.Exists(Path.Combine(Application.dataPath, "Scenes/PersiaWarPrototype.unity")))
                       throw new Exception("Required scene is missing: " + scenePath);
 
+                  PlayerSettings.SetScriptingBackend(
+                      NamedBuildTarget.Android,
+                      ScriptingImplementation.IL2CPP
+                  );
                   PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
 
-                  var scenes = new[] { scenePath };
+                  var backend = PlayerSettings.GetScriptingBackend(NamedBuildTarget.Android);
+                  var architecture = PlayerSettings.Android.targetArchitectures;
+                  Console.WriteLine("UNITY_ANDROID_BACKEND:" + backend);
+                  Console.WriteLine("UNITY_ANDROID_ARCH:" + architecture);
+
+                  if (backend != ScriptingImplementation.IL2CPP)
+                      throw new Exception("Android scripting backend was not set to IL2CPP.");
+                  if (architecture == AndroidArchitecture.None)
+                      throw new Exception("Android target architecture is None.");
+
                   EditorBuildSettings.scenes = new[]
                   {
                       new EditorBuildSettingsScene(scenePath, true)
                   };
 
-                  var report = BuildPipeline.BuildPlayer(
-                      scenes,
-                      output,
-                      BuildTarget.Android,
-                      BuildOptions.None
-                  );
+                  var options = new BuildPlayerOptions
+                  {
+                      scenes = new[] { scenePath },
+                      locationPathName = output,
+                      target = BuildTarget.Android,
+                      targetGroup = BuildTargetGroup.Android,
+                      options = BuildOptions.None
+                  };
+
+                  var report = BuildPipeline.BuildPlayer(options);
 
                   if (report.summary.result != BuildResult.Succeeded)
                       throw new Exception("Unity Android build failed: " + report.summary.result);
