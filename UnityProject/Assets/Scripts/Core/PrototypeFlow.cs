@@ -15,8 +15,6 @@ namespace PersiaWar.Unity2D5D
             Match
         }
 
-        private static PrototypeFlow instance;
-
         private ScreenMode mode = ScreenMode.HeroSelect;
         private PlayerController player;
         private EnemySpawner enemySpawner;
@@ -42,15 +40,6 @@ namespace PersiaWar.Unity2D5D
             "SILK WARRIOR",
             "DESERT KNIGHT"
         };
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void CreateRuntimeFlow()
-        {
-            if (instance != null) return;
-            GameObject root = new GameObject("PrototypeFlow");
-            root.hideFlags = HideFlags.DontSave;
-            instance = root.AddComponent<PrototypeFlow>();
-        }
 
         private void Awake()
         {
