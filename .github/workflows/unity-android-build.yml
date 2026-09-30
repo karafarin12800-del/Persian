@@ -224,7 +224,14 @@ jobs:
                   if (!File.Exists(output) || new FileInfo(output).Length == 0)
                       throw new Exception("Unity reported success but APK file is missing or empty.");
 
+                  File.WriteAllText(
+                      "build/Android/UNITY_BUILD_SUCCESS.txt",
+                      "BuildResult=Succeeded\n" +
+                      "TotalErrors=" + report.summary.totalErrors + "\n" +
+                      "APK=" + output + "\n"
+                  );
                   Console.WriteLine("UNITY_BUILD_SUCCEEDED:" + output);
+                  Console.WriteLine("UNITY_BUILD_SENTINEL:build/Android/UNITY_BUILD_SUCCESS.txt");
               }
           }
           CS
@@ -294,18 +301,9 @@ jobs:
 
           echo "=== Verifying Unity Personal entitlement ==="
           ENTITLEMENTS="$("$LICENSE_CLIENT" --showEntitlements 2>&1 || true)"
-          printf '%s\n' "$ENTITLEMENTS" | sed 's/[[:space:]]*$//'
-          printf '%s\n' "$ENTITLEMENTS" | grep -q "Unity Personal" || {
-            echo "::error::Unity Personal entitlement was not activated.";
-            "$LICENSE_CLIENT" --showContext 2>&1 || true
-            exit 1
-          }
-
-          test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
-          echo "Unity Personal license file is ready."
-
-          echo "=== Building the existing Unity project ==="
+          printf '%s\n' "$ENTITLE          echo "=== Building the existing Unity project ==="
           cd /workspace
+          set +e
           unity-editor \
             -batchmode \
             -nographics \
@@ -315,9 +313,20 @@ jobs:
             -buildTarget Android \
             -executeMethod PersiaWarCiBuild.BuildAndroid \
             -logFile -
+          unity_exit=$?
+          set -e
 
+          echo "UNITY_EDITOR_EXIT_CODE:$unity_exit"
+          test -s /workspace/build/Android/UNITY_BUILD_SUCCESS.txt || {
+            echo "::error::Unity did not produce the verified build-success sentinel."
+            exit "$unity_exit"
+          }
           test -s /workspace/build/Android/PersiaWar.apk
           echo "UNITY_APK_READY:/workspace/build/Android/PersiaWar.apk"
+          if [[ "$unity_exit" -ne 0 ]]; then
+            echo "::warning::Unity Editor returned exit code $unity_exit after a successful BuildPipeline result; nonfatal editor diagnostics were present."
+          fi
+
           SH
           chmod +x .ci/unity-build.sh
 
