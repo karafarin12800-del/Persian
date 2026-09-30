@@ -37,6 +37,8 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private boolean moving, aiming;
     private long lastNanos;
     private float fireCooldown;
+    private float playerVX, playerVZ;
+    private float animationTime;
 
     private int hp = 100, ammo = 30, reserve = 120, kills = 0, grenades = 3;
     private int width = 1, height = 1;
@@ -178,6 +180,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         fireCooldown = Math.max(0, fireCooldown - dt);
 
         movePlayer(dt);
+        animationTime += dt;
         updateEnemies(dt);
         collectPickups();
 
@@ -251,8 +254,18 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawEnemy(Enemy e) {
-        box(e.x, .85f, e.z, .75f, 1.7f, .65f, .55f, .10f, .08f);
-        box(e.x, 1.95f, e.z, .65f, .65f, .65f, .25f, .07f, .05f);
+        float t = animationTime * 7.0f + e.x * .17f + e.z * .11f;
+        float stride = (float)Math.sin(t) * .22f;
+        float bob = Math.abs((float)Math.sin(t * .5f)) * .035f;
+        float attack = Math.max(0f, 1f - Math.min(1f, fireCooldown / .20f));
+        box(e.x, .88f + bob, e.z, .75f, 1.7f, .65f, .55f, .10f, .08f);
+        box(e.x, 1.97f + bob, e.z, .65f, .65f, .65f, .25f, .07f, .05f);
+        boxRotated(e.x - .22f, .52f, e.z, .24f, 1.0f, .24f, -stride, 0f, 0f, .16f, .12f, .09f);
+        boxRotated(e.x + .22f, .52f, e.z, .24f, 1.0f, .24f, stride, 0f, 0f, .16f, .12f, .09f);
+        boxRotated(e.x - .40f, 1.16f + bob, e.z, .20f, .85f, .20f, stride * .65f, 0f, -12f, .46f, .14f, .10f);
+        boxRotated(e.x + .40f, 1.16f + bob, e.z, .20f, .85f, .20f, -stride * .65f, 0f, 12f, .46f, .14f, .10f);
+        float recoil = attack * .10f;
+        boxRotated(e.x, 1.20f, e.z - .48f - recoil, .24f, .24f, .85f, 0f, 0f, 0f, .12f, .12f, .10f);
         float pct = Math.max(0f, e.hp / 100f);
         box(e.x, 2.55f, e.z, .95f, .08f, .10f, .15f, .08f, .06f);
         if (pct > 0) box(e.x - .48f*(1-pct), 2.56f, e.z, .92f*pct, .10f, .12f,
@@ -260,9 +273,17 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawPlayer() {
-        box(px, .9f, pz, .82f, 1.8f, .70f, .66f, .43f, .16f);
-        box(px, 2.05f, pz, .66f, .66f, .66f, .83f, .70f, .42f);
-        box(px, 1.15f, pz - .48f, .25f, .25f, .80f, .12f, .12f, .10f);
+        float speed = (float)Math.hypot(playerVX, playerVZ);
+        float locomotion = Math.min(1f, speed / 5.8f);
+        float stride = (float)Math.sin(animationTime * (7.0f + locomotion * 5.0f)) * .28f * locomotion;
+        float bob = Math.abs((float)Math.sin(animationTime * 7.0f)) * .055f * locomotion;
+        box(px, .95f + bob, pz, .82f, 1.8f, .70f, .66f, .43f, .16f);
+        box(px, 2.07f + bob, pz, .66f, .66f, .66f, .83f, .70f, .42f);
+        boxRotated(px - .23f, .55f, pz, .25f, 1.0f, .25f, -stride, 0f, 0f, .14f, .12f, .10f);
+        boxRotated(px + .23f, .55f, pz, .25f, 1.0f, .25f, stride, 0f, 0f, .14f, .12f, .10f);
+        boxRotated(px - .43f, 1.19f + bob, pz, .20f, .86f, .20f, stride * .72f, 0f, -10f, .78f, .52f, .20f);
+        boxRotated(px + .43f, 1.19f + bob, pz, .20f, .86f, .20f, -stride * .72f, 0f, 10f, .78f, .52f, .20f);
+        box(px, 1.17f, pz - .48f, .25f, .25f, .80f, .12f, .12f, .10f);
     }
 
     private void drawPickup(Pickup p) {
@@ -277,14 +298,24 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
 
     private void movePlayer(float dt) {
         float len = (float)Math.hypot(moveX, moveY);
-        if (len < .05f) return;
-        float forwardX = (float)Math.sin(yaw), forwardZ = (float)Math.cos(yaw);
-        float rightX = (float)Math.cos(yaw), rightZ = -(float)Math.sin(yaw);
-        float vx = (forwardX*moveY + rightX*moveX) / len;
-        float vz = (forwardZ*moveY + rightZ*moveX) / len;
-        float nx = px + vx * 5.0f * dt, nz = pz + vz * 5.0f * dt;
-        if (!blocked(nx, pz, .55f)) px = nx;
-        if (!blocked(px, nz, .55f)) pz = nz;
+        float targetVX = 0f, targetVZ = 0f;
+        if (len >= .05f) {
+            float forwardX = (float)Math.sin(yaw), forwardZ = (float)Math.cos(yaw);
+            float rightX = (float)Math.cos(yaw), rightZ = -(float)Math.sin(yaw);
+            float nx = (forwardX*moveY + rightX*moveX) / len;
+            float nz = (forwardZ*moveY + rightZ*moveX) / len;
+            float speed = 5.2f + Math.min(1f, len) * 1.8f;
+            targetVX = nx * speed;
+            targetVZ = nz * speed;
+        }
+        float response = 1f - (float)Math.exp(-(len >= .05f ? 12f : 16f) * dt);
+        playerVX += (targetVX - playerVX) * response;
+        playerVZ += (targetVZ - playerVZ) * response;
+        if (Math.abs(playerVX) < .01f) playerVX = 0f;
+        if (Math.abs(playerVZ) < .01f) playerVZ = 0f;
+        float nx = px + playerVX * dt, nz = pz + playerVZ * dt;
+        if (!blocked(nx, pz, .55f)) px = nx; else playerVX = 0f;
+        if (!blocked(px, nz, .55f)) pz = nz; else playerVZ = 0f;
     }
 
     private void updateEnemies(float dt) {
@@ -356,8 +387,15 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     private void box(float x,float y,float z,float w,float h,float d,float r,float g,float b){
+        boxRotated(x,y,z,w,h,d,0f,0f,0f,r,g,b);
+    }
+
+    private void boxRotated(float x,float y,float z,float w,float h,float d,float rotX,float rotY,float rotZ,float r,float g,float b){
         Matrix.setIdentityM(model,0);
         Matrix.translateM(model,0,x,y,z);
+        if (rotX != 0f) Matrix.rotateM(model,0,rotX * 57.29578f,1f,0f,0f);
+        if (rotY != 0f) Matrix.rotateM(model,0,rotY * 57.29578f,0f,1f,0f);
+        if (rotZ != 0f) Matrix.rotateM(model,0,rotZ,0f,0f,1f);
         Matrix.scaleM(model,0,w*.5f,h*.5f,d*.5f);
         Matrix.multiplyMM(mvp,0,vp,0,model,0);
         GLES20.glUseProgram(colorProgram);
