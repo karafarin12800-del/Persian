@@ -3,3 +3,4 @@ Workflow fix commit: c1608416e139e488c0628f6da51209d9522c5463
 This marker exists only to trigger a fresh post-fix Unity Android validation run.
 Concurrency fix commit: 372819842407884235bcf08f892768aefe1d2ed8
 Final isolated-build workflow commit: a583640bd86e2613b2079e5f6dec59ee8d26ee73
+Asset integrity fix commit: 8a1596ab8eb404b31895ab9d4b9cf02da70663ee
