@@ -22,6 +22,11 @@ namespace PersiaWar.Unity2D5D
         private float collisionRadius = 0.55f;
         private StylizedCharacterVisual visual;
 
+        public void SetTarget(Transform targetTransform)
+        {
+            target = targetTransform;
+        }
+
         public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
 
         public void Configure(Transform targetTransform, int enemyArchetype)
