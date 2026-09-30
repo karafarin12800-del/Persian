@@ -218,3 +218,4 @@ namespace PersiaWar.Unity2D5D
         }
     }
 }
+// CI validation marker: visual-only build validation 2026-09-30
