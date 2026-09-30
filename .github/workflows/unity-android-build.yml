@@ -41,12 +41,23 @@ jobs:
           test -f UnityProject/ProjectSettings/ProjectSettings.asset
           test -f UnityProject/ProjectSettings/EditorBuildSettings.asset
           test -f UnityProject/Packages/manifest.json
+          test -f UnityProject/Assets/Scenes/BootScene.unity
+          test -f UnityProject/Assets/Scenes/BootScene.unity.meta
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity.meta
           test -f UnityProject/Assets/Resources/PersiaWarLit.shader
           test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
           test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
+          grep -q 'Assets/Scenes/BootScene.unity' UnityProject/ProjectSettings/EditorBuildSettings.asset
           grep -q 'Assets/Scenes/PersiaWarPrototype.unity' UnityProject/ProjectSettings/EditorBuildSettings.asset
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('UnityProject/ProjectSettings/EditorBuildSettings.asset').read_text(encoding='utf-8')
+          boot = 'path: Assets/Scenes/BootScene.unity'
+          game = 'path: Assets/Scenes/PersiaWarPrototype.unity'
+          assert boot in text and game in text and text.index(boot) < text.index(game), 'BootScene must be Build Settings index 0'
+          print('Build Settings scene order: BootScene -> PersiaWarPrototype')
+          PY
           grep -q 'm_Name: GameRoot' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           grep -q 'm_Name: Main Camera' UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           grep -q '^  AndroidMinSdkVersion: 23$' UnityProject/ProjectSettings/ProjectSettings.asset
@@ -182,9 +193,13 @@ jobs:
                   var output = Path.Combine(outputDirectory, "PersiaWar.apk");
                   Directory.CreateDirectory(outputDirectory);
 
-                  const string scenePath = "Assets/Scenes/PersiaWarPrototype.unity";
+                  const string bootScenePath = "Assets/Scenes/BootScene.unity";
+                  const string gameplayScenePath = "Assets/Scenes/PersiaWarPrototype.unity";
+
+                  if (!File.Exists(Path.Combine(Application.dataPath, "Scenes/BootScene.unity")))
+                      throw new Exception("Required scene is missing: " + bootScenePath);
                   if (!File.Exists(Path.Combine(Application.dataPath, "Scenes/PersiaWarPrototype.unity")))
-                      throw new Exception("Required scene is missing: " + scenePath);
+                      throw new Exception("Required scene is missing: " + gameplayScenePath);
 
                   PlayerSettings.SetScriptingBackend(
                       NamedBuildTarget.Android,
@@ -218,12 +233,13 @@ jobs:
 
                   EditorBuildSettings.scenes = new[]
                   {
-                      new EditorBuildSettingsScene(scenePath, true)
+                      new EditorBuildSettingsScene(bootScenePath, true),
+                      new EditorBuildSettingsScene(gameplayScenePath, true)
                   };
 
                   var options = new BuildPlayerOptions
                   {
-                      scenes = new[] { scenePath },
+                      scenes = new[] { bootScenePath, gameplayScenePath },
                       locationPathName = output,
                       target = BuildTarget.Android,
                       targetGroup = BuildTargetGroup.Android,
