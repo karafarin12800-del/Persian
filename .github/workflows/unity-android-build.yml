@@ -128,11 +128,53 @@ jobs:
             Library-UnityProject-
             Library-
 
+      - name: Prepare Unity activation payload
+        id: activation
+        shell: bash
+        env:
+          UNITY_LICENSE_INPUT: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL_INPUT: ${{ secrets.UNITY_SERIAL }}
+        run: |
+          set -euo pipefail
+
+          candidate="${UNITY_SERIAL_INPUT:-}"
+          if [[ -z "$candidate" ]]; then
+            candidate="${UNITY_LICENSE_INPUT:-}"
+          fi
+
+          candidate="$(printf '%s' "$candidate" | tr -d '\r' | sed 's/^ *//; s/ *$//')"
+
+          if printf '%s' "$candidate" | grep -Eq '^(PS/SC/)?[A-Z0-9]{2}-[A-Z0-9]{4}(-[A-Z0-9]{4}){3,5}$'; then
+            serial="$candidate"
+            serial="${serial#PS/SC/}"
+            {
+              echo "UNITY_SERIAL=$serial" >> "$GITHUB_ENV"
+              echo "mode=serial" >> "$GITHUB_OUTPUT"
+            }
+            echo "A Unity serial-like payload was found in the existing secrets; using serial activation."
+            exit 0
+          fi
+
+          if printf '%s' "${UNITY_LICENSE_INPUT:-}" | grep -q '<UnityLicense'; then
+            {
+              echo 'UNITY_LICENSE<<UNITY_LICENSE_EOF'
+              printf '%s\n' "${UNITY_LICENSE_INPUT}"
+              echo 'UNITY_LICENSE_EOF'
+              echo "mode=ulf" >> "$GITHUB_OUTPUT"
+            } >> "$GITHUB_ENV"
+            echo "A valid ULF license payload was found."
+            exit 0
+          fi
+
+          echo "mode=credential-only" >> "$GITHUB_OUTPUT"
+          echo "No serial/ULF payload found; the runner will attempt current Unity Personal entitlement activation."
+
       - name: Build Unity Android APK directly
         shell: bash
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        timeout-minutes: 30
         run: |
           set -euo pipefail
           IMAGE="unityci/editor:2022.3.62f1-android-3"
@@ -179,20 +221,48 @@ jobs:
           }
           CS
 
+          SERIAL_ARGS=()
+          if [[ -n "${UNITY_SERIAL:-}" ]]; then
+            SERIAL_ARGS=(-serial "$UNITY_SERIAL")
+          elif [[ "${{ steps.activation.outputs.mode }}" == "ulf" ]]; then
+            mkdir -p .ci-unity-home/.local/share/unity3d/Unity
+            printf '%s\n' "${UNITY_LICENSE:-}" > .ci-unity-home/.local/share/unity3d/Unity/Unity_lic.ulf
+          fi
+
+          if [[ "${{ steps.activation.outputs.mode }}" == "serial" ]]; then
+            echo "Activating Unity with the discovered serial payload..."
+          else
+            echo "Attempting current Unity Personal entitlement activation..."
+          fi
+
           docker run --rm \
             -e UNITY_EMAIL="$UNITY_EMAIL" \
             -e UNITY_PASSWORD="$UNITY_PASSWORD" \
+            -e UNITY_SERIAL="${UNITY_SERIAL:-}" \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
             "$IMAGE" \
             bash -lc '
               set -euo pipefail
 
-              echo "Activating Unity Personal license..."
-              unity-editor -batchmode -nographics -quit -serial -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -logFile - || {
-                echo "Unity Personal command-line activation returned non-zero."
-                exit 1
-              }
+              if [[ -n "${UNITY_SERIAL:-}" ]]; then
+                unity-editor -batchmode -nographics -quit \
+                  -serial "$UNITY_SERIAL" \
+                  -username "$UNITY_EMAIL" \
+                  -password "$UNITY_PASSWORD" \
+                  -logFile -
+              else
+                unity-editor -batchmode -nographics -quit \
+                  -serial \
+                  -username "$UNITY_EMAIL" \
+                  -password "$UNITY_PASSWORD" \
+                  -logFile -
+              fi
+
+              echo "Checking for an activated Unity license..."
+              if [[ -f /root/.local/share/unity3d/Unity/Unity_lic.ulf ]]; then
+                echo "Unity license file is present."
+              fi
 
               echo "Building the existing Unity project..."
               unity-editor \
@@ -212,6 +282,8 @@ jobs:
 
           rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs
           rmdir UnityProject/Assets/Editor 2>/dev/null || true
+          rm -rf .ci-unity-home
+
       - name: Verify APK
         shell: bash
         run: |
