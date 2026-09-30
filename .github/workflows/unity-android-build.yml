@@ -20,7 +20,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: persiawar-unity-android-${{ github.ref }}
+  group: persiawar-unity-android-${{ github.workflow }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
