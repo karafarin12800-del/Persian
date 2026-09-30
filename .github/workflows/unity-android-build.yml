@@ -177,8 +177,10 @@ jobs:
           {
               public static void BuildAndroid()
               {
-                  var output = "build/Android/PersiaWar.apk";
-                  Directory.CreateDirectory("build/Android");
+                  var projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                  var outputDirectory = Path.GetFullPath(Path.Combine(projectRoot, "..", "build", "Android"));
+                  var output = Path.Combine(outputDirectory, "PersiaWar.apk");
+                  Directory.CreateDirectory(outputDirectory);
 
                   const string scenePath = "Assets/Scenes/PersiaWarPrototype.unity";
                   if (!File.Exists(Path.Combine(Application.dataPath, "Scenes/PersiaWarPrototype.unity")))
@@ -225,13 +227,13 @@ jobs:
                       throw new Exception("Unity reported success but APK file is missing or empty.");
 
                   File.WriteAllText(
-                      "build/Android/UNITY_BUILD_SUCCESS.txt",
+                      Path.Combine(outputDirectory, "UNITY_BUILD_SUCCESS.txt"),
                       "BuildResult=Succeeded\n" +
                       "TotalErrors=" + report.summary.totalErrors + "\n" +
                       "APK=" + output + "\n"
                   );
                   Console.WriteLine("UNITY_BUILD_SUCCEEDED:" + output);
-                  Console.WriteLine("UNITY_BUILD_SENTINEL:build/Android/UNITY_BUILD_SUCCESS.txt");
+                  Console.WriteLine("UNITY_BUILD_SENTINEL:" + Path.Combine(outputDirectory, "UNITY_BUILD_SUCCESS.txt"));
               }
           }
           CS
@@ -310,6 +312,9 @@ jobs:
 
           test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
           echo "Unity Personal license file is ready."
+
+          echo "=== Cleaning previous Android build output ==="
+          rm -rf /workspace/build/Android
 
           echo "=== Building the existing Unity project ==="
           cd /workspace
