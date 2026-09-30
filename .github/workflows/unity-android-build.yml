@@ -15,6 +15,10 @@ on:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
 
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
   group: persiawar-unity-android-${{ github.ref }}
   cancel-in-progress: true
@@ -182,13 +186,18 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Request Unity activation file
-        if: ${{ env.UNITY_SERIAL == '' }}
-        id: request-alf
-        uses: game-ci/unity-request-activation-file@v2
+      - name: Download known-good GitHub activation request
+        if: ${{ steps.prepare-license.outputs.mode == 'personal' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: Unity-v2022.3.62f1-activation
+          path: activation-artifact
+          repository: ${{ github.repository }}
+          run-id: 36434270573
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Convert ALF to ULF using Unity account
-        if: ${{ env.UNITY_SERIAL == '' }}
+        if: ${{ steps.prepare-license.outputs.mode == 'personal' }}
         shell: bash
         env:
           UNITY_EMAIL_INPUT: ${{ secrets.UNITY_EMAIL }}
@@ -197,9 +206,12 @@ jobs:
           set -euo pipefail
           npm install --global unity-license-activate@0.3.9
 
-          alf="${{ steps.request-alf.outputs.filePath }}"
-          test -f "$alf"
-          echo "Received Unity activation request: $alf"
+          alf="$(find activation-artifact -maxdepth 2 -type f -name '*.alf' -print -quit)"
+          if [[ -z "$alf" ]]; then
+            echo "::error::The stored Unity activation artifact did not contain a .alf file."
+            exit 1
+          fi
+          echo "Using Unity activation request from the verified activation run."
 
           rm -f ./*.ulf
           unity-license-activate "$UNITY_EMAIL_INPUT" "$UNITY_PASSWORD_INPUT" "$alf"
@@ -277,4 +289,4 @@ jobs:
           path: build/Android/*.apk
           if-no-files-found: error
 
-# Build trigger: 2026-09-30 automatic Personal-license fallback
+# Build trigger: 2026-09-30 automatic Personal-license activation via stored ALF
