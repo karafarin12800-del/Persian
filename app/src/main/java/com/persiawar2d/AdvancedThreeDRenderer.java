@@ -1,6 +1,8 @@
 package com.persiawar2d;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
@@ -35,7 +37,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private float yaw = 0.78f;
     private float moveX, moveY;
     private float lastX, lastY;
-    private boolean moving, aiming;
+    private boolean moving, aiming, gameOver;
     private long lastNanos;
     private float fireCooldown;
     private float playerVX, playerVZ;
@@ -181,6 +183,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         long now = System.nanoTime();
         float dt = Math.min(.033f, Math.max(.001f, (now - lastNanos) / 1_000_000_000f));
         lastNanos = now;
+        if (gameOver) return;
         fireCooldown = Math.max(0, fireCooldown - dt);
         muzzleFlash = Math.max(0, muzzleFlash - dt);
         weaponKick = Math.max(0, weaponKick - dt * 5f);
@@ -401,6 +404,25 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         return n;
     }
 
+    public void reload() {
+        if(gameOver || ammo>=30 || reserve<=0)return;
+        int add=Math.min(30-ammo,reserve);
+        ammo+=add;reserve-=add;
+    }
+
+    public void throwGrenade() {
+        if(gameOver || grenades<=0 || hp<=0)return;
+        grenades--;
+        float fx=(float)Math.sin(yaw),fz=(float)Math.cos(yaw);
+        projectiles.add(new Projectile(px+fx*.75f,1.0f,pz+fz*.75f,fx*9.2f,fz*9.2f,.82f,90f,true,true,3.8f));
+    }
+
+    public void resetBattle() {
+        px=0f;pz=0f;hp=100;ammo=30;reserve=120;kills=0;grenades=3;wave=1;
+        gameOver=false;nextWaveAt=0;fireCooldown=0;muzzleFlash=0;weaponKick=0;
+        projectiles.clear();spawnEnemies();spawnPickups();
+    }
+
     private void collectPickups() {
         for (int i = pickups.size()-1; i >= 0; i--) {
             Pickup p = pickups.get(i);
@@ -439,7 +461,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     private void fire() {
-        if (ammo<=0 || fireCooldown>0 || hp<=0) return;
+        if (gameOver || ammo<=0 || fireCooldown>0 || hp<=0) return;
         ammo--;
         fireCooldown=.20f;
         muzzleFlash=.10f;
