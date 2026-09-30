@@ -43,7 +43,6 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
-            DontDestroyOnLoad(gameObject);
             player = FindFirstObjectByType<PlayerController>();
             enemySpawner = FindFirstObjectByType<EnemySpawner>();
             mobileInput = FindFirstObjectByType<MobileInputHub>();
