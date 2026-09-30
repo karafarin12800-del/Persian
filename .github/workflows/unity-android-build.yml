@@ -166,12 +166,12 @@ jobs:
           mkdir -p UnityProject/Assets/Editor
           cat > UnityProject/Assets/Editor/PersiaWarCiBuild.cs <<'CS'
           using System;
-          using System;
           using System.IO;
           using UnityEditor;
           using UnityEditor.Build;
           using UnityEditor.Build.Reporting;
           using UnityEngine;
+          using UnityEngine.Rendering;
 
           public static class PersiaWarCiBuild
           {
@@ -191,6 +191,20 @@ jobs:
                       ScriptingImplementation.IL2CPP
                   );
                   PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+
+                  // Mobile compatibility hardening: explicitly avoid Vulkan on the target device class.
+                  // OpenGLES3 is broadly supported on the project's Android minimum/target range and
+                  // removes a common native startup failure path while leaving gameplay code unchanged.
+                  PlayerSettings.SetGraphicsAPIs(
+                      NamedBuildTarget.Android,
+                      new[] { GraphicsDeviceType.OpenGLES3 }
+                  );
+                  PlayerSettings.colorSpace = ColorSpace.Gamma;
+
+                  var graphicsApis = PlayerSettings.GetGraphicsAPIs(NamedBuildTarget.Android);
+                  Console.WriteLine("UNITY_ANDROID_GRAPHICS_API:" + string.Join(",", graphicsApis));
+                  if (graphicsApis.Length != 1 || graphicsApis[0] != GraphicsDeviceType.OpenGLES3)
+                      throw new Exception("Android graphics API was not forced to OpenGLES3.");
 
                   var backend = PlayerSettings.GetScriptingBackend(NamedBuildTarget.Android);
                   var architecture = PlayerSettings.Android.targetArchitectures;
@@ -374,7 +388,7 @@ jobs:
           print("APK ZIP integrity: OK")
           print("ARM64 IL2CPP ABI: OK")
           PY
-          echo "Verified Unity APK: build/Android/PersiaWar.apk (valid ZIP + ARM64 IL2CPP ABI)"
+          echo "Verified Unity APK: build/Android/PersiaWar.apk (valid ZIP + ARM64 IL2CPP ABI + OpenGLES3)"
 
       - name: Verify APK
         shell: bash
