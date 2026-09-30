@@ -1,0 +1,2 @@
+Unity Android CI trigger for verified build pipeline.
+Latest CI fix commit: 627d40d6a16fb2b5eed31669b3210b098033bcd2
