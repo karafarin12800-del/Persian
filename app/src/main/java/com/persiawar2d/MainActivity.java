@@ -1139,10 +1139,13 @@ public final class MainActivity extends Activity {
             if(x<getWidth()*.48f&&y>HUD&&joyPointer<0){
                 joyPointer=id;
                 joyActive=true;
-                joyX=joyBaseX=x;
-                joyY=joyBaseY=y;
-                input.moveX=0;
-                input.moveY=0;
+                // Fixed joystick: keep the base anchored in the lower-left.
+                // The touch position becomes the handle position, clamped to the base radius.
+                joyBaseX=idleJoyX();
+                joyBaseY=idleJoyY();
+                joyX=joyBaseX;
+                joyY=joyBaseY;
+                setJoy(x,y);
                 return;
             }
             if(x>getWidth()*.48f&&y>HUD&&aimPointer<0){
@@ -1164,6 +1167,9 @@ public final class MainActivity extends Activity {
             if(l>0){
                 joyX=joyBaseX+dx/l*u;
                 joyY=joyBaseY+dy/l*u;
+            }else{
+                joyX=joyBaseX;
+                joyY=joyBaseY;
             }
             input.moveX=(joyX-joyBaseX)/max;
             input.moveY=(joyY-joyBaseY)/max;
