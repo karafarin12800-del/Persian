@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: persiawar-unity-android-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validate:
