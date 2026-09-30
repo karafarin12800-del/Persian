@@ -4,7 +4,7 @@
 
 ## وضعیت فعلی
 - Unity project skeleton
-- Scene اولیه `Assets/Scenes/PersiaWarPrototype.unity`
+- Scene بوت سبک `Assets/Scenes/BootScene.unity` و Scene بازی `Assets/Scenes/PersiaWarPrototype.unity`
 - دوربین 2.5D و دنبال‌کردن بازیکن
 - حرکت بازیکن با ورودی موبایل و Keyboard در Editor
 - محدوده جهان 1056×1056
@@ -16,9 +16,13 @@ Assetهای اصلی Android در `main` باقی مانده‌اند و منب�
 
 ## اجرا
 1. پوشه `UnityProject` را به‌عنوان پروژه در Unity 2022.3 LTS باز کنید.
-2. Scene `Assets/Scenes/PersiaWarPrototype.unity` را باز کنید.
+2. برای اجرای عادی، Build Settings باید `BootScene` را در index 0 و `PersiaWarPrototype` را در index 1 داشته باشد. برای تست مستقیم داخل Editor می‌توانید Scene بازی را باز کنید.
 3. Play را بزنید؛ در Editor با WASD/Arrow حرکت کنید.
 4. در Android ورودی لمسی از `MobileInputHub` استفاده می‌کند.
 
 ## محدودیت این مرحله
 خروجی APK در این محیط ساخته نشده است، چون Unity Editor و Android Build Support داخل محیط اجرای فعلی در دسترس نیست. کد و ساختار روی شاخه GitHub آماده شده‌اند تا در Unity Build شوند.
+
+## Android startup
+
+در اجرای Android ابتدا `BootScene` به‌صورت بسیار سبک اجرا می‌شود و سپس `PersiaWarPrototype` با `SceneManager.LoadSceneAsync` در پس‌زمینه آماده می‌شود. Activation صحنه بازی تا رسیدن بارگذاری به نقطه 0.9 و نمایش حداقل یک فریم Boot به تأخیر می‌افتد تا Startup اولیه سبک بماند.
