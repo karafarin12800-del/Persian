@@ -337,8 +337,18 @@ jobs:
 
           test -s build/Android/PersiaWar.apk
           unzip -t build/Android/PersiaWar.apk >/dev/null
-          unzip -l build/Android/PersiaWar.apk | grep -q 'lib/arm64-v8a/'
-          unzip -l build/Android/PersiaWar.apk | grep -q 'lib/arm64-v8a/libil2cpp.so'
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          apk = Path("build/Android/PersiaWar.apk")
+          with zipfile.ZipFile(apk) as z:
+              names = set(z.namelist())
+          assert any(name.startswith("lib/arm64-v8a/") for name in names), "ARM64 ABI directory missing"
+          assert "lib/arm64-v8a/libil2cpp.so" in names, "ARM64 libil2cpp.so missing"
+          print("APK ZIP integrity: OK")
+          print("ARM64 IL2CPP ABI: OK")
+          PY
           echo "Verified Unity APK: build/Android/PersiaWar.apk (valid ZIP + ARM64 IL2CPP ABI)"
 
       - name: Verify APK
