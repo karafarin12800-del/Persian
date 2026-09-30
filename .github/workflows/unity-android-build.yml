@@ -123,7 +123,12 @@ jobs:
         run: |
           set -euo pipefail
           echo "Unity APK source commit: $(git rev-parse HEAD)"
-          test "$(git rev-parse HEAD)" = "${{ inputs.build_ref || github.sha }}" || {
+          expected_ref="${{ inputs.build_ref || github.sha }}"
+          expected_sha="$(git rev-parse "$expected_ref^{commit}")"
+          actual_sha="$(git rev-parse HEAD)"
+          echo "Expected build source: $expected_sha"
+          echo "Actual checkout: $actual_sha"
+          test "$actual_sha" = "$expected_sha" || {
             echo "::error::Checkout SHA does not match the requested build source."
             exit 1
           }
@@ -172,15 +177,15 @@ jobs:
                   var output = "build/Android/PersiaWar.apk";
                   Directory.CreateDirectory("build/Android");
 
-                  var scenes = new System.Collections.Generic.List<string>();
-                  foreach (var scene in EditorBuildSettings.scenes)
-                  {
-                      if (scene.enabled)
-                          scenes.Add(scene.path);
-                  }
+                  const string scenePath = "Assets/Scenes/PersiaWarPrototype.unity";
+                  if (!File.Exists(Path.Combine(Application.dataPath, "Scenes/PersiaWarPrototype.unity")))
+                      throw new Exception("Required scene is missing: " + scenePath);
 
-                  if (scenes.Count == 0)
-                      throw new Exception("No enabled scenes found in EditorBuildSettings.");
+                  var scenes = new[] { scenePath };
+                  EditorBuildSettings.scenes = new[]
+                  {
+                      new EditorBuildSettingsScene(scenePath, true)
+                  };
 
                   var report = BuildPipeline.BuildPlayer(
                       scenes.ToArray(),
