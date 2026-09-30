@@ -247,9 +247,10 @@ public class MainActivity extends Activity {
         void drawHud(Canvas c){
             p.setStyle(Paint.Style.FILL);p.setColor(0xE8171A18);c.drawRect(0,0,getWidth(),HUD_H,p);
             p.setColor(0xCC2A2924);c.drawRoundRect(14,9,300,HUD_H-9,18,18,p);
-            p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.LEFT);p.setTextSize(20);p.setColor(0xFFF0C86A);c.drawText("PERSIA WAR",30,31,p);
-            p.setTypeface(Typeface.DEFAULT);p.setTextSize(12);p.setColor(0xFFD8D1BF);c.drawText("ROYAL GUARD  •  2.5D",30,51,p);
-            p.setTextSize(14);p.setColor(Color.WHITE);c.drawText("KILLS  "+score,30,70,p);
+            if(achaemenidPlayerArt!=null){achaemenidPlayerArt.setBounds(20,16,72,68);achaemenidPlayerArt.draw(c);}
+            p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.LEFT);p.setTextSize(20);p.setColor(0xFFF0C86A);c.drawText("PERSIA WAR",84,31,p);
+            p.setTypeface(Typeface.DEFAULT);p.setTextSize(12);p.setColor(0xFFD8D1BF);c.drawText("ROYAL GUARD  •  2.5D",84,51,p);
+            p.setTextSize(14);p.setColor(Color.WHITE);c.drawText("KILLS  "+score,84,70,p);
             float cx=getWidth()*.5f;p.setColor(0xCC2A2924);c.drawRoundRect(cx-180,9,cx+180,HUD_H-9,18,18,p);
             p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(15);p.setColor(0xFFEAD9AE);c.drawText("WAVE  "+wave,cx,30,p);
             float bw=220,bx=cx-bw/2f,by=43;p.setColor(0xFF151714);c.drawRoundRect(bx,by,bx+bw,by+15,8,8,p);
