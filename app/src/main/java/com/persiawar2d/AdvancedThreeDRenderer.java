@@ -388,6 +388,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
                 if(!blocked(e.x,nz,.45f))e.z=nz;
             } else {
                 hp=Math.max(0,hp-(int)Math.ceil(7f*dt));
+                if(hp<=0) gameOver=true;
             }
 
             if(d<16f&&now-e.lastShot>1200){
@@ -421,6 +422,18 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         px=0f;pz=0f;hp=100;ammo=30;reserve=120;kills=0;grenades=3;wave=1;
         gameOver=false;nextWaveAt=0;fireCooldown=0;muzzleFlash=0;weaponKick=0;
         projectiles.clear();spawnEnemies();spawnPickups();
+    }
+
+    private void explodeAt(float x,float z,float damage,float radius) {
+        for(Enemy e:enemies) {
+            if(e.hp<=0) continue;
+            float d=(float)Math.hypot(e.x-x,e.z-z);
+            if(d<=radius) {
+                int dealt=Math.max(20,Math.round(damage*(1f-d/radius)));
+                e.hp-=dealt;
+                if(e.hp<=0){e.hp=0;kills++;}
+            }
+        }
     }
 
     private void collectPickups() {
@@ -491,7 +504,10 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
             b.x += b.vx*dt;
             b.z += b.vz*dt;
             b.life -= dt;
-            if (b.life<=0 || b.x<-36 || b.x>36 || b.z<-36 || b.z>36 || blocked(b.x,b.z,.10f)) {
+            boolean expired=b.life<=0f;
+            boolean out=b.x<-36f||b.x>36f||b.z<-36f||b.z>36f||blocked(b.x,b.z,.10f);
+            if (expired || out) {
+                if (b.explosive && expired) explodeAt(b.x,b.z,b.damage,b.splashRadius);
                 projectiles.remove(i);
                 continue;
             }
@@ -502,12 +518,14 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
                     if (segmentDistance(e.x,e.z,oldX,oldZ,b.x,b.z)<.65f) {
                         e.hp -= b.damage;
                         if (e.hp<=0) { e.hp=0; kills++; }
+                        if (b.explosive) explodeAt(b.x,b.z,b.damage,b.splashRadius);
                         remove=true;
                         break;
                     }
                 }
             } else if (Math.hypot(px-b.x,pz-b.z)<.58f) {
                 hp=Math.max(0,hp-Math.round(b.damage));
+                if (hp<=0) gameOver=true;
                 remove=true;
             }
             if (remove) projectiles.remove(i);
@@ -525,7 +543,8 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private void drawProjectile(Projectile b) {
         float glow=(float)(.65+.35*Math.sin(animationTime*18f));
         if(b.fromPlayer) {
-            box(b.x,.92f,b.z,.22f,.18f,.48f,1.0f*glow,.68f,.20f);
+            if(b.explosive) box(b.x,.98f,b.z,.34f,.34f,.34f,.28f,.58f,.30f);
+            else box(b.x,.92f,b.z,.22f,.18f,.48f,1.0f*glow,.68f,.20f);
         } else {
             box(b.x,.92f,b.z,.24f,.18f,.52f,.85f,.16f,.10f);
         }
