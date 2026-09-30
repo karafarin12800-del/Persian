@@ -31,8 +31,6 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private final float[] model = new float[16], mvp = new float[16];
 
     private FloatBuffer cube;
-    // Character art is rendered as lightweight low-poly meshes instead of gameplay cubes.
-    private FloatBuffer sphereMesh, frustumMesh;
     private int colorProgram, aPos, uColor, uMatrix;
 
     private float px = 0f, pz = 0f;
@@ -171,8 +169,6 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         uColor = GLES20.glGetUniformLocation(colorProgram, "C");
         uMatrix = GLES20.glGetUniformLocation(colorProgram, "M");
         cube = buf(makeCube());
-        sphereMesh = buf(makeSphere(8, 16));
-        frustumMesh = buf(makeFrustum(0.34f, 0.34f, 2.0f, 14));
         lastNanos = System.nanoTime();
     }
 
@@ -311,243 +307,22 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     /**
-     * Visual-only player pass.
+     * Visual-only player hook.
      *
-     * Gameplay state (position, velocity, yaw, weapon kick, muzzle flash, etc.)
-     * is consumed exactly as before. This method only changes how the player is
-     * rendered so the character reads as a Persian warrior rather than a stack
-     * of cubes.
+     * Gameplay movement, aiming and firing remain untouched. The actual King
+     * sprite is composited by ThreeDGameActivity/KingSpriteDrawable so the
+     * character can use the existing high-resolution artwork without changing
+     * gameplay state or collision logic.
      */
     private void drawPlayer() {
-        float speed = (float)Math.hypot(playerVX, playerVZ);
-        float locomotion = Math.min(1f, speed / 5.8f);
-        float phase = animationTime * (7.0f + locomotion * 5.0f);
-        float stride = (float)Math.sin(phase) * .34f * locomotion;
-        float bob = Math.abs((float)Math.sin(phase)) * .045f * locomotion;
-
-        float fx = (float)Math.sin(yaw);
-        float fz = (float)Math.cos(yaw);
-        float rx = fz;
-        float rz = -fx;
-
-        // Soft contact shadow: visual only, deliberately flat and dark.
-        drawEllipsoid(px, .055f, pz, .72f, .055f, .52f, .05f, .055f, .05f);
-
-        // Boots and articulated legs.
-        float legY = .55f + bob * .45f;
-        float leftStrideX = rx * (-.17f) + fx * (stride * .26f);
-        float leftStrideZ = rz * (-.17f) + fz * (stride * .26f);
-        float rightStrideX = rx * (.17f) + fx * (-stride * .26f);
-        float rightStrideZ = rz * (.17f) + fz * (-stride * .26f);
-
-        drawCylinderBetween(
-                px + leftStrideX, .22f, pz + leftStrideZ,
-                px + leftStrideX, .72f, pz + leftStrideZ,
-                .16f, .18f, .15f, .12f, .08f);
-        drawCylinderBetween(
-                px + rightStrideX, .22f, pz + rightStrideZ,
-                px + rightStrideX, .72f, pz + rightStrideZ,
-                .16f, .18f, .15f, .12f, .08f);
-        drawEllipsoid(px + leftStrideX + fx*.02f, .16f, pz + leftStrideZ + fz*.02f,
-                .25f, .12f, .34f, .09f, .065f, .045f);
-        drawEllipsoid(px + rightStrideX + fx*.02f, .16f, pz + rightStrideZ + fz*.02f,
-                .25f, .12f, .34f, .09f, .065f, .045f);
-
-        // Layered tunic + bronze chest guard.
-        drawEllipsoid(px, 1.18f + bob, pz, .52f, .72f, .34f, .08f, .20f, .22f);
-        drawEllipsoid(px + fx*.025f, 1.30f + bob, pz + fz*.025f,
-                .42f, .43f, .29f, .46f, .31f, .13f);
-
-        // Shoulder mantle and belt create a readable silhouette at phone scale.
-        drawEllipsoid(px, 1.67f + bob, pz, .63f, .16f, .39f, .19f, .11f, .075f);
-        drawEllipsoid(px, .96f + bob, pz, .50f, .10f, .33f, .55f, .37f, .12f);
-
-        // Head, hair, beard and Persian-style crown/helmet.
-        drawEllipsoid(px, 2.13f + bob, pz, .31f, .36f, .28f, .72f, .50f, .32f);
-        drawEllipsoid(px - rx*.02f, 2.02f + bob, pz - rz*.02f,
-                .27f, .18f, .25f, .10f, .075f, .055f);
-        drawFrustum(px, 2.38f + bob, pz, .30f, .20f, .14f, .54f, .33f, .10f);
-        drawFrustum(px + fx*.01f, 2.50f + bob, pz + fz*.01f,
-                .16f, .06f, .30f, .60f, .43f, .17f);
-        drawEllipsoid(px - fx*.01f, 2.55f + bob, pz - fz*.01f,
-                .10f, .13f, .08f, .78f, .59f, .16f);
-
-        // Facial highlight/eye line: deliberately subtle so it survives small screen sizes.
-        drawEllipsoid(px + fx*.285f, 2.15f + bob, pz + fz*.285f,
-                .055f, .045f, .035f, .10f, .065f, .035f);
-        drawEllipsoid(px + fx*.285f - rx*.07f, 2.15f + bob, pz + fz*.285f - rz*.07f,
-                .040f, .020f, .025f, .78f, .68f, .38f);
-
-        // Articulated arms. Hands point toward the existing aim/yaw direction.
-        float shoulderY = 1.62f + bob;
-        float handBaseX = px + fx*.50f;
-        float handBaseZ = pz + fz*.50f;
-        float leftShoulderX = px - rx*.42f;
-        float leftShoulderZ = pz - rz*.42f;
-        float rightShoulderX = px + rx*.42f;
-        float rightShoulderZ = pz + rz*.42f;
-        drawCylinderBetween(leftShoulderX, shoulderY, leftShoulderZ,
-                px - rx*.29f + fx*.20f, 1.25f + bob, pz - rz*.29f + fz*.20f,
-                .13f, .18f, .13f, .11f, .07f);
-        drawCylinderBetween(rightShoulderX, shoulderY, rightShoulderZ,
-                px + rx*.29f + fx*.26f, 1.28f + bob, pz + rz*.29f + fz*.26f,
-                .13f, .18f, .13f, .11f, .07f);
-        drawEllipsoid(leftShoulderX - rx*.02f, shoulderY, leftShoulderZ - rz*.02f,
-                .18f, .18f, .17f, .31f, .20f, .12f);
-        drawEllipsoid(rightShoulderX + rx*.02f, shoulderY, rightShoulderZ + rz*.02f,
-                .18f, .18f, .17f, .31f, .20f, .12f);
-        drawEllipsoid(px - rx*.29f + fx*.20f, 1.20f + bob, pz - rz*.29f + fz*.20f,
-                .12f, .12f, .12f, .72f, .50f, .31f);
-        drawEllipsoid(px + rx*.29f + fx*.30f, 1.23f + bob, pz + rz*.29f + fz*.30f,
-                .12f, .12f, .12f, .72f, .50f, .31f);
-
-        // Bow: curved wooden limbs + string, aligned with the current aim direction.
-        float bx = handBaseX + rx*.02f;
-        float bz = handBaseZ + rz*.02f;
-        float bowCenterY = 1.34f + bob;
-        float bowForward = .10f;
-        float p1x = bx - rx*.20f + fx*bowForward;
-        float p1z = bz - rz*.20f + fz*bowForward;
-        float p2x = bx + fx*.08f;
-        float p2z = bz + fz*.08f;
-        float p3x = bx + rx*.20f + fx*bowForward;
-        float p3z = bz + rz*.20f + fz*bowForward;
-        drawCylinderBetween(p1x, bowCenterY+.38f, p1z, p2x, bowCenterY, p2z,
-                .038f, .22f, .14f, .055f, .025f);
-        drawCylinderBetween(p2x, bowCenterY, p2z, p3x, bowCenterY-.38f, p3z,
-                .038f, .22f, .14f, .055f, .025f);
-        drawCylinderBetween(p1x, bowCenterY+.38f, p1z, p3x, bowCenterY-.38f, p3z,
-                .018f, .70f, .62f, .54f, .38f);
-
-        // Nocked arrow gives the player a clear ranged-combat identity.
-        drawCylinderBetween(bx - fx*.02f, bowCenterY, bz - fz*.02f,
-                bx + fx*.82f, bowCenterY, bz + fz*.82f,
-                .028f, .13f, .095f, .055f, .025f);
-
-        // Existing recoil/flash values affect visuals only; firing logic is untouched.
-        float kick = weaponKick*.26f;
-        float muzzleX = px + fx*(1.08f + kick);
-        float muzzleZ = pz + fz*(1.08f + kick);
-        if (muzzleFlash > 0f) {
-            drawEllipsoid(muzzleX, 1.30f + bob, muzzleZ,
-                    .26f, .24f, .18f, 1.00f, .72f, .20f);
-            drawEllipsoid(muzzleX + fx*.20f, 1.30f + bob, muzzleZ + fz*.20f,
-                    .12f, .12f, .12f, 1.00f, .91f, .46f);
-        }
+        // Keep only the contact shadow in the 3D pass; the character art itself
+        // is drawn by the transparent Canvas overlay on top of the scene.
+        box(px, .055f, pz, 1.05f, .035f, .70f, .055f, .065f, .06f);
     }
 
-    private void drawEllipsoid(float x, float y, float z, float sx, float sy, float sz,
-                               float r, float g, float b) {
-        Matrix.setIdentityM(model,0);
-        Matrix.translateM(model,0,x,y,z);
-        Matrix.scaleM(model,0,sx,sy,sz);
-        drawMesh(sphereMesh,r,g,b);
-    }
-
-    private void drawFrustum(float x, float y, float z, float topRadius, float bottomRadius, float height,
-                             float r, float g, float b) {
-        Matrix.setIdentityM(model,0);
-        Matrix.translateM(model,0,x,y,z);
-        Matrix.scaleM(model,0,1f,height/2f,1f);
-        // frustumMesh was authored with bottom radius .34; scale uniformly to the desired footprint.
-        float base=.34f;
-        float width=Math.max(topRadius,bottomRadius)/base;
-        Matrix.scaleM(model,0,width,1f,width);
-        drawMesh(frustumMesh,r,g,b);
-    }
-
-    private void drawCylinderBetween(float x1,float y1,float z1,float x2,float y2,float z2,float radius,
-                                     float r,float g,float b) {
-        float dx=x2-x1,dy=y2-y1,dz=z2-z1;
-        float len=(float)Math.sqrt(dx*dx+dy*dy+dz*dz);
-        if(len<.0001f)return;
-        Matrix.setIdentityM(model,0);
-        Matrix.translateM(model,0,(x1+x2)*.5f,(y1+y2)*.5f,(z1+z2)*.5f);
-
-        float nx=dx/len, ny=dy/len, nz=dz/len;
-        float dot=Math.max(-1f,Math.min(1f,ny));
-        float angle=(float)Math.acos(dot)*57.29578f;
-        float ax=nz, ay=0f, az=-nx;
-        float axisLen=(float)Math.sqrt(ax*ax+az*az);
-        if(axisLen<.0001f) {
-            if(ny<0f)Matrix.rotateM(model,0,180f,1f,0f,0f);
-        } else {
-            ax/=axisLen; az/=axisLen;
-            Matrix.rotateM(model,0,angle,ax,ay,az);
-        }
-        Matrix.scaleM(model,0,radius,len/2f,radius);
-        drawMesh(frustumMesh,r,g,b);
-    }
-
-    private void drawMesh(FloatBuffer mesh,float r,float g,float b) {
-        Matrix.multiplyMM(mvp,0,vp,0,model,0);
-        GLES20.glUseProgram(colorProgram);
-        GLES20.glUniformMatrix4fv(uMatrix,1,false,mvp,0);
-        GLES20.glUniform4f(uColor,r,g,b,1f);
-        mesh.position(0);
-        GLES20.glEnableVertexAttribArray(aPos);
-        GLES20.glVertexAttribPointer(aPos,3,GLES20.GL_FLOAT,false,0,mesh);
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,mesh.capacity()/3);
-        GLES20.glDisableVertexAttribArray(aPos);
-    }
-
-    private static float[] makeSphere(int stacks,int slices) {
-        ArrayList<Float> out=new ArrayList<>();
-        for(int i=0;i<stacks;i++){
-            float v0=(float)i/stacks, v1=(float)(i+1)/stacks;
-            float p0=(float)(Math.PI*v0-Math.PI/2.0), p1=(float)(Math.PI*v1-Math.PI/2.0);
-            float y0=(float)Math.sin(p0), y1=(float)Math.sin(p1);
-            float r0=(float)Math.cos(p0), r1=(float)Math.cos(p1);
-            for(int j=0;j<slices;j++){
-                float a0=(float)(2.0*Math.PI*j/slices), a1=(float)(2.0*Math.PI*(j+1)/slices);
-                float x00=r0*(float)Math.cos(a0), z00=r0*(float)Math.sin(a0);
-                float x01=r0*(float)Math.cos(a1), z01=r0*(float)Math.sin(a1);
-                float x10=r1*(float)Math.cos(a0), z10=r1*(float)Math.sin(a0);
-                float x11=r1*(float)Math.cos(a1), z11=r1*(float)Math.sin(a1);
-                addTri(out,x00,y0,z00,x10,y1,z10,x11,y1,z11);
-                addTri(out,x00,y0,z00,x11,y1,z11,x01,y0,z01);
-            }
-        }
-        float[] a=new float[out.size()];
-        for(int i=0;i<a.length;i++)a[i]=out.get(i);
-        return a;
-    }
-
-    private static float[] makeFrustum(float topRadius,float bottomRadius,float height,int slices) {
-        ArrayList<Float> out=new ArrayList<>();
-        float hy=height*.5f;
-        for(int j=0;j<slices;j++){
-            float a0=(float)(2.0*Math.PI*j/slices), a1=(float)(2.0*Math.PI*(j+1)/slices);
-            float x0=(float)Math.cos(a0),z0=(float)Math.sin(a0);
-            float x1=(float)Math.cos(a1),z1=(float)Math.sin(a1);
-            addTri(out,bottomRadius*x0,-hy,bottomRadius*z0,topRadius*x0,hy,topRadius*x1,hy,topRadius*z1);
-            addTri(out,bottomRadius*x0,-hy,bottomRadius*x1,-hy,bottomRadius*z1,topRadius*x1,hy,topRadius*z1);
-            addTri(out,0,hy,0,topRadius*x0,hy,topRadius*z0,topRadius*x1,hy,topRadius*z1);
-            addTri(out,0,-hy,0,bottomRadius*x1,-hy,bottomRadius*z1,bottomRadius*x0,-hy,bottomRadius*z0);
-        }
-        float[] a=new float[out.size()];
-        for(int i=0;i<a.length;i++)a[i]=out.get(i);
-        return a;
-    }
-
-    private static void addTri(ArrayList<Float> out,
-                               float x1,float y1,float z1,
-                               float x2,float y2,float z2,
-                               float x3,float y3,float z3) {
-        out.add(x1);out.add(y1);out.add(z1);
-        out.add(x2);out.add(y2);out.add(z2);
-        out.add(x3);out.add(y3);out.add(z3);
-    }
-
-    private void drawPickup(Pickup p) {
-        float bob = .12f * (float)Math.sin(System.nanoTime()/180_000_000.0 + p.type);
-        if (p.type == Pickup.GRENADE)
-            box(p.x, .55f+bob, p.z, .55f, .55f, .55f, .16f, .35f, .18f);
-        else if (p.type == Pickup.AMMO)
-            box(p.x, .45f+bob, p.z, .70f, .45f, .45f, .66f, .51f, .16f);
-        else
-            box(p.x, .45f+bob, p.z, .72f, .45f, .45f, .70f, .16f, .12f);
-    }
+    public float getPlayerSpeed() { return (float)Math.hypot(playerVX, playerVZ); }
+    public float getPlayerYaw() { return yaw; }
+    public boolean isPlayerFiringVisual() { return muzzleFlash > 0f; }
 
     private void movePlayer(float dt) {
         float len = (float)Math.hypot(moveX, moveY);
