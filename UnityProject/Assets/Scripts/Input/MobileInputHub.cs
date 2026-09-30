@@ -31,7 +31,9 @@ namespace PersiaWar.Unity2D5D
             if (gameplayCamera == null) gameplayCamera = Camera.main;
             if (player != null) grenadeController = player.Grenades;
             if (moveRadius > 0f) joystickRadius = Mathf.Clamp(moveRadius * 0.86f, 90f, 150f);
-            CreateMinimap();
+
+            // GUI assets are cheap and required only for the HUD. The second camera and
+            // render target are deliberately deferred until the real match starts.
             CreateGuiTextures();
         }
 
@@ -55,6 +57,10 @@ namespace PersiaWar.Unity2D5D
                 if (player == null) return;
                 grenadeController = player.Grenades;
             }
+
+            // Minimap creation is intentionally lazy: PrototypeFlow disables this component
+            // during the hero/spawn menus, so no secondary render target is allocated at launch.
+            EnsureMinimap();
 
 #if UNITY_EDITOR || UNITY_STANDALONE
             Vector2 keyboard = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
@@ -192,8 +198,19 @@ namespace PersiaWar.Unity2D5D
             grenadeController.Throw(new Vector2(direction.x, direction.z));
         }
 
+        private void EnsureMinimap()
+        {
+            if (minimapCamera != null && minimapTexture != null)
+                return;
+
+            CreateMinimap();
+        }
+
         private void CreateMinimap()
         {
+            if (minimapCamera != null || minimapTexture != null)
+                return;
+
             GameObject mapObject = new GameObject("MinimapCamera");
             mapObject.hideFlags = HideFlags.HideAndDontSave;
             minimapCamera = mapObject.AddComponent<Camera>();
