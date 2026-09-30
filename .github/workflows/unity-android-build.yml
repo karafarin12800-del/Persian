@@ -128,92 +128,6 @@ jobs:
             Library-UnityProject-
             Library-
 
-      - name: Prepare Unity activation payload
-        id: activation
-        shell: bash
-        env:
-          UNITY_LICENSE_INPUT: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL_INPUT: ${{ secrets.UNITY_SERIAL }}
-        run: |
-          set -euo pipefail
-
-          normalize() {
-            printf '%s' "$1" | tr -d '\r' | sed 's/^[[:space:]"]*//; s/[[:space:]"]*$//'
-          }
-
-          extract_serial() {
-            grep -Eo '(PS/SC/)?[A-Za-z0-9]{2}-[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){3,5}' || true
-          }
-
-          candidate="$(normalize "${UNITY_SERIAL_INPUT:-}")"
-
-          # 1) A real Unity serial may be stored directly in UNITY_SERIAL.
-          # 2) Older setups sometimes put the Personal serial in UNITY_LICENSE.
-          if [[ -z "$candidate" ]]; then
-            candidate="$(normalize "${UNITY_LICENSE_INPUT:-}")"
-          fi
-
-          serial="$(printf '%s' "$candidate" | extract_serial | head -n1 || true)"
-
-          # Also inspect decoded content. This catches base64-wrapped serials,
-          # DeveloperData extracted from a ULF, or JSON/text wrappers.
-          decoded=""
-          if [[ -n "${UNITY_LICENSE_INPUT:-}" ]]; then
-            cleaned="$(printf '%s' "${UNITY_LICENSE_INPUT}" | tr -d '\r\n[:space:]' 2>/dev/null || true)"
-            decoded="$(printf '%s' "$cleaned" | base64 -d 2>/dev/null || true)"
-          fi
-
-          if [[ -z "$serial" ]]; then
-            serial="$(printf '%s' "${UNITY_LICENSE_INPUT:-}" | extract_serial | head -n1 || true)"
-          fi
-          if [[ -z "$serial" && -n "$decoded" ]]; then
-            serial="$(printf '%s' "$decoded" | extract_serial | head -n1 || true)"
-          fi
-
-          if [[ -n "$serial" ]]; then
-            serial="${serial#PS/SC/}"
-            printf 'UNITY_SERIAL=%s\n' "$serial" >> "$GITHUB_ENV"
-            echo "mode=serial" >> "$GITHUB_OUTPUT"
-            echo "Usable Unity serial payload detected from existing secrets."
-            exit 0
-          fi
-
-          # Accept raw ULF after removing accidental surrounding quotes or
-          # literal escaped newlines often introduced during secret creation.
-          raw_ulf="$(printf '%s' "${UNITY_LICENSE_INPUT:-}" | sed 's/\\\\n/\n/g' | tr -d '\r')"
-          if printf '%s' "$raw_ulf" | grep -q '<UnityLicense'; then
-            {
-              echo 'UNITY_LICENSE<<UNITY_LICENSE_EOF'
-              printf '%s\n' "$raw_ulf"
-              echo 'UNITY_LICENSE_EOF'
-            } >> "$GITHUB_ENV"
-            echo "mode=ulf" >> "$GITHUB_OUTPUT"
-            echo "Usable raw Unity ULF payload detected."
-            exit 0
-          fi
-
-          if printf '%s' "$decoded" | grep -q '<UnityLicense'; then
-            {
-              echo 'UNITY_LICENSE<<UNITY_LICENSE_EOF'
-              printf '%s\n' "$decoded"
-              echo 'UNITY_LICENSE_EOF'
-            } >> "$GITHUB_ENV"
-            echo "mode=ulf" >> "$GITHUB_OUTPUT"
-            echo "Usable base64-encoded Unity ULF payload detected."
-            exit 0
-          fi
-
-          # A manual activation request (.alf) cannot be used as a build
-          # license, so fail with an exact category rather than attempting
-          # another broken browser conversion.
-          if printf '%s' "${UNITY_LICENSE_INPUT:-}" | grep -q '<root><SystemInfo>'; then
-            echo "::error::UNITY_LICENSE contains a Unity .alf activation request, not a .ulf build license."
-            exit 1
-          fi
-
-          echo "::error::No usable Unity Personal serial or ULF license was found in the configured secrets."
-          exit 1
-
       - name: Build Unity Android APK directly
         shell: bash
         env:
@@ -268,18 +182,11 @@ jobs:
 
           rm -rf .ci-unity-home
           mkdir -p .ci-unity-home/.local/share/unity3d/Unity
-
-          if [[ "${{ steps.activation.outputs.mode }}" == "ulf" ]]; then
-            printf '%s\n' "${UNITY_LICENSE:-}" > .ci-unity-home/.local/share/unity3d/Unity/Unity_lic.ulf
-            echo "Using ULF license payload."
-          elif [[ "${steps.activation.outputs.mode}" == "serial" ]]; then
-            echo "Using Unity serial payload."
-          fi
+          mkdir -p .ci-unity-home/.config/unity3d/Unity
 
           docker run --rm \
             -e UNITY_EMAIL="$UNITY_EMAIL" \
             -e UNITY_PASSWORD="$UNITY_PASSWORD" \
-            -e UNITY_SERIAL="${UNITY_SERIAL:-}" \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$GITHUB_WORKSPACE/.ci-unity-home:/root" \
             -w /workspace \
@@ -287,19 +194,55 @@ jobs:
             bash -lc '
               set -euo pipefail
 
-              if [[ -n "${UNITY_SERIAL:-}" ]]; then
-                echo "Activating Unity with serial..."
-                unity-editor -batchmode -nographics -quit \
-                  -serial "$UNITY_SERIAL" \
-                  -username "$UNITY_EMAIL" \
-                  -password "$UNITY_PASSWORD" \
-                  -logFile -
-              else
-                echo "Using supplied ULF license..."
-                test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
+              echo "Checking Unity Licensing Client availability..."
+              find /opt /usr /root -type f -name "Unity.Licensing.Client" -perm -111 2>/dev/null | head -n 10 || true
+
+              echo "Installing direct Unity Licensing Client wrapper..."
+              if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+                apt-get update -qq
+                apt-get install -y -qq nodejs npm
               fi
 
-              echo "Building the existing Unity project without changing its game code..."
+              npm install --no-save --no-package-lock @rage-against-the-pixel/unity-cli@2.0.0
+
+              node - <<'"'"'NODE'
+              const { LicensingClient, LicenseType } = require("@rage-against-the-pixel/unity-cli");
+
+              (async () => {
+                const email = process.env.UNITY_EMAIL;
+                const password = process.env.UNITY_PASSWORD;
+
+                if (!email || !password) {
+                  throw new Error("Unity credentials are missing.");
+                }
+
+                const client = new LicensingClient("6.x");
+
+                console.log("Activating Unity Personal license through Licensing Client...");
+                await client.Activate({
+                  licenseType: LicenseType.personal,
+                  username: email,
+                  password,
+                }, true);
+
+                const active = await client.GetActiveEntitlements();
+                console.log("Active Unity license types:", active.join(", "));
+
+                if (!active.includes(LicenseType.personal)) {
+                  throw new Error("Unity Personal license was not reported active.");
+                }
+
+                console.log("UNITY_PERSONAL_LICENSE_ACTIVATED");
+              })().catch((err) => {
+                console.error(err);
+                process.exit(1);
+              });
+              NODE
+
+              echo "Verifying persisted license file..."
+              test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
+
+              echo "Building the existing Unity project; game source is untouched..."
               unity-editor \
                 -batchmode \
                 -nographics \
