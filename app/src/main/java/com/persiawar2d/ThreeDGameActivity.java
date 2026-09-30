@@ -27,12 +27,59 @@ public final class ThreeDGameActivity extends Activity {
         surface.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
         surface.setOnTouchListener((v,e)->renderer.onTouch(e));
         root.addView(surface,new FrameLayout.LayoutParams(-1,-1));
+        root.addView(new CharacterView(),new FrameLayout.LayoutParams(-1,-1,Gravity.TOP|Gravity.START));
         root.addView(new HudView(),new FrameLayout.LayoutParams(-1,-1,Gravity.TOP|Gravity.START));
         setContentView(root);
     }
 
     @Override protected void onPause(){super.onPause();if(renderer!=null)renderer.pause();}
     @Override protected void onResume(){super.onResume();if(renderer!=null)renderer.resume();}
+
+    /** Transparent visual layer for the high-resolution King sprite. */
+    private final class CharacterView extends View {
+        private final KingSpriteDrawable sprite;
+        private final Runnable refresh=new Runnable(){@Override public void run(){invalidate();postDelayed(this,90);}};
+        private int lastAction=-1,lastDirection=-1,lastFrame=-1;
+
+        CharacterView(){
+            super(ThreeDGameActivity.this);
+            setWillNotDraw(false);
+            setClickable(false);
+            setFocusable(false);
+            sprite=new KingSpriteDrawable(ThreeDGameActivity.this);
+            post(refresh);
+        }
+
+        @Override protected void onDraw(Canvas c){
+            if(renderer==null || getWidth()<=0 || getHeight()<=0)return;
+            float yaw=renderer.getPlayerYaw();
+            float fx=(float)Math.sin(yaw), fz=(float)Math.cos(yaw);
+            int direction;
+            if(Math.abs(fz)>=Math.abs(fx)) direction=fz>=0f?0:3; // Down / Up
+            else direction=fx<0f?1:2; // Left / Right
+
+            boolean firing=renderer.isPlayerFiringVisual();
+            boolean moving=renderer.getPlayerSpeed()>.35f;
+            int action=firing?KingSpriteDrawable.ACTION_ATTACK:
+                    (moving?KingSpriteDrawable.ACTION_WALK:KingSpriteDrawable.ACTION_IDLE);
+            float t=System.nanoTime()/1_000_000_000f;
+            int frame=(action==KingSpriteDrawable.ACTION_IDLE)?0:(int)(t*10f)%KingSpriteDrawable.FRAME_COUNT;
+
+            if(action!=lastAction || direction!=lastDirection || frame!=lastFrame){
+                sprite.setState(direction,action,frame);
+                lastAction=action;lastDirection=direction;lastFrame=frame;
+            }
+
+            float h=getHeight();
+            int charH=(int)(h*.36f);
+            int charW=Math.max(1,(int)(charH*342f/1024f));
+            int cx=getWidth()/2;
+            int bottom=(int)(h*.76f);
+            int left=cx-charW/2;
+            sprite.setBounds(left,bottom-charH,left+charW,bottom);
+            sprite.draw(c);
+        }
+    }
 
     private final class HudView extends View {
         private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
