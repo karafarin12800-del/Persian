@@ -14,7 +14,11 @@ Shader "PersiaWar/Lit"
         LOD 200
 
         CGPROGRAM
+#if defined(SHADER_API_MOBILE)
+        #pragma surface surf Standard noshadow
+#else
         #pragma surface surf Standard fullforwardshadows addshadow
+#endif
         #pragma target 3.0
 
         sampler2D _MainTex;
