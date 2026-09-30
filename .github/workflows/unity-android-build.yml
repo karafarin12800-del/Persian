@@ -139,7 +139,14 @@ jobs:
           IMAGE="unityci/editor:2022.3.62f1-android-3"
 
           mkdir -p .ci
-          trap 'rm -f .ci/unity-build.sh; rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs; rmdir UnityProject/Assets/Editor 2>/dev/null || true; rm -rf .ci-unity-home' EXIT
+          cleanup() {
+            sudo chown -R "$(id -u):$(id -g)" .ci UnityProject/Assets/Editor .ci-unity-home 2>/dev/null || true
+            rm -f .ci/unity-build.sh
+            rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs UnityProject/Assets/Editor/PersiaWarCiBuild.cs.meta
+            rmdir UnityProject/Assets/Editor 2>/dev/null || true
+            rm -rf .ci-unity-home
+          }
+          trap cleanup EXIT
 
           mkdir -p UnityProject/Assets/Editor
           cat > UnityProject/Assets/Editor/PersiaWarCiBuild.cs <<'CS'
