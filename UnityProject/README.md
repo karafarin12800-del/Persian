@@ -26,3 +26,10 @@ Assetهای اصلی Android در `main` باقی مانده‌اند و منب�
 ## Android startup
 
 در اجرای Android ابتدا `BootScene` به‌صورت بسیار سبک اجرا می‌شود و سپس `PersiaWarPrototype` با `SceneManager.LoadSceneAsync` در پس‌زمینه آماده می‌شود. Activation صحنه بازی تا رسیدن بارگذاری به نقطه 0.9 و نمایش حداقل یک فریم Boot به تأخیر می‌افتد تا Startup اولیه سبک بماند.
+
+### Startup acceptance test
+
+- APK launch must first show the lightweight `PERSIA WAR` preparation screen.
+- The gameplay scene must not be visible before the loading bar reaches the end and activation is requested.
+- Android logcat should contain `PERSIA_BOOT_STAGE: BootSceneStarted`, `MainSceneLoadStarted`, `MainSceneActivationRequested`, and `MainSceneActivated` during a normal startup.
+- `Hero Select` remains the first gameplay UI after the main scene activates; the existing match flow is preserved.
