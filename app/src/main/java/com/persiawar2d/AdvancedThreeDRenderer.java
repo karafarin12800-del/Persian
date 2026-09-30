@@ -324,6 +324,16 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     public float getPlayerYaw() { return yaw; }
     public boolean isPlayerFiringVisual() { return muzzleFlash > 0f; }
 
+    private void drawPickup(Pickup p) {
+        float bob = .12f * (float)Math.sin(System.nanoTime()/180_000_000.0 + p.type);
+        if (p.type == Pickup.GRENADE)
+            box(p.x, .55f+bob, p.z, .55f, .55f, .55f, .16f, .35f, .18f);
+        else if (p.type == Pickup.AMMO)
+            box(p.x, .45f+bob, p.z, .70f, .45f, .45f, .66f, .51f, .16f);
+        else
+            box(p.x, .45f+bob, p.z, .72f, .45f, .45f, .70f, .16f, .12f);
+    }
+
     private void movePlayer(float dt) {
         float len = (float)Math.hypot(moveX, moveY);
         float targetVX = 0f, targetVZ = 0f;
