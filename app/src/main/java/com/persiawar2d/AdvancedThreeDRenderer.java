@@ -85,7 +85,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         addBuilding(-32f, 18f, 5.0f, 7.0f, 3.5f, style++);
         addBuilding(32f, -18f, 5.0f, 7.0f, 4.0f, style++);
 
-        for (int i = 0; i < 70; i++) {
+        for (int i = 0; i < 24; i++) {
             float x = -34f + random.nextFloat() * 68f;
             float z = -34f + random.nextFloat() * 68f;
             if (isOnRoad(x, z, 1.5f) || blocked(x, z, 1.0f)) continue;
@@ -221,10 +221,24 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
             box(cx, .02f, cz, len, .06f, r.width, .10f, .11f, .10f);
             box(cx, .055f, cz - r.width*.43f, len, .03f, .13f, .34f, .35f, .30f);
             box(cx, .055f, cz + r.width*.43f, len, .03f, .13f, .34f, .35f, .30f);
+            for(float x=r.x1+1.7f;x<r.x2-1.0f;x+=3.8f) {
+                box(x, .075f, cz, 2.0f, .025f, .09f, .74f, .68f, .38f);
+            }
+            for(float x=r.x1+1.0f;x<r.x2-1.0f;x+=9.0f) {
+                box(x, .075f, cz-r.width*.49f, 4.0f, .018f, .08f, .55f, .56f, .50f);
+                box(x, .075f, cz+r.width*.49f, 4.0f, .018f, .08f, .55f, .56f, .50f);
+            }
         } else {
             box(cx, .02f, cz, r.width, .06f, len, .10f, .11f, .10f);
             box(cx - r.width*.43f, .055f, cz, .13f, .03f, len, .34f, .35f, .30f);
             box(cx + r.width*.43f, .055f, cz, .13f, .03f, len, .34f, .35f, .30f);
+            for(float z=r.z1+1.7f;z<r.z2-1.0f;z+=3.8f) {
+                box(cx, .075f, z, .09f, .025f, 2.0f, .74f, .68f, .38f);
+            }
+            for(float z=r.z1+1.0f;z<r.z2-1.0f;z+=9.0f) {
+                box(cx-r.width*.49f, .075f, z, .08f, .018f, 4.0f, .55f, .56f, .50f);
+                box(cx+r.width*.49f, .075f, z, .08f, .018f, 4.0f, .55f, .56f, .50f);
+            }
         }
     }
 
@@ -237,6 +251,8 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         // Roof slab gives a clear 2.5D silhouette instead of flat brown rectangles.
         box(b.x, b.h + .12f, b.z, b.w + .18f, .22f, b.d + .18f,
                 .16f, .13f, .10f);
+        box(b.x, b.h + .25f, b.z, Math.min(b.w*.42f,1.9f), .16f, Math.min(b.d*.42f,1.7f),
+                .22f, .18f, .13f);
 
         // Lit facade panels/windows.
         float frontZ = b.z - b.d*.5f - .012f;
