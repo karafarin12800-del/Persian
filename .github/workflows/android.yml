@@ -92,3 +92,5 @@ jobs:
           name: PersiaWar2D-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+# Validation rerun marker: stable baseline only; gameplay code intentionally untouched.
