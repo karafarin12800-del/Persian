@@ -133,10 +133,13 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        timeout-minutes: 30
+        timeout-minutes: 45
         run: |
           set -euo pipefail
           IMAGE="unityci/editor:2022.3.62f1-android-3"
+
+          mkdir -p .ci
+          trap 'rm -f .ci/unity-build.sh; rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs; rmdir UnityProject/Assets/Editor 2>/dev/null || true' EXIT
 
           mkdir -p UnityProject/Assets/Editor
           cat > UnityProject/Assets/Editor/PersiaWarCiBuild.cs <<'CS'
@@ -175,10 +178,122 @@ jobs:
                   if (report.summary.totalErrors > 0)
                       throw new Exception("Unity Android build reported " + report.summary.totalErrors + " error(s).");
 
+                  if (!File.Exists(output) || new FileInfo(output).Length == 0)
+                      throw new Exception("Unity reported success but APK file is missing or empty.");
+
                   Console.WriteLine("UNITY_BUILD_SUCCEEDED:" + output);
               }
           }
           CS
+
+          cat > .ci/unity-build.sh <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          export DEBIAN_FRONTEND=noninteractive
+          NODE_VERSION="22.14.0"
+          NODE_ROOT="/opt/node-v22.14.0-linux-x64"
+          export PATH="/opt/node-v22.14.0-linux-x64/bin:$PATH"
+
+          echo "=== Preparing Node.js 22 ==="
+          if [[ ! -x "/opt/node-v22.14.0-linux-x64/bin/node" ]]; then
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends ca-certificates curl wget gnupg xz-utils
+            curl -fsSL "https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz" -o /tmp/node.tar.xz
+            rm -rf "/opt/node-v22.14.0-linux-x64"
+            tar -xJf /tmp/node.tar.xz -C /opt
+            rm -f /tmp/node.tar.xz
+          fi
+          node --version
+          npm --version
+
+          echo "=== Installing Unity Hub ==="
+          if [[ ! -x /usr/lib/unityhub/unityhub && ! -x /opt/unityhub/unityhub ]]; then
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends ca-certificates wget gnupg xvfb
+            mkdir -p /usr/share/keyrings
+            wget -qO - https://hub.unity3d.com/linux/keys/public | gpg --dearmor > /usr/share/keyrings/Unity_Technologies_ApS.gpg
+            rm -f /etc/apt/sources.list.d/unityhub.list
+            cat > /etc/apt/sources.list.d/unityhub.sources <<'EOF'
+          Types: deb
+          URIs: https://hub.unity3d.com/linux/repos/deb
+          Suites: stable
+          Components: main
+          Signed-By: /usr/share/keyrings/Unity_Technologies_ApS.gpg
+          EOF
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends unityhub
+          fi
+
+          if [[ -x /usr/lib/unityhub/unityhub ]]; then
+            echo "Unity Hub found at /usr/lib/unityhub/unityhub"
+          elif [[ -x /opt/unityhub/unityhub ]]; then
+            echo "Unity Hub found at /opt/unityhub/unityhub"
+          else
+            echo "::error::Unity Hub binary was not found after installation."
+            exit 1
+          fi
+
+          echo "=== Installing current Unity Licensing Client ==="
+          rm -rf /tmp/unity-license-runtime
+          mkdir -p /tmp/unity-license-runtime
+          npm install --prefix /tmp/unity-license-runtime --no-save --no-package-lock @rage-against-the-pixel/unity-cli@2.0.0
+
+          cat > /tmp/activate-unity.js <<'JS'
+          const { LicensingClient, LicenseType } = require("@rage-against-the-pixel/unity-cli");
+
+          (async () => {
+            const email = process.env.UNITY_EMAIL;
+            const password = process.env.UNITY_PASSWORD;
+
+            if (!email || !password) {
+              throw new Error("Unity credentials are missing.");
+            }
+
+            const client = new LicensingClient("6.x");
+
+            console.log("Activating Unity Personal license...");
+            await client.Activate({
+              licenseType: LicenseType.personal,
+              username: email,
+              password,
+            }, true);
+
+            const active = await client.GetActiveEntitlements();
+            console.log("Active Unity entitlements: " + active.join(", "));
+
+            if (!active.includes(LicenseType.personal)) {
+              throw new Error("Unity Personal entitlement is not active.");
+            }
+
+            console.log("UNITY_PERSONAL_LICENSE_ACTIVATED");
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          JS
+
+          NODE_PATH=/tmp/unity-license-runtime/node_modules node /tmp/activate-unity.js
+
+          test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
+          echo "Unity Personal license file created successfully."
+
+          echo "=== Building existing Unity project ==="
+          cd /workspace
+          unity-editor \
+            -batchmode \
+            -nographics \
+            -quit \
+            -accept-apiupdate \
+            -projectPath /workspace/UnityProject \
+            -buildTarget Android \
+            -executeMethod PersiaWarCiBuild.BuildAndroid \
+            -logFile -
+
+          test -s /workspace/build/Android/PersiaWar.apk
+          echo "UNITY_APK_READY:/workspace/build/Android/PersiaWar.apk"
+          SH
+          chmod +x .ci/unity-build.sh
 
           rm -rf .ci-unity-home
           mkdir -p .ci-unity-home/.local/share/unity3d/Unity
@@ -191,76 +306,11 @@ jobs:
             -v "$GITHUB_WORKSPACE/.ci-unity-home:/root" \
             -w /workspace \
             "$IMAGE" \
-            bash -lc '
-              set -euo pipefail
-
-              echo "Checking Unity Licensing Client availability..."
-              find /opt /usr /root -type f -name "Unity.Licensing.Client" -perm -111 2>/dev/null | head -n 10 || true
-
-              echo "Installing direct Unity Licensing Client wrapper..."
-              if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-                apt-get update -qq
-                apt-get install -y -qq nodejs npm
-              fi
-
-              npm install --no-save --no-package-lock @rage-against-the-pixel/unity-cli@2.0.0
-
-              node - <<'"'"'NODE'
-              const { LicensingClient, LicenseType } = require("@rage-against-the-pixel/unity-cli");
-
-              (async () => {
-                const email = process.env.UNITY_EMAIL;
-                const password = process.env.UNITY_PASSWORD;
-
-                if (!email || !password) {
-                  throw new Error("Unity credentials are missing.");
-                }
-
-                const client = new LicensingClient("6.x");
-
-                console.log("Activating Unity Personal license through Licensing Client...");
-                await client.Activate({
-                  licenseType: LicenseType.personal,
-                  username: email,
-                  password,
-                }, true);
-
-                const active = await client.GetActiveEntitlements();
-                console.log("Active Unity license types:", active.join(", "));
-
-                if (!active.includes(LicenseType.personal)) {
-                  throw new Error("Unity Personal license was not reported active.");
-                }
-
-                console.log("UNITY_PERSONAL_LICENSE_ACTIVATED");
-              })().catch((err) => {
-                console.error(err);
-                process.exit(1);
-              });
-              NODE
-
-              echo "Verifying persisted license file..."
-              test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
-
-              echo "Building the existing Unity project; game source is untouched..."
-              unity-editor \
-                -batchmode \
-                -nographics \
-                -quit \
-                -accept-apiupdate \
-                -projectPath /workspace/UnityProject \
-                -buildTarget Android \
-                -executeMethod PersiaWarCiBuild.BuildAndroid \
-                -logFile -
-            '
+            bash /workspace/.ci/unity-build.sh
 
           test -s build/Android/PersiaWar.apk
           unzip -t build/Android/PersiaWar.apk >/dev/null
           echo "Verified Unity APK: build/Android/PersiaWar.apk"
-
-          rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs
-          rmdir UnityProject/Assets/Editor 2>/dev/null || true
-          rm -rf .ci-unity-home
 
       - name: Verify APK
         shell: bash
