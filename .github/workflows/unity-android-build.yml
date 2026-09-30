@@ -142,7 +142,12 @@ jobs:
             decoded="$(printf '%s' "$license" | base64 -d 2>/dev/null || true)"
             if printf '%s' "$decoded" | grep -q '<UnityLicense'; then
               echo "Unity activation mode: base64-encoded .ulf payload."
-              echo "The decoded payload will be passed to GameCI."
+              {
+                echo "UNITY_LICENSE<<UNITY_LICENSE_EOF"
+                printf "%s\\n" "$decoded"
+                echo "UNITY_LICENSE_EOF"
+              } >> "$GITHUB_ENV"
+              echo "Decoded .ulf payload exported for the build step."
             elif printf '%s' "$license" | grep -Eiq '<(MachineIdentification|MachineBindings|LicenseRequest|ActivationRequest|root)'; then
               echo "::error::UNITY_LICENSE is an activation request (.alf), not a license (.ulf)."
               exit 1
