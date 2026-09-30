@@ -119,7 +119,7 @@ public class MainActivity extends Activity {
                 return;
             }
             if(joystickDown&&Math.hypot(moveNX,moveNY)>.05){
-                movePlayer(moveNX*370f*dt,moveNY*370f*dt);
+                movePlayer(moveNX*620f*dt,moveNY*620f*dt);
                 if(now>=playerActionUntil)animatePlayer(now);
             } else if(now<playerActionUntil){
                 animateAction(now);
@@ -264,11 +264,11 @@ public class MainActivity extends Activity {
         }
         void drawControls(Canvas c){
             long age=Math.max(0,joystickVisibleUntil-System.currentTimeMillis());int alpha=joystickDown?235:(int)Math.max(42,Math.min(185,70+age/10));
-            float jx=getWidth()*.16f,jy=getHeight()*.80f;p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0x26322F);c.drawCircle(jx,jy,86,p);
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor((alpha<<24)|0xD8C98E);c.drawCircle(jx,jy,86,p);
+            float jx=getWidth()*.16f,jy=getHeight()*.80f;p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0x26322F);c.drawCircle(jx,jy,104,p);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor((alpha<<24)|0xD8C98E);c.drawCircle(jx,jy,104,p);
             p.setStyle(Paint.Style.FILL);p.setColor((alpha<<24)|0xC7A955);c.drawCircle(joyX,joyY,34,p);
             p.setStyle(Paint.Style.STROKE);p.setColor((alpha<<24)|0xFFF1D98A);c.drawCircle(joyX,joyY,34,p);
-            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(11);p.setColor(0xCCFFFFFF);c.drawText("MOVE",jx,jy+116,p);
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(11);p.setColor(0xCCFFFFFF);c.drawText("MOVE",jx,jy+132,p);
             float br=Math.max(78,Math.min(112,getHeight()*.125f));float fireX=getWidth()*.84f,fireY=getHeight()*.79f;
             actionButton(c,fireX,fireY,br,0xD17D302B,"FIRE",20);actionButton(c,getWidth()*.68f,getHeight()*.69f,br*.52f,0xB35B684B,"GRENADE",12);
             actionButton(c,getWidth()*.76f,getHeight()*.91f,br*.48f,0xB04B5651,"RELOAD",11);actionButton(c,getWidth()*.90f,getHeight()*.91f,br*.48f,0xB04B5651,"WEAPON",10);
@@ -319,7 +319,7 @@ public class MainActivity extends Activity {
         }
 
         private void updateJoystick(float x,float y){
-            float dx=x-joyBaseX,dy=y-joyBaseY,mag=Math.max(1f,(float)Math.hypot(dx,dy)),max=92f,use=Math.min(max,mag);
+            float dx=x-joyBaseX,dy=y-joyBaseY,mag=Math.max(1f,(float)Math.hypot(dx,dy)),max=112f,use=Math.min(max,mag);
             joyX=joyBaseX+dx/mag*use;joyY=joyBaseY+dy/mag*use;
             moveNX=(joyX-joyBaseX)/max;moveNY=(joyY-joyBaseY)/max;
         }
