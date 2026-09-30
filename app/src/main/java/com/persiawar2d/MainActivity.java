@@ -36,6 +36,8 @@ public class MainActivity extends Activity {
         final WorldRenderer world;
         final KingSpriteDrawable king;
         final Drawable enemyArt;
+        final Drawable achaemenidEnemyArt;
+        final Drawable achaemenidPlayerArt;
         final ArrayList<Enemy> enemies = new ArrayList<>();
         final ArrayList<Bullet> bullets = new ArrayList<>();
         final ArrayList<Pickup> pickups = new ArrayList<>();
@@ -58,6 +60,8 @@ public class MainActivity extends Activity {
             world = new WorldRenderer(context);
             king = new KingSpriteDrawable(context);
             enemyArt = context.getDrawable(R.drawable.persia_enemy);
+            achaemenidEnemyArt = context.getDrawable(R.drawable.achaemenid_enemy);
+            achaemenidPlayerArt = context.getDrawable(R.drawable.achaemenid_player);
             setFocusable(true);
             setLayerType(View.LAYER_TYPE_HARDWARE, null);
             resetGame();
@@ -98,7 +102,7 @@ public class MainActivity extends Activity {
             addPickup(Pickup.MEDKIT,clamp(px+130,180,WORLD_SIZE-180),clamp(py+390,180,WORLD_SIZE-180));
         }
         void addPickup(int type,float x,float y){if(!world.isBlocked(x,y,45))pickups.add(new Pickup(x,y,type));}
-        @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){joyBaseX=w*.17f;joyBaseY=h*.80f;joyX=joyBaseX;joyY=joyBaseY;}
+        @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){joyBaseX=w*.16f;joyBaseY=h*.80f;joyX=joyBaseX;joyY=joyBaseY;}
         float cameraScale(){return Math.min(getWidth()/2200f,Math.max(.62f,(getHeight()-HUD_H)/1180f));}
 
         @Override protected void onDraw(Canvas canvas){
@@ -212,23 +216,23 @@ public class MainActivity extends Activity {
         }
         void drawEnemy(Canvas c,Enemy e,float s){
             float x=e.x*s,y=e.y*s,bob=1.5f*(float)Math.sin((System.currentTimeMillis()+e.type*90)/125.0);
-            float dx=px-e.x,dy=py-e.y,angle=(float)Math.atan2(dy,dx);
             p.setStyle(Paint.Style.FILL);p.setColor(0x50000000);c.drawOval(x-42*s,y+42*s,x+42*s,y+62*s,p);
-            c.save();c.translate(x,y+bob*s);c.scale(1f,1f/CAMERA_PITCH);
-            int tunic=e.type==3?0xFF6D2630:(e.type==2?0xFF9A4A2D:0xFFB33A2F);
-            p.setColor(0xFF22201D);c.drawRoundRect(-21*s,32*s,-4*s,68*s,5*s,5*s,p);c.drawRoundRect(4*s,32*s,21*s,68*s,5*s,5*s,p);
-            p.setColor(0xFF111111);c.drawRoundRect(-25*s,61*s,1*s,72*s,4*s,4*s,p);c.drawRoundRect(-1*s,61*s,25*s,72*s,4*s,4*s,p);
-            p.setColor(tunic);c.drawRoundRect(-31*s,-9*s,31*s,43*s,12*s,12*s,p);p.setColor(0xFF5D3B27);c.drawRect(-31*s,8*s,31*s,15*s,p);p.setColor(0xFFB98C3C);c.drawRect(-25*s,14*s,25*s,19*s,p);
-            p.setStrokeWidth(11*s);p.setStrokeCap(Paint.Cap.ROUND);p.setColor(0xFFB97955);c.drawLine(-23*s,1*s,-42*s,26*s,p);c.drawLine(23*s,1*s,42*s,26*s,p);
-            p.setColor(0xFFB97955);c.drawCircle(0,-37*s,22*s,p);p.setColor(0xFF241B18);c.drawArc(-17*s,-38*s,17*s,-12*s,0,180,true,p);
-            p.setColor(e.type==3?0xFFD2A44A:0xFF6C7770);c.drawRoundRect(-24*s,-58*s,24*s,-43*s,7*s,7*s,p);p.setColor(0xFF1E1E1C);c.drawRect(-27*s,-45*s,27*s,-40*s,p);
-            c.save();c.rotate(angle*57.29578f);p.setStrokeWidth(e.type==3?10*s:8*s);p.setStrokeCap(Paint.Cap.SQUARE);p.setColor(0xFF252525);c.drawLine(27*s,7*s,88*s,7*s,p);
-            p.setStrokeWidth(3*s);p.setColor(e.type==3?0xFFD4B05A:0xFF9E3C32);c.drawLine(52*s,7*s,82*s,7*s,p);c.restore();p.setStrokeCap(Paint.Cap.BUTT);c.restore();
+
+            // TEMP ART: use the bundled Achaemenid vector character for a cleaner visual test.
+            if(achaemenidEnemyArt!=null){
+                c.save();c.translate(x,y+bob*s);c.scale(1f,1f/CAMERA_PITCH);
+                float half=e.type==3?48f:43f;
+                achaemenidEnemyArt.setBounds((int)(-half*s),(int)(-88f*s),(int)(half*s),(int)(62f*s));
+                achaemenidEnemyArt.draw(c);
+                c.restore();
+            }
+
             float max=e.type==3?120:(e.type==2?70:45),pct=Math.max(0,Math.min(1,e.hp/max));
             float bw=(e.type==3?88:70)*s,bh=7*s,left=x-bw*.5f,top=(e.y-92)*s;
             p.setColor(0xB51A1917);c.drawRoundRect(left,top,left+bw,top+bh,4*s,4*s,p);
             p.setColor(e.type==3?0xFFE0A943:0xFFE14A3E);c.drawRoundRect(left+2*s,top+2*s,left+2*s+(bw-4*s)*pct,top+bh-2*s,3*s,3*s,p);
         }
+
         void drawBullet(Canvas c,Bullet b,float s){
             float x=b.x*s,y=b.y*s,len=Math.max(18*s,Math.min(46*s,(float)Math.hypot(b.vx,b.vy)*.018f*s));
             float d=Math.max(1f,(float)Math.hypot(b.vx,b.vy)),ex=x-b.vx/d*len,ey=y-b.vy/d*len;
@@ -280,9 +284,43 @@ public class MainActivity extends Activity {
         @Override public boolean onTouchEvent(MotionEvent event){
             int action=event.getActionMasked();if(gameOver){if(action==MotionEvent.ACTION_DOWN)resetGame();return true;}
             float br=Math.max(92,Math.min(132,getHeight()*.14f));float fireX=getWidth()*.83f,fireY=getHeight()*.72f,grenadeX=getWidth()*.67f,grenadeY=getHeight()*.72f,reloadX=getWidth()*.78f,reloadY=getHeight()*.91f,weaponX=getWidth()*.91f,weaponY=getHeight()*.91f,swordX=getWidth()*.63f,swordY=getHeight()*.55f;
-            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){int idx=event.getActionIndex(),id=event.getPointerId(idx);float x=event.getX(idx),y=event.getY(idx);if(near(x,y,fireX,fireY,br*1.34f)){firePointer=id;fireDown=true;shoot();return true;}if(near(x,y,grenadeX,grenadeY,br*.82f)){useGrenade();return true;}if(near(x,y,reloadX,reloadY,br*.68f)){reload();return true;}if(near(x,y,weaponX,weaponY,br*.68f)){toggleWeapon();return true;}if(near(x,y,swordX,swordY,br*.75f)){melee();return true;}if(x<getWidth()*.52f&&y>HUD_H){joystickPointer=id;joystickDown=true;joystickVisibleUntil=System.currentTimeMillis()+1800;joyBaseX=clamp(x,108,getWidth()*.46f);joyBaseY=clamp(y,HUD_H+108,getHeight()-108);joyX=joyBaseX;joyY=joyBaseY;moveNX=moveNY=0;return true;}if(y>HUD_H){aimPointer=id;setAimFromScreen(x,y);return true;}}
-            if(action==MotionEvent.ACTION_MOVE){for(int i=0;i<event.getPointerCount();i++){int id=event.getPointerId(i);float x=event.getX(i),y=event.getY(i);if(id==joystickPointer){float dx=x-joyBaseX,dy=y-joyBaseY,mag=Math.max(1f,(float)Math.hypot(dx,dy)),max=92f,use=Math.min(max,mag);joyX=joyBaseX+dx/mag*use;joyY=joyBaseY+dy/mag*use;moveNX=(joyX-joyBaseX)/max;moveNY=(joyY-joyBaseY)/max;}if(id==aimPointer)setAimFromScreen(x,y);}return true;}
-            if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_CANCEL){int id=event.getPointerId(event.getActionIndex());if(id==joystickPointer){joystickPointer=-1;joystickDown=false;moveNX=moveNY=0;joyX=joyBaseX;joyY=joyBaseY;joystickVisibleUntil=System.currentTimeMillis()+1200;}if(id==firePointer){firePointer=-1;fireDown=false;}if(id==aimPointer)aimPointer=-1;return true;}return true;
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
+                int idx=event.getActionIndex(),id=event.getPointerId(idx);float x=event.getX(idx),y=event.getY(idx);
+                if(near(x,y,fireX,fireY,br*1.34f)){firePointer=id;fireDown=true;shoot();return true;}
+                if(near(x,y,grenadeX,grenadeY,br*.82f)){useGrenade();return true;}
+                if(near(x,y,reloadX,reloadY,br*.68f)){reload();return true;}
+                if(near(x,y,weaponX,weaponY,br*.68f)){toggleWeapon();return true;}
+                if(near(x,y,swordX,swordY,br*.75f)){melee();return true;}
+                if(joystickPointer==-1&&x<getWidth()*.52f&&y>HUD_H){
+                    joystickPointer=id;joystickDown=true;joystickVisibleUntil=System.currentTimeMillis()+1800;
+                    joyX=joyBaseX;joyY=joyBaseY;
+                    updateJoystick(x,y);
+                    return true;
+                }
+                if(y>HUD_H&&aimPointer==-1){aimPointer=id;setAimFromScreen(x,y);return true;}
+            }
+            if(action==MotionEvent.ACTION_MOVE){
+                for(int i=0;i<event.getPointerCount();i++){
+                    int id=event.getPointerId(i);float x=event.getX(i),y=event.getY(i);
+                    if(id==joystickPointer)updateJoystick(x,y);
+                    if(id==aimPointer)setAimFromScreen(x,y);
+                }
+                return true;
+            }
+            if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_CANCEL){
+                int id=event.getPointerId(event.getActionIndex());
+                if(id==joystickPointer){joystickPointer=-1;joystickDown=false;moveNX=moveNY=0;joyX=joyBaseX;joyY=joyBaseY;joystickVisibleUntil=System.currentTimeMillis()+1200;}
+                if(id==firePointer){firePointer=-1;fireDown=false;}
+                if(id==aimPointer)aimPointer=-1;
+                return true;
+            }
+            return true;
+        }
+
+        private void updateJoystick(float x,float y){
+            float dx=x-joyBaseX,dy=y-joyBaseY,mag=Math.max(1f,(float)Math.hypot(dx,dy)),max=92f,use=Math.min(max,mag);
+            joyX=joyBaseX+dx/mag*use;joyY=joyBaseY+dy/mag*use;
+            moveNX=(joyX-joyBaseX)/max;moveNY=(joyY-joyBaseY)/max;
         }
 
         void setAimFromScreen(float sx,float sy){
