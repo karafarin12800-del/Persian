@@ -104,7 +104,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.build_ref || github.ref }}
+          ref: ${{ inputs.build_ref || github.sha }}
           lfs: true
 
       - name: Validate Unity Personal credentials
