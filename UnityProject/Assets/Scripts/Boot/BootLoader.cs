@@ -13,7 +13,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class BootLoader : MonoBehaviour
     {
         private const string GameplayScenePath = "Assets/Scenes/PersiaWarPrototype.unity";
-        private const float MinimumVisibleSeconds = 0.35f;
+        private const float MinimumVisibleSeconds = 0.65f;
 
         private AsyncOperation loadOperation;
         private GUIStyle titleStyle;
@@ -23,6 +23,8 @@ namespace PersiaWar.Unity2D5D
         private bool failed;
         private string failureMessage = string.Empty;
         private float progress;
+        private float loadElapsed;
+        private bool loadWarningLogged;
         private string status = "Starting Persia War...";
 
         private void Awake()
@@ -70,7 +72,13 @@ namespace PersiaWar.Unity2D5D
             while (loadOperation.progress < 0.9f)
             {
                 progress = Mathf.Clamp01(loadOperation.progress / 0.9f) * 0.92f;
-                status = "Loading battlefield...";
+                loadElapsed += Time.unscaledDeltaTime;
+                if (!loadWarningLogged && loadElapsed > 20f)
+                {
+                    loadWarningLogged = true;
+                    Debug.LogWarning("PERSIA_BOOT_STAGE: MainSceneLoadTakingLongerThanExpected");
+                }
+                status = loadElapsed > 20f ? "Still preparing the battlefield..." : "Loading battlefield...";
                 visibleSeconds += Time.unscaledDeltaTime;
                 yield return null;
             }
@@ -152,18 +160,23 @@ namespace PersiaWar.Unity2D5D
             GUI.color = new Color(0.025f, 0.045f, 0.075f, 1f);
             GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
 
-            float panelWidth = Mathf.Min(Screen.width - 80f, 720f);
+            float margin = Mathf.Max(24f, Screen.width * 0.07f);
+            float panelWidth = Mathf.Min(Screen.width - margin * 2f, 760f);
             float centerX = (Screen.width - panelWidth) * 0.5f;
             float centerY = Screen.height * 0.5f;
 
+            Rect panel = new Rect(centerX, centerY - 165f, panelWidth, 330f);
             GUI.color = new Color(0.055f, 0.085f, 0.125f, 0.98f);
-            GUI.DrawTexture(new Rect(centerX, centerY - 145f, panelWidth, 290f), Texture2D.whiteTexture);
+            GUI.DrawTexture(panel, Texture2D.whiteTexture);
+            GUI.color = new Color(0.88f, 0.65f, 0.20f, 0.85f);
+            GUI.DrawTexture(new Rect(panel.x, panel.y, panel.width, 5f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(panel.x, panel.yMax - 5f, panel.width, 5f), Texture2D.whiteTexture);
 
             GUI.color = Color.white;
-            GUI.Label(new Rect(centerX, centerY - 118f, panelWidth, 58f), "PERSIA WAR", titleStyle);
-            GUI.Label(new Rect(centerX, centerY - 52f, panelWidth, 34f), status, statusStyle);
+            GUI.Label(new Rect(centerX, centerY - 128f, panelWidth, 58f), "PERSIA WAR", titleStyle);
+            GUI.Label(new Rect(centerX, centerY - 62f, panelWidth, 34f), status, statusStyle);
 
-            Rect bar = new Rect(centerX + 70f, centerY + 6f, panelWidth - 140f, 26f);
+            Rect bar = new Rect(centerX + 60f, centerY + 2f, panelWidth - 120f, 30f);
             GUI.color = new Color(0.12f, 0.15f, 0.19f, 1f);
             GUI.DrawTexture(bar, Texture2D.whiteTexture);
 
@@ -173,7 +186,7 @@ namespace PersiaWar.Unity2D5D
             GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(progress), bar.height), Texture2D.whiteTexture);
 
             GUI.color = Color.white;
-            GUI.Label(new Rect(centerX, centerY + 42f, panelWidth, 30f), Mathf.RoundToInt(progress * 100f) + "%", percentStyle);
+            GUI.Label(new Rect(centerX, centerY + 44f, panelWidth, 30f), Mathf.RoundToInt(progress * 100f) + "%", percentStyle);
 
             if (failed)
             {
@@ -185,8 +198,8 @@ namespace PersiaWar.Unity2D5D
             else
             {
                 GUI.Label(
-                    new Rect(centerX, centerY + 79f, panelWidth, 30f),
-                    "Please wait while the battlefield is prepared.",
+                    new Rect(centerX, centerY + 84f, panelWidth, 30f),
+                    "Preparing the battlefield • Please wait.",
                     footerStyle);
             }
 
