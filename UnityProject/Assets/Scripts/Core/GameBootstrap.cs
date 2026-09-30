@@ -78,7 +78,12 @@ namespace PersiaWar.Unity2D5D
             gameplayCamera.nearClipPlane = 0.1f;
             gameplayCamera.farClipPlane = 240f;
             gameplayCamera.allowHDR = false;
+#if UNITY_ANDROID
+            // Conservative mobile rendering path: avoid MSAA/HDR overhead during startup.
+            gameplayCamera.allowMSAA = false;
+#else
             gameplayCamera.allowMSAA = true;
+#endif
             gameplayCamera.transform.position = new Vector3(0f, 14f, -14f);
             gameplayCamera.transform.rotation = Quaternion.Euler(48f, 0f, 0f);
 
@@ -96,6 +101,9 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogStartDistance = 75f;
             RenderSettings.fogEndDistance = 240f;
+#if UNITY_ANDROID
+            QualitySettings.antiAliasing = 0;
+#endif
 
             Light sun = FindFirstObjectByType<Light>();
             if (sun == null)
@@ -107,8 +115,14 @@ namespace PersiaWar.Unity2D5D
             sun.type = LightType.Directional;
             sun.intensity = 1.15f;
             sun.color = new Color(1f, 0.93f, 0.82f);
+#if UNITY_ANDROID
+            // Keep the first frame deterministic on mobile GPUs; gameplay and geometry are unchanged.
+            sun.shadows = LightShadows.None;
+            sun.shadowStrength = 0f;
+#else
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.78f;
+#endif
             sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
         }
 
