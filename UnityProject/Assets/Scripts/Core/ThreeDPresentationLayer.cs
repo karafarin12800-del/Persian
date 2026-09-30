@@ -5,7 +5,8 @@ namespace PersiaWar.Unity2D5D
 {
     /// <summary>
     /// Presentation-only layer for the existing 2.5D gameplay.
-    /// Bright stylized lighting is tuned for a colorful mobile low-poly look.
+    /// Mobile uses a conservative rendering profile so the presentation layer
+    /// cannot re-enable expensive/fragile features after GameBootstrap configures them.
     /// </summary>
     public static class ThreeDPresentationLayer
     {
@@ -19,12 +20,20 @@ namespace PersiaWar.Unity2D5D
 
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
+
+#if UNITY_ANDROID
+            QualitySettings.shadows = ShadowQuality.Disable;
+            QualitySettings.shadowDistance = 0f;
+            QualitySettings.shadowCascades = 0;
+            QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
+#else
             QualitySettings.shadows = ShadowQuality.All;
             QualitySettings.shadowResolution = ShadowResolution.High;
             QualitySettings.shadowProjection = ShadowProjection.StableFit;
             QualitySettings.shadowDistance = 105f;
             QualitySettings.shadowCascades = 2;
             QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
+#endif
             QualitySettings.masterTextureLimit = 0;
 
             ConfigureWorldLighting();
@@ -53,10 +62,16 @@ namespace PersiaWar.Unity2D5D
             sun.type = LightType.Directional;
             sun.intensity = 1.35f;
             sun.color = new Color(1f, 0.96f, 0.84f);
+
+#if UNITY_ANDROID
+            sun.shadows = LightShadows.None;
+            sun.shadowStrength = 0f;
+#else
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.58f;
             sun.shadowBias = 0.04f;
             sun.shadowNormalBias = 0.22f;
+#endif
             sun.transform.rotation = Quaternion.Euler(52f, -38f, 0f);
         }
 
@@ -70,7 +85,12 @@ namespace PersiaWar.Unity2D5D
             camera.nearClipPlane = 0.08f;
             camera.farClipPlane = 240f;
             camera.allowHDR = false;
+
+#if UNITY_ANDROID
+            camera.allowMSAA = false;
+#else
             camera.allowMSAA = true;
+#endif
             camera.depthTextureMode = DepthTextureMode.None;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.30f, 0.56f, 0.78f, 1f);
@@ -85,8 +105,10 @@ namespace PersiaWar.Unity2D5D
                 if (renderer == null || renderer.gameObject.name.StartsWith("Minimap"))
                     continue;
 
+#if !UNITY_ANDROID
                 renderer.shadowCastingMode = ShadowCastingMode.On;
                 renderer.receiveShadows = true;
+#endif
 
                 Material material = renderer.sharedMaterial;
                 if (material == null || material.shader == null) continue;
