@@ -196,12 +196,12 @@ jobs:
                   // OpenGLES3 is broadly supported on the project's Android minimum/target range and
                   // removes a common native startup failure path while leaving gameplay code unchanged.
                   PlayerSettings.SetGraphicsAPIs(
-                      NamedBuildTarget.Android,
+                      BuildTarget.Android,
                       new[] { GraphicsDeviceType.OpenGLES3 }
                   );
                   PlayerSettings.colorSpace = ColorSpace.Gamma;
 
-                  var graphicsApis = PlayerSettings.GetGraphicsAPIs(NamedBuildTarget.Android);
+                  var graphicsApis = PlayerSettings.GetGraphicsAPIs(BuildTarget.Android);
                   Console.WriteLine("UNITY_ANDROID_GRAPHICS_API:" + string.Join(",", graphicsApis));
                   if (graphicsApis.Length != 1 || graphicsApis[0] != GraphicsDeviceType.OpenGLES3)
                       throw new Exception("Android graphics API was not forced to OpenGLES3.");
