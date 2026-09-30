@@ -8,12 +8,13 @@ namespace PersiaWar.Unity2D5D
     /// <summary>
     /// Lightweight first scene for Android startup. It deliberately contains no
     /// gameplay objects or asset loading. The gameplay scene is prepared in the
-    /// background and activated only after it reaches the safe 0.9 loading point.
+    /// background and activated after a bounded warm-up so Android cannot remain parked on the boot screen.
     /// </summary>
     public sealed class BootLoader : MonoBehaviour
     {
         private const string GameplayScenePath = "Assets/Scenes/PersiaWarPrototype.unity";
         private const float MinimumVisibleSeconds = 0.65f;
+        private const float MaxPreActivationWaitSeconds = 8f;
 
         private AsyncOperation loadOperation;
         private GUIStyle titleStyle;
@@ -69,23 +70,28 @@ namespace PersiaWar.Unity2D5D
             loadOperation.allowSceneActivation = false;
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
 
-            while (loadOperation.progress < 0.9f)
+            while (loadOperation.progress < 0.9f && loadElapsed < MaxPreActivationWaitSeconds)
             {
                 progress = Mathf.Clamp01(loadOperation.progress / 0.9f) * 0.92f;
                 loadElapsed += Time.unscaledDeltaTime;
-                if (!loadWarningLogged && loadElapsed > 20f)
+                if (!loadWarningLogged && loadElapsed > 5f)
                 {
                     loadWarningLogged = true;
                     Debug.LogWarning("PERSIA_BOOT_STAGE: MainSceneLoadTakingLongerThanExpected");
                 }
-                status = loadElapsed > 20f ? "Still preparing the battlefield..." : "Loading battlefield...";
+                status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
                 visibleSeconds += Time.unscaledDeltaTime;
                 yield return null;
             }
 
-            // Unity's async scene load normally stalls at 0.9 while activation is
-            // disabled. Keep the lightweight boot UI visible briefly so the device
-            // gets a real startup frame before the larger scene activates.
+            if (loadOperation.progress < 0.9f)
+            {
+                Debug.LogWarning("PERSIA_BOOT_STAGE: ActivatingMainSceneAfterBoundedWarmup");
+                status = "Starting Persia War...";
+            }
+
+            // Keep the lightweight boot UI visible briefly so the device gets a real
+            // startup frame before the larger scene activates.
             while (visibleSeconds < MinimumVisibleSeconds)
             {
                 visibleSeconds += Time.unscaledDeltaTime;
