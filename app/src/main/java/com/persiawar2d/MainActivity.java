@@ -816,7 +816,7 @@ public final class MainActivity extends Activity {
 
             // Existing fire input only controls this visual flash.
             if(player && input.fire){
-                float mx=x+fx*77*u,my=y+fy*77*u;
+                float mx=x+fx*70*u,my=y+fy*70*u;
                 p.setColor(0xFFFFDA70);
                 path.reset();
                 path.moveTo(mx,my);
@@ -1139,8 +1139,7 @@ public final class MainActivity extends Activity {
             if(x<getWidth()*.48f&&y>HUD&&joyPointer<0){
                 joyPointer=id;
                 joyActive=true;
-                // Fixed joystick: keep the base anchored in the lower-left.
-                // The touch position becomes the handle position, clamped to the base radius.
+                // Fixed joystick: the base stays anchored; touch only moves the handle.
                 joyBaseX=idleJoyX();
                 joyBaseY=idleJoyY();
                 joyX=joyBaseX;
