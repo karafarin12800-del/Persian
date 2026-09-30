@@ -182,6 +182,8 @@ jobs:
                   if (!File.Exists(Path.Combine(Application.dataPath, "Scenes/PersiaWarPrototype.unity")))
                       throw new Exception("Required scene is missing: " + scenePath);
 
+                  PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+
                   var scenes = new[] { scenePath };
                   EditorBuildSettings.scenes = new[]
                   {
