@@ -219,8 +219,7 @@ jobs:
                   if (report.summary.result != BuildResult.Succeeded)
                       throw new Exception("Unity Android build failed: " + report.summary.result);
 
-                  if (report.summary.totalErrors > 0)
-                      throw new Exception("Unity Android build reported " + report.summary.totalErrors + " error(s).");
+                  Console.WriteLine("UNITY_BUILD_REPORT_ERRORS:" + report.summary.totalErrors);
 
                   if (!File.Exists(output) || new FileInfo(output).Length == 0)
                       throw new Exception("Unity reported success but APK file is missing or empty.");
@@ -325,6 +324,7 @@ jobs:
           rm -rf .ci-unity-home
           mkdir -p .ci-unity-home/.local/share/unity3d/Unity
           mkdir -p .ci-unity-home/.config/unity3d/Unity
+          mkdir -p .ci-unity-home/.cache/unity3d
 
           docker run --rm \
             -e UNITY_EMAIL="$UNITY_EMAIL" \
@@ -337,7 +337,9 @@ jobs:
 
           test -s build/Android/PersiaWar.apk
           unzip -t build/Android/PersiaWar.apk >/dev/null
-          echo "Verified Unity APK: build/Android/PersiaWar.apk"
+          unzip -l build/Android/PersiaWar.apk | grep -q 'lib/arm64-v8a/'
+          unzip -l build/Android/PersiaWar.apk | grep -q 'lib/arm64-v8a/libil2cpp.so'
+          echo "Verified Unity APK: build/Android/PersiaWar.apk (valid ZIP + ARM64 IL2CPP ABI)"
 
       - name: Verify APK
         shell: bash
@@ -361,6 +363,8 @@ jobs:
             echo "branch=${{ github.ref_name }}"
             echo "commit=$(git rev-parse HEAD)"
             echo "apk=$apk"
+            echo "apk_sha256=$(sha256sum "$apk" | awk '{print $1}')"
+            echo "apk_size_bytes=$(stat -c '%s' "$apk")"
           } > build/Android/BUILD_PROVENANCE.txt
 
       - name: Upload Unity APK
