@@ -43,6 +43,15 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            CreateTextures();
+            BuildStyles();
+        }
+
+        private void Start()
+        {
+            // All scene/component Awake methods have completed here. GameBootstrap
+            // creates RuntimeCombatHUD and EnemySpawner during Awake, so binding in
+            // Start avoids relying on undefined Awake ordering.
             player = FindFirstObjectByType<PlayerController>();
             enemySpawner = FindFirstObjectByType<EnemySpawner>();
             mobileInput = FindFirstObjectByType<MobileInputHub>();
@@ -50,8 +59,6 @@ namespace PersiaWar.Unity2D5D
             Camera camera = Camera.main;
             followCamera = camera != null ? camera.GetComponent<CameraFollow25D>() : null;
 
-            CreateTextures();
-            BuildStyles();
             GateGameplay(false);
             ApplyHeroStyle(selectedHero);
         }
