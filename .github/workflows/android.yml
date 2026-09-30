@@ -7,9 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Do not cancel a valid APK build because another commit was pushed.
+# Every build is tied to its exact commit SHA and artifact name.
 concurrency:
-  group: persiawar2d-${{ github.ref }}
-  cancel-in-progress: true
+  group: persiawar2d-${{ github.run_id }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
