@@ -581,12 +581,28 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     public int getHp(){return hp;} public int getAmmo(){return ammo;} public int getReserve(){return reserve;} public int getKills(){return kills;} public int getGrenades(){return grenades;} public int getWave(){return wave;}
+    public boolean isGameOver(){return gameOver;}
+    public void drawMinimap(Canvas c,float left,float top,float size) {
+        Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+        float h=size*.82f;
+        p.setStyle(Paint.Style.FILL);p.setColor(0xD91B241F);c.drawRoundRect(left,top,left+size,top+h,18,18,p);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xC7E0D29B);c.drawRoundRect(left,top,left+size,top+h,18,18,p);
+        float innerL=left+9,innerT=top+27,innerW=size-18,innerH=h-36,sx=innerW/68f,sz=innerH/68f;
+        p.setStyle(Paint.Style.FILL);p.setColor(0xFF29362F);c.drawRect(innerL,innerT,innerL+innerW,innerT+innerH,p);
+        for(Road r:roads){p.setColor(0xAA6D7770);p.setStrokeWidth(Math.max(2f,r.width*sx*.65f));c.drawLine(innerL+(r.x1+34)*sx,innerT+(r.z1+34)*sz,innerL+(r.x2+34)*sx,innerT+(r.z2+34)*sz,p);}
+        for(Building b:buildings){p.setColor(0xB56B5848);c.drawRect(innerL+(b.x-b.w*.5f+34)*sx,innerT+(b.z-b.d*.5f+34)*sz,innerL+(b.x+b.w*.5f+34)*sx,innerT+(b.z+b.d*.5f+34)*sz,p);}
+        p.setColor(0xFFE1B85A);c.drawCircle(innerL+(px+34)*sx,innerT+(pz+34)*sz,4,p);
+        for(Enemy e:enemies)if(e.hp>0){p.setColor(0xFFE55A50);c.drawCircle(innerL+(e.x+34)*sx,innerT+(e.z+34)*sz,3,p);}
+        p.setStyle(Paint.Style.FILL);p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);p.setTextSize(12);p.setColor(0xFFF1DBA1);p.setTextAlign(Paint.Align.LEFT);c.drawText("TACTICAL MAP",left+14,top+18,p);p.setTypeface(android.graphics.Typeface.DEFAULT);
+    }
+
+
     public void pause(){} public void resume(){}
 
     private static final class Road{final float x1,z1,x2,z2,width;Road(float x1,float z1,float x2,float z2,float width){this.x1=x1;this.z1=z1;this.x2=x2;this.z2=z2;this.width=width;}}
     private static final class Building{final float x,z,w,d,h;final int style;Building(float x,float z,float w,float d,float h,int style){this.x=x;this.z=z;this.w=w;this.d=d;this.h=h;this.style=style;}}
     private static final class Tree{final float x,z,r;Tree(float x,float z,float r){this.x=x;this.z=z;this.r=r;}}
     private static final class Enemy{float x,z;int hp=100;long lastShot;Enemy(float x,float z){this.x=x;this.z=z;}}
-    private static final class Projectile{float x,y,z,vx,vz,life,damage;boolean fromPlayer;Projectile(float x,float y,float z,float vx,float vz,float life,float damage,boolean fromPlayer){this.x=x;this.y=y;this.z=z;this.vx=vx;this.vz=vz;this.life=life;this.damage=damage;this.fromPlayer=fromPlayer;}}
+    private static final class Projectile{float x,y,z,vx,vz,life,damage,splashRadius;boolean fromPlayer,explosive;Projectile(float x,float y,float z,float vx,float vz,float life,float damage,boolean fromPlayer){this(x,y,z,vx,vz,life,damage,fromPlayer,false,0f);}Projectile(float x,float y,float z,float vx,float vz,float life,float damage,boolean fromPlayer,boolean explosive,float splashRadius){this.x=x;this.y=y;this.z=z;this.vx=vx;this.vz=vz;this.life=life;this.damage=damage;this.fromPlayer=fromPlayer;this.explosive=explosive;this.splashRadius=splashRadius;}}
     private static final class Pickup{static final int AMMO=1,GRENADE=2,MEDKIT=3;final float x,z;final int type;Pickup(float x,float z,int type){this.x=x;this.z=z;this.type=type;}}
 }
