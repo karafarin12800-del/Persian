@@ -149,16 +149,9 @@ jobs:
             --engine unity \
             --target-platform Android \
             --provider-strategy local-docker \
-            --unity-version 2022.3.62f1 \
             --project-path UnityProject \
             --build-name PersiaWar \
-            --builds-path build \
-            --versioning None \
-            --watch-to-end true \
-            --allow-dirty-build false \
-            --android-target-sdk-version 35 \
-            --android-export-type androidPackage \
-            --android-symbol-type none
+            --builds-path build
 
       - name: Verify APK
         shell: bash
