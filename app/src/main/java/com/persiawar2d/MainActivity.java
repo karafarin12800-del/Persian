@@ -12,6 +12,7 @@ import android.graphics.LinearGradient;
 import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -28,8 +29,36 @@ public final class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         |View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-        gameView=new GameView(this);
-        setContentView(gameView);
+        try {
+            gameView=new GameView(this);
+            setContentView(gameView);
+        } catch (Throwable t) {
+            reportStartupFailure(t);
+            setContentView(buildRecoveryView("STARTUP",t));
+        }
+    }
+
+    private void reportStartupFailure(Throwable t){
+        Log.e("PersiaWar", "Startup failure", t);
+        try {
+            java.io.File f=new java.io.File(getFilesDir(),"last_crash.txt");
+            java.io.PrintWriter out=new java.io.PrintWriter(new java.io.FileWriter(f,false));
+            out.println("STARTUP");
+            t.printStackTrace(out);
+            out.close();
+        } catch (Throwable ignored) {}
+    }
+
+    private android.view.View buildRecoveryView(String stage,Throwable t){
+        android.widget.TextView v=new android.widget.TextView(this);
+        v.setBackgroundColor(Color.rgb(10,15,13));
+        v.setTextColor(Color.rgb(240,220,160));
+        v.setTextSize(15);
+        v.setPadding(28,28,28,28);
+        v.setGravity(android.view.Gravity.CENTER);
+        v.setText("PERSIA WAR\n\nRecovery mode\nStage: "+stage+"\n\n"+t.getClass().getSimpleName()+": "+String.valueOf(t.getMessage())+
+                "\n\nThe error was saved to last_crash.txt.");
+        return v;
     }
 
     @Override public void onBackPressed(){if(gameView!=null)gameView.togglePause();}
@@ -56,7 +85,9 @@ public final class MainActivity extends Activity {
             String skin=context.getSharedPreferences("player",0).getString("skin","classic");
             core=new GameCore(world,skin);
             setFocusable(true);
-            setLayerType(View.LAYER_TYPE_HARDWARE,null);
+            // Let Android choose the rendering layer for this device; forcing a hardware layer
+            // can trigger vendor-specific Canvas/GPU crashes on some Android devices.
+            setWillNotDraw(false);
         }
 
         private float sc(){return Math.min(getWidth()/1900f,Math.max(.34f,(getHeight()-HUD)/1250f));}
@@ -85,28 +116,77 @@ public final class MainActivity extends Activity {
             joyBaseX=dp(120f);joyBaseY=h-dp(105f);joyX=joyBaseX;joyY=joyBaseY;
         }
 
+        private boolean recoveryMode;
+        private String recoveryStage="";
+        private String recoveryMessage="";
+
         @Override protected void onDraw(Canvas c){
-            long now=System.nanoTime();
-            float dt=Math.min(.045f,Math.max(.001f,(now-lastNanos)/1e9f));
-            lastNanos=now;
-            if(!paused){core.update(dt,input);input.sword=false;input.grenade=false;input.reload=false;}
-            c.drawColor(Color.rgb(25,31,25));
-            synchronized(core){
-                drawGround(c);
-                drawRoads(c);
-                drawBuildings(c);
-                drawVehicles(c);
-                drawFences(c);
-                drawNature(c);
-                drawCombat(c);
-                drawZone(c);
-                drawMiniMap(c);
-                drawHud(c);
+            if(recoveryMode){
+                drawRecovery(c);
+                postInvalidateOnAnimation();
+                return;
             }
-            drawControls(c);
-            if(paused)drawPause(c);
-            if(core.gameOver())drawGameOver(c);
+            try {
+                long now=System.nanoTime();
+                float dt=Math.min(.045f,Math.max(.001f,(now-lastNanos)/1e9f));
+                lastNanos=now;
+                if(!paused){core.update(dt,input);input.sword=false;input.grenade=false;input.reload=false;}
+                c.drawColor(Color.rgb(25,31,25));
+                synchronized(core){
+                    drawGround(c);
+                    drawRoads(c);
+                    drawBuildings(c);
+                    drawVehicles(c);
+                    drawFences(c);
+                    drawNature(c);
+                    drawCombat(c);
+                    drawZone(c);
+                    drawMiniMap(c);
+                    drawHud(c);
+                }
+                drawControls(c);
+                if(paused)drawPause(c);
+                if(core.gameOver())drawGameOver(c);
+            } catch (Throwable t) {
+                enterRecovery("FRAME",t);
+                drawRecovery(c);
+            }
             postInvalidateOnAnimation();
+        }
+
+        private void enterRecovery(String stage,Throwable t){
+            recoveryMode=true;
+            recoveryStage=stage;
+            recoveryMessage=t.getClass().getSimpleName()+": "+String.valueOf(t.getMessage());
+            Log.e("PersiaWar","Render/game failure at "+stage,t);
+            try {
+                java.io.File f=new java.io.File(getContext().getFilesDir(),"last_crash.txt");
+                java.io.PrintWriter out=new java.io.PrintWriter(new java.io.FileWriter(f,false));
+                out.println(stage);
+                t.printStackTrace(out);
+                out.close();
+            } catch (Throwable ignored) {}
+            clearInput();
+        }
+
+        private void drawRecovery(Canvas c){
+            c.drawColor(Color.rgb(10,15,13));
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0xFFF0DCA0);
+            p.setTypeface(PaintCompat.BOLD);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTextSize(dp(24f));
+            c.drawText("PERSIA WAR • RECOVERY MODE",getWidth()*.5f,getHeight()*.40f,p);
+            p.setTypeface(null);
+            p.setTextSize(dp(15f));
+            p.setColor(0xFFD8DDD8);
+            c.drawText("Stage: "+recoveryStage,getWidth()*.5f,getHeight()*.49f,p);
+            p.setTextSize(dp(12f));
+            c.drawText(recoveryMessage,getWidth()*.5f,getHeight()*.55f,p);
+            p.setTextSize(dp(11f));
+            p.setColor(0xFFB9C1BA);
+            c.drawText("Error saved to last_crash.txt",getWidth()*.5f,getHeight()*.62f,p);
+            p.setTextAlign(Paint.Align.LEFT);
         }
 
         private void drawGround(Canvas c){
