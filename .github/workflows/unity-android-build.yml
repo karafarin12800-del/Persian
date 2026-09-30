@@ -167,6 +167,7 @@ jobs:
           cat > UnityProject/Assets/Editor/PersiaWarCiBuild.cs <<'CS'
           using System;
           using System.IO;
+          using UnityEngine;
           using UnityEditor;
           using UnityEditor.Build.Reporting;
 
@@ -188,7 +189,7 @@ jobs:
                   };
 
                   var report = BuildPipeline.BuildPlayer(
-                      scenes.ToArray(),
+                      scenes,
                       output,
                       BuildTarget.Android,
                       BuildOptions.None
