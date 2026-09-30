@@ -360,6 +360,7 @@ jobs:
             bash /workspace/.ci/unity-build.sh
 
           test -s build/Android/PersiaWar.apk
+          sudo chown -R "$(id -u):$(id -g)" build/Android
           unzip -t build/Android/PersiaWar.apk >/dev/null
           python3 - <<'PY'
           import zipfile
