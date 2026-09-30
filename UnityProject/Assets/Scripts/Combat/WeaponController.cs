@@ -93,6 +93,37 @@ namespace PersiaWar.Unity2D5D
             return true;
         }
 
+        public bool TryFireDirection(Vector3 worldDirection)
+        {
+            IsMelee = false;
+
+            if (Time.time < nextFireTime) return false;
+            if (magazine <= 0)
+            {
+                Reload();
+                return false;
+            }
+            if (projectilePrefab == null) return false;
+
+            worldDirection.y = 0f;
+            if (worldDirection.sqrMagnitude < 0.001f)
+                return false;
+
+            Vector3 direction = worldDirection.normalized;
+            Vector3 origin = muzzle != null ? muzzle.position : transform.position + Vector3.up;
+
+            nextFireTime = Time.time + fireCooldown;
+            magazine--;
+            transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+
+            Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
+            projectile.gameObject.SetActive(true);
+            projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
+            projectile.SetOwner(transform);
+            projectile.Launch(direction);
+            return true;
+        }
+
         public void Reload()
         {
             if (magazine >= magazineSize || reserve <= 0) return;
