@@ -5,9 +5,14 @@ namespace PersiaWar.Unity2D5D
     public sealed class WorldBuilder : MonoBehaviour
     {
         [SerializeField] private float worldSize = 220f;
-        [SerializeField] private float roadWidth = 9.5f;
-        [SerializeField] private int roadCount = 5;
-        [SerializeField] private float roadCoverage = 0.72f;
+
+        // These values are deliberately based on the existing character scale.
+        // Character scale stays unchanged; the environment is enlarged to match it.
+        [SerializeField] private float mainRoadWidth = 14f;
+        [SerializeField] private float alleyWidth = 7f;
+        [SerializeField] private int mainRoadCount = 5;
+        [SerializeField] private int alleyCountPerAxis = 11;
+        [SerializeField] private float roadCoverage = 0.90f;
         [SerializeField] private Material groundMaterial;
         [SerializeField] private Material roadMaterial;
 
@@ -28,13 +33,42 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildRoads()
         {
-            float spacing = worldSize / (roadCount + 1);
-            float length = worldSize * roadCoverage;
-            for (int i = 1; i <= roadCount; i++)
+            float mainSpacing = worldSize / (mainRoadCount + 1);
+            float mainLength = worldSize * roadCoverage;
+
+            for (int i = 1; i <= mainRoadCount; i++)
             {
-                float p = -worldSize * 0.5f + spacing * i;
-                CreateRoad(new Vector3(p, 0.012f, 0f), new Vector3(roadWidth, 0.02f, length), "Road_Vertical");
-                CreateRoad(new Vector3(0f, 0.013f, p), new Vector3(length, 0.02f, roadWidth), "Road_Horizontal");
+                float p = -worldSize * 0.5f + mainSpacing * i;
+
+                CreateRoad(
+                    new Vector3(p, 0.012f, 0f),
+                    new Vector3(mainRoadWidth, 0.024f, mainLength),
+                    "MainRoad_Vertical_" + i);
+
+                CreateRoad(
+                    new Vector3(0f, 0.013f, p),
+                    new Vector3(mainLength, 0.024f, mainRoadWidth),
+                    "MainRoad_Horizontal_" + i);
+            }
+
+            // 11 lanes each direction => 22 secondary streets, producing the requested
+            // dense urban block structure while keeping enough width for the character.
+            float alleySpacing = worldSize / (alleyCountPerAxis + 1);
+            float alleyLength = worldSize * 0.86f;
+
+            for (int i = 1; i <= alleyCountPerAxis; i++)
+            {
+                float p = -worldSize * 0.5f + alleySpacing * i;
+
+                CreateRoad(
+                    new Vector3(p, 0.015f, 0f),
+                    new Vector3(alleyWidth, 0.026f, alleyLength),
+                    "Alley_Vertical_" + i);
+
+                CreateRoad(
+                    new Vector3(0f, 0.016f, p),
+                    new Vector3(alleyLength, 0.026f, alleyWidth),
+                    "Alley_Horizontal_" + i);
             }
         }
 
@@ -51,15 +85,21 @@ namespace PersiaWar.Unity2D5D
         {
             Renderer renderer = obj.GetComponent<Renderer>();
             if (renderer == null) return;
+
             if (source != null)
             {
                 renderer.sharedMaterial = source;
                 return;
             }
+
             Shader shader = Shader.Find("Standard");
             if (shader != null)
             {
-                Material material = new Material(shader) { color = fallback, enableInstancing = true };
+                Material material = new Material(shader)
+                {
+                    color = fallback,
+                    enableInstancing = true
+                };
                 renderer.sharedMaterial = material;
             }
         }
