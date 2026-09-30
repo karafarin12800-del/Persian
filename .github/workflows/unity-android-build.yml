@@ -128,20 +128,29 @@ jobs:
             Library-UnityProject-
             Library-
 
-      - name: Build Unity project
-        uses: game-ci/unity-builder@v4
+      - name: Install and run GameCI Orchestrator
+        uses: game-ci/cli@main
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_LICENSING_METHOD: personal
         with:
-          projectPath: UnityProject
-          targetPlatform: Android
-          androidTargetSdkVersion: '35'
-          versioning: Semantic
-          buildName: PersiaWar
-          androidExportType: androidPackage
-          androidSymbolType: none
+          args: >-
+            --plugin @game-ci/orchestrator-plugin
+            orchestrate
+            --engine unity
+            --target-platform Android
+            --provider-strategy local-docker
+            --unity-version 2022.3.62f1
+            --project-path UnityProject
+            --build-name PersiaWar
+            --builds-path build
+            --versioning None
+            --watch-to-end true
+            --allow-dirty-build false
+            --android-target-sdk-version 35
+            --android-export-type androidPackage
+            --android-symbol-type none
 
       - name: Verify APK
         shell: bash
