@@ -43,7 +43,8 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private float muzzleFlash;
     private float weaponKick;
 
-    private int hp = 100, ammo = 30, reserve = 120, kills = 0, grenades = 3;
+    private int hp = 100, ammo = 30, reserve = 120, kills = 0, grenades = 3, wave = 1;
+    private long nextWaveAt;
     private int width = 1, height = 1;
 
     private final ArrayList<Road> roads = new ArrayList<>();
@@ -189,6 +190,13 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         updateEnemies(dt);
         updateProjectiles(dt);
         collectPickups();
+        long nowMs = System.currentTimeMillis();
+        if (livingEnemyCount() == 0) {
+            if (nextWaveAt == 0) nextWaveAt = nowMs + 1400;
+            else if (nowMs >= nextWaveAt) { wave++; spawnEnemies(); nextWaveAt = 0; }
+        } else {
+            nextWaveAt = 0;
+        }
 
         float distance = 15.5f;
         float camX = px - (float)Math.sin(yaw) * distance;
@@ -280,7 +288,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         float t = animationTime * 7.0f + e.x * .17f + e.z * .11f;
         float stride = (float)Math.sin(t) * .22f;
         float bob = Math.abs((float)Math.sin(t * .5f)) * .035f;
-        float attack = Math.max(0f, 1f - Math.min(1f, fireCooldown / .20f));
+        float attack = Math.max(0f, 1f - Math.min(1f, (System.currentTimeMillis()-e.lastShot) / 220f));
         box(e.x, .88f + bob, e.z, .75f, 1.7f, .65f, .55f, .10f, .08f);
         box(e.x, 1.97f + bob, e.z, .65f, .65f, .65f, .25f, .07f, .05f);
         boxRotated(e.x - .22f, .52f, e.z, .24f, 1.0f, .24f, -stride, 0f, 0f, .16f, .12f, .09f);
@@ -345,19 +353,52 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     private void updateEnemies(float dt) {
-        for (Enemy e : enemies) {
-            if (e.hp <= 0) continue;
-            float dx = px - e.x, dz = pz - e.z;
-            float d = (float)Math.hypot(dx, dz);
-            if (d > 2.1f) {
-                float nx = e.x + dx/d * 1.15f * dt;
-                float nz = e.z + dz/d * 1.15f * dt;
-                if (!blocked(nx, e.z, .45f)) e.x = nx;
-                if (!blocked(e.x, nz, .45f)) e.z = nz;
+        long now = System.currentTimeMillis();
+        for (int i=0;i<enemies.size();i++) {
+            Enemy e=enemies.get(i);
+            if (e.hp<=0) continue;
+            float dx=px-e.x,dz=pz-e.z,d=Math.max(.001f,(float)Math.hypot(dx,dz));
+
+            float sepX=0f,sepZ=0f;
+            for(int j=0;j<enemies.size();j++){
+                if(i==j)continue;
+                Enemy other=enemies.get(j);
+                if(other.hp<=0)continue;
+                float ox=e.x-other.x,oz=e.z-other.z,od=(float)Math.hypot(ox,oz);
+                if(od<1.5f&&od>.001f){float push=(1.5f-od)/1.5f;sepX+=ox/od*push;sepZ+=oz/od*push;}
+            }
+
+            float moveSpeed=(d>9f?1.55f:1.05f);
+            if(d>2.4f){
+                float desiredX=dx/d,desiredZ=dz/d;
+                if(d<8.5f){
+                    float strafe=(float)Math.sin(animationTime*1.6f+i*1.7f)*.48f;
+                    float sideX=-desiredZ,sideZ=desiredX;
+                    desiredX=desiredX*(1f-Math.abs(strafe)*.35f)+sideX*strafe;
+                    desiredZ=desiredZ*(1f-Math.abs(strafe)*.35f)+sideZ*strafe;
+                }
+                desiredX+=sepX*.9f; desiredZ+=sepZ*.9f;
+                float len=Math.max(.001f,(float)Math.hypot(desiredX,desiredZ));
+                desiredX/=len;desiredZ/=len;
+                float nx=e.x+desiredX*moveSpeed*dt,nz=e.z+desiredZ*moveSpeed*dt;
+                if(!blocked(nx,e.z,.45f))e.x=nx;
+                if(!blocked(e.x,nz,.45f))e.z=nz;
             } else {
-                hp = Math.max(0, hp - (int)Math.ceil(7f*dt));
+                hp=Math.max(0,hp-(int)Math.ceil(7f*dt));
+            }
+
+            if(d<16f&&now-e.lastShot>1200){
+                float tx=dx/d,tz=dz/d;
+                projectiles.add(new Projectile(e.x+tx*.72f,1.15f,e.z+tz*.72f,tx*8.5f,tz*8.5f,2.8f,8f,false));
+                e.lastShot=now;
             }
         }
+    }
+
+    private int livingEnemyCount() {
+        int n=0;
+        for(Enemy e:enemies) if(e.hp>0) n++;
+        return n;
     }
 
     private void collectPickups() {
@@ -498,7 +539,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         float[] o=new float[108];int q=0;for(float[] a:f)for(float n:a)o[q++]=n;return o;
     }
 
-    public int getHp(){return hp;} public int getAmmo(){return ammo;} public int getReserve(){return reserve;} public int getKills(){return kills;} public int getGrenades(){return grenades;}
+    public int getHp(){return hp;} public int getAmmo(){return ammo;} public int getReserve(){return reserve;} public int getKills(){return kills;} public int getGrenades(){return grenades;} public int getWave(){return wave;}
     public void pause(){} public void resume(){}
 
     private static final class Road{final float x1,z1,x2,z2,width;Road(float x1,float z1,float x2,float z2,float width){this.x1=x1;this.z1=z1;this.x2=x2;this.z2=z2;this.width=width;}}
