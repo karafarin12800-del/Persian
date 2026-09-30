@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: persiawar-unity-android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -117,6 +117,16 @@ jobs:
           [[ -n "${UNITY_EMAIL_INPUT}" ]] || { echo "::error::UNITY_EMAIL secret is missing."; exit 1; }
           [[ -n "${UNITY_PASSWORD_INPUT}" ]] || { echo "::error::UNITY_PASSWORD secret is missing."; exit 1; }
           echo "Unity Personal credentials are present. The build will use GameCI's current licensing client path."
+
+      - name: Verify build source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Unity APK source commit: $(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "${{ inputs.build_ref || github.sha }}" || {
+            echo "::error::Checkout SHA does not match the requested build source."
+            exit 1
+          }
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -313,11 +323,26 @@ jobs:
           unzip -t "$apk" >/dev/null
           echo "Verified APK: $apk"
 
-      - name: Upload APK
+      - name: Write build provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find build/Android -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$apk"
+          {
+            echo "repository=karafarin12800-del/Persian"
+            echo "branch=${{ github.ref_name }}"
+            echo "commit=$(git rev-parse HEAD)"
+            echo "apk=$apk"
+          } > build/Android/BUILD_PROVENANCE.txt
+
+      - name: Upload Unity APK
         uses: actions/upload-artifact@v4
         with:
           name: PersiaWar-Unity-Android-${{ github.sha }}
-          path: build/Android/*.apk
+          path: |
+            build/Android/*.apk
+            build/Android/BUILD_PROVENANCE.txt
           if-no-files-found: error
 
 # Build trigger: 2026-09-30 GameCI Personal licensing client
