@@ -553,8 +553,236 @@ public final class MainActivity extends Activity {
         }
 
         private void drawPlayer(Canvas c){
-            float s=sc(),x=cx(),y=cy();
+            final float s=sc(), x=cx(), y=cy(), u=s*2.00f;
+
+            // Dedicated hero presentation: all layers here are render-only.
+            // Player position, hitbox, facing, input and combat state remain owned by GameCore.
+            drawPlayerRoyalCape(c,x,y,u);
+            drawPlayerHeraldicBack(c,x,y,u);
             drawWarrior(c,x,y,s,0,0xFFD7B85F,true);
+            drawPlayerEliteArmor(c,x,y,u);
+            drawPlayerWingedCrown(c,x,y,u);
+        }
+
+        /** Large cape silhouette placed behind the existing soldier body. */
+        private void drawPlayerRoyalCape(Canvas c,float x,float y,float u){
+            p.setStyle(Paint.Style.FILL);
+
+            // Soft cape shadow keeps the layered silhouette grounded.
+            p.setColor(0x47000000);
+            path.reset();
+            path.moveTo(x-24*u,y-10*u);
+            path.lineTo(x-46*u,y+13*u);
+            path.lineTo(x-54*u,y+66*u);
+            path.quadTo(x-31*u,y+55*u,x-17*u,y+35*u);
+            path.close();
+            c.drawPath(path,p);
+            path.reset();
+            path.moveTo(x+24*u,y-10*u);
+            path.lineTo(x+46*u,y+13*u);
+            path.lineTo(x+54*u,y+66*u);
+            path.quadTo(x+31*u,y+55*u,x+17*u,y+35*u);
+            path.close();
+            c.drawPath(path,p);
+
+            // Main emerald mantle with a deep lower fold.
+            p.setShader(new LinearGradient(x-52*u,y-8*u,x+52*u,y+66*u,
+                    0xFF173C35,0xFF0B241F,Shader.TileMode.CLAMP));
+            path.reset();
+            path.moveTo(x-25*u,y-13*u);
+            path.quadTo(x-40*u,y+8*u,x-46*u,y+34*u);
+            path.lineTo(x-56*u,y+72*u);
+            path.quadTo(x-34*u,y+67*u,x-13*u,y+39*u);
+            path.lineTo(x-8*u,y+8*u);
+            path.close();
+            c.drawPath(path,p);
+            path.reset();
+            path.moveTo(x+25*u,y-13*u);
+            path.quadTo(x+40*u,y+8*u,x+46*u,y+34*u);
+            path.lineTo(x+56*u,y+72*u);
+            path.quadTo(x+34*u,y+67*u,x+13*u,y+39*u);
+            path.lineTo(x+8*u,y+8*u);
+            path.close();
+            c.drawPath(path,p);
+            p.setShader(null);
+
+            // Royal gold edging.
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeWidth(Math.max(2.2f,2.8f*u));
+            p.setColor(0xFFD0A84E);
+            path.reset();
+            path.moveTo(x-44*u,y+27*u);path.quadTo(x-49*u,y+49*u,x-53*u,y+68*u);
+            path.quadTo(x-38*u,y+63*u,x-20*u,y+39*u);
+            c.drawPath(path,p);
+            path.reset();
+            path.moveTo(x+44*u,y+27*u);path.quadTo(x+49*u,y+49*u,x+53*u,y+68*u);
+            path.quadTo(x+38*u,y+63*u,x+20*u,y+39*u);
+            c.drawPath(path,p);
+
+            // Repeating gold mantle studs.
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0xFFE3C56A);
+            for(int i=0;i<4;i++){
+                float yy=y+18*u+i*12*u;
+                float xx=25*u+i*3*u;
+                c.drawCircle(x-xx,yy,1.8f*u,p);
+                c.drawCircle(x+xx,yy,1.8f*u,p);
+            }
+            p.setStrokeCap(Paint.Cap.BUTT);
+        }
+
+        /** Heraldic back-piece: a stylized Persian wing motif, visible around the shoulders. */
+        private void drawPlayerHeraldicBack(Canvas c,float x,float y,float u){
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0xFF234D45);
+            path.reset();
+            path.moveTo(x-18*u,y-7*u);path.lineTo(x-43*u,y-19*u);path.lineTo(x-55*u,y-7*u);
+            path.lineTo(x-35*u,y+1*u);path.lineTo(x-50*u,y+11*u);path.lineTo(x-28*u,y+10*u);
+            path.close();c.drawPath(path,p);
+            path.reset();
+            path.moveTo(x+18*u,y-7*u);path.lineTo(x+43*u,y-19*u);path.lineTo(x+55*u,y-7*u);
+            path.lineTo(x+35*u,y+1*u);path.lineTo(x+50*u,y+11*u);path.lineTo(x+28*u,y+10*u);
+            path.close();c.drawPath(path,p);
+
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1.5f,2.1f*u));
+            p.setColor(0xFFD5B35A);
+            path.reset();
+            path.moveTo(x-19*u,y-5*u);path.lineTo(x-41*u,y-14*u);path.lineTo(x-50*u,y-5*u);
+            c.drawPath(path,p);
+            path.reset();
+            path.moveTo(x+19*u,y-5*u);path.lineTo(x+41*u,y-14*u);path.lineTo(x+50*u,y-5*u);
+            c.drawPath(path,p);
+            p.setStyle(Paint.Style.FILL);
+        }
+
+        /** Foreground armor details that make the player unmistakable on phone screens. */
+        private void drawPlayerEliteArmor(Canvas c,float x,float y,float u){
+            p.setStyle(Paint.Style.FILL);
+
+            // Oversized pauldrons with three readable metal plates each.
+            p.setShader(new LinearGradient(x-44*u,y-19*u,x-13*u,y+5*u,
+                    0xFFE0BF68,0xFF76592C,Shader.TileMode.CLAMP));
+            c.drawOval(new RectF(x-40*u,y-19*u,x-10*u,y+9*u),p);
+            p.setShader(new LinearGradient(x+44*u,y-19*u,x+13*u,y+5*u,
+                    0xFFE0BF68,0xFF76592C,Shader.TileMode.CLAMP));
+            c.drawOval(new RectF(x+10*u,y-19*u,x+40*u,y+9*u),p);
+            p.setShader(null);
+
+            p.setColor(0xFFD9B95F);
+            for(int i=0;i<3;i++){
+                float yy=y-12*u+i*6*u;
+                c.drawRoundRect(new RectF(x-36*u,yy,x-19*u,yy+3*u),1.5f*u,1.5f*u,p);
+                c.drawRoundRect(new RectF(x+19*u,yy,x+36*u,yy+3*u),1.5f*u,1.5f*u,p);
+            }
+
+            // High-contrast central cuirass with royal rosette.
+            p.setShader(new LinearGradient(x-17*u,y-12*u,x+17*u,y+23*u,
+                    0xFF44675F,0xFF182A26,Shader.TileMode.CLAMP));
+            c.drawRoundRect(new RectF(x-18*u,y-14*u,x+18*u,y+22*u),7*u,7*u,p);
+            p.setShader(null);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(2f,2.6f*u));
+            p.setColor(0xFFD5B25B);
+            c.drawRoundRect(new RectF(x-15*u,y-11*u,x+15*u,y+19*u),5*u,5*u,p);
+
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0xFFE1C15F);
+            c.drawCircle(x,y+1*u,9*u,p);
+            p.setColor(0xFF2F7F70);
+            c.drawCircle(x,y+1*u,5.8f*u,p);
+            p.setColor(0xFFE8D27B);
+            c.drawCircle(x,y+1*u,2.0f*u,p);
+            for(int i=0;i<8;i++){
+                double a=i*Math.PI/4.0;
+                float px=(float)Math.cos(a)*7.2f*u;
+                float py=(float)Math.sin(a)*7.2f*u;
+                c.drawCircle(x+px,y+1*u+py,1.3f*u,p);
+            }
+
+            // Layered lamellar skirt and gold waist seal.
+            p.setColor(0xFF2B5048);
+            c.drawRoundRect(new RectF(x-20*u,y+19*u,x+20*u,y+36*u),5*u,5*u,p);
+            p.setColor(0xFFD6B660);
+            for(int row=0;row<2;row++){
+                float yy=y+21*u+row*6*u;
+                for(int col=-2;col<=2;col++){
+                    float xx=x+col*7*u;
+                    c.drawRoundRect(new RectF(xx-3*u,yy,xx+3*u,yy+4*u),1.3f*u,1.3f*u,p);
+                }
+            }
+            p.setColor(0xFFB3873E);
+            c.drawCircle(x,y+30*u,4.6f*u,p);
+            p.setColor(0xFFE0C26A);
+            c.drawCircle(x,y+30*u,2.4f*u,p);
+
+            // Heavy bracers + bright gold wraps.
+            p.setColor(0xFF304D47);
+            c.drawRoundRect(new RectF(x-31*u,y+7*u,x-23*u,y+22*u),2*u,2*u,p);
+            c.drawRoundRect(new RectF(x+23*u,y+7*u,x+31*u,y+22*u),2*u,2*u,p);
+            p.setColor(0xFFD7B65D);
+            c.drawRect(x-31*u,y+10*u,x-23*u,y+13*u,p);
+            c.drawRect(x+23*u,y+10*u,x+31*u,y+13*u,p);
+
+            // Greaves and boot bands, deliberately brighter than enemy silhouettes.
+            p.setColor(0xFF3F5B54);
+            c.drawRoundRect(new RectF(x-18*u,y+33*u,x-3*u,y+51*u),4*u,4*u,p);
+            c.drawRoundRect(new RectF(x+3*u,y+33*u,x+18*u,y+51*u),4*u,4*u,p);
+            p.setColor(0xFFE1C56E);
+            c.drawRect(x-17*u,y+40*u,x-4*u,y+44*u,p);
+            c.drawRect(x+4*u,y+40*u,x+17*u,y+44*u,p);
+
+            // Small turquoise inlays provide a strong Persian royal accent.
+            p.setColor(0xFF54A99A);
+            c.drawCircle(x-23*u,y-6*u,2.0f*u,p);
+            c.drawCircle(x+23*u,y-6*u,2.0f*u,p);
+            c.drawCircle(x,y+19*u,1.8f*u,p);
+        }
+
+        /** Winged-disk crown: a clear top silhouette that cannot be confused with an enemy. */
+        private void drawPlayerWingedCrown(Canvas c,float x,float y,float u){
+            p.setStyle(Paint.Style.FILL);
+
+            // Helmet crown base and crest.
+            p.setShader(new LinearGradient(x,y-64*u,x,y-39*u,
+                    0xFF90A87F,0xFF354C42,Shader.TileMode.CLAMP));
+            c.drawRoundRect(new RectF(x-17*u,y-51*u,x+17*u,y-38*u),5*u,5*u,p);
+            p.setShader(null);
+
+            p.setColor(0xFFD9B861);
+            path.reset();
+            path.moveTo(x,y-43*u);path.lineTo(x-7*u,y-55*u);path.lineTo(x-3*u,y-74*u);
+            path.lineTo(x,y-66*u);path.lineTo(x+3*u,y-74*u);path.lineTo(x+7*u,y-55*u);path.close();
+            c.drawPath(path,p);
+
+            // Winged disk / Persian emblem.
+            p.setColor(0xFFE0BF61);
+            c.drawCircle(x,y-60*u,7.2f*u,p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1.6f,2.1f*u));
+            p.setColor(0xFF8C6B31);
+            c.drawCircle(x,y-60*u,4.4f*u,p);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0xFF2C6F63);
+            c.drawCircle(x,y-60*u,2.8f*u,p);
+
+            // Symmetric wings with stepped feathers.
+            p.setColor(0xFFD8B65A);
+            path.reset();
+            path.moveTo(x-5*u,y-57*u);path.lineTo(x-23*u,y-62*u);path.lineTo(x-34*u,y-57*u);
+            path.lineTo(x-21*u,y-54*u);path.lineTo(x-32*u,y-49*u);path.lineTo(x-18*u,y-50*u);
+            path.lineTo(x-28*u,y-43*u);path.lineTo(x-11*u,y-48*u);path.lineTo(x-4*u,y-52*u);
+            path.close();c.drawPath(path,p);
+            path.reset();
+            path.moveTo(x+5*u,y-57*u);path.lineTo(x+23*u,y-62*u);path.lineTo(x+34*u,y-57*u);
+            path.lineTo(x+21*u,y-54*u);path.lineTo(x+32*u,y-49*u);path.lineTo(x+18*u,y-50*u);
+            path.lineTo(x+28*u,y-43*u);path.lineTo(x+11*u,y-48*u);path.lineTo(x+4*u,y-52*u);
+            path.close();c.drawPath(path,p);
+
+            // Small jewel highlight.
+            p.setColor(0xFFFFE8A2);
+            c.drawCircle(x-1.4f*u,y-61.5f*u,1.1f*u,p);
         }
 
         private void drawWarrior(Canvas c,float x,float y,float s,int type,int armor,boolean player){
