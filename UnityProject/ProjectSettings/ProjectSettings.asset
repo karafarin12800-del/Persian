@@ -188,3 +188,5 @@ PlayerSettings:
   switchNetLibKey:
   switchTitleNames_0:
   switchPublisherNames_0:
+
+# Android startup stability hardening: conservative mobile rendering path
