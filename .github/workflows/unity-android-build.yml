@@ -128,33 +128,90 @@ jobs:
             Library-UnityProject-
             Library-
 
-      - name: Install GameCI CLI
-        shell: bash
-        run: |
-          set -euo pipefail
-          export GAME_CI_INSTALL="${RUNNER_TEMP}/game-ci/bin"
-          curl -fsSL https://raw.githubusercontent.com/game-ci/cli/main/install.sh | sh
-          echo "${GAME_CI_INSTALL}" >> "$GITHUB_PATH"
-          "${GAME_CI_INSTALL}/game-ci" --help >/dev/null
-
-      - name: Run GameCI Orchestrator
+      - name: Build Unity Android APK directly
         shell: bash
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSING_METHOD: personal
         run: |
           set -euo pipefail
-          game-ci orchestrate \
-            --engine unity \
-            --target-platform Android \
-            --provider-strategy local-docker \
-            --orchestrator-repo-name game-ci/unity-builder \
-            --orchestrator-branch main \
-            --project-path UnityProject \
-            --build-name PersiaWar \
-            --builds-path build
+          IMAGE="unityci/editor:2022.3.62f1-android-3"
 
+          mkdir -p UnityProject/Assets/Editor
+          cat > UnityProject/Assets/Editor/PersiaWarCiBuild.cs <<'CS'
+          using System;
+          using System.IO;
+          using UnityEditor;
+          using UnityEditor.Build.Reporting;
+
+          public static class PersiaWarCiBuild
+          {
+              public static void BuildAndroid()
+              {
+                  var output = "build/Android/PersiaWar.apk";
+                  Directory.CreateDirectory("build/Android");
+
+                  var scenes = new System.Collections.Generic.List<string>();
+                  foreach (var scene in EditorBuildSettings.scenes)
+                  {
+                      if (scene.enabled)
+                          scenes.Add(scene.path);
+                  }
+
+                  if (scenes.Count == 0)
+                      throw new Exception("No enabled scenes found in EditorBuildSettings.");
+
+                  var report = BuildPipeline.BuildPlayer(
+                      scenes.ToArray(),
+                      output,
+                      BuildTarget.Android,
+                      BuildOptions.None
+                  );
+
+                  if (report.summary.result != BuildResult.Succeeded)
+                      throw new Exception("Unity Android build failed: " + report.summary.result);
+
+                  if (report.summary.totalErrors > 0)
+                      throw new Exception("Unity Android build reported " + report.summary.totalErrors + " error(s).");
+
+                  Console.WriteLine("UNITY_BUILD_SUCCEEDED:" + output);
+              }
+          }
+          CS
+
+          docker run --rm \
+            -e UNITY_EMAIL="$UNITY_EMAIL" \
+            -e UNITY_PASSWORD="$UNITY_PASSWORD" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$IMAGE" \
+            bash -lc '
+              set -euo pipefail
+
+              echo "Activating Unity Personal license..."
+              unity-editor -batchmode -nographics -quit -serial -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -logFile - || {
+                echo "Unity Personal command-line activation returned non-zero."
+                exit 1
+              }
+
+              echo "Building the existing Unity project..."
+              unity-editor \
+                -batchmode \
+                -nographics \
+                -quit \
+                -accept-apiupdate \
+                -projectPath /workspace/UnityProject \
+                -buildTarget Android \
+                -executeMethod PersiaWarCiBuild.BuildAndroid \
+                -logFile -
+            '
+
+          test -s build/Android/PersiaWar.apk
+          unzip -t build/Android/PersiaWar.apk >/dev/null
+          echo "Verified Unity APK: build/Android/PersiaWar.apk"
+
+          rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs
+          rmdir UnityProject/Assets/Editor 2>/dev/null || true
       - name: Verify APK
         shell: bash
         run: |
