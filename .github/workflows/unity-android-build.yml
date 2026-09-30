@@ -149,6 +149,8 @@ jobs:
             --engine unity \
             --target-platform Android \
             --provider-strategy local-docker \
+            --orchestrator-repo-name game-ci/unity-builder \
+            --orchestrator-branch main \
             --project-path UnityProject \
             --build-name PersiaWar \
             --builds-path build
