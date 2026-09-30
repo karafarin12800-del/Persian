@@ -133,13 +133,13 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: |
           set -euo pipefail
           IMAGE="unityci/editor:2022.3.62f1-android-3"
 
           mkdir -p .ci
-          trap 'rm -f .ci/unity-build.sh; rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs; rmdir UnityProject/Assets/Editor 2>/dev/null || true' EXIT
+          trap 'rm -f .ci/unity-build.sh; rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs; rmdir UnityProject/Assets/Editor 2>/dev/null || true; rm -rf .ci-unity-home' EXIT
 
           mkdir -p UnityProject/Assets/Editor
           cat > UnityProject/Assets/Editor/PersiaWarCiBuild.cs <<'CS'
@@ -191,21 +191,7 @@ jobs:
           set -euo pipefail
 
           export DEBIAN_FRONTEND=noninteractive
-          NODE_VERSION="22.14.0"
-          NODE_ROOT="/opt/node-v22.14.0-linux-x64"
-          export PATH="/opt/node-v22.14.0-linux-x64/bin:$PATH"
-
-          echo "=== Preparing Node.js 22 ==="
-          if [[ ! -x "/opt/node-v22.14.0-linux-x64/bin/node" ]]; then
-            apt-get update -qq
-            apt-get install -y -qq --no-install-recommends ca-certificates curl wget gnupg xz-utils
-            curl -fsSL "https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz" -o /tmp/node.tar.xz
-            rm -rf "/opt/node-v22.14.0-linux-x64"
-            tar -xJf /tmp/node.tar.xz -C /opt
-            rm -f /tmp/node.tar.xz
-          fi
-          node --version
-          npm --version
+          export UNITY_HUB_PATH="/usr/lib/unityhub/unityhub"
 
           echo "=== Installing Unity Hub ==="
           if [[ ! -x /usr/lib/unityhub/unityhub && ! -x /opt/unityhub/unityhub ]]; then
@@ -225,60 +211,57 @@ jobs:
             apt-get install -y -qq --no-install-recommends unityhub
           fi
 
-          if [[ -x /usr/lib/unityhub/unityhub ]]; then
-            echo "Unity Hub found at /usr/lib/unityhub/unityhub"
-          elif [[ -x /opt/unityhub/unityhub ]]; then
-            echo "Unity Hub found at /opt/unityhub/unityhub"
-          else
-            echo "::error::Unity Hub binary was not found after installation."
+          HUB_BIN=""
+          for candidate in /usr/lib/unityhub/unityhub /opt/unityhub/unityhub; do
+            if [[ -x "$candidate" ]]; then
+              HUB_BIN="$candidate"
+              break
+            fi
+          done
+          [[ -n "$HUB_BIN" ]] || { echo "::error::Unity Hub binary not found."; exit 1; }
+          echo "Unity Hub found: $HUB_BIN"
+
+          echo "=== Locating Unity Licensing Client ==="
+          LICENSE_CLIENT=""
+          while IFS= read -r candidate; do
+            if [[ -x "$candidate" ]]; then
+              LICENSE_CLIENT="$candidate"
+              break
+            fi
+          done < <(find /usr/lib/unityhub /opt/unityhub -type f -name 'Unity.Licensing.Client' -perm -111 2>/dev/null || true)
+
+          [[ -n "$LICENSE_CLIENT" ]] || {
+            echo "::error::Unity.Licensing.Client was not found inside Unity Hub.";
+            echo "Unity Hub directory:";
+            find /usr/lib/unityhub /opt/unityhub -maxdepth 3 -type f 2>/dev/null | head -n 120 || true
             exit 1
-          fi
+          }
 
-          echo "=== Installing current Unity Licensing Client ==="
-          rm -rf /tmp/unity-license-runtime
-          mkdir -p /tmp/unity-license-runtime
-          npm install --prefix /tmp/unity-license-runtime --no-save --no-package-lock @rage-against-the-pixel/unity-cli@2.0.0
+          echo "Unity Licensing Client found."
 
-          cat > /tmp/activate-unity.js <<'JS'
-          const { LicensingClient, LicenseType } = require("@rage-against-the-pixel/unity-cli");
+          mkdir -p /root/.local/share/unity3d/Unity
+          mkdir -p /root/.config/unity3d/Unity
 
-          (async () => {
-            const email = process.env.UNITY_EMAIL;
-            const password = process.env.UNITY_PASSWORD;
+          echo "=== Activating Unity Personal license directly ==="
+          "$LICENSE_CLIENT" \
+            --activate-ulf \
+            --username "$UNITY_EMAIL" \
+            --password "$UNITY_PASSWORD" \
+            --include-personal
 
-            if (!email || !password) {
-              throw new Error("Unity credentials are missing.");
-            }
-
-            const client = new LicensingClient("6.x");
-
-            console.log("Activating Unity Personal license...");
-            await client.Activate({
-              licenseType: LicenseType.personal,
-              username: email,
-              password,
-            }, true);
-
-            const active = await client.GetActiveEntitlements();
-            console.log("Active Unity entitlements: " + active.join(", "));
-
-            if (!active.includes(LicenseType.personal)) {
-              throw new Error("Unity Personal entitlement is not active.");
-            }
-
-            console.log("UNITY_PERSONAL_LICENSE_ACTIVATED");
-          })().catch((error) => {
-            console.error(error);
-            process.exit(1);
-          });
-          JS
-
-          NODE_PATH=/tmp/unity-license-runtime/node_modules node /tmp/activate-unity.js
+          echo "=== Verifying Unity Personal entitlement ==="
+          ENTITLEMENTS="$("$LICENSE_CLIENT" --showEntitlements 2>&1 || true)"
+          printf '%s\n' "$ENTITLEMENTS" | sed 's/[[:space:]]*$//'
+          printf '%s\n' "$ENTITLEMENTS" | grep -q "Unity Personal" || {
+            echo "::error::Unity Personal entitlement was not activated.";
+            "$LICENSE_CLIENT" --showContext 2>&1 || true
+            exit 1
+          }
 
           test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
-          echo "Unity Personal license file created successfully."
+          echo "Unity Personal license file is ready."
 
-          echo "=== Building existing Unity project ==="
+          echo "=== Building the existing Unity project ==="
           cd /workspace
           unity-editor \
             -batchmode \
