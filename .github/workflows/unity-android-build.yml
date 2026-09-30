@@ -142,7 +142,8 @@ jobs:
                 echo "UNITY_SERIAL_EOF"
               } >> "$GITHUB_ENV"
               echo "Unity activation mode: serial."
-              exit 0
+            echo "mode=serial" >> "$GITHUB_OUTPUT"
+            exit 0
             fi
             echo "::error::UNITY_SERIAL is not in a recognized serial format."
             exit 1
@@ -154,6 +155,7 @@ jobs:
             printf '%s\n' "$license" > "$tmp_ulf"
             export_ulf "$tmp_ulf"
             rm -f "$tmp_ulf"
+            echo "mode=personal" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -167,13 +169,15 @@ jobs:
             export_ulf "$tmp_ulf"
             rm -f "$tmp_ulf"
             echo "Existing base64-encoded .ulf was accepted."
+            echo "mode=personal" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "UNITY_LICENSE is not a usable .ulf. Falling back to automatic Personal-license activation."
+          echo "mode=personal" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js for automatic Personal activation
-        if: ${{ env.UNITY_SERIAL == '' }}
+        if: ${{ steps.prepare-license.outputs.mode == 'personal' }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -221,16 +225,13 @@ jobs:
 
       - name: Validate final Unity activation payload
         shell: bash
-        env:
-          UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ env.UNITY_SERIAL }}
         run: |
           set -euo pipefail
-          if [[ -n "${UNITY_SERIAL}" ]]; then
+          if [[ -n "${UNITY_SERIAL:-}" ]]; then
             echo "Final activation payload: serial."
             exit 0
           fi
-          [[ -n "${UNITY_LICENSE}" ]] || { echo "::error::No final Unity activation payload available."; exit 1; }
+          [[ -n "${UNITY_LICENSE:-}" ]] || { echo "::error::No final Unity activation payload available."; exit 1; }
           printf '%s' "${UNITY_LICENSE}" | grep -q '<UnityLicense'
           echo 'Final activation payload is valid .ulf XML.'
 
