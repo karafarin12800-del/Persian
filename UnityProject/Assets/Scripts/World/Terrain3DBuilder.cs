@@ -5,6 +5,8 @@ namespace PersiaWar.Unity2D5D
     /// <summary>
     /// Builds the playable ground as real 3D geometry instead of a single flat cube.
     /// Height is intentionally subtle so existing combat, roads and movement remain stable.
+    /// The generated terrain is visual-only on Android; gameplay movement is kept at y=0
+    /// and building colliders provide the actual collision surfaces.
     /// </summary>
     public sealed class Terrain3DBuilder : MonoBehaviour
     {
@@ -20,8 +22,6 @@ namespace PersiaWar.Unity2D5D
             if (filter == null) filter = gameObject.AddComponent<MeshFilter>();
             MeshRenderer renderer = GetComponent<MeshRenderer>();
             if (renderer == null) renderer = gameObject.AddComponent<MeshRenderer>();
-            MeshCollider collider = GetComponent<MeshCollider>();
-            if (collider == null) collider = gameObject.AddComponent<MeshCollider>();
 
             Mesh mesh = new Mesh { name = "PersiaWar3DTerrain" };
             int count = subdivisions + 1;
@@ -70,8 +70,6 @@ namespace PersiaWar.Unity2D5D
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             filter.sharedMesh = mesh;
-            collider.sharedMesh = null;
-            collider.sharedMesh = mesh;
 
             Texture2D grassTexture = BuildGrassTexture(96, seed);
             Material material = RuntimeMaterialFactory.CreateTextured(
