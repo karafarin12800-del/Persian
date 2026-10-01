@@ -167,7 +167,17 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
+            if (!SceneManager.SetActiveScene(gameplayScene))
+            {
+                Fail("Unity could not make the gameplay scene active before root activation.", null);
+                yield break;
+            }
+
+            StartupCheckpoint.Set("GameplaySceneSetActiveBeforeRoots");
             yield return StartCoroutine(ActivateGameplayRoots(gameplayScene));
+            if (failed)
+                yield break;
+
             yield return StartCoroutine(ContinueGameplayInitialization());
         }
 
@@ -237,7 +247,15 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            SceneManager.SetActiveScene(gameplayScene);
+            if (SceneManager.GetActiveScene() != gameplayScene)
+            {
+                if (!SceneManager.SetActiveScene(gameplayScene))
+                {
+                    Fail("Gameplay scene is loaded but could not become the active scene.", null);
+                    yield break;
+                }
+            }
+
             StartupCheckpoint.Set("GameplaySceneActivated");
 
             float readyWait = 0f;
