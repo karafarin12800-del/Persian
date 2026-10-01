@@ -6,15 +6,15 @@ using UnityEngine.SceneManagement;
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// Safe Android boot flow. The gameplay scene is loaded additively first, then
-    /// its root objects are activated in small stages so a single expensive scene
-    /// activation cannot take down the process.
+    /// Lightweight Android boot flow. Loads the gameplay scene directly as the
+    /// single active scene; gameplay itself remains gated by PrototypeFlow until
+    /// the player starts a match.
     /// </summary>
     public sealed class BootLoader : MonoBehaviour
     {
-        private const string GameplayScenePath = "Assets/Scenes/PersiaWarPrototype.unity";
         private const int GameplaySceneBuildIndex = 1;
         private const float MinimumVisibleSeconds = 0.65f;
+        private const float StartupTimeoutSeconds = 30f;
 
         private AsyncOperation loadOperation;
         private GUIStyle titleStyle;
@@ -47,14 +47,10 @@ namespace PersiaWar.Unity2D5D
             yield return null;
 
             status = "Loading battlefield...";
-            Scene bootScene = SceneManager.GetActiveScene();
             float visibleSeconds = 0f;
 
             try
             {
-                // Use the explicit build index after validating Build Settings. This avoids
-                // platform-specific scene-name/path resolution differences and guarantees that
-                // Android launches the same BootScene -> GameplayScene contract as the Editor.
                 Scene gameplayConfigured = SceneManager.GetSceneByBuildIndex(GameplaySceneBuildIndex);
                 if (!gameplayConfigured.IsValid())
                 {
@@ -62,7 +58,12 @@ namespace PersiaWar.Unity2D5D
                     yield break;
                 }
 
-                loadOperation = SceneManager.LoadSceneAsync(GameplaySceneBuildIndex, LoadSceneMode.Additive);
+                loadOperation = SceneManager.LoadSceneAsync(
+                    GameplaySceneBuildIndex,
+                    LoadSceneMode.Single);
+
+                if (loadOperation != null)
+                    loadOperation.allowSceneActivation = true;
             }
             catch (Exception ex)
             {
@@ -91,83 +92,34 @@ namespace PersiaWar.Unity2D5D
                     Debug.LogWarning("PERSIA_BOOT_STAGE: MainSceneLoadTakingLongerThanExpected");
                 }
 
+                if (loadElapsed > StartupTimeoutSeconds)
+                {
+                    Fail("Battlefield scene did not finish loading within 30 seconds.", null);
+                    yield break;
+                }
+
                 yield return null;
             }
 
-            Scene gameplayScene = SceneManager.GetSceneByBuildIndex(GameplaySceneBuildIndex);
-            if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
-            {
-                Fail("Battlefield scene loaded but is not valid.", null);
-                yield break;
-            }
-
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadedAdditive");
-            progress = 0.80f;
-
+            visibleSeconds += Time.unscaledDeltaTime;
             while (visibleSeconds < MinimumVisibleSeconds)
             {
                 visibleSeconds += Time.unscaledDeltaTime;
                 yield return null;
             }
 
-            GameObject[] roots = gameplayScene.GetRootGameObjects();
-
-            // Only the camera and front-end are activated during boot. The expensive
-            // gameplay roots stay dormant until the player explicitly starts the match.
-            yield return ActivateRoot(roots, "Main Camera", 0.84f);
-            yield return ActivateRoot(roots, "PrototypeFlow", 0.96f);
-
-            SceneManager.SetActiveScene(gameplayScene);
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
-            if (!SceneManager.GetActiveScene().Equals(gameplayScene))
+            Scene gameplayScene = SceneManager.GetActiveScene();
+            if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
             {
-                Debug.LogError("PERSIA_BOOT_STAGE: ActiveSceneSwitchFailed");
-                Fail("Battlefield scene loaded but could not become the active scene.", null);
+                Fail("Battlefield scene loaded but is not valid.", null);
                 yield break;
-            }
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
-
-            // Only now remove the lightweight boot scene.
-            AsyncOperation unload = SceneManager.UnloadSceneAsync(bootScene);
-            if (unload != null)
-            {
-                while (!unload.isDone)
-                    yield return null;
             }
 
             progress = 1f;
-        }
-
-        private IEnumerator ActivateRoot(GameObject[] roots, string rootName, float targetProgress)
-        {
-            GameObject root = FindRoot(roots, rootName);
-            if (root == null)
-            {
-                Debug.LogWarning("PERSIA_BOOT_STAGE: MissingRoot:" + rootName);
-                yield return null;
-                yield break;
-            }
-
-            if (!root.activeSelf)
-            {
-                status = "Starting " + rootName + "...";
-                Debug.Log("PERSIA_BOOT_STAGE: ActivatingRoot:" + rootName);
-                root.SetActive(true);
-                yield return null;
-            }
-
-            progress = targetProgress;
-            yield return null;
-        }
-
-        private static GameObject FindRoot(GameObject[] roots, string rootName)
-        {
-            for (int i = 0; i < roots.Length; i++)
-            {
-                if (roots[i] != null && roots[i].name == rootName)
-                    return roots[i];
-            }
-            return null;
+            status = "Battlefield ready.";
+            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadedSingle");
+            Debug.Log("PERSIA_BOOT_STAGE: GameplaySceneActive:" + gameplayScene.name);
+            StartupCheckpoint.Set("GameplaySceneLoadComplete");
         }
 
         private void Fail(string message, Exception exception)
