@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
@@ -24,6 +25,13 @@ namespace PersiaWar.Unity2D5D
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
+        private bool startingMatch;
+        private string startupStatus = string.Empty;
+        private GameObject playerRoot;
+        private GameObject mobileInputRoot;
+        private GameObject worldBoundsRoot;
+        private GameObject gameRoot;
+        private GameBootstrap gameBootstrap;
         private Texture2D pixel;
         private Texture2D mapTexture;
         private GUIStyle titleStyle;
@@ -49,17 +57,32 @@ namespace PersiaWar.Unity2D5D
 
         private void Start()
         {
-            player = FindFirstObjectByType<PlayerController>();
-            enemySpawner = FindFirstObjectByType<EnemySpawner>();
-            mobileInput = FindFirstObjectByType<MobileInputHub>();
-            combatHud = FindFirstObjectByType<RuntimeCombatHUD>();
+            // Include inactive gameplay objects: BootLoader intentionally leaves them dormant
+            // so the hero/drop menu can render without starting the battlefield.
+            player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+            mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
+            combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
             Camera camera = Camera.main;
             followCamera = camera != null ? camera.GetComponent<CameraFollow25D>() : null;
+            CacheGameplayRoots();
 
-            // Menu gating happens before the first gameplay Update. EnemySpawner is
-            // disabled here so the hero/drop screens do not start combat waves.
             GateGameplay(false);
-            ApplyHeroStyle(selectedHero);
+            StartupCheckpoint.Set("PrototypeFlowMenuReady");
+        }
+
+        private void CacheGameplayRoots()
+        {
+            GameObject[] roots = gameObject.scene.GetRootGameObjects();
+            for (int i = 0; i < roots.Length; i++)
+            {
+                GameObject root = roots[i];
+                if (root == null) continue;
+                if (root.name == "Player") playerRoot = root;
+                else if (root.name == "MobileInput") mobileInputRoot = root;
+                else if (root.name == "WorldBounds") worldBoundsRoot = root;
+                else if (root.name == "GameRoot") gameRoot = root;
+            }
         }
 
         private void Update()
@@ -73,6 +96,23 @@ namespace PersiaWar.Unity2D5D
         {
             if (mode == ScreenMode.Match) return;
             DrawBackdrop();
+
+            if (startingMatch)
+            {
+                float width = Mathf.Min(Screen.width - 48f, 760f);
+                float height = 170f;
+                Rect panel = new Rect(
+                    (Screen.width - width) * 0.5f,
+                    Screen.height * 0.5f - height * 0.5f,
+                    width,
+                    height);
+                Fill(panel, new Color(0.04f, 0.07f, 0.11f, 0.96f));
+                Fill(new Rect(panel.x, panel.y, panel.width, 6f), new Color(0.92f, 0.66f, 0.18f, 1f));
+                GUI.Label(new Rect(panel.x + 18f, panel.y + 30f, panel.width - 36f, 40f), "PERSIA WAR", headerStyle);
+                GUI.Label(new Rect(panel.x + 18f, panel.y + 76f, panel.width - 36f, 30f), startupStatus, bodyStyle);
+                GUI.Label(new Rect(panel.x + 18f, panel.y + 116f, panel.width - 36f, 28f), "Preparing battlefield...", smallStyle);
+                return;
+            }
             if (mode == ScreenMode.HeroSelect)
                 DrawHeroSelect();
             else
@@ -111,7 +151,6 @@ namespace PersiaWar.Unity2D5D
                 if (GUI.Button(card, GUIContent.none, GUIStyle.none))
                 {
                     selectedHero = i;
-                    ApplyHeroStyle(selectedHero);
                 }
             }
 
@@ -252,12 +291,89 @@ namespace PersiaWar.Unity2D5D
 
         private void StartMatch()
         {
-            if (player == null) return;
+            if (!spawnChosen || startingMatch)
+                return;
+
+            StartCoroutine(BeginMatchSafely());
+        }
+
+        private IEnumerator BeginMatchSafely()
+        {
+            startingMatch = true;
+            startupStatus = "Activating battlefield...";
+            StartupCheckpoint.Set("MatchActivationStarted");
+
+            CacheGameplayRoots();
+            yield return ActivateRoot(playerRoot, "Player");
+            yield return ActivateRoot(mobileInputRoot, "MobileInput");
+            yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
+            yield return ActivateRoot(gameRoot, "GameRoot");
+
+            gameBootstrap = gameRoot != null
+                ? gameRoot.GetComponent<GameBootstrap>()
+                : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
+
+            if (gameBootstrap == null)
+            {
+                startupStatus = "Battlefield bootstrap is missing.";
+                StartupCheckpoint.Set("GameBootstrapMissing");
+                startingMatch = false;
+                yield break;
+            }
+
+            float timeout = 20f;
+            while (!gameBootstrap.IsWorldReady && timeout > 0f)
+            {
+                timeout -= Time.unscaledDeltaTime;
+                startupStatus = "Preparing battlefield...";
+                yield return null;
+            }
+
+            if (!gameBootstrap.IsWorldReady)
+            {
+                startupStatus = "Battlefield preparation failed. Tap START MATCH to retry.";
+                StartupCheckpoint.Set("MatchActivationTimedOut");
+                startingMatch = false;
+                yield break;
+            }
+
+            player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+            mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
+            combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+
+            if (player == null)
+            {
+                startupStatus = "Player initialization failed. Tap START MATCH to retry.";
+                StartupCheckpoint.Set("PlayerInitializationFailed");
+                startingMatch = false;
+                yield break;
+            }
+
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
-            if (followCamera != null) followCamera.SetTarget(player.transform);
-            mode = ScreenMode.Match;
+
+            if (followCamera != null)
+                followCamera.SetTarget(player.transform);
+
             GateGameplay(true);
+            mode = ScreenMode.Match;
+            startingMatch = false;
+            startupStatus = string.Empty;
+            StartupCheckpoint.Set("MatchStarted");
+        }
+
+        private IEnumerator ActivateRoot(GameObject root, string rootName)
+        {
+            if (root == null)
+                yield break;
+
+            if (!root.activeSelf)
+            {
+                startupStatus = "Starting " + rootName + "...";
+                root.SetActive(true);
+                yield return null;
+            }
         }
 
         private void GateGameplay(bool enabled)

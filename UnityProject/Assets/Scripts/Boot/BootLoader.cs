@@ -101,14 +101,10 @@ namespace PersiaWar.Unity2D5D
 
             GameObject[] roots = gameplayScene.GetRootGameObjects();
 
-            // Keep the activation order deterministic. The gameplay scene currently
-            // contains exactly these root objects; unknown roots remain untouched.
+            // Only the camera and front-end are activated during boot. The expensive
+            // gameplay roots stay dormant until the player explicitly starts the match.
             yield return ActivateRoot(roots, "Main Camera", 0.84f);
-            yield return ActivateRoot(roots, "Player", 0.87f);
-            yield return ActivateRoot(roots, "MobileInput", 0.89f);
-            yield return ActivateRoot(roots, "WorldBounds", 0.91f);
-            yield return ActivateRoot(roots, "GameRoot", 0.95f);
-            yield return ActivateRoot(roots, "PrototypeFlow", 0.98f);
+            yield return ActivateRoot(roots, "PrototypeFlow", 0.96f);
 
             SceneManager.SetActiveScene(gameplayScene);
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");

@@ -11,6 +11,8 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int enemyCount = 8;
         [SerializeField] private float enemySpawnRadius = 44f;
 
+        public bool IsWorldReady { get; private set; }
+
         private Transform worldRoot;
         private Material groundMaterial;
         private Material roadMaterial;
@@ -25,6 +27,7 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            IsWorldReady = false;
             StartupCheckpoint.Set("GameBootstrapAwakeEntered");
             // Keep scene activation lightweight on Android. Gameplay initialization and
             // object creation are deferred until the scene has finished activating.
@@ -92,6 +95,7 @@ namespace PersiaWar.Unity2D5D
             yield return null;
             BuildRuinedQuarter();
             StartupCheckpoint.Set("WorldBuildComplete");
+            IsWorldReady = true;
         }
 
         private void EnsureGameSession()
@@ -110,15 +114,23 @@ namespace PersiaWar.Unity2D5D
                 spawner = objectRoot.AddComponent<EnemySpawner>();
             }
             spawner.Configure(player, enemyCount, enemySpawnRadius, 0f);
+            // PrototypeFlow owns the final match gate. Keep combat dormant until
+            // the procedural world is completely built.
+            spawner.enabled = false;
         }
 
         private void EnsureGameplayHUD(PlayerController player)
         {
             RuntimeCombatHUD existing = FindFirstObjectByType<RuntimeCombatHUD>();
-            if (existing != null) return;
+            if (existing != null)
+            {
+                existing.enabled = false;
+                return;
+            }
 
             GameObject hudObject = new GameObject("RuntimeCombatHUD");
-            hudObject.AddComponent<RuntimeCombatHUD>();
+            RuntimeCombatHUD hud = hudObject.AddComponent<RuntimeCombatHUD>();
+            hud.enabled = false;
         }
 
         private void ConfigureCameraSafe()
