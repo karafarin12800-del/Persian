@@ -42,16 +42,11 @@ namespace PersiaWar.Unity2D5D
 
         private IEnumerator LoadGameplayScene()
         {
-            // Always render the lightweight boot screen at least once before the
-            // gameplay scene starts loading.
             yield return null;
 
             status = "Loading battlefield...";
             try
             {
-                // IMPORTANT: activation is intentionally not blocked. A device must
-                // never remain permanently parked on BootScene because an Android
-                // driver/device reports an unexpected AsyncOperation progress value.
                 loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Single);
             }
             catch (Exception ex)
@@ -73,20 +68,20 @@ namespace PersiaWar.Unity2D5D
             {
                 loadElapsed += Time.unscaledDeltaTime;
                 visibleSeconds += Time.unscaledDeltaTime;
-
-                // AsyncOperation.progress normally moves from 0 to 0.9 and then to
-                // 1 during activation. Do not gate activation on 0.9; Unity owns that.
                 progress = Mathf.Clamp01(loadOperation.progress / 0.9f);
+
                 if (!loadWarningLogged && loadElapsed > 5f)
                 {
                     loadWarningLogged = true;
                     Debug.LogWarning("PERSIA_BOOT_STAGE: MainSceneLoadTakingLongerThanExpected");
                 }
-                status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
+
+                status = loadElapsed > 5f
+                    ? "Preparing battlefield..."
+                    : "Loading battlefield...";
                 yield return null;
             }
 
-            // Keep the Boot frame visible briefly when loading completed extremely fast.
             while (visibleSeconds < MinimumVisibleSeconds)
             {
                 visibleSeconds += Time.unscaledDeltaTime;
@@ -113,33 +108,29 @@ namespace PersiaWar.Unity2D5D
                 Debug.LogError("PERSIA_BOOT_STAGE: " + message);
         }
 
+        private GUIStyle CreateTextStyle(int fontSize, FontStyle fontStyle)
+        {
+            GUIStyle style = new GUIStyle();
+            style.fontSize = fontSize;
+            style.fontStyle = fontStyle;
+            style.alignment = TextAnchor.MiddleCenter;
+            style.wordWrap = true;
+
+            GUIStyleState state = new GUIStyleState();
+            state.textColor = Color.white;
+            style.normal = state;
+            style.hover = state;
+            style.active = state;
+            style.focused = state;
+            return style;
+        }
+
         private void BuildStyles()
         {
-            titleStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 42,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter
-            };
-
-            statusStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 19,
-                alignment = TextAnchor.MiddleCenter
-            };
-
-            percentStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 17,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter
-            };
-
-            footerStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 13,
-                alignment = TextAnchor.MiddleCenter
-            };
+            titleStyle = CreateTextStyle(42, FontStyle.Bold);
+            statusStyle = CreateTextStyle(19, FontStyle.Normal);
+            percentStyle = CreateTextStyle(17, FontStyle.Bold);
+            footerStyle = CreateTextStyle(13, FontStyle.Normal);
         }
 
         private void OnGUI()
@@ -157,6 +148,7 @@ namespace PersiaWar.Unity2D5D
             Rect panel = new Rect(centerX, centerY - 165f, panelWidth, 330f);
             GUI.color = new Color(0.055f, 0.085f, 0.125f, 0.98f);
             GUI.DrawTexture(panel, Texture2D.whiteTexture);
+
             GUI.color = new Color(0.88f, 0.65f, 0.20f, 0.85f);
             GUI.DrawTexture(new Rect(panel.x, panel.y, panel.width, 5f), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(panel.x, panel.yMax - 5f, panel.width, 5f), Texture2D.whiteTexture);
@@ -169,10 +161,23 @@ namespace PersiaWar.Unity2D5D
             GUI.color = new Color(0.12f, 0.15f, 0.19f, 1f);
             GUI.DrawTexture(bar, Texture2D.whiteTexture);
 
-            GUI.color = failed
-                ? new Color(0.70f, 0.18f, 0.14f, 1f)
-                : new Color(0.88f, 0.65f, 0.20f, 1f);
-            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(progress), bar.height), Texture2D.whiteTexture);
+            float fill = Mathf.Clamp01(progress);
+            if (fill < 0.015f && !failed)
+            {
+                // Always show visible activity even while Unity is still preparing
+                // the scene and has not advanced AsyncOperation.progress yet.
+                float pulse = 0.18f + (Mathf.Sin(Time.unscaledTime * 4f) + 1f) * 0.09f;
+                float x = bar.x + (bar.width - bar.width * pulse) * Mathf.Repeat(Time.unscaledTime * 0.16f, 1f);
+                GUI.color = new Color(0.88f, 0.65f, 0.20f, 1f);
+                GUI.DrawTexture(new Rect(x, bar.y, bar.width * pulse, bar.height), Texture2D.whiteTexture);
+            }
+            else
+            {
+                GUI.color = failed
+                    ? new Color(0.70f, 0.18f, 0.14f, 1f)
+                    : new Color(0.88f, 0.65f, 0.20f, 1f);
+                GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * fill, bar.height), Texture2D.whiteTexture);
+            }
 
             GUI.color = Color.white;
             GUI.Label(new Rect(centerX, centerY + 44f, panelWidth, 30f), Mathf.RoundToInt(progress * 100f) + "%", percentStyle);
