@@ -25,6 +25,7 @@ namespace PersiaWar.Unity2D5D
         private float progress;
         private float loadElapsed;
         private bool loadWarningLogged;
+        private bool startRequested;
         private string status = "Starting Persia War...";
         private string previousCheckpoint = string.Empty;
 
@@ -41,6 +42,14 @@ namespace PersiaWar.Unity2D5D
         private void Start()
         {
             BuildStyles();
+            status = "Ready to deploy into the battlefield";
+        }
+
+        private void BeginGame()
+        {
+            if (startRequested || failed) return;
+            startRequested = true;
+            status = "Loading battlefield...";
             StartCoroutine(LoadGameplayScene());
         }
 
@@ -292,6 +301,19 @@ namespace PersiaWar.Unity2D5D
             GUI.color = Color.white;
             GUI.Label(new Rect(centerX, centerY - 128f, panelWidth, 58f), "PERSIA WAR", titleStyle);
             GUI.Label(new Rect(centerX, centerY - 62f, panelWidth, 34f), status, statusStyle);
+
+            if (!startRequested && !failed)
+            {
+                Rect startButton = new Rect(centerX + 90f, centerY + 5f, panelWidth - 180f, 58f);
+                GUI.color = new Color(0.88f, 0.65f, 0.20f, 1f);
+                if (GUI.Button(startButton, "START BATTLE", percentStyle))
+                    BeginGame();
+                GUI.color = Color.white;
+                GUI.Label(new Rect(centerX, centerY + 75f, panelWidth, 30f), "The battlefield will load after Start.", footerStyle);
+                GUI.color = old;
+                return;
+            }
+
 
             Rect bar = new Rect(centerX + 60f, centerY + 2f, panelWidth - 120f, 30f);
             GUI.color = new Color(0.12f, 0.15f, 0.19f, 1f);
