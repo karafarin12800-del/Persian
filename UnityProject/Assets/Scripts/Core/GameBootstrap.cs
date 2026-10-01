@@ -20,7 +20,16 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            // Keep scene activation lightweight on Android. Gameplay initialization and
+            // object creation are deferred until the scene has finished activating.
             StartupCheckpoint.Set("GameBootstrapAwake");
+        }
+
+        private IEnumerator Start()
+        {
+            // One frame separates Unity scene activation from the first heavy bootstrap work.
+            yield return null;
+
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             Random.InitState(seed);
