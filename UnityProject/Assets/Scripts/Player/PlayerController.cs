@@ -30,8 +30,11 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            StartupCheckpoint.Set("PlayerAwakeStarted");
             EnsurePlayerVisual();
+            StartupCheckpoint.Set("PlayerVisualBuilt");
             EnsureGameplayComponents();
+            StartupCheckpoint.Set("PlayerComponentsReady");
         }
 
         public void SetMoveInput(Vector2 value)
@@ -143,60 +146,32 @@ namespace PersiaWar.Unity2D5D
             visualRoot = new GameObject("PlayerVisual").transform;
             visualRoot.SetParent(transform, false);
 
-            // PRESENTATION ONLY: built-in Unity primitives assembled as a polished
-            // mobile-friendly Persian warrior. Gameplay, movement and combat are untouched.
-            body = CreatePart(PrimitiveType.Capsule, "Body", new Vector3(0f, 0.92f, 0f),
-                new Vector3(0.62f, 0.82f, 0.62f), new Color(0.20f, 0.24f, 0.28f));
+            body = CreatePart(PrimitiveType.Capsule, "Body", new Vector3(0f, 0.92f, 0f), new Vector3(0.62f, 0.82f, 0.62f), new Color(0.20f, 0.24f, 0.28f));
+            CreatePart(PrimitiveType.Capsule, "Tunic", new Vector3(0f, 1.02f, 0.05f), new Vector3(0.72f, 0.58f, 0.70f), new Color(0.42f, 0.15f, 0.08f));
+            CreatePart(PrimitiveType.Cube, "ChestArmor", new Vector3(0f, 1.25f, 0.17f), new Vector3(0.92f, 0.56f, 0.18f), new Color(0.72f, 0.52f, 0.20f));
+            CreatePart(PrimitiveType.Cube, "Belt", new Vector3(0f, 0.78f, 0.04f), new Vector3(0.82f, 0.14f, 0.72f), new Color(0.78f, 0.62f, 0.25f));
+            CreatePart(PrimitiveType.Capsule, "LegL", new Vector3(-0.22f, 0.38f, 0.02f), new Vector3(0.24f, 0.48f, 0.24f), new Color(0.14f, 0.18f, 0.22f));
+            CreatePart(PrimitiveType.Capsule, "LegR", new Vector3(0.22f, 0.38f, 0.02f), new Vector3(0.24f, 0.48f, 0.24f), new Color(0.14f, 0.18f, 0.22f));
+            CreatePart(PrimitiveType.Sphere, "Head", new Vector3(0f, 1.93f, 0f), new Vector3(0.45f, 0.45f, 0.45f), new Color(0.64f, 0.40f, 0.24f));
+            CreatePart(PrimitiveType.Cylinder, "PersianHelmet", new Vector3(0f, 2.18f, 0f), new Vector3(0.54f, 0.22f, 0.54f), new Color(0.74f, 0.55f, 0.20f));
+            CreatePart(PrimitiveType.Cube, "HelmetCrest", new Vector3(0f, 2.08f, 0.03f), new Vector3(0.76f, 0.10f, 0.62f), new Color(0.16f, 0.20f, 0.23f));
+            CreatePart(PrimitiveType.Capsule, "RedPlume", new Vector3(0f, 2.48f, -0.04f), new Vector3(0.18f, 0.42f, 0.18f), new Color(0.52f, 0.08f, 0.05f));
 
-            CreatePart(PrimitiveType.Capsule, "Tunic", new Vector3(0f, 1.02f, 0.05f),
-                new Vector3(0.72f, 0.58f, 0.70f), new Color(0.42f, 0.15f, 0.08f));
-
-            CreatePart(PrimitiveType.Cube, "ChestArmor", new Vector3(0f, 1.25f, 0.17f),
-                new Vector3(0.92f, 0.56f, 0.18f), new Color(0.72f, 0.52f, 0.20f));
-
-            CreatePart(PrimitiveType.Cube, "Belt", new Vector3(0f, 0.78f, 0.04f),
-                new Vector3(0.82f, 0.14f, 0.72f), new Color(0.78f, 0.62f, 0.25f));
-
-            CreatePart(PrimitiveType.Capsule, "LegL", new Vector3(-0.22f, 0.38f, 0.02f),
-                new Vector3(0.24f, 0.48f, 0.24f), new Color(0.14f, 0.18f, 0.22f));
-            CreatePart(PrimitiveType.Capsule, "LegR", new Vector3(0.22f, 0.38f, 0.02f),
-                new Vector3(0.24f, 0.48f, 0.24f), new Color(0.14f, 0.18f, 0.22f));
-
-            CreatePart(PrimitiveType.Sphere, "Head", new Vector3(0f, 1.93f, 0f),
-                new Vector3(0.45f, 0.45f, 0.45f), new Color(0.64f, 0.40f, 0.24f));
-
-            CreatePart(PrimitiveType.Cylinder, "PersianHelmet", new Vector3(0f, 2.18f, 0f),
-                new Vector3(0.54f, 0.22f, 0.54f), new Color(0.74f, 0.55f, 0.20f));
-            CreatePart(PrimitiveType.Cube, "HelmetCrest", new Vector3(0f, 2.08f, 0.03f),
-                new Vector3(0.76f, 0.10f, 0.62f), new Color(0.16f, 0.20f, 0.23f));
-            CreatePart(PrimitiveType.Capsule, "RedPlume", new Vector3(0f, 2.48f, -0.04f),
-                new Vector3(0.18f, 0.42f, 0.18f), new Color(0.52f, 0.08f, 0.05f));
-
-            Transform armL = CreatePart(PrimitiveType.Capsule, "ArmL", new Vector3(-0.50f, 1.02f, 0.08f),
-                new Vector3(0.18f, 0.48f, 0.18f), new Color(0.58f, 0.42f, 0.22f));
+            Transform armL = CreatePart(PrimitiveType.Capsule, "ArmL", new Vector3(-0.50f, 1.02f, 0.08f), new Vector3(0.18f, 0.48f, 0.18f), new Color(0.58f, 0.42f, 0.22f));
             armL.localRotation = Quaternion.Euler(15f, 0f, 25f);
-            Transform armR = CreatePart(PrimitiveType.Capsule, "ArmR", new Vector3(0.50f, 1.02f, 0.18f),
-                new Vector3(0.18f, 0.48f, 0.18f), new Color(0.58f, 0.42f, 0.22f));
+            Transform armR = CreatePart(PrimitiveType.Capsule, "ArmR", new Vector3(0.50f, 1.02f, 0.18f), new Vector3(0.18f, 0.48f, 0.18f), new Color(0.58f, 0.42f, 0.22f));
             armR.localRotation = Quaternion.Euler(15f, 0f, -20f);
 
-            // Shield: a layered circular Persian-style shield.
-            Transform shield = CreatePart(PrimitiveType.Cylinder, "Shield", new Vector3(-0.58f, 1.05f, 0.20f),
-                new Vector3(0.42f, 0.08f, 0.42f), new Color(0.10f, 0.18f, 0.22f));
+            Transform shield = CreatePart(PrimitiveType.Cylinder, "Shield", new Vector3(-0.58f, 1.05f, 0.20f), new Vector3(0.42f, 0.08f, 0.42f), new Color(0.10f, 0.18f, 0.22f));
             shield.localRotation = Quaternion.Euler(90f, 0f, 8f);
-            Transform shieldBoss = CreatePart(PrimitiveType.Sphere, "ShieldBoss", new Vector3(-0.61f, 1.05f, 0.27f),
-                new Vector3(0.11f, 0.11f, 0.11f), new Color(0.88f, 0.68f, 0.25f));
+            CreatePart(PrimitiveType.Sphere, "ShieldBoss", new Vector3(-0.61f, 1.05f, 0.27f), new Vector3(0.11f, 0.11f, 0.11f), new Color(0.88f, 0.68f, 0.25f));
 
-            // Spear/rifle silhouette retained purely as presentation geometry.
-            Transform weapon = CreatePart(PrimitiveType.Cylinder, "Weapon", new Vector3(0.48f, 1.15f, 0.55f),
-                new Vector3(0.075f, 0.72f, 0.075f), new Color(0.08f, 0.10f, 0.12f));
+            Transform weapon = CreatePart(PrimitiveType.Cylinder, "Weapon", new Vector3(0.48f, 1.15f, 0.55f), new Vector3(0.075f, 0.72f, 0.075f), new Color(0.08f, 0.10f, 0.12f));
             weapon.localRotation = Quaternion.Euler(18f, 0f, 8f);
-            Transform weaponTip = CreatePart(PrimitiveType.Cylinder, "WeaponTip", new Vector3(0.62f, 1.42f, 0.80f),
-                new Vector3(0.12f, 0.22f, 0.12f), new Color(0.76f, 0.62f, 0.28f));
+            Transform weaponTip = CreatePart(PrimitiveType.Cylinder, "WeaponTip", new Vector3(0.62f, 1.42f, 0.80f), new Vector3(0.12f, 0.22f, 0.12f), new Color(0.76f, 0.62f, 0.28f));
             weaponTip.localRotation = Quaternion.Euler(18f, 0f, 8f);
 
-            // Small cape for a stronger silhouette from the 2.5D camera.
-            Transform cape = CreatePart(PrimitiveType.Cube, "Cape", new Vector3(0f, 1.12f, -0.34f),
-                new Vector3(0.92f, 1.05f, 0.08f), new Color(0.30f, 0.07f, 0.06f));
+            Transform cape = CreatePart(PrimitiveType.Cube, "Cape", new Vector3(0f, 1.12f, -0.34f), new Vector3(0.92f, 1.05f, 0.08f), new Color(0.30f, 0.07f, 0.06f));
             cape.localRotation = Quaternion.Euler(5f, 0f, 0f);
         }
 
