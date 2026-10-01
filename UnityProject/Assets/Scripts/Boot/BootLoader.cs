@@ -23,6 +23,7 @@ namespace PersiaWar.Unity2D5D
         private bool failed;
         private string failureMessage = string.Empty;
         private float progress;
+        private float progressTarget;
         private float loadElapsed;
         private bool loadWarningLogged;
         private bool startRequested;
@@ -34,6 +35,7 @@ namespace PersiaWar.Unity2D5D
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             progress = 0f;
+            progressTarget = 0f;
             previousCheckpoint = StartupCheckpoint.Last;
             StartupCheckpoint.Set("BootSceneStarted");
             Debug.Log("PERSIA_BOOT_STAGE: BootSceneStarted");
@@ -86,7 +88,8 @@ namespace PersiaWar.Unity2D5D
             while (loadOperation.progress < 0.9f)
             {
                 loadElapsed += Time.unscaledDeltaTime;
-                progress = Mathf.Clamp01((loadOperation.progress / 0.9f) * 0.55f);
+                progressTarget = Mathf.Clamp01((loadOperation.progress / 0.9f) * 0.40f);
+                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.25f);
                 status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
 
                 if (!loadWarningLogged && loadElapsed > 5f)
@@ -101,12 +104,14 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("GameplaySceneLoadedWaitingForActivation");
             status = "Activating battlefield...";
-            progress = Mathf.Max(progress, 0.55f);
+            progressTarget = 0.45f;
+            progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.25f);
 
             loadOperation.allowSceneActivation = true;
             while (!loadOperation.isDone)
             {
-                progress = Mathf.Lerp(progress, 0.68f, 0.08f);
+                progressTarget = 0.55f;
+                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.20f);
                 yield return null;
             }
 
@@ -122,7 +127,8 @@ namespace PersiaWar.Unity2D5D
             {
                 readyWait += Time.unscaledDeltaTime;
                 status = GetStageStatus(StartupCheckpoint.Last);
-                progress = GetGameplayProgress(StartupCheckpoint.Last);
+                progressTarget = GetGameplayProgress(StartupCheckpoint.Last);
+                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.18f);
                 yield return null;
             }
 
@@ -140,10 +146,12 @@ namespace PersiaWar.Unity2D5D
                 visibleElapsed += Time.unscaledDeltaTime;
                 status = "Finalizing battlefield...";
                 float timeProgress = Mathf.Clamp01(visibleElapsed / MinimumVisibleSeconds);
-                progress = Mathf.Max(progress, Mathf.Lerp(0.92f, 0.985f, timeProgress));
+                progressTarget = Mathf.Lerp(0.92f, 0.985f, timeProgress);
+                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.18f);
                 yield return null;
             }
 
+            progressTarget = 1f;
             progress = 1f;
             status = "Battlefield ready";
             StartupCheckpoint.Set("GameplayReady");
@@ -245,6 +253,7 @@ namespace PersiaWar.Unity2D5D
             failureMessage = message;
             status = "Startup failed";
             progress = 0f;
+            progressTarget = 0f;
             StartupCheckpoint.Set("BootFailure");
 
             if (exception != null)
