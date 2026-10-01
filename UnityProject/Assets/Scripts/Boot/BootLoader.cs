@@ -13,6 +13,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class BootLoader : MonoBehaviour
     {
         private const string GameplayScenePath = "Assets/Scenes/PersiaWarPrototype.unity";
+        private const int GameplaySceneBuildIndex = 1;
         private const float MinimumVisibleSeconds = 0.65f;
 
         private AsyncOperation loadOperation;
@@ -51,7 +52,17 @@ namespace PersiaWar.Unity2D5D
 
             try
             {
-                loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Additive);
+                // Use the explicit build index after validating Build Settings. This avoids
+                // platform-specific scene-name/path resolution differences and guarantees that
+                // Android launches the same BootScene -> GameplayScene contract as the Editor.
+                Scene gameplayConfigured = SceneManager.GetSceneByBuildIndex(GameplaySceneBuildIndex);
+                if (!gameplayConfigured.IsValid())
+                {
+                    Fail("Gameplay scene is missing from Build Settings at index " + GameplaySceneBuildIndex + ".", null);
+                    yield break;
+                }
+
+                loadOperation = SceneManager.LoadSceneAsync(GameplaySceneBuildIndex, LoadSceneMode.Additive);
             }
             catch (Exception ex)
             {
@@ -83,7 +94,7 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
             }
 
-            Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
+            Scene gameplayScene = SceneManager.GetSceneByBuildIndex(GameplaySceneBuildIndex);
             if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
             {
                 Fail("Battlefield scene loaded but is not valid.", null);
@@ -108,6 +119,12 @@ namespace PersiaWar.Unity2D5D
 
             SceneManager.SetActiveScene(gameplayScene);
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
+            if (!SceneManager.GetActiveScene().Equals(gameplayScene))
+            {
+                Debug.LogError("PERSIA_BOOT_STAGE: ActiveSceneSwitchFailed");
+                Fail("Battlefield scene loaded but could not become the active scene.", null);
+                yield break;
+            }
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
 
             // Only now remove the lightweight boot scene.
