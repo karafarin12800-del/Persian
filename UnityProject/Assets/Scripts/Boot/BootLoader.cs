@@ -12,7 +12,8 @@ namespace PersiaWar.Unity2D5D
     public sealed class BootLoader : MonoBehaviour
     {
         private const string GameplayScenePath = "Assets/Scenes/PersiaWarPrototype.unity";
-        private const float MinimumVisibleSeconds = 0.65f;
+        private const float MinimumVisibleSeconds = 12f;
+        private const float ReadyTimeoutSeconds = 45f;
 
         private AsyncOperation loadOperation;
         private GUIStyle titleStyle;
@@ -49,9 +50,13 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("GameplaySceneLoadRequested");
 
             status = "Loading battlefield...";
+            loadElapsed = 0f;
+
             try
             {
-                loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Single);
+                // Keep BootScene alive. Gameplay is loaded additively so the
+                // loading overlay remains visible during real initialization.
+                loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Additive);
             }
             catch (Exception ex)
             {
@@ -65,15 +70,15 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
+            loadOperation.allowSceneActivation = false;
             StartupCheckpoint.Set("GameplaySceneLoadStarted");
+            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
 
-            float visibleSeconds = 0f;
-            while (!loadOperation.isDone)
+            while (loadOperation.progress < 0.9f)
             {
                 loadElapsed += Time.unscaledDeltaTime;
-                visibleSeconds += Time.unscaledDeltaTime;
-                progress = Mathf.Clamp01(loadOperation.progress / 0.9f);
+                progress = Mathf.Clamp01((loadOperation.progress / 0.9f) * 0.55f);
+                status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
 
                 if (!loadWarningLogged && loadElapsed > 5f)
                 {
@@ -82,24 +87,143 @@ namespace PersiaWar.Unity2D5D
                     StartupCheckpoint.Set("GameplaySceneLoadTakingLongerThanExpected");
                 }
 
-                status = loadElapsed > 5f
-                    ? "Preparing battlefield..."
-                    : "Loading battlefield...";
                 yield return null;
             }
 
-            while (visibleSeconds < MinimumVisibleSeconds)
+            StartupCheckpoint.Set("GameplaySceneLoadedWaitingForActivation");
+            status = "Activating battlefield...";
+            progress = Mathf.Max(progress, 0.55f);
+
+            loadOperation.allowSceneActivation = true;
+            while (!loadOperation.isDone)
             {
-                visibleSeconds += Time.unscaledDeltaTime;
-                progress = 1f;
-                status = "Starting Persia War...";
+                progress = Mathf.Lerp(progress, 0.68f, 0.08f);
+                yield return null;
+            }
+
+            StartupCheckpoint.Set("GameplaySceneActivated");
+            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
+
+            float readyWait = 0f;
+            while (!GameplayIsReady() && readyWait < ReadyTimeoutSeconds)
+            {
+                readyWait += Time.unscaledDeltaTime;
+                status = GetStageStatus(StartupCheckpoint.Last);
+                progress = GetGameplayProgress(StartupCheckpoint.Last);
+                yield return null;
+            }
+
+            if (!GameplayIsReady())
+            {
+                Fail("Battlefield initialization did not complete in time.", null);
+                yield break;
+            }
+
+            // Minimum 12 seconds, without blocking the main thread. The bar only
+            // reaches 100% after the gameplay readiness checkpoint is reached.
+            float visibleElapsed = 0f;
+            while (visibleElapsed < MinimumVisibleSeconds)
+            {
+                visibleElapsed += Time.unscaledDeltaTime;
+                status = "Finalizing battlefield...";
+                float timeProgress = Mathf.Clamp01(visibleElapsed / MinimumVisibleSeconds);
+                progress = Mathf.Max(progress, Mathf.Lerp(0.92f, 0.985f, timeProgress));
                 yield return null;
             }
 
             progress = 1f;
-            StartupCheckpoint.Set("GameplaySceneLoadCompleted");
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
+            status = "Battlefield ready";
+            StartupCheckpoint.Set("GameplayReady");
+            Debug.Log("PERSIA_BOOT_STAGE: GameplayReady");
+
+            yield return null;
+
+            Scene bootScene = gameObject.scene;
+            if (bootScene.IsValid() && bootScene.isLoaded)
+            {
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(bootScene);
+                if (unload != null)
+                    yield return unload;
+            }
+        }
+
+        private bool GameplayIsReady()
+        {
+            return StartupCheckpoint.Last == "WorldBuildComplete"
+                || StartupCheckpoint.Last == "RuntimeShaderReady"
+                || StartupCheckpoint.Last == "GameplayReady";
+        }
+
+        private float GetGameplayProgress(string checkpoint)
+        {
+            switch (checkpoint)
+            {
+                case "GameplaySceneActivated":
+                case "GameBootstrapAwake":
+                    return 0.70f;
+                case "GameSessionReady":
+                case "CameraConfigured":
+                case "LightingConfigured":
+                case "PlayerLocated":
+                    return 0.76f;
+                case "PlayerAwakeStarted":
+                case "PlayerVisualBuilt":
+                case "PlayerComponentsReady":
+                    return 0.82f;
+                case "EnemySpawnerReady":
+                case "HUDReady":
+                case "GameplayBootstrapAwakeComplete":
+                    return 0.87f;
+                case "WorldBuildStarted":
+                case "WorldBaseBuilt":
+                    return 0.90f;
+                case "RoadMarkingsBuilt":
+                case "CityBlocksBuilt":
+                    return 0.93f;
+                case "LandmarksBuilt":
+                case "StreetPropsBuilt":
+                    return 0.96f;
+                case "WorldBuildComplete":
+                case "RuntimeShaderReady":
+                case "GameplayReady":
+                    return 1f;
+                default:
+                    return Mathf.Clamp(progress, 0.68f, 0.89f);
+            }
+        }
+
+        private string GetStageStatus(string checkpoint)
+        {
+            switch (checkpoint)
+            {
+                case "GameSessionReady":
+                    return "Preparing game session...";
+                case "CameraConfigured":
+                case "LightingConfigured":
+                    return "Configuring battlefield...";
+                case "PlayerAwakeStarted":
+                case "PlayerVisualBuilt":
+                case "PlayerComponentsReady":
+                    return "Preparing player...";
+                case "EnemySpawnerReady":
+                    return "Preparing enemies...";
+                case "HUDReady":
+                    return "Preparing controls...";
+                case "WorldBuildStarted":
+                case "WorldBaseBuilt":
+                    return "Building battlefield...";
+                case "RoadMarkingsBuilt":
+                case "CityBlocksBuilt":
+                    return "Building city...";
+                case "LandmarksBuilt":
+                case "StreetPropsBuilt":
+                    return "Finishing city...";
+                case "WorldBuildComplete":
+                case "RuntimeShaderReady":
+                    return "Finalizing battlefield...";
+                default:
+                    return "Preparing battlefield...";
+            }
         }
 
         private void Fail(string message, Exception exception)
