@@ -45,7 +45,7 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator SpawnInitialWaveAfterStartup()
         {
             yield return new WaitForSecondsRealtime(initialSpawnDelay);
-            if (player != null && !player.GetComponent<PlayerController>()?.IsDefeated == true)
+            if (player != null && player.GetComponent<PlayerController>()?.IsDefeated != true)
                 SpawnWave();
         }
 
@@ -90,7 +90,7 @@ namespace PersiaWar.Unity2D5D
             if (spawned == 0)
             {
                 failedSpawnAttempts++;
-                Debug.LogWarning($"PERSIA_COMBAT: enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}); retrying is bounded to avoid an infinite pickup/wave loop.");
+                Debug.LogWarning($"PERSIA_COMBAT: enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}); retries are bounded to avoid an infinite wave/pickup loop.");
                 return;
             }
 
