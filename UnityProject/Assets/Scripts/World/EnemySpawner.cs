@@ -8,11 +8,16 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private Transform player;
         [SerializeField] private int startingCount = 8;
         [SerializeField] private float spawnRadius = 44f;
-        [SerializeField] private float nextWaveDelay = 1.2f;
+        [SerializeField] private float nextWaveDelay = 3f;
+        [SerializeField] private float initialSpawnDelay = 4f;
+        [SerializeField] private float enemyCheckInterval = 0.5f;
         [SerializeField] private int maxPerWave = 15;
 
         private int wave = 1;
         private bool spawning;
+        private float nextEnemyCheckTime;
+        private int failedSpawnAttempts;
+        private const int MaxFailedSpawnAttempts = 2;
 
         public int CurrentWave => wave;
 
@@ -31,27 +36,26 @@ namespace PersiaWar.Unity2D5D
                 if (found != null) player = found.transform;
             }
 
-            // Do not make the first gameplay-scene activation wait for enemy
-            // construction, Resources sprite loading and visual primitive creation.
-            // Let the scene finish its first frame, then create the initial wave.
+            // Enemy construction is deliberately delayed until the gameplay scene has
+            // had time to render and finish its procedural world startup on Android.
             if (player != null)
                 StartCoroutine(SpawnInitialWaveAfterStartup());
         }
 
         private IEnumerator SpawnInitialWaveAfterStartup()
         {
-            yield return null;
-            yield return null;
-            if (player != null)
+            yield return new WaitForSecondsRealtime(initialSpawnDelay);
+            if (player != null && !player.GetComponent<PlayerController>()?.IsDefeated == true)
                 SpawnWave();
         }
 
         private void Update()
         {
-            if (player == null || spawning) return;
+            if (player == null || spawning || Time.unscaledTime < nextEnemyCheckTime) return;
+            nextEnemyCheckTime = Time.unscaledTime + enemyCheckInterval;
 
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
-            if (enemies.Length == 0)
+            if (enemies.Length == 0 && failedSpawnAttempts < MaxFailedSpawnAttempts)
             {
                 spawning = true;
                 Invoke(nameof(SpawnNextWave), nextWaveDelay);
@@ -83,6 +87,14 @@ namespace PersiaWar.Unity2D5D
                 spawned++;
             }
 
+            if (spawned == 0)
+            {
+                failedSpawnAttempts++;
+                Debug.LogWarning($"PERSIA_COMBAT: enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}); retrying is bounded to avoid an infinite pickup/wave loop.");
+                return;
+            }
+
+            failedSpawnAttempts = 0;
             if (GameSession.Instance != null)
                 GameSession.Instance.SetWave(wave);
 
