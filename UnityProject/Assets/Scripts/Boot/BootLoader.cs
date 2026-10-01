@@ -101,6 +101,10 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
             }
 
+            Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
+            if (gameplayScene.IsValid() && gameplayScene.isLoaded)
+                SceneManager.SetActiveScene(gameplayScene);
+
             StartupCheckpoint.Set("GameplaySceneActivated");
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
 
