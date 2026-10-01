@@ -441,4 +441,4 @@ jobs:
             build/Android/BUILD_PROVENANCE.txt
           if-no-files-found: error
 
-# Build trigger: 2026-09-30 GameCI Personal licensing client
+# Build trigger: 2026-10-01 staged Android startup validation
