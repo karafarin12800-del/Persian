@@ -12,6 +12,10 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float enemySpawnRadius = 44f;
 
         public bool IsWorldReady { get; private set; }
+        public bool IsWorldPreparing { get; private set; }
+        public bool WorldBuildFailed { get; private set; }
+        public string WorldBuildError { get; private set; } = string.Empty;
+        private bool prepareRequested;
 
         private Transform worldRoot;
         private Material groundMaterial;
@@ -34,68 +38,66 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("GameBootstrapAwake");
         }
 
-        private IEnumerator Start()
+        private void Start()
         {
-            // One frame separates Unity scene activation from the first heavy bootstrap work.
-            yield return null;
             StartupCheckpoint.Set("GameBootstrapStartEntered");
+        }
 
-            Application.targetFrameRate = 60;
-            QualitySettings.vSyncCount = 0;
-            Random.InitState(seed);
-
-            EnsureGameSession();
-            GameSession.Instance?.ResetMatch();
-            StartupCheckpoint.Set("GameSessionReady");
-
-            // Android startup uses the serialized Main Camera exactly as authored in the scene.
-            // Do not query Camera.main, add components, or mutate camera properties here.
-            StartupCheckpoint.Set("CameraConfigurationStarted");
-            ConfigureCameraSafe();
-            StartupCheckpoint.Set("CameraConfigured");
-            StartupCheckpoint.Set("CameraConfigurationComplete");
-            StartupCheckpoint.Set("LightingConfigurationStarted");
-            ConfigureLighting();
-            StartupCheckpoint.Set("LightingConfigured");
-
-            PlayerController player = FindFirstObjectByType<PlayerController>();
-            if (player != null)
-            {
-                player.transform.position = new Vector3(0f, 0f, -4f);
-                // Camera follow is intentionally disabled during Android startup.
-                StartupCheckpoint.Set("PlayerLocated");
-                EnsureEnemySpawner(player.transform);
-                StartupCheckpoint.Set("EnemySpawnerReady");
-                EnsureGameplayHUD(player);
-                StartupCheckpoint.Set("HUDReady");
-            }
-
-            StartupCheckpoint.Set("GameplayBootstrapAwakeComplete");
+        public void PrepareWorld()
+        {
+            if (prepareRequested || IsWorldReady || IsWorldPreparing) return;
+            prepareRequested = true;
             StartCoroutine(BuildWorldAfterStartup());
         }
 
         private IEnumerator BuildWorldAfterStartup()
         {
+            IsWorldPreparing = true;
+            IsWorldReady = false;
+            WorldBuildFailed = false;
+            WorldBuildError = string.Empty;
             yield return null;
             StartupCheckpoint.Set("WorldBuildStarted");
-            BuildWorldBase();
-            StartupCheckpoint.Set("WorldBaseBuilt");
-            yield return null;
-            BuildRoadMarkings(8f);
-            StartupCheckpoint.Set("RoadMarkingsBuilt");
-            yield return null;
-            BuildCityBlocks(8f);
-            StartupCheckpoint.Set("CityBlocksBuilt");
-            yield return null;
-            BuildLandmarks();
-            StartupCheckpoint.Set("LandmarksBuilt");
-            yield return null;
-            BuildStreetProps();
-            StartupCheckpoint.Set("StreetPropsBuilt");
-            yield return null;
-            BuildRuinedQuarter();
-            StartupCheckpoint.Set("WorldBuildComplete");
-            IsWorldReady = true;
+            try
+            {
+                Application.targetFrameRate = 60;
+                QualitySettings.vSyncCount = 0;
+                Random.InitState(seed);
+                EnsureGameSession();
+                GameSession.Instance?.ResetMatch();
+                StartupCheckpoint.Set("GameSessionReady");
+                ConfigureCameraSafe();
+                ConfigureLighting();
+                BuildWorldBase();
+                StartupCheckpoint.Set("WorldBaseBuilt");
+                yield return null;
+                BuildRoadMarkings(8f);
+                StartupCheckpoint.Set("RoadMarkingsBuilt");
+                yield return null;
+                BuildCityBlocks(8f);
+                StartupCheckpoint.Set("CityBlocksBuilt");
+                yield return null;
+                BuildLandmarks();
+                StartupCheckpoint.Set("LandmarksBuilt");
+                yield return null;
+                BuildStreetProps();
+                StartupCheckpoint.Set("StreetPropsBuilt");
+                yield return null;
+                BuildRuinedQuarter();
+                StartupCheckpoint.Set("WorldBuildComplete");
+                IsWorldReady = true;
+            }
+            catch (System.Exception ex)
+            {
+                WorldBuildFailed = true;
+                WorldBuildError = ex.Message;
+                StartupCheckpoint.Set("WorldBuildFailed");
+                Debug.LogException(ex);
+            }
+            finally
+            {
+                IsWorldPreparing = false;
+            }
         }
 
         private void EnsureGameSession()
