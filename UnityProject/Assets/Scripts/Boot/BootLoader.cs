@@ -6,9 +6,9 @@ using UnityEngine.SceneManagement;
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// Lightweight Android boot flow. Loads the gameplay scene directly as the
-    /// single active scene; gameplay itself remains gated by PrototypeFlow until
-    /// the player starts a match.
+    /// Android-safe boot flow. Loads the gameplay scene additively while keeping
+    /// expensive gameplay roots dormant. The menu can render without a Camera;
+    /// the Camera is activated only when the player starts the match.
     /// </summary>
     public sealed class BootLoader : MonoBehaviour
     {
@@ -47,6 +47,7 @@ namespace PersiaWar.Unity2D5D
             yield return null;
 
             status = "Loading battlefield...";
+            Scene bootScene = SceneManager.GetActiveScene();
             float visibleSeconds = 0f;
 
             try
@@ -58,12 +59,11 @@ namespace PersiaWar.Unity2D5D
                     yield break;
                 }
 
+                // Keep this additive. Unity does not run Awake/Start on inactive roots,
+                // so Player/GameRoot/WorldBounds stay dormant while the menu is shown.
                 loadOperation = SceneManager.LoadSceneAsync(
                     GameplaySceneBuildIndex,
-                    LoadSceneMode.Single);
-
-                if (loadOperation != null)
-                    loadOperation.allowSceneActivation = true;
+                    LoadSceneMode.Additive);
             }
             catch (Exception ex)
             {
@@ -101,25 +101,82 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
             }
 
-            visibleSeconds += Time.unscaledDeltaTime;
-            while (visibleSeconds < MinimumVisibleSeconds)
-            {
-                visibleSeconds += Time.unscaledDeltaTime;
-                yield return null;
-            }
-
-            Scene gameplayScene = SceneManager.GetActiveScene();
+            Scene gameplayScene = SceneManager.GetSceneByBuildIndex(GameplaySceneBuildIndex);
             if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
             {
                 Fail("Battlefield scene loaded but is not valid.", null);
                 yield break;
             }
 
+            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadedAdditive");
+            progress = 0.85f;
+
+            while (visibleSeconds < MinimumVisibleSeconds)
+            {
+                visibleSeconds += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            // PrototypeFlow is deliberately the only gameplay root activated here.
+            // It draws the hero/drop menu with IMGUI and therefore does not require
+            // a Camera. Main Camera, Player, MobileInput, WorldBounds and GameRoot
+            // remain inactive until START MATCH.
+            GameObject[] roots = gameplayScene.GetRootGameObjects();
+            yield return ActivateRoot(roots, "PrototypeFlow", 0.96f);
+
+            SceneManager.SetActiveScene(gameplayScene);
+            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
+
+            if (!SceneManager.GetActiveScene().Equals(gameplayScene))
+            {
+                Fail("Battlefield scene loaded but could not become the active scene.", null);
+                yield break;
+            }
+
+            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
+
+            AsyncOperation unload = SceneManager.UnloadSceneAsync(bootScene);
+            if (unload != null)
+            {
+                while (!unload.isDone)
+                    yield return null;
+            }
+
             progress = 1f;
-            status = "Battlefield ready.";
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadedSingle");
-            Debug.Log("PERSIA_BOOT_STAGE: GameplaySceneActive:" + gameplayScene.name);
-            StartupCheckpoint.Set("GameplaySceneLoadComplete");
+            status = "Ready.";
+            StartupCheckpoint.Set("GameplayMenuReady");
+        }
+
+        private IEnumerator ActivateRoot(GameObject[] roots, string rootName, float targetProgress)
+        {
+            GameObject root = FindRoot(roots, rootName);
+            if (root == null)
+            {
+                Debug.LogWarning("PERSIA_BOOT_STAGE: MissingRoot:" + rootName);
+                yield return null;
+                yield break;
+            }
+
+            if (!root.activeSelf)
+            {
+                status = "Starting " + rootName + "...";
+                Debug.Log("PERSIA_BOOT_STAGE: ActivatingRoot:" + rootName);
+                root.SetActive(true);
+                yield return null;
+            }
+
+            progress = targetProgress;
+            yield return null;
+        }
+
+        private static GameObject FindRoot(GameObject[] roots, string rootName)
+        {
+            for (int i = 0; i < roots.Length; i++)
+            {
+                if (roots[i] != null && roots[i].name == rootName)
+                    return roots[i];
+            }
+            return null;
         }
 
         private void Fail(string message, Exception exception)
