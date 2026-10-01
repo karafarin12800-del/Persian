@@ -45,9 +45,10 @@ namespace PersiaWar.Unity2D5D
             GameSession.Instance?.ResetMatch();
             StartupCheckpoint.Set("GameSessionReady");
 
-            if (gameplayCamera == null) gameplayCamera = Camera.main;
+            // Android startup uses the serialized Main Camera exactly as authored in the scene.
+            // Do not query Camera.main, add components, or mutate camera properties here.
             StartupCheckpoint.Set("CameraConfigurationStarted");
-            ConfigureCamera();
+            ConfigureCameraSafe();
             StartupCheckpoint.Set("CameraConfigured");
             StartupCheckpoint.Set("CameraConfigurationComplete");
             StartupCheckpoint.Set("LightingConfigurationStarted");
@@ -58,8 +59,7 @@ namespace PersiaWar.Unity2D5D
             if (player != null)
             {
                 player.transform.position = new Vector3(0f, 0f, -4f);
-                CameraFollow25D follow = gameplayCamera != null ? gameplayCamera.GetComponent<CameraFollow25D>() : null;
-                if (follow != null) follow.SetTarget(player.transform);
+                // Camera follow is intentionally disabled during Android startup.
                 StartupCheckpoint.Set("PlayerLocated");
                 EnsureEnemySpawner(player.transform);
                 StartupCheckpoint.Set("EnemySpawnerReady");
@@ -121,25 +121,18 @@ namespace PersiaWar.Unity2D5D
             hudObject.AddComponent<RuntimeCombatHUD>();
         }
 
-        private void ConfigureCamera()
+        private void ConfigureCameraSafe()
         {
-            if (gameplayCamera == null) return;
-            gameplayCamera.orthographic = false;
-            gameplayCamera.fieldOfView = 52f;
-            gameplayCamera.nearClipPlane = 0.1f;
-            gameplayCamera.farClipPlane = 240f;
-            gameplayCamera.allowHDR = false;
-#if UNITY_ANDROID
-            gameplayCamera.allowMSAA = false;
-#else
-            gameplayCamera.allowMSAA = true;
-#endif
-            gameplayCamera.transform.position = new Vector3(0f, 14f, -14f);
-            gameplayCamera.transform.rotation = Quaternion.Euler(48f, 0f, 0f);
+            if (gameplayCamera == null)
+            {
+                StartupCheckpoint.Set("CameraMissingSafePath");
+                return;
+            }
 
-            CameraFollow25D follow = gameplayCamera.GetComponent<CameraFollow25D>();
-            if (follow == null) follow = gameplayCamera.gameObject.AddComponent<CameraFollow25D>();
-            follow.SetTarget(FindFirstObjectByType<PlayerController>()?.transform);
+            // The scene already contains the complete mobile-safe camera configuration.
+            // Keeping startup camera setup read-only avoids native graphics transitions
+            // during Android scene activation.
+            StartupCheckpoint.Set("CameraSafePathEntered");
         }
 
         private void ConfigureLighting()
