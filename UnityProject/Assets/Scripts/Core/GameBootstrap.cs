@@ -18,8 +18,14 @@ namespace PersiaWar.Unity2D5D
         private Material roofMaterial;
         private Material accentMaterial;
 
+        private void OnEnable()
+        {
+            StartupCheckpoint.Set("GameBootstrapOnEnable");
+        }
+
         private void Awake()
         {
+            StartupCheckpoint.Set("GameBootstrapAwakeEntered");
             // Keep scene activation lightweight on Android. Gameplay initialization and
             // object creation are deferred until the scene has finished activating.
             StartupCheckpoint.Set("GameBootstrapAwake");
@@ -29,6 +35,7 @@ namespace PersiaWar.Unity2D5D
         {
             // One frame separates Unity scene activation from the first heavy bootstrap work.
             yield return null;
+            StartupCheckpoint.Set("GameBootstrapStartEntered");
 
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
@@ -39,8 +46,11 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("GameSessionReady");
 
             if (gameplayCamera == null) gameplayCamera = Camera.main;
+            StartupCheckpoint.Set("CameraConfigurationStarted");
             ConfigureCamera();
             StartupCheckpoint.Set("CameraConfigured");
+            StartupCheckpoint.Set("CameraConfigurationComplete");
+            StartupCheckpoint.Set("LightingConfigurationStarted");
             ConfigureLighting();
             StartupCheckpoint.Set("LightingConfigured");
 
