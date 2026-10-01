@@ -27,6 +27,7 @@ namespace PersiaWar.Unity2D5D
         private int selectedHero;
         private bool startingMatch;
         private string startupStatus = string.Empty;
+        private GameObject mainCameraRoot;
         private GameObject playerRoot;
         private GameObject mobileInputRoot;
         private GameObject worldBoundsRoot;
@@ -63,9 +64,9 @@ namespace PersiaWar.Unity2D5D
             enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
             mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
             combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
-            Camera camera = Camera.main;
-            followCamera = camera != null ? camera.GetComponent<CameraFollow25D>() : null;
             CacheGameplayRoots();
+            // The boot flow intentionally keeps the camera inactive while the menu is shown.
+            // IMGUI does not require a Camera; activate and bind it only when the match starts.
 
             GateGameplay(false);
             StartupCheckpoint.Set("PrototypeFlowMenuReady");
@@ -78,7 +79,8 @@ namespace PersiaWar.Unity2D5D
             {
                 GameObject root = roots[i];
                 if (root == null) continue;
-                if (root.name == "Player") playerRoot = root;
+                if (root.name == "Main Camera") mainCameraRoot = root;
+                else if (root.name == "Player") playerRoot = root;
                 else if (root.name == "MobileInput") mobileInputRoot = root;
                 else if (root.name == "WorldBounds") worldBoundsRoot = root;
                 else if (root.name == "GameRoot") gameRoot = root;
@@ -336,6 +338,18 @@ namespace PersiaWar.Unity2D5D
                 startingMatch = false;
                 yield break;
             }
+
+            if (mainCameraRoot != null && !mainCameraRoot.activeSelf)
+            {
+                startupStatus = "Starting camera...";
+                mainCameraRoot.SetActive(true);
+                yield return null;
+            }
+
+            Camera activeCamera = Camera.main;
+            followCamera = activeCamera != null
+                ? activeCamera.GetComponent<CameraFollow25D>()
+                : null;
 
             player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
             enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
