@@ -61,24 +61,10 @@ namespace PersiaWar.Unity2D5D
 
             transitionRequested = false;
             transitionDone = true;
-            StartupCheckpoint.Set("DiagnosticTransitionRequested");
-            Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Transition requested from Update");
+            StartupCheckpoint.Set("DiagnosticGameplayLoadRequested");
+            Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Loading PersiaWarPrototype");
 
-            Scene probeScene = SceneManager.CreateScene("PersiaDiagnosticTransitionScene");
-            if (!probeScene.IsValid())
-            {
-                StartupCheckpoint.Set("DiagnosticTransitionCreateFailed");
-                Debug.LogError("PERSIA_BOOT_DIAGNOSTIC: CreateScene returned invalid scene");
-                return;
-            }
-
-            GameObject probeRoot = new GameObject("DiagnosticTransitionProbe");
-            SceneManager.MoveGameObjectToScene(probeRoot, probeScene);
-            probeRoot.AddComponent<DiagnosticTransitionProbe>();
-            SceneManager.SetActiveScene(probeScene);
-
-            StartupCheckpoint.Set("DiagnosticTransitionSceneActive");
-            Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Runtime scene active");
+            SceneManager.LoadSceneAsync("PersiaWarPrototype", LoadSceneMode.Single);
         }
     }
 }
