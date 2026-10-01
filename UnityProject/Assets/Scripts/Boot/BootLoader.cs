@@ -1,17 +1,14 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace PersiaWar.Unity2D5D
 {
-    /// <summary>
-    /// Controlled Android startup/scene-transition diagnostic.
-    /// Stage 1 stays asset-free and confirms BootScene rendering.
-    /// Stage 2 creates a brand-new runtime scene without loading any project asset.
-    /// Gameplay is intentionally NOT loaded yet; this isolates SceneManager transition.
-    /// </summary>
     public sealed class BootLoader : MonoBehaviour
     {
+        private int guiFrames;
+        private bool transitionRequested;
+        private bool transitionDone;
+
         private void Awake()
         {
             Application.targetFrameRate = 60;
@@ -24,61 +21,64 @@ namespace PersiaWar.Unity2D5D
         {
             StartupCheckpoint.Set("DiagnosticBootSceneStarted");
             Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Start");
-            StartCoroutine(RunTransitionProbe());
         }
 
-        private IEnumerator RunTransitionProbe()
+        private void OnGUI()
         {
-            // Keep the known-good color probe visible long enough to prove Stage 1.
-            yield return new WaitForSecondsRealtime(2.5f);
+            guiFrames++;
 
-            StartupCheckpoint.Set("DiagnosticTransitionCreatingScene");
-            Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Creating runtime scene");
+            if (!transitionDone)
+            {
+                GUI.color = new Color(0.02f, 0.02f, 0.04f, 1f);
+                GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+
+                float w = Mathf.Min(Screen.width - 80f, 900f);
+                float h = Mathf.Min(Screen.height - 80f, 520f);
+                float x = (Screen.width - w) * 0.5f;
+                float y = (Screen.height - h) * 0.5f;
+
+                GUI.color = Color.white;
+                GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
+                GUI.color = Color.green;
+                GUI.DrawTexture(new Rect(x, y, w, 32f), Texture2D.whiteTexture);
+                GUI.color = Color.magenta;
+                GUI.DrawTexture(new Rect(x, y + h - 32f, w, 32f), Texture2D.whiteTexture);
+                GUI.color = Color.cyan;
+                GUI.DrawTexture(new Rect(x + 32f, y + 80f, w - 64f, h - 160f), Texture2D.whiteTexture);
+                GUI.color = Color.black;
+                GUI.DrawTexture(new Rect(x + 80f, y + 140f, w - 160f, h - 280f), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+
+                if (guiFrames >= 150)
+                    transitionRequested = true;
+            }
+        }
+
+        private void Update()
+        {
+            if (!transitionRequested || transitionDone)
+                return;
+
+            transitionRequested = false;
+            transitionDone = true;
+            StartupCheckpoint.Set("DiagnosticTransitionRequested");
+            Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Transition requested from Update");
 
             Scene probeScene = SceneManager.CreateScene("PersiaDiagnosticTransitionScene");
             if (!probeScene.IsValid())
             {
                 StartupCheckpoint.Set("DiagnosticTransitionCreateFailed");
                 Debug.LogError("PERSIA_BOOT_DIAGNOSTIC: CreateScene returned invalid scene");
-                yield break;
+                return;
             }
 
             GameObject probeRoot = new GameObject("DiagnosticTransitionProbe");
             SceneManager.MoveGameObjectToScene(probeRoot, probeScene);
             probeRoot.AddComponent<DiagnosticTransitionProbe>();
-
             SceneManager.SetActiveScene(probeScene);
+
             StartupCheckpoint.Set("DiagnosticTransitionSceneActive");
             Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Runtime scene active");
-        }
-
-        private void OnGUI()
-        {
-            // Stage 1: pure texture/rectangle output. No fonts, TMP, UI, or gameplay assets.
-            GUI.color = new Color(0.02f, 0.02f, 0.04f, 1f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-
-            float w = Mathf.Min(Screen.width - 80f, 900f);
-            float h = Mathf.Min(Screen.height - 80f, 520f);
-            float x = (Screen.width - w) * 0.5f;
-            float y = (Screen.height - h) * 0.5f;
-
-            GUI.color = Color.white;
-            GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
-
-            GUI.color = Color.green;
-            GUI.DrawTexture(new Rect(x, y, w, 32f), Texture2D.whiteTexture);
-
-            GUI.color = Color.magenta;
-            GUI.DrawTexture(new Rect(x, y + h - 32f, w, 32f), Texture2D.whiteTexture);
-
-            GUI.color = Color.cyan;
-            GUI.DrawTexture(new Rect(x + 32f, y + 80f, w - 64f, h - 160f), Texture2D.whiteTexture);
-
-            GUI.color = Color.black;
-            GUI.DrawTexture(new Rect(x + 80f, y + 140f, w - 160f, h - 280f), Texture2D.whiteTexture);
-
-            GUI.color = Color.white;
         }
     }
 }
