@@ -8,6 +8,14 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public static class StartupCheckpoint
     {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
+        private static void MarkBeforeSplashScreen()
+        {
+            PlayerPrefs.SetString(Key, "BeforeSplashScreen");
+            PlayerPrefs.SetString(TimeKey, System.DateTime.UtcNow.ToString("O"));
+            PlayerPrefs.Save();
+            Debug.Log("PERSIA_BOOT_CHECKPOINT: BeforeSplashScreen");
+        }
         private const string Key = "PersiaWar.StartupCheckpoint";
         private const string TimeKey = "PersiaWar.StartupCheckpointTime";
 
