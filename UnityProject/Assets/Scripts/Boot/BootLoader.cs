@@ -1,11 +1,14 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// Minimal Android startup probe.
-    /// This scene deliberately does not load gameplay and does not depend on fonts,
-    /// TextMeshPro, UI Text, or any gameplay asset.
+    /// Controlled Android startup/scene-transition diagnostic.
+    /// Stage 1 stays asset-free and confirms BootScene rendering.
+    /// Stage 2 creates a brand-new runtime scene without loading any project asset.
+    /// Gameplay is intentionally NOT loaded yet; this isolates SceneManager transition.
     /// </summary>
     public sealed class BootLoader : MonoBehaviour
     {
@@ -21,11 +24,37 @@ namespace PersiaWar.Unity2D5D
         {
             StartupCheckpoint.Set("DiagnosticBootSceneStarted");
             Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Start");
+            StartCoroutine(RunTransitionProbe());
+        }
+
+        private IEnumerator RunTransitionProbe()
+        {
+            // Keep the known-good color probe visible long enough to prove Stage 1.
+            yield return new WaitForSecondsRealtime(2.5f);
+
+            StartupCheckpoint.Set("DiagnosticTransitionCreatingScene");
+            Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Creating runtime scene");
+
+            Scene probeScene = SceneManager.CreateScene("PersiaDiagnosticTransitionScene");
+            if (!probeScene.IsValid())
+            {
+                StartupCheckpoint.Set("DiagnosticTransitionCreateFailed");
+                Debug.LogError("PERSIA_BOOT_DIAGNOSTIC: CreateScene returned invalid scene");
+                yield break;
+            }
+
+            GameObject probeRoot = new GameObject("DiagnosticTransitionProbe");
+            SceneManager.MoveGameObjectToScene(probeRoot, probeScene);
+            probeRoot.AddComponent<DiagnosticTransitionProbe>();
+
+            SceneManager.SetActiveScene(probeScene);
+            StartupCheckpoint.Set("DiagnosticTransitionSceneActive");
+            Debug.Log("PERSIA_BOOT_DIAGNOSTIC: Runtime scene active");
         }
 
         private void OnGUI()
         {
-            // Pure texture/rectangle output: no fonts, no TMP, no UI system.
+            // Stage 1: pure texture/rectangle output. No fonts, TMP, UI, or gameplay assets.
             GUI.color = new Color(0.02f, 0.02f, 0.04f, 1f);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
 
@@ -34,7 +63,6 @@ namespace PersiaWar.Unity2D5D
             float x = (Screen.width - w) * 0.5f;
             float y = (Screen.height - h) * 0.5f;
 
-            // Bright, unmistakable startup probe.
             GUI.color = Color.white;
             GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
 
