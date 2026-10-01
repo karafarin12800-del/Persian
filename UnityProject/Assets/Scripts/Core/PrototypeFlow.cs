@@ -282,21 +282,12 @@ namespace PersiaWar.Unity2D5D
                 : heroIndex == 2 ? new Color(0.70f, 0.84f, 0.20f)
                 : new Color(0.92f, 0.28f, 0.22f);
 
-            SetChildMaterial("Body", body);
-            SetChildMaterial("Tunic", body);
-            SetChildMaterial("ChestArmor", accent);
-            SetChildMaterial("PersianHelmet", heroIndex == 0 ? new Color(0.92f, 0.66f, 0.14f) : new Color(0.64f, 0.68f, 0.72f));
-            SetChildMaterial("HelmetCrest", heroIndex == 0 ? new Color(0.16f, 0.20f, 0.23f) : accent);
-            SetChildMaterial("RedPlume", heroIndex == 3 ? new Color(0.90f, 0.22f, 0.12f) : accent);
-        }
-
-        private void SetChildMaterial(string childName, Color color)
-        {
-            Transform child = player.transform.Find("PlayerVisual/" + childName);
-            if (child == null) return;
-            Renderer renderer = child.GetComponent<Renderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = RuntimeMaterialFactory.Create(childName + "HeroStyle", color);
+            StylizedCharacterVisual visual = player.GetComponentInChildren<StylizedCharacterVisual>(true);
+            if (visual != null)
+            {
+                visual.ConfigurePlayerHero(heroIndex);
+                return;
+            }
         }
 
         private Vector2 WorldToMap(Vector2 world, Rect rect)
