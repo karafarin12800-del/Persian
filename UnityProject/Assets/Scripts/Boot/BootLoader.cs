@@ -136,23 +136,17 @@ namespace PersiaWar.Unity2D5D
             yield return StartCoroutine(ContinueGameplayInitialization());
         }
 
-        private IEnumerator LoadGameplayScene()
+        private IEnumerator ContinueGameplayInitialization()
         {
-            if (loadOperation == null)
+            Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
+            if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
             {
-                yield return StartCoroutine(PrepareGameResources());
-                if (!preparationComplete) yield break;
+                Fail("Prepared gameplay scene is no longer loaded.", null);
+                yield break;
             }
 
-            yield return StartCoroutine(ActivatePreparedGameplay());
-            yield break;
-
-            Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
-            if (gameplayScene.IsValid() && gameplayScene.isLoaded)
-                SceneManager.SetActiveScene(gameplayScene);
-
+            SceneManager.SetActiveScene(gameplayScene);
             StartupCheckpoint.Set("GameplaySceneActivated");
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
 
             float readyWait = 0f;
             while (!GameplayIsReady() && readyWait < ReadyTimeoutSeconds)
@@ -170,8 +164,6 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            // Minimum 12 seconds, without blocking the main thread. The bar only
-            // reaches 100% after the gameplay readiness checkpoint is reached.
             float visibleElapsed = 0f;
             while (visibleElapsed < MinimumVisibleSeconds)
             {
@@ -187,7 +179,6 @@ namespace PersiaWar.Unity2D5D
             progress = 1f;
             status = "Battlefield ready";
             StartupCheckpoint.Set("GameplayReady");
-            Debug.Log("PERSIA_BOOT_STAGE: GameplayReady");
 
             yield return null;
 
