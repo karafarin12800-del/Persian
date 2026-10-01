@@ -65,6 +65,11 @@ namespace PersiaWar.Unity2D5D
             mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
             combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
             CacheGameplayRoots();
+            gameBootstrap = gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
+            if (gameBootstrap != null && gameRoot != null && !gameRoot.activeSelf)
+                gameRoot.SetActive(true);
+            if (gameBootstrap != null)
+                gameBootstrap.PrepareWorld();
             // The boot flow intentionally keeps the camera inactive while the menu is shown.
             // IMGUI does not require a Camera; activate and bind it only when the match starts.
 
@@ -302,19 +307,11 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator BeginMatchSafely()
         {
             startingMatch = true;
-            startupStatus = "Activating battlefield...";
+            startupStatus = "Waiting for battlefield...";
             StartupCheckpoint.Set("MatchActivationStarted");
 
-            CacheGameplayRoots();
-            yield return ActivateRoot(playerRoot, "Player");
-            yield return ActivateRoot(mobileInputRoot, "MobileInput");
-            yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
-            yield return ActivateRoot(gameRoot, "GameRoot");
-
-            gameBootstrap = gameRoot != null
-                ? gameRoot.GetComponent<GameBootstrap>()
-                : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
-
+            if (gameBootstrap == null)
+                gameBootstrap = gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
             if (gameBootstrap == null)
             {
                 startupStatus = "Battlefield bootstrap is missing.";
@@ -323,33 +320,27 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            float timeout = 20f;
-            while (!gameBootstrap.IsWorldReady && timeout > 0f)
+            if (!gameBootstrap.IsWorldReady && !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
+                gameBootstrap.PrepareWorld();
+
+            while (gameBootstrap.IsWorldPreparing)
             {
-                timeout -= Time.unscaledDeltaTime;
                 startupStatus = "Preparing battlefield...";
                 yield return null;
             }
 
-            if (!gameBootstrap.IsWorldReady)
+            if (gameBootstrap.WorldBuildFailed || !gameBootstrap.IsWorldReady)
             {
-                startupStatus = "Battlefield preparation failed. Tap START MATCH to retry.";
-                StartupCheckpoint.Set("MatchActivationTimedOut");
+                startupStatus = "Battlefield preparation failed: " + gameBootstrap.WorldBuildError;
+                StartupCheckpoint.Set("MatchActivationFailed");
                 startingMatch = false;
                 yield break;
             }
 
-            if (mainCameraRoot != null && !mainCameraRoot.activeSelf)
-            {
-                startupStatus = "Starting camera...";
-                mainCameraRoot.SetActive(true);
-                yield return null;
-            }
-
-            Camera activeCamera = Camera.main;
-            followCamera = activeCamera != null
-                ? activeCamera.GetComponent<CameraFollow25D>()
-                : null;
+            yield return ActivateRoot(playerRoot, "Player");
+            yield return ActivateRoot(mobileInputRoot, "MobileInput");
+            yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
+            yield return ActivateRoot(mainCameraRoot, "Main Camera");
 
             player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
             enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
@@ -358,17 +349,17 @@ namespace PersiaWar.Unity2D5D
 
             if (player == null)
             {
-                startupStatus = "Player initialization failed. Tap START MATCH to retry.";
+                startupStatus = "Player initialization failed.";
                 StartupCheckpoint.Set("PlayerInitializationFailed");
                 startingMatch = false;
                 yield break;
             }
 
+            Camera activeCamera = mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null;
+            followCamera = activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null;
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
-
-            if (followCamera != null)
-                followCamera.SetTarget(player.transform);
+            if (followCamera != null) followCamera.SetTarget(player.transform);
 
             GateGameplay(true);
             mode = ScreenMode.Match;
