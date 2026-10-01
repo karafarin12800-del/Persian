@@ -26,53 +26,74 @@ namespace PersiaWar.Unity2D5D
         private float loadElapsed;
         private bool loadWarningLogged;
         private string status = "Starting Persia War...";
+        private BootOverlay bootOverlay;
 
         private void Awake()
         {
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             progress = 0f;
+            bootOverlay = gameObject.GetComponent<BootOverlay>();
+            if (bootOverlay == null)
+                bootOverlay = gameObject.AddComponent<BootOverlay>();
+            try
+            {
+                bootOverlay.Initialize();
+                bootOverlay.SetProgress(progress, status, failed, failureMessage);
+            }
+            catch (Exception ex)
+            {
+                StartupCheckpoint.Set("BootOverlayInitFailed");
+                Debug.LogException(ex);
+            }
+
+            StartupCheckpoint.Set("BootSceneStarted");
             Debug.Log("PERSIA_BOOT_STAGE: BootSceneStarted");
         }
 
         private void Start()
         {
-            BuildStyles();
-            StartCoroutine(LoadGameplaySceneSafely());
+            try
+            {
+                BuildStyles();
+                StartupCheckpoint.Set("BootSceneStartEntered");
+                StartCoroutine(LoadGameplaySceneSafely());
+            }
+            catch (Exception ex)
+            {
+                Fail("Boot UI initialization failed.", ex);
+            }
         }
 
         private IEnumerator LoadGameplaySceneSafely()
         {
-            yield return null;
-
-            status = "Loading battlefield...";
-            Scene bootScene = SceneManager.GetActiveScene();
-            float visibleSeconds = 0f;
-
             try
             {
+                yield return null;
+
+                status = "Loading battlefield...";
+                UpdateOverlay();
+                Scene bootScene = SceneManager.GetActiveScene();
+                float visibleSeconds = 0f;
+
                 loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Additive);
-            }
-            catch (Exception ex)
-            {
-                Fail("Could not start the gameplay scene load.", ex);
-                yield break;
-            }
 
-            if (loadOperation == null)
-            {
-                Fail("Unity did not return a scene load operation.", null);
-                yield break;
-            }
+                if (loadOperation == null)
+                {
+                    Fail("Unity did not return a scene load operation.", null);
+                    yield break;
+                }
 
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
+                StartupCheckpoint.Set("MainSceneLoadStarted");
+                Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
 
             while (!loadOperation.isDone)
             {
                 loadElapsed += Time.unscaledDeltaTime;
                 visibleSeconds += Time.unscaledDeltaTime;
-                progress = Mathf.Clamp01(loadOperation.progress);
-                status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
+                    progress = Mathf.Clamp01(loadOperation.progress);
+                    status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
+                    UpdateOverlay();
 
                 if (!loadWarningLogged && loadElapsed > 5f)
                 {
@@ -83,46 +104,55 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
             }
 
-            Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
-            if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
-            {
-                Fail("Battlefield scene loaded but is not valid.", null);
-                yield break;
-            }
+                Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
+                if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
+                {
+                    Fail("Battlefield scene loaded but is not valid.", null);
+                    yield break;
+                }
 
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadedAdditive");
-            progress = 0.80f;
+                StartupCheckpoint.Set("MainSceneLoadedAdditive");
+                Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadedAdditive");
+                progress = 0.80f;
+                UpdateOverlay();
 
             while (visibleSeconds < MinimumVisibleSeconds)
             {
-                visibleSeconds += Time.unscaledDeltaTime;
-                yield return null;
-            }
+                    visibleSeconds += Time.unscaledDeltaTime;
+                    yield return null;
+                }
 
-            GameObject[] roots = gameplayScene.GetRootGameObjects();
+                GameObject[] roots = gameplayScene.GetRootGameObjects();
 
             // Keep the activation order deterministic. The gameplay scene currently
             // contains exactly these root objects; unknown roots remain untouched.
-            yield return ActivateRoot(roots, "Main Camera", 0.84f);
+                yield return ActivateRoot(roots, "Main Camera", 0.84f);
             yield return ActivateRoot(roots, "Player", 0.87f);
             yield return ActivateRoot(roots, "MobileInput", 0.89f);
             yield return ActivateRoot(roots, "WorldBounds", 0.91f);
             yield return ActivateRoot(roots, "GameRoot", 0.95f);
-            yield return ActivateRoot(roots, "PrototypeFlow", 0.98f);
+                yield return ActivateRoot(roots, "PrototypeFlow", 0.98f);
 
-            SceneManager.SetActiveScene(gameplayScene);
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
+                StartupCheckpoint.Set("MainSceneActivationRequested");
+                SceneManager.SetActiveScene(gameplayScene);
+                Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
+                Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
 
-            // Only now remove the lightweight boot scene.
-            AsyncOperation unload = SceneManager.UnloadSceneAsync(bootScene);
-            if (unload != null)
-            {
-                while (!unload.isDone)
-                    yield return null;
+                // Only now remove the lightweight boot scene.
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(bootScene);
+                if (unload != null)
+                {
+                    while (!unload.isDone)
+                        yield return null;
+                }
+
+                progress = 1f;
+                UpdateOverlay();
             }
-
-            progress = 1f;
+            catch (Exception ex)
+            {
+                Fail("Battlefield startup failed.", ex);
+            }
         }
 
         private IEnumerator ActivateRoot(GameObject[] roots, string rootName, float targetProgress)
@@ -138,13 +168,22 @@ namespace PersiaWar.Unity2D5D
             if (!root.activeSelf)
             {
                 status = "Starting " + rootName + "...";
+                UpdateOverlay();
+                StartupCheckpoint.Set("ActivatingRoot:" + rootName);
                 Debug.Log("PERSIA_BOOT_STAGE: ActivatingRoot:" + rootName);
                 root.SetActive(true);
                 yield return null;
             }
 
             progress = targetProgress;
+            UpdateOverlay();
             yield return null;
+        }
+
+        private void UpdateOverlay()
+        {
+            if (bootOverlay != null)
+                bootOverlay.SetProgress(progress, status, failed, failureMessage);
         }
 
         private static GameObject FindRoot(GameObject[] roots, string rootName)
@@ -163,6 +202,8 @@ namespace PersiaWar.Unity2D5D
             failureMessage = message;
             status = "Startup failed";
             progress = 0f;
+            StartupCheckpoint.CaptureException(message, exception);
+            UpdateOverlay();
 
             if (exception != null)
                 Debug.LogException(exception);
@@ -201,6 +242,9 @@ namespace PersiaWar.Unity2D5D
 
         private void OnGUI()
         {
+            if (bootOverlay != null && bootOverlay.IsReady)
+                return;
+
             Color old = GUI.color;
 
             GUI.color = new Color(0.025f, 0.045f, 0.075f, 1f);
