@@ -46,28 +46,28 @@ namespace PersiaWar.Unity2D5D
 
             topRule = CreateRule("TopRule", panelObject.transform);
             bottomRule = CreateRule("BottomRule", panelObject.transform);
-            SetAnchored(topRule.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -5f), new Vector2(0f, 0f), new Vector2(0f, 5f));
-            SetAnchored(bottomRule.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, 5f), new Vector2(0f, 0f));
+            SetStretchRule(topRule.rectTransform, true);
+            SetStretchRule(bottomRule.rectTransform, false);
 
             title = CreateText("Title", panelObject.transform, 42, FontStyle.Bold);
-            SetAnchored(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(20f, -145f), new Vector2(-20f, 0f), new Vector2(0f, -58f));
+            SetCenteredAt(title.rectTransform, new Vector2(0f, 100f), new Vector2(720f, 58f));
             title.alignment = TextAnchor.MiddleCenter;
             title.text = "PERSIA WAR";
 
             status = CreateText("Status", panelObject.transform, 20, FontStyle.Normal);
-            SetAnchored(status.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(35f, -195f), new Vector2(-35f, -150f), new Vector2(0f, -34f));
+            SetCenteredAt(status.rectTransform, new Vector2(0f, 45f), new Vector2(690f, 34f));
             status.alignment = TextAnchor.MiddleCenter;
 
             Image barBackground = CreateImage("BarBackground", panelObject.transform, new Color(0.12f, 0.15f, 0.19f, 1f));
-            SetAnchored(barBackground.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(60f, 0f), new Vector2(-60f, 0f), new Vector2(0f, -30f));
+            SetCenteredAt(barBackground.rectTransform, new Vector2(0f, -18f), new Vector2(640f, 30f));
 
             Image barFill = CreateImage("BarFill", barBackground.transform, new Color(0.88f, 0.65f, 0.20f, 1f));
             RectTransform fillRect = barFill.rectTransform;
-            fillRect.anchorMin = new Vector2(0f, 0f);
-            fillRect.anchorMax = new Vector2(0f, 1f);
+            fillRect.anchorMin = new Vector2(0f, 0.5f);
+            fillRect.anchorMax = new Vector2(0f, 0.5f);
             fillRect.pivot = new Vector2(0f, 0.5f);
             fillRect.anchoredPosition = Vector2.zero;
-            fillRect.sizeDelta = new Vector2(0f, 0f);
+            fillRect.sizeDelta = new Vector2(0f, 30f);
 
             GameObject stateObject = new GameObject("BootOverlayState");
             stateObject.transform.SetParent(panelObject.transform, false);
@@ -76,11 +76,11 @@ namespace PersiaWar.Unity2D5D
             state.BindFill(barFill, barBackground);
 
             percent = CreateText("Percent", panelObject.transform, 18, FontStyle.Bold);
-            SetAnchored(percent.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, -55f), new Vector2(0f, -20f), new Vector2(0f, -30f));
+            SetCenteredAt(percent.rectTransform, new Vector2(0f, -62f), new Vector2(300f, 30f));
             percent.alignment = TextAnchor.MiddleCenter;
 
             footer = CreateText("Footer", panelObject.transform, 14, FontStyle.Normal);
-            SetAnchored(footer.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(35f, 35f), new Vector2(-35f, 65f), new Vector2(0f, -30f));
+            SetCenteredAt(footer.rectTransform, new Vector2(0f, -112f), new Vector2(690f, 34f));
             footer.alignment = TextAnchor.MiddleCenter;
             footer.text = "Preparing the battlefield • Please wait.";
 
@@ -144,14 +144,21 @@ namespace PersiaWar.Unity2D5D
             rect.sizeDelta = size;
         }
 
-        private static void SetAnchored(RectTransform rect, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax, Vector2 size)
+        private static void SetCenteredAt(RectTransform rect, Vector2 position, Vector2 size)
         {
-            rect.anchorMin = min;
-            rect.anchorMax = max;
-            rect.offsetMin = offsetMin;
-            rect.offsetMax = offsetMax;
-            if (size != Vector2.zero)
-                rect.sizeDelta = size;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private static void SetStretchRule(RectTransform rect, bool top)
+        {
+            rect.anchorMin = new Vector2(0f, top ? 1f : 0f);
+            rect.anchorMax = new Vector2(1f, top ? 1f : 0f);
+            rect.offsetMin = new Vector2(0f, top ? -5f : 0f);
+            rect.offsetMax = new Vector2(0f, top ? 0f : 5f);
         }
     }
 
