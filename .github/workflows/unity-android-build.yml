@@ -147,7 +147,7 @@ jobs:
       # Unity Library cache intentionally disabled for deterministic CI builds.
       # Restoring a stale/large Library can block before the actual Unity build.
 
-      - name: Build Unity Android APK directly      - name: Build Unity Android APK directly
+      - name: Build Unity Android APK directly
         shell: bash
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
