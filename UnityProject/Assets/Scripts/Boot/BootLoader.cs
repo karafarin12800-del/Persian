@@ -27,6 +27,8 @@ namespace PersiaWar.Unity2D5D
         private float loadElapsed;
         private bool loadWarningLogged;
         private bool startRequested;
+        private bool preparationComplete;
+        private bool preparationFailed;
         private string status = "Starting Persia War...";
         private string previousCheckpoint = string.Empty;
 
@@ -44,76 +46,106 @@ namespace PersiaWar.Unity2D5D
         private void Start()
         {
             BuildStyles();
-            status = "Ready to deploy into the battlefield";
+            status = "Preparing game resources...";
+            StartCoroutine(PrepareGameResources());
+        }
+
+        private IEnumerator PrepareGameResources()
+        {
+            yield return null;
+            StartupCheckpoint.Set("PreflightStarted");
+
+            try
+            {
+                Shader.Find("Unlit/Color");
+                Shader.Find("Unlit/Texture");
+                Shader.Find("Sprites/Default");
+                RuntimeMaterialFactory.GetShader();
+
+                Resources.Load<Texture2D>("PersianCharacters/Hero");
+                Resources.Load<Texture2D>("PersianCharacters/Enemy_01");
+                Resources.Load<Texture2D>("PersianCharacters/Enemy_02");
+                Resources.Load<Texture2D>("PersianCharacters/Enemy_03");
+                yield return null;
+
+                status = "Preparing battlefield in background...";
+                loadElapsed = 0f;
+                loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Additive);
+
+                if (loadOperation == null)
+                {
+                    preparationFailed = true;
+                    Fail("Unity could not prepare the gameplay scene.", null);
+                    yield break;
+                }
+
+                loadOperation.allowSceneActivation = false;
+                StartupCheckpoint.Set("GameplayScenePreloadStarted");
+
+                while (loadOperation.progress < 0.9f)
+                {
+                    loadElapsed += Time.unscaledDeltaTime;
+                    progressTarget = Mathf.Clamp01((loadOperation.progress / 0.9f) * 0.82f);
+                    progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.30f);
+                    status = loadElapsed > 8f
+                        ? "Still preparing battlefield..."
+                        : "Preparing battlefield in background...";
+                    yield return null;
+                }
+
+                progressTarget = 0.88f;
+                progress = Mathf.MoveTowards(progress, progressTarget, 0.30f);
+                StartupCheckpoint.Set("GameplayScenePreloaded");
+                preparationComplete = true;
+                progressTarget = 1f;
+                progress = 1f;
+                status = "Ready to deploy";
+                StartupCheckpoint.Set("PreflightReady");
+            }
+            catch (Exception ex)
+            {
+                preparationFailed = true;
+                Fail("Game preparation failed before Start.", ex);
+            }
         }
 
         private void BeginGame()
         {
-            if (startRequested || failed) return;
+            if (startRequested || failed || preparationFailed || !preparationComplete || loadOperation == null)
+                return;
+
             startRequested = true;
-            status = "Loading battlefield...";
-            StartCoroutine(LoadGameplayScene());
+            status = "Starting battlefield...";
+            progress = 0f;
+            progressTarget = 0f;
+            StartCoroutine(ActivatePreparedGameplay());
+        }
+
+        private IEnumerator ActivatePreparedGameplay()
+        {
+            StartupCheckpoint.Set("GameplayActivationRequested");
+            loadOperation.allowSceneActivation = true;
+
+            while (!loadOperation.isDone)
+            {
+                progressTarget = 0.25f;
+                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.20f);
+                yield return null;
+            }
+
+            yield return StartCoroutine(ContinueGameplayInitialization());
         }
 
         private IEnumerator LoadGameplayScene()
         {
-            yield return null;
-            StartupCheckpoint.Set("GameplaySceneLoadRequested");
-
-            status = "Loading battlefield...";
-            loadElapsed = 0f;
-
-            try
-            {
-                // Keep BootScene alive. Gameplay is loaded additively so the
-                // loading overlay remains visible during real initialization.
-                loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Additive);
-            }
-            catch (Exception ex)
-            {
-                Fail("Could not start the gameplay scene load.", ex);
-                yield break;
-            }
-
             if (loadOperation == null)
             {
-                Fail("Unity did not return a scene load operation.", null);
-                yield break;
+                yield return StartCoroutine(PrepareGameResources());
+                if (!preparationComplete) yield break;
             }
 
-            loadOperation.allowSceneActivation = false;
-            StartupCheckpoint.Set("GameplaySceneLoadStarted");
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
-
-            while (loadOperation.progress < 0.9f)
-            {
-                loadElapsed += Time.unscaledDeltaTime;
-                progressTarget = Mathf.Clamp01((loadOperation.progress / 0.9f) * 0.40f);
-                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.25f);
-                status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
-
-                if (!loadWarningLogged && loadElapsed > 5f)
-                {
-                    loadWarningLogged = true;
-                    Debug.LogWarning("PERSIA_BOOT_STAGE: MainSceneLoadTakingLongerThanExpected");
-                    StartupCheckpoint.Set("GameplaySceneLoadTakingLongerThanExpected");
-                }
-
-                yield return null;
-            }
-
-            StartupCheckpoint.Set("GameplaySceneLoadedWaitingForActivation");
-            status = "Activating battlefield...";
-            progressTarget = 0.45f;
-            progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.25f);
-
-            loadOperation.allowSceneActivation = true;
-            while (!loadOperation.isDone)
-            {
-                progressTarget = 0.55f;
-                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.20f);
-                yield return null;
-            }
+            yield return StartCoroutine(ActivatePreparedGameplay());
+            yield break;
 
             Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
             if (gameplayScene.IsValid() && gameplayScene.isLoaded)
@@ -311,7 +343,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(centerX, centerY - 128f, panelWidth, 58f), "PERSIA WAR", titleStyle);
             GUI.Label(new Rect(centerX, centerY - 62f, panelWidth, 34f), status, statusStyle);
 
-            if (!startRequested && !failed)
+            if (!startRequested && !failed && preparationComplete)
             {
                 Rect startButton = new Rect(centerX + 90f, centerY + 5f, panelWidth - 180f, 58f);
                 GUI.color = new Color(0.88f, 0.65f, 0.20f, 1f);
