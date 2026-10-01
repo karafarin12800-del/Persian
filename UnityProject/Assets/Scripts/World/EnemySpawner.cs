@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
@@ -29,7 +30,20 @@ namespace PersiaWar.Unity2D5D
                 PlayerController found = FindFirstObjectByType<PlayerController>();
                 if (found != null) player = found.transform;
             }
-            if (player != null) SpawnWave();
+
+            // Do not make the first gameplay-scene activation wait for enemy
+            // construction, Resources sprite loading and visual primitive creation.
+            // Let the scene finish its first frame, then create the initial wave.
+            if (player != null)
+                StartCoroutine(SpawnInitialWaveAfterStartup());
+        }
+
+        private IEnumerator SpawnInitialWaveAfterStartup()
+        {
+            yield return null;
+            yield return null;
+            if (player != null)
+                SpawnWave();
         }
 
         private void Update()
