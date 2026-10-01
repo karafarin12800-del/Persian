@@ -25,12 +25,15 @@ namespace PersiaWar.Unity2D5D
         private float loadElapsed;
         private bool loadWarningLogged;
         private string status = "Starting Persia War...";
+        private string previousCheckpoint = string.Empty;
 
         private void Awake()
         {
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             progress = 0f;
+            previousCheckpoint = StartupCheckpoint.Last;
+            StartupCheckpoint.Set("BootSceneStarted");
             Debug.Log("PERSIA_BOOT_STAGE: BootSceneStarted");
         }
 
@@ -43,6 +46,7 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator LoadGameplayScene()
         {
             yield return null;
+            StartupCheckpoint.Set("GameplaySceneLoadRequested");
 
             status = "Loading battlefield...";
             try
@@ -62,6 +66,7 @@ namespace PersiaWar.Unity2D5D
             }
 
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
+            StartupCheckpoint.Set("GameplaySceneLoadStarted");
 
             float visibleSeconds = 0f;
             while (!loadOperation.isDone)
@@ -74,6 +79,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     loadWarningLogged = true;
                     Debug.LogWarning("PERSIA_BOOT_STAGE: MainSceneLoadTakingLongerThanExpected");
+                    StartupCheckpoint.Set("GameplaySceneLoadTakingLongerThanExpected");
                 }
 
                 status = loadElapsed > 5f
@@ -91,6 +97,7 @@ namespace PersiaWar.Unity2D5D
             }
 
             progress = 1f;
+            StartupCheckpoint.Set("GameplaySceneLoadCompleted");
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
         }
@@ -101,6 +108,7 @@ namespace PersiaWar.Unity2D5D
             failureMessage = message;
             status = "Startup failed";
             progress = 0f;
+            StartupCheckpoint.Set("BootFailure");
 
             if (exception != null)
                 Debug.LogException(exception);
@@ -164,8 +172,6 @@ namespace PersiaWar.Unity2D5D
             float fill = Mathf.Clamp01(progress);
             if (fill < 0.015f && !failed)
             {
-                // Always show visible activity even while Unity is still preparing
-                // the scene and has not advanced AsyncOperation.progress yet.
                 float pulse = 0.18f + (Mathf.Sin(Time.unscaledTime * 4f) + 1f) * 0.09f;
                 float x = bar.x + (bar.width - bar.width * pulse) * Mathf.Repeat(Time.unscaledTime * 0.16f, 1f);
                 GUI.color = new Color(0.88f, 0.65f, 0.20f, 1f);
@@ -185,6 +191,12 @@ namespace PersiaWar.Unity2D5D
             if (failed)
             {
                 GUI.Label(new Rect(centerX + 35f, centerY + 77f, panelWidth - 70f, 48f), failureMessage, footerStyle);
+            }
+            else if (!string.IsNullOrEmpty(previousCheckpoint) && previousCheckpoint != "none" && previousCheckpoint != "GameplaySceneLoadCompleted")
+            {
+                GUI.Label(new Rect(centerX + 30f, centerY + 82f, panelWidth - 60f, 42f),
+                    "Last startup checkpoint: " + previousCheckpoint,
+                    footerStyle);
             }
             else
             {
