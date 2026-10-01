@@ -66,10 +66,9 @@ namespace PersiaWar.Unity2D5D
             combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
             CacheGameplayRoots();
             gameBootstrap = gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
-            if (gameBootstrap != null && gameRoot != null && !gameRoot.activeSelf)
-                gameRoot.SetActive(true);
-            if (gameBootstrap != null)
-                gameBootstrap.PrepareWorld();
+            // Do not start procedural world generation while the front-end menu is opening.
+            // GameRoot remains dormant until START MATCH so Android can finish scene activation
+            // and render the menu without a large main-thread workload.
             // The boot flow intentionally keeps the camera inactive while the menu is shown.
             // IMGUI does not require a Camera; activate and bind it only when the match starts.
 
