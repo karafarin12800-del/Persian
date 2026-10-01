@@ -15,6 +15,14 @@ namespace PersiaWar.Unity2D5D
         public bool IsWorldPreparing { get; private set; }
         public bool WorldBuildFailed { get; private set; }
         public string WorldBuildError { get; private set; } = string.Empty;
+        public string CurrentStage { get; private set; } = "Stage 0: waiting for battlefield preparation...";
+
+        private void ReportStage(string message, string checkpoint)
+        {
+            CurrentStage = message;
+            StartupCheckpoint.Set(checkpoint);
+            Debug.Log("[PERSIA STARTUP] " + message);
+        }
         private bool prepareRequested;
 
         private Transform worldRoot;
@@ -57,7 +65,7 @@ namespace PersiaWar.Unity2D5D
             WorldBuildFailed = false;
             WorldBuildError = string.Empty;
             yield return null;
-            StartupCheckpoint.Set("WorldBuildStarted");
+            ReportStage("Stage 1: battlefield preparation started.", "WorldBuildStarted");
 
             System.Exception startupException = null;
             try
@@ -67,11 +75,12 @@ namespace PersiaWar.Unity2D5D
                 Random.InitState(seed);
                 EnsureGameSession();
                 GameSession.Instance?.ResetMatch();
-                StartupCheckpoint.Set("GameSessionReady");
+                ReportStage("Stage 2: creating game session...", "GameSessionReady");
                 ConfigureCameraSafe();
                 ConfigureLighting();
+                ReportStage("Stage 3: building terrain and main roads...", "BeforeWorldBaseBuilt");
                 BuildWorldBase();
-                StartupCheckpoint.Set("WorldBaseBuilt");
+                ReportStage("Stage 4: terrain and main roads completed.", "WorldBaseBuilt");
             }
             catch (System.Exception ex)
             {
@@ -85,27 +94,33 @@ namespace PersiaWar.Unity2D5D
             }
 
             yield return null;
+            ReportStage("Stage 5: painting road markings...", "BeforeRoadMarkings");
             if (!RunWorldBuildStep(() => BuildRoadMarkings(8f), "RoadMarkingsBuilt"))
                 yield break;
 
             yield return null;
+            ReportStage("Stage 6: creating city buildings and blocks...", "BeforeCityBlocks");
             if (!RunWorldBuildStep(() => BuildCityBlocks(8f), "CityBlocksBuilt"))
                 yield break;
 
             yield return null;
+            ReportStage("Stage 7: creating landmarks...", "BeforeLandmarks");
             if (!RunWorldBuildStep(BuildLandmarks, "LandmarksBuilt"))
                 yield break;
 
             yield return null;
+            ReportStage("Stage 8: placing trees and vehicles...", "BeforeStreetProps");
             if (!RunWorldBuildStep(BuildStreetProps, "StreetPropsBuilt"))
                 yield break;
 
             yield return null;
+            ReportStage("Stage 9: creating ruined quarter and debris...", "BeforeRuinedQuarter");
             if (!RunWorldBuildStep(BuildRuinedQuarter, "WorldBuildComplete"))
                 yield break;
 
             IsWorldReady = true;
             IsWorldPreparing = false;
+            ReportStage("Stage 10: battlefield completely ready.", "WorldBuildReady");
         }
 
         private bool RunWorldBuildStep(System.Action buildStep, string checkpoint)
@@ -127,6 +142,7 @@ namespace PersiaWar.Unity2D5D
         {
             WorldBuildFailed = true;
             WorldBuildError = ex.Message;
+            CurrentStage = "FAILED: " + ex.Message;
             IsWorldReady = false;
             IsWorldPreparing = false;
             StartupCheckpoint.Set("WorldBuildFailed");
