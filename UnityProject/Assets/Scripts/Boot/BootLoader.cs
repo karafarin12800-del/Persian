@@ -148,6 +148,7 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator ActivatePreparedGameplay()
         {
             StartupCheckpoint.Set("GameplayActivationRequested");
+            StartupCheckpoint.Set("GameplaySceneActivationStarted");
             loadOperation.allowSceneActivation = true;
 
             while (!loadOperation.isDone)
@@ -157,6 +158,7 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
             }
 
+            StartupCheckpoint.Set("GameplaySceneActivationCompleted");
             yield return StartCoroutine(ContinueGameplayInitialization());
         }
 
