@@ -58,6 +58,8 @@ namespace PersiaWar.Unity2D5D
             WorldBuildError = string.Empty;
             yield return null;
             StartupCheckpoint.Set("WorldBuildStarted");
+
+            System.Exception startupException = null;
             try
             {
                 Application.targetFrameRate = 60;
@@ -70,34 +72,65 @@ namespace PersiaWar.Unity2D5D
                 ConfigureLighting();
                 BuildWorldBase();
                 StartupCheckpoint.Set("WorldBaseBuilt");
-                yield return null;
-                BuildRoadMarkings(8f);
-                StartupCheckpoint.Set("RoadMarkingsBuilt");
-                yield return null;
-                BuildCityBlocks(8f);
-                StartupCheckpoint.Set("CityBlocksBuilt");
-                yield return null;
-                BuildLandmarks();
-                StartupCheckpoint.Set("LandmarksBuilt");
-                yield return null;
-                BuildStreetProps();
-                StartupCheckpoint.Set("StreetPropsBuilt");
-                yield return null;
-                BuildRuinedQuarter();
-                StartupCheckpoint.Set("WorldBuildComplete");
-                IsWorldReady = true;
             }
             catch (System.Exception ex)
             {
-                WorldBuildFailed = true;
-                WorldBuildError = ex.Message;
-                StartupCheckpoint.Set("WorldBuildFailed");
-                Debug.LogException(ex);
+                startupException = ex;
             }
-            finally
+
+            if (startupException != null)
             {
-                IsWorldPreparing = false;
+                MarkWorldBuildFailed(startupException);
+                yield break;
             }
+
+            yield return null;
+            if (!RunWorldBuildStep(() => BuildRoadMarkings(8f), "RoadMarkingsBuilt"))
+                yield break;
+
+            yield return null;
+            if (!RunWorldBuildStep(() => BuildCityBlocks(8f), "CityBlocksBuilt"))
+                yield break;
+
+            yield return null;
+            if (!RunWorldBuildStep(BuildLandmarks, "LandmarksBuilt"))
+                yield break;
+
+            yield return null;
+            if (!RunWorldBuildStep(BuildStreetProps, "StreetPropsBuilt"))
+                yield break;
+
+            yield return null;
+            if (!RunWorldBuildStep(BuildRuinedQuarter, "WorldBuildComplete"))
+                yield break;
+
+            IsWorldReady = true;
+            IsWorldPreparing = false;
+        }
+
+        private bool RunWorldBuildStep(System.Action buildStep, string checkpoint)
+        {
+            try
+            {
+                buildStep();
+                StartupCheckpoint.Set(checkpoint);
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                MarkWorldBuildFailed(ex);
+                return false;
+            }
+        }
+
+        private void MarkWorldBuildFailed(System.Exception ex)
+        {
+            WorldBuildFailed = true;
+            WorldBuildError = ex.Message;
+            IsWorldReady = false;
+            IsWorldPreparing = false;
+            StartupCheckpoint.Set("WorldBuildFailed");
+            Debug.LogException(ex);
         }
 
         private void EnsureGameSession()
