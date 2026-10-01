@@ -435,4 +435,5 @@ jobs:
           if-no-files-found: error
 
 # Build trigger: 2026-10-02 build exact GameRoot-dormant startup fix
-# Build source: 9766b4c83ec949685f1ab440f07f6b0e1cb097c6
+# Build source: 889ee4cd526b6c36d2a70e589c72221c02ef61c6
+# Build trigger: 2026-10-02 isolate BootScene first-frame startup
