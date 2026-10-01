@@ -55,6 +55,64 @@ namespace PersiaWar.Unity2D5D
             yield return null;
             StartupCheckpoint.Set("PreflightStarted");
 
+            Exception preparationException;
+            if (!TryPrepareGameResources(out preparationException))
+            {
+                preparationFailed = true;
+                Fail("Game preparation failed before Start.", preparationException);
+                yield break;
+            }
+
+            yield return null;
+
+            status = "Preparing battlefield in background...";
+            loadElapsed = 0f;
+
+            try
+            {
+                loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Additive);
+            }
+            catch (Exception ex)
+            {
+                preparationFailed = true;
+                Fail("Unity could not prepare the gameplay scene.", ex);
+                yield break;
+            }
+
+            if (loadOperation == null)
+            {
+                preparationFailed = true;
+                Fail("Unity could not prepare the gameplay scene.", null);
+                yield break;
+            }
+
+            loadOperation.allowSceneActivation = false;
+            StartupCheckpoint.Set("GameplayScenePreloadStarted");
+
+            while (loadOperation.progress < 0.9f)
+            {
+                loadElapsed += Time.unscaledDeltaTime;
+                progressTarget = Mathf.Clamp01((loadOperation.progress / 0.9f) * 0.82f);
+                progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.30f);
+                status = loadElapsed > 8f
+                    ? "Still preparing battlefield..."
+                    : "Preparing battlefield in background...";
+                yield return null;
+            }
+
+            progressTarget = 0.88f;
+            progress = Mathf.MoveTowards(progress, progressTarget, 0.30f);
+            StartupCheckpoint.Set("GameplayScenePreloaded");
+            preparationComplete = true;
+            progressTarget = 1f;
+            progress = 1f;
+            status = "Ready to deploy";
+            StartupCheckpoint.Set("PreflightReady");
+        }
+
+        private bool TryPrepareGameResources(out Exception exception)
+        {
+            exception = null;
             try
             {
                 Shader.Find("Unlit/Color");
@@ -66,46 +124,12 @@ namespace PersiaWar.Unity2D5D
                 Resources.Load<Texture2D>("PersianCharacters/Enemy_01");
                 Resources.Load<Texture2D>("PersianCharacters/Enemy_02");
                 Resources.Load<Texture2D>("PersianCharacters/Enemy_03");
-                yield return null;
-
-                status = "Preparing battlefield in background...";
-                loadElapsed = 0f;
-                loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Additive);
-
-                if (loadOperation == null)
-                {
-                    preparationFailed = true;
-                    Fail("Unity could not prepare the gameplay scene.", null);
-                    yield break;
-                }
-
-                loadOperation.allowSceneActivation = false;
-                StartupCheckpoint.Set("GameplayScenePreloadStarted");
-
-                while (loadOperation.progress < 0.9f)
-                {
-                    loadElapsed += Time.unscaledDeltaTime;
-                    progressTarget = Mathf.Clamp01((loadOperation.progress / 0.9f) * 0.82f);
-                    progress = Mathf.MoveTowards(progress, progressTarget, Time.unscaledDeltaTime * 0.30f);
-                    status = loadElapsed > 8f
-                        ? "Still preparing battlefield..."
-                        : "Preparing battlefield in background...";
-                    yield return null;
-                }
-
-                progressTarget = 0.88f;
-                progress = Mathf.MoveTowards(progress, progressTarget, 0.30f);
-                StartupCheckpoint.Set("GameplayScenePreloaded");
-                preparationComplete = true;
-                progressTarget = 1f;
-                progress = 1f;
-                status = "Ready to deploy";
-                StartupCheckpoint.Set("PreflightReady");
+                return true;
             }
             catch (Exception ex)
             {
-                preparationFailed = true;
-                Fail("Game preparation failed before Start.", ex);
+                exception = ex;
+                return false;
             }
         }
 
