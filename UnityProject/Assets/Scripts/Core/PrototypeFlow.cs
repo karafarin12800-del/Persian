@@ -49,9 +49,6 @@ namespace PersiaWar.Unity2D5D
 
         private void Start()
         {
-            // All scene/component Awake methods have completed here. GameBootstrap
-            // creates RuntimeCombatHUD and EnemySpawner during Awake, so binding in
-            // Start avoids relying on undefined Awake ordering.
             player = FindFirstObjectByType<PlayerController>();
             enemySpawner = FindFirstObjectByType<EnemySpawner>();
             mobileInput = FindFirstObjectByType<MobileInputHub>();
@@ -59,6 +56,8 @@ namespace PersiaWar.Unity2D5D
             Camera camera = Camera.main;
             followCamera = camera != null ? camera.GetComponent<CameraFollow25D>() : null;
 
+            // Menu gating happens before the first gameplay Update. EnemySpawner is
+            // disabled here so the hero/drop screens do not start combat waves.
             GateGameplay(false);
             ApplyHeroStyle(selectedHero);
         }
@@ -66,7 +65,6 @@ namespace PersiaWar.Unity2D5D
         private void Update()
         {
             if (mode == ScreenMode.Match || player == null) return;
-
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
         }
@@ -74,7 +72,6 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             if (mode == ScreenMode.Match) return;
-
             DrawBackdrop();
             if (mode == ScreenMode.HeroSelect)
                 DrawHeroSelect();
@@ -120,9 +117,7 @@ namespace PersiaWar.Unity2D5D
 
             Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
             if (GUI.Button(continueRect, "SELECT SPAWN POINT", buttonStyle))
-            {
                 mode = ScreenMode.DropMap;
-            }
         }
 
         private void DrawHeroCard(Rect rect, int index, bool selected)
@@ -207,7 +202,6 @@ namespace PersiaWar.Unity2D5D
                 Fill(new Rect(rect.x, rect.y + i * block - 13f, rect.width, 26f), new Color(0.16f, 0.18f, 0.19f));
             }
 
-            // Neighborhoods: safe residential blocks, central services, and ruined sector.
             for (int gx = 0; gx < 6; gx++)
             {
                 for (int gy = 0; gy < 6; gy++)
@@ -217,11 +211,8 @@ namespace PersiaWar.Unity2D5D
                     if (gx >= 4 && gy <= 2) c = new Color(0.48f, 0.44f, 0.39f, 1f);
                     if (gx == 2 && gy == 3) c = new Color(0.30f, 0.50f, 0.66f, 1f);
                     Fill(cell, c);
-
                     if (gx != 5 && gy != 5)
-                    {
                         Fill(new Rect(cell.x + 10f, cell.y + 10f, cell.width * 0.42f, cell.height * 0.34f), new Color(0.86f, 0.69f, 0.30f, 1f));
-                    }
                 }
             }
 
@@ -253,7 +244,6 @@ namespace PersiaWar.Unity2D5D
                 Mathf.Clamp01((screen.x - mapRect.x) / mapRect.width),
                 Mathf.Clamp01((screen.y - mapRect.y) / mapRect.height));
 
-            // Keep the drop point inside the 220x220 gameplay world and away from the edge.
             float x = Mathf.Lerp(-96f, 96f, uv.x);
             float z = Mathf.Lerp(96f, -96f, uv.y);
             spawnWorld = new Vector2(x, z);
@@ -263,11 +253,9 @@ namespace PersiaWar.Unity2D5D
         private void StartMatch()
         {
             if (player == null) return;
-
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
             if (followCamera != null) followCamera.SetTarget(player.transform);
-
             mode = ScreenMode.Match;
             GateGameplay(true);
         }
@@ -295,8 +283,11 @@ namespace PersiaWar.Unity2D5D
                 : new Color(0.92f, 0.28f, 0.22f);
 
             SetChildMaterial("Body", body);
-            SetChildMaterial("ShoulderArmor", accent);
-            SetChildMaterial("Crown", heroIndex == 0 ? new Color(0.92f, 0.66f, 0.14f) : new Color(0.64f, 0.68f, 0.72f));
+            SetChildMaterial("Tunic", body);
+            SetChildMaterial("ChestArmor", accent);
+            SetChildMaterial("PersianHelmet", heroIndex == 0 ? new Color(0.92f, 0.66f, 0.14f) : new Color(0.64f, 0.68f, 0.72f));
+            SetChildMaterial("HelmetCrest", heroIndex == 0 ? new Color(0.16f, 0.20f, 0.23f) : accent);
+            SetChildMaterial("RedPlume", heroIndex == 3 ? new Color(0.90f, 0.22f, 0.12f) : accent);
         }
 
         private void SetChildMaterial(string childName, Color color)
@@ -325,35 +316,11 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildStyles()
         {
-            titleStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 34,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleLeft
-            };
-            headerStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 30,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter
-            };
-            bodyStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 20,
-                alignment = TextAnchor.MiddleCenter
-            };
-            smallStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 16,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter
-            };
-            buttonStyle = new GUIStyle(GUI.skin.button)
-            {
-                fontSize = 20,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter
-            };
+            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
+            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         }
 
         private void Fill(Rect rect, Color color)
