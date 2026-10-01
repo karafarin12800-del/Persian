@@ -20,16 +20,20 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            StartupCheckpoint.Set("GameBootstrapAwake");
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             Random.InitState(seed);
 
             EnsureGameSession();
             GameSession.Instance?.ResetMatch();
+            StartupCheckpoint.Set("GameSessionReady");
 
             if (gameplayCamera == null) gameplayCamera = Camera.main;
             ConfigureCamera();
+            StartupCheckpoint.Set("CameraConfigured");
             ConfigureLighting();
+            StartupCheckpoint.Set("LightingConfigured");
 
             PlayerController player = FindFirstObjectByType<PlayerController>();
             if (player != null)
@@ -37,32 +41,38 @@ namespace PersiaWar.Unity2D5D
                 player.transform.position = new Vector3(0f, 0f, -4f);
                 CameraFollow25D follow = gameplayCamera != null ? gameplayCamera.GetComponent<CameraFollow25D>() : null;
                 if (follow != null) follow.SetTarget(player.transform);
+                StartupCheckpoint.Set("PlayerLocated");
                 EnsureEnemySpawner(player.transform);
+                StartupCheckpoint.Set("EnemySpawnerReady");
                 EnsureGameplayHUD(player);
+                StartupCheckpoint.Set("HUDReady");
             }
 
-            // Do not construct the entire city inside the first-scene Awake sequence.
-            // Unity documents Awake as part of first-scene loading; moving the expensive
-            // procedural world construction past the first rendered frame prevents the
-            // Android startup path from being blocked by hundreds of runtime primitives,
-            // colliders and shader/material allocations.
+            StartupCheckpoint.Set("GameplayBootstrapAwakeComplete");
             StartCoroutine(BuildWorldAfterStartup());
         }
 
         private IEnumerator BuildWorldAfterStartup()
         {
             yield return null;
+            StartupCheckpoint.Set("WorldBuildStarted");
             BuildWorldBase();
+            StartupCheckpoint.Set("WorldBaseBuilt");
             yield return null;
             BuildRoadMarkings(8f);
+            StartupCheckpoint.Set("RoadMarkingsBuilt");
             yield return null;
             BuildCityBlocks(8f);
+            StartupCheckpoint.Set("CityBlocksBuilt");
             yield return null;
             BuildLandmarks();
+            StartupCheckpoint.Set("LandmarksBuilt");
             yield return null;
             BuildStreetProps();
+            StartupCheckpoint.Set("StreetPropsBuilt");
             yield return null;
             BuildRuinedQuarter();
+            StartupCheckpoint.Set("WorldBuildComplete");
         }
 
         private void EnsureGameSession()
@@ -316,10 +326,11 @@ namespace PersiaWar.Unity2D5D
         {
             GameObject obj = GameObject.CreatePrimitive(primitive);
             obj.name = objectName;
+            obj.transform.SetParent(worldRoot, true);
             obj.transform.position = position;
             obj.transform.localScale = scale;
             Renderer renderer = obj.GetComponent<Renderer>();
-            if (renderer != null) renderer.sharedMaterial = MakeMaterial(objectName + "Material", color);
+            if (renderer != null) renderer.sharedMaterial = RuntimeMaterialFactory.Create(objectName + "Material", color);
             if (!collider)
             {
                 Collider c = obj.GetComponent<Collider>();
