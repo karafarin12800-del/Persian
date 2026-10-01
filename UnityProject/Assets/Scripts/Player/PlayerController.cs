@@ -30,7 +30,13 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            // Keep scene activation lightweight on Android. Heavy runtime primitive/material
+            // creation is deferred until Start, after the gameplay scene is fully activated.
             StartupCheckpoint.Set("PlayerAwakeStarted");
+        }
+
+        private void Start()
+        {
             EnsurePlayerVisual();
             StartupCheckpoint.Set("PlayerVisualBuilt");
             EnsureGameplayComponents();
