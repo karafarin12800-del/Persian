@@ -159,7 +159,73 @@ namespace PersiaWar.Unity2D5D
             }
 
             StartupCheckpoint.Set("GameplaySceneActivationCompleted");
+
+            Scene gameplayScene = SceneManager.GetSceneByPath(GameplayScenePath);
+            if (!gameplayScene.IsValid() || !gameplayScene.isLoaded)
+            {
+                Fail("Prepared gameplay scene is not loaded after activation.", null);
+                yield break;
+            }
+
+            yield return StartCoroutine(ActivateGameplayRoots(gameplayScene));
             yield return StartCoroutine(ContinueGameplayInitialization());
+        }
+
+        private IEnumerator ActivateGameplayRoots(Scene gameplayScene)
+        {
+            StartupCheckpoint.Set("GameplayRootsActivationStarted");
+
+            GameObject cameraRoot = FindRootObject(gameplayScene, "Main Camera");
+            GameObject playerRoot = FindRootObject(gameplayScene, "Player");
+            GameObject gameRoot = FindRootObject(gameplayScene, "GameRoot");
+            GameObject mobileInputRoot = FindRootObject(gameplayScene, "MobileInput");
+            GameObject worldBoundsRoot = FindRootObject(gameplayScene, "WorldBounds");
+            GameObject prototypeFlowRoot = FindRootObject(gameplayScene, "PrototypeFlow");
+
+            if (cameraRoot == null || playerRoot == null || gameRoot == null ||
+                mobileInputRoot == null || worldBoundsRoot == null || prototypeFlowRoot == null)
+            {
+                Fail("Gameplay scene is missing one or more required roots.", null);
+                yield break;
+            }
+
+            cameraRoot.SetActive(true);
+            StartupCheckpoint.Set("GameplayCameraRootActivated");
+            yield return null;
+
+            playerRoot.SetActive(true);
+            StartupCheckpoint.Set("GameplayPlayerRootActivated");
+            yield return null;
+
+            gameRoot.SetActive(true);
+            StartupCheckpoint.Set("GameplayBootstrapRootActivated");
+            yield return null;
+
+            mobileInputRoot.SetActive(true);
+            StartupCheckpoint.Set("GameplayMobileInputRootActivated");
+            yield return null;
+
+            worldBoundsRoot.SetActive(true);
+            StartupCheckpoint.Set("GameplayWorldBoundsRootActivated");
+            yield return null;
+
+            prototypeFlowRoot.SetActive(true);
+            StartupCheckpoint.Set("GameplayPrototypeFlowRootActivated");
+            yield return null;
+
+            StartupCheckpoint.Set("GameplayRootsActivationComplete");
+        }
+
+        private GameObject FindRootObject(Scene scene, string objectName)
+        {
+            GameObject[] roots = scene.GetRootGameObjects();
+            for (int i = 0; i < roots.Length; i++)
+            {
+                if (roots[i] != null && roots[i].name == objectName)
+                    return roots[i];
+            }
+
+            return null;
         }
 
         private IEnumerator ContinueGameplayInitialization()
