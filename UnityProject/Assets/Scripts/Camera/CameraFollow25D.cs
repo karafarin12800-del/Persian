@@ -19,7 +19,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
-            ApplyCameraSettings();
+            // CameraFollow is attached during gameplay startup. Keep Awake side-effect free
+            // on Android; GameBootstrap owns all Camera property configuration.
+            StartupCheckpoint.Set("CameraFollowAwake");
         }
 
         public void Rotate(float screenDeltaX) { }
@@ -45,19 +47,9 @@ namespace PersiaWar.Unity2D5D
             transform.position = Vector3.Lerp(transform.position, desired, blend);
 
             Vector3 lookTarget = target.position + Vector3.up * lookHeight;
-            transform.rotation = Quaternion.LookRotation(lookTarget - transform.position, Vector3.up);
-        }
-
-        private void ApplyCameraSettings()
-        {
-            Camera cam = GetComponent<Camera>();
-            if (cam == null)
-                return;
-
-            cam.orthographic = false;
-            cam.fieldOfView = fieldOfView;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 280f;
+            Vector3 direction = lookTarget - transform.position;
+            if (direction.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
         }
     }
 }
