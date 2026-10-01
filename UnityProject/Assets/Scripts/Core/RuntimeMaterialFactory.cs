@@ -7,6 +7,7 @@ namespace PersiaWar.Unity2D5D
     {
         private static Shader cachedShader;
         private static readonly Dictionary<int, Material> sharedMaterials = new Dictionary<int, Material>();
+        private static bool shaderCheckpointWritten;
 
         public static Material Create(string materialName, Color color)
         {
@@ -14,12 +15,10 @@ namespace PersiaWar.Unity2D5D
             if (shader == null)
             {
                 Debug.LogError("PersiaWar: no compatible runtime material shader was found.");
+                StartupCheckpoint.Set("RuntimeShaderMissing");
                 return null;
             }
 
-            // The procedural city creates hundreds of renderers. Reusing materials by
-            // shader+color prevents a large material/heap spike on Android while keeping
-            // the visual appearance unchanged. Callers still receive a sharedMaterial.
             int key = ComputeKey(shader, color);
             if (sharedMaterials.TryGetValue(key, out Material cached) && cached != null)
                 return cached;
@@ -36,8 +35,6 @@ namespace PersiaWar.Unity2D5D
 
         public static Material CreateTextured(string materialName, Color tint, Texture2D texture, float tiling)
         {
-            // Textured materials are intentionally unique because their texture/tiling
-            // state is part of the material identity.
             Material material = CreateUnique(materialName, tint);
             if (material == null || texture == null)
                 return material;
@@ -57,6 +54,7 @@ namespace PersiaWar.Unity2D5D
             if (shader == null)
             {
                 Debug.LogError("PersiaWar: no compatible runtime material shader was found.");
+                StartupCheckpoint.Set("RuntimeShaderMissing");
                 return null;
             }
 
@@ -86,6 +84,12 @@ namespace PersiaWar.Unity2D5D
             if (cachedShader != null)
                 return cachedShader;
 
+            if (!shaderCheckpointWritten)
+            {
+                shaderCheckpointWritten = true;
+                StartupCheckpoint.Set("RuntimeShaderLookupStarted");
+            }
+
             cachedShader = Resources.Load<Shader>("PersiaWarLit");
             if (cachedShader == null)
                 cachedShader = Shader.Find("PersiaWar/Lit");
@@ -97,6 +101,9 @@ namespace PersiaWar.Unity2D5D
                 cachedShader = Shader.Find("VertexLit");
             if (cachedShader == null)
                 cachedShader = Shader.Find("Sprites/Default");
+
+            if (cachedShader != null)
+                StartupCheckpoint.Set("RuntimeShaderReady");
 
             return cachedShader;
         }
