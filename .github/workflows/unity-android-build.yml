@@ -434,4 +434,5 @@ jobs:
             build/Android/BUILD_PROVENANCE.txt
           if-no-files-found: error
 
-# Build trigger: 2026-10-01 staged Android startup validation
+# Build trigger: 2026-10-02 build exact GameRoot-dormant startup fix
+# Build source: 9766b4c83ec949685f1ab440f07f6b0e1cb097c6
