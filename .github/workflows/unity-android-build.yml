@@ -1,4 +1,5 @@
-name: Unity Android Build
+name: Unity # Direct-start validation: 2026-10-01
+ndroid Build
 
 on:
   workflow_dispatch:
