@@ -90,7 +90,16 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("RuntimeShaderLookupStarted");
             }
 
-            cachedShader = Resources.Load<Shader>("PersiaWarLit");
+#if UNITY_ANDROID
+            // Keep runtime primitive materials on a built-in unlit mobile shader.
+            // This avoids compiling the custom surface shader on the Android path.
+            cachedShader = Shader.Find("Unlit/Texture");
+            if (cachedShader == null)
+                cachedShader = Shader.Find("Unlit/Color");
+#endif
+
+            if (cachedShader == null)
+                cachedShader = Resources.Load<Shader>("PersiaWarLit");
             if (cachedShader == null)
                 cachedShader = Shader.Find("PersiaWar/Lit");
             if (cachedShader == null)
