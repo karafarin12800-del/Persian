@@ -105,6 +105,9 @@ namespace PersiaWar.Unity2D5D
 
             if (startingMatch)
             {
+                if (gameBootstrap != null && gameBootstrap.IsWorldPreparing && !string.IsNullOrEmpty(gameBootstrap.CurrentStage))
+                    startupStatus = gameBootstrap.CurrentStage;
+
                 float width = Mathf.Min(Screen.width - 48f, 760f);
                 float height = 170f;
                 Rect panel = new Rect(
@@ -306,7 +309,8 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator BeginMatchSafely()
         {
             startingMatch = true;
-            startupStatus = "Waiting for battlefield...";
+            startupStatus = "Stage 1: starting battlefield preparation...";
+
             StartupCheckpoint.Set("MatchActivationStarted");
 
             if (gameBootstrap == null)
@@ -320,11 +324,14 @@ namespace PersiaWar.Unity2D5D
             }
 
             if (!gameBootstrap.IsWorldReady && !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
+            {
+                startupStatus = "Stage 2: requesting battlefield build...";
                 gameBootstrap.PrepareWorld();
+            }
 
             while (gameBootstrap.IsWorldPreparing)
             {
-                startupStatus = "Preparing battlefield...";
+                startupStatus = gameBootstrap.CurrentStage;
                 yield return null;
             }
 
@@ -336,9 +343,13 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
+            startupStatus = "Stage 8: activating player...";
             yield return ActivateRoot(playerRoot, "Player");
+            startupStatus = "Stage 9: activating mobile input...";
             yield return ActivateRoot(mobileInputRoot, "MobileInput");
+            startupStatus = "Stage 10: activating world bounds...";
             yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
+            startupStatus = "Stage 11: activating main camera...";
             yield return ActivateRoot(mainCameraRoot, "Main Camera");
 
             player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
@@ -361,6 +372,7 @@ namespace PersiaWar.Unity2D5D
             if (followCamera != null) followCamera.SetTarget(player.transform);
 
             GateGameplay(true);
+            startupStatus = "Stage 12: battlefield ready — starting match.";
             mode = ScreenMode.Match;
             startingMatch = false;
             startupStatus = string.Empty;
