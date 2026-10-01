@@ -7,14 +7,12 @@ namespace PersiaWar.Unity2D5D
 {
     /// <summary>
     /// Lightweight first scene for Android startup. It deliberately contains no
-    /// gameplay objects or asset loading. The gameplay scene is prepared in the
-    /// background and activated after a bounded warm-up so Android cannot remain parked on the boot screen.
+    /// gameplay objects or gameplay asset loading.
     /// </summary>
     public sealed class BootLoader : MonoBehaviour
     {
         private const string GameplayScenePath = "Assets/Scenes/PersiaWarPrototype.unity";
         private const float MinimumVisibleSeconds = 0.65f;
-        private const float MaxPreActivationWaitSeconds = 8f;
 
         private AsyncOperation loadOperation;
         private GUIStyle titleStyle;
@@ -44,15 +42,16 @@ namespace PersiaWar.Unity2D5D
 
         private IEnumerator LoadGameplayScene()
         {
-            // Give the BootScene at least one rendered frame before the gameplay
-            // scene starts allocating its larger runtime objects.
+            // Always render the lightweight boot screen at least once before the
+            // gameplay scene starts loading.
             yield return null;
 
-            float visibleSeconds = 0f;
-            status = "Preparing game engine...";
-
+            status = "Loading battlefield...";
             try
             {
+                // IMPORTANT: activation is intentionally not blocked. A device must
+                // never remain permanently parked on BootScene because an Android
+                // driver/device reports an unexpected AsyncOperation progress value.
                 loadOperation = SceneManager.LoadSceneAsync(GameplayScenePath, LoadSceneMode.Single);
             }
             catch (Exception ex)
@@ -67,53 +66,37 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            loadOperation.allowSceneActivation = false;
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneLoadStarted");
 
-            while (loadOperation.progress < 0.9f && loadElapsed < MaxPreActivationWaitSeconds)
+            float visibleSeconds = 0f;
+            while (!loadOperation.isDone)
             {
-                progress = Mathf.Clamp01(loadOperation.progress / 0.9f) * 0.92f;
                 loadElapsed += Time.unscaledDeltaTime;
+                visibleSeconds += Time.unscaledDeltaTime;
+
+                // AsyncOperation.progress normally moves from 0 to 0.9 and then to
+                // 1 during activation. Do not gate activation on 0.9; Unity owns that.
+                progress = Mathf.Clamp01(loadOperation.progress / 0.9f);
                 if (!loadWarningLogged && loadElapsed > 5f)
                 {
                     loadWarningLogged = true;
                     Debug.LogWarning("PERSIA_BOOT_STAGE: MainSceneLoadTakingLongerThanExpected");
                 }
                 status = loadElapsed > 5f ? "Preparing battlefield..." : "Loading battlefield...";
-                visibleSeconds += Time.unscaledDeltaTime;
                 yield return null;
             }
 
-            if (loadOperation.progress < 0.9f)
-            {
-                Debug.LogWarning("PERSIA_BOOT_STAGE: ActivatingMainSceneAfterBoundedWarmup");
-                status = "Starting Persia War...";
-            }
-
-            // Keep the lightweight boot UI visible briefly so the device gets a real
-            // startup frame before the larger scene activates.
+            // Keep the Boot frame visible briefly when loading completed extremely fast.
             while (visibleSeconds < MinimumVisibleSeconds)
             {
                 visibleSeconds += Time.unscaledDeltaTime;
-                progress = Mathf.Max(progress, 0.92f);
-                status = "Finalizing resources...";
-                yield return null;
-            }
-
-            progress = 0.97f;
-            status = "Starting Persia War...";
-            yield return null;
-
-            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
-            loadOperation.allowSceneActivation = true;
-
-            while (!loadOperation.isDone)
-            {
-                progress = Mathf.Lerp(0.97f, 1f, Mathf.Clamp01(loadOperation.progress));
+                progress = 1f;
+                status = "Starting Persia War...";
                 yield return null;
             }
 
             progress = 1f;
+            Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivationRequested");
             Debug.Log("PERSIA_BOOT_STAGE: MainSceneActivated");
         }
 
@@ -196,17 +179,11 @@ namespace PersiaWar.Unity2D5D
 
             if (failed)
             {
-                GUI.Label(
-                    new Rect(centerX + 35f, centerY + 77f, panelWidth - 70f, 48f),
-                    failureMessage,
-                    footerStyle);
+                GUI.Label(new Rect(centerX + 35f, centerY + 77f, panelWidth - 70f, 48f), failureMessage, footerStyle);
             }
             else
             {
-                GUI.Label(
-                    new Rect(centerX, centerY + 84f, panelWidth, 30f),
-                    "Preparing the battlefield • Please wait.",
-                    footerStyle);
+                GUI.Label(new Rect(centerX, centerY + 84f, panelWidth, 30f), "Preparing the battlefield • Please wait.", footerStyle);
             }
 
             GUI.color = old;
