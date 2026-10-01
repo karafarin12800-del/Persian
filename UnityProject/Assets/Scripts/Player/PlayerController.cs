@@ -26,8 +26,14 @@ namespace PersiaWar.Unity2D5D
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
 
+        private void OnEnable()
+        {
+            StartupCheckpoint.Set("PlayerOnEnable");
+        }
+
         private void Awake()
         {
+            StartupCheckpoint.Set("PlayerAwakeEntered");
             // Keep scene activation lightweight on Android. Visual construction is deferred
             // until Start and uses the shared sprite presentation path instead of a large
             // set of runtime 3D primitives.
