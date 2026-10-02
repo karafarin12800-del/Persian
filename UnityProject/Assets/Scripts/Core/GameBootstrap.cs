@@ -284,7 +284,7 @@ namespace PersiaWar.Unity2D5D
                     if (Vector2.Distance(new Vector2(x, z), new Vector2(0f, -4f)) < 16f) continue;
                     if (Random.value < 0.12f) continue;
 
-                    int count = Random.Range(1, 4);
+                    int count = Random.Range(1, 3);
                     for (int i = 0; i < count; i++)
                     {
                         float px = x + Random.Range(-6.5f, 6.5f);
@@ -324,7 +324,7 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildStreetProps()
         {
-            for (int i = 0; i < 22; i++)
+            for (int i = 0; i < 12; i++)
             {
                 float x = Random.Range(-84f, 84f);
                 float z = Random.Range(-84f, 84f);
@@ -332,7 +332,7 @@ namespace PersiaWar.Unity2D5D
                 CreateTree(new Vector3(x, 0f, z));
             }
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 6; i++)
             {
                 float x = Random.Range(-84f, 84f);
                 float z = Random.Range(-84f, 84f);
@@ -343,14 +343,14 @@ namespace PersiaWar.Unity2D5D
         private void BuildRuinedQuarter()
         {
             Vector3 center = new Vector3(-62f, 0f, 62f);
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 6; i++)
             {
                 float x = center.x + Random.Range(-15f, 15f);
                 float z = center.z + Random.Range(-15f, 15f);
                 float h = Random.Range(1.2f, 4.5f);
                 CreateBox("RuinedBlock", new Vector3(x, h * 0.5f, z), new Vector3(Random.Range(3f, 7f), h, Random.Range(3f, 7f)), buildingMaterial, true);
             }
-            for (int i = 0; i < 14; i++)
+            for (int i = 0; i < 9; i++)
             {
                 float x = center.x + Random.Range(-18f, 18f);
                 float z = center.z + Random.Range(-18f, 18f);
