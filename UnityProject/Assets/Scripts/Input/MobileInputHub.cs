@@ -23,6 +23,7 @@ namespace PersiaWar.Unity2D5D
         private Texture2D lineTexture;
         private GrenadeController grenadeController;
         private bool minimapEnabled;
+        private GUIStyle buttonTextStyle;
 
         public Vector2 MoveValue => moveValue;
 
@@ -297,15 +298,19 @@ namespace PersiaWar.Unity2D5D
             DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
 
             DrawCircle(grenadePos, radius * 0.56f, new Color(0.32f, 0.24f, 0.10f, grenadePointerId >= 0 ? 0.55f : 0.32f));
-            GUIStyle buttonText = new GUIStyle(GUI.skin.label)
+            if (buttonTextStyle == null)
             {
-                fontSize = Mathf.RoundToInt(20f * scale),
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter
-            };
-            GUI.Label(new Rect(grenadePos.x - radius * 0.5f, grenadePos.y - radius * 0.5f, radius, radius), "G", buttonText);
-            GUI.Label(new Rect(firePos.x - radius, firePos.y + radius * 0.52f, radius * 2f, 26f * scale), "AIM / FIRE", buttonText);
-            GUI.Label(new Rect(basePos.x - radius, basePos.y + radius * 0.52f, radius * 2f, 26f * scale), "MOVE", buttonText);
+                buttonTextStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+            }
+            buttonTextStyle.fontSize = Mathf.RoundToInt(20f * scale);
+
+            GUI.Label(new Rect(grenadePos.x - radius * 0.5f, grenadePos.y - radius * 0.5f, radius, radius), "G", buttonTextStyle);
+            GUI.Label(new Rect(firePos.x - radius, firePos.y + radius * 0.52f, radius * 2f, 26f * scale), "AIM / FIRE", buttonTextStyle);
+            GUI.Label(new Rect(basePos.x - radius, basePos.y + radius * 0.52f, radius * 2f, 26f * scale), "MOVE", buttonTextStyle);
 
             DrawAimGuide(scale);
 
