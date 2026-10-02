@@ -27,6 +27,17 @@ namespace PersiaWar.Unity2D5D
         private int selectedHero;
         private bool startingMatch;
         private bool matchInputArmed;
+        private string previousCrashBreadcrumb;
+
+        private const string CrashBreadcrumbKey = "PersiaWar_LastCrashBreadcrumb";
+
+        private void Breadcrumb(string value)
+        {
+            StartupCheckpoint.Set(value);
+            previousCrashBreadcrumb = value;
+            PlayerPrefs.SetString(CrashBreadcrumbKey, value);
+            PlayerPrefs.Save();
+        }
         private string startupStatus = string.Empty;
         private GameObject mainCameraRoot;
         private GameObject playerRoot;
@@ -426,6 +437,7 @@ namespace PersiaWar.Unity2D5D
             mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
             combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
 
+            Breadcrumb("PLAYER_FOUND_CHECK");
             if (player == null)
             {
                 startupStatus = "Player initialization failed.";
@@ -438,21 +450,26 @@ namespace PersiaWar.Unity2D5D
             followCamera = activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null;
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
+            Breadcrumb("BEFORE_CAMERA_ENABLE");
             if (followCamera != null)
             {
                 followCamera.SetTarget(player.transform);
                 followCamera.enabled = true;
             }
+            Breadcrumb("AFTER_CAMERA_ENABLE");
 
             // Enter gameplay with only the player/camera path armed. On Android, mobile
             // touch input is intentionally enabled after a few clean frames so the tap
             // that selected the spawn point can never leak into gameplay activation.
+            Breadcrumb("BEFORE_GATE_GAMEPLAY");
             GateGameplay(true);
+            Breadcrumb("AFTER_GATE_GAMEPLAY");
             if (mobileInput != null)
                 mobileInput.enabled = false;
 
             startupStatus = "Stage 12: battlefield ready — starting match.";
             StartupCheckpoint.Set("MatchCoreReady");
+            Breadcrumb("AFTER_MATCH_MODE_SET");
             mode = ScreenMode.Match;
             startingMatch = false;
             startupStatus = string.Empty;
@@ -460,6 +477,7 @@ namespace PersiaWar.Unity2D5D
 
             // Match-critical activation is finished. Build optional presentation/combat
             // services only after clean gameplay frames.
+            Breadcrumb("BEFORE_MATCH_SERVICES");
             StartCoroutine(InitializeMatchServices());
         }
 
