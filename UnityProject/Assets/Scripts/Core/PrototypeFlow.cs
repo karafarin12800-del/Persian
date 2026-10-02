@@ -432,7 +432,11 @@ namespace PersiaWar.Unity2D5D
             followCamera = activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null;
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
-            if (followCamera != null) followCamera.SetTarget(player.transform);
+            if (followCamera != null)
+            {
+                followCamera.SetTarget(player.transform);
+                followCamera.enabled = true;
+            }
 
             GateGameplay(true);
             startupStatus = "Stage 12: battlefield ready — starting match.";
