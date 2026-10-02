@@ -104,6 +104,24 @@ namespace PersiaWar.Unity2D5D
         private void SpawnEnemy(Vector3 position, int index, int currentWave)
         {
             int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
+#if UNITY_ANDROID
+            // Keep the Android combat path on explicit lightweight components.
+            // Do not introduce primitive mesh allocation after the player enters combat.
+            GameObject enemy = new GameObject($"Enemy_W{currentWave}_{index}");
+            enemy.transform.position = position;
+            enemy.transform.localScale = new Vector3(0.9f, 0.9f, 0.9f);
+
+            CapsuleCollider capsule = enemy.AddComponent<CapsuleCollider>();
+            capsule.radius = 0.55f;
+            capsule.height = 1.8f;
+            capsule.center = new Vector3(0f, 0.9f, 0f);
+
+            TargetHealth health = enemy.AddComponent<TargetHealth>();
+            health.SetMaxHealth(archetype == 3 ? 160 : (archetype == 2 ? 120 : 100));
+
+            EnemyChase chase = enemy.AddComponent<EnemyChase>();
+            chase.Configure(player, archetype);
+#else
             GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             enemy.name = $"Enemy_W{currentWave}_{index}";
             enemy.transform.position = position;
@@ -121,6 +139,7 @@ namespace PersiaWar.Unity2D5D
 
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
             chase.Configure(player, archetype);
+#endif
         }
 
         private void SpawnWaveReward()
@@ -140,6 +159,23 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnPickup(Vector3 position, PickupItem.PickupType type, int amount)
         {
+#if UNITY_ANDROID
+            Color color = type == PickupItem.PickupType.Ammo
+                ? new Color(0.95f, 0.72f, 0.12f)
+                : (type == PickupItem.PickupType.Medkit
+                    ? new Color(0.14f, 0.75f, 0.28f)
+                    : new Color(0.55f, 0.28f, 0.78f));
+
+            GameObject pickup = AndroidSafeRuntimeFactory.CreateMarker(
+                $"Pickup_{type}",
+                position,
+                Vector3.one * 0.46f,
+                color,
+                true);
+
+            PickupItem item = pickup.AddComponent<PickupItem>();
+            item.Configure(type, amount);
+#else
             GameObject pickup = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             pickup.name = $"Pickup_{type}";
             pickup.transform.position = position;
@@ -161,6 +197,7 @@ namespace PersiaWar.Unity2D5D
 
             PickupItem item = pickup.AddComponent<PickupItem>();
             item.Configure(type, amount);
+#endif
         }
     }
 }
