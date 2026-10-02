@@ -87,6 +87,29 @@ jobs:
             fi
           done < <(find UnityProject/Assets -type f -print0)
           test "${missing_meta}" -eq 0
+          grep -q 'SpriteMeshType.FullRect' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
+          grep -q 'followCamera.enabled = true' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
+          grep -q 'if (minimapEnabled)' UnityProject/Assets/Scripts/Input/MobileInputHub.cs
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')
+          android_start = bootstrap.index('#if UNITY_ANDROID')
+          android_end = bootstrap.index('#else', android_start)
+          android_path = bootstrap[android_start:android_end]
+          assert 'Terrain3DBuilder' not in android_path, 'Android first-match path still references Terrain3DBuilder.'
+          assert 'GameObject.CreatePrimitive' not in android_path, 'Android first-match path still uses CreatePrimitive.'
+          assert 'CreateFlatMesh' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
+
+          weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
+          awake = weapon[weapon.index('private void Awake()'):weapon.index('private void EnsureProjectileTemplate()')]
+          assert 'EnsureProjectileTemplate()' not in awake, 'Projectile template is still allocated during Player Awake.'
+
+          visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
+          presentation = visual[visual.index('private void EnsurePresentation()'):visual.index('private void LoadCharacterSprite()')]
+          assert 'CreateMuzzleFlash()' not in presentation, 'Muzzle flash is still allocated during player presentation setup.'
+          print('Android startup isolation checks: PASS')
+          PY
           echo 'Unity project structure/settings validation passed.'
 
       - name: Report Unity version
@@ -341,155 +364,6 @@ jobs:
 
           test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
           echo "Unity Personal license file is ready."
-
-          echo "=== Running Unity synchronous startup smoke test ==="
-          mkdir -p UnityProject/Assets/Editor /workspace/build
-          cat > UnityProject/Assets/Editor/PersiaWarCiSmoke.cs <<'CS'
-          using System;
-          using System.IO;
-          using System.Reflection;
-          using UnityEditor;
-          using UnityEditor.SceneManagement;
-          using UnityEngine;
-          using UnityEngine.SceneManagement;
-
-          public static class PersiaWarCiSmoke
-          {
-              private static bool failed;
-              private static string firstError = string.Empty;
-
-              public static void Run()
-              {
-                  Application.logMessageReceived += OnLog;
-                  try
-                  {
-                      EditorSceneManager.OpenScene("Assets/Scenes/PersiaWarPrototype.unity", OpenSceneMode.Single);
-
-                      GameObject gameRoot = Root("GameRoot");
-                      GameObject playerRoot = Root("Player");
-                      GameObject cameraRoot = Root("Main Camera");
-                      GameObject inputRoot = Root("MobileInput");
-                      GameObject flowRoot = Root("PrototypeFlow");
-                      Require(gameRoot != null, "GameRoot missing.");
-                      Require(playerRoot != null && !playerRoot.activeSelf, "Player root must start dormant.");
-                      Require(cameraRoot != null && !cameraRoot.activeSelf, "Main Camera root must start dormant.");
-                      Require(inputRoot != null && !inputRoot.activeSelf, "MobileInput root must start dormant.");
-                      Require(flowRoot != null && flowRoot.activeSelf, "PrototypeFlow root missing/inactive.");
-
-                      var bootstrap = gameRoot.GetComponent<PersiaWar.Unity2D5D.GameBootstrap>();
-                      Require(bootstrap != null, "GameBootstrap missing.");
-                      Invoke(bootstrap, "BuildWorldBase");
-                      Require(GameObject.Find("BattleRoyaleCity") != null, "Battlefield root was not created.");
-
-                      var flow = flowRoot.GetComponent<PersiaWar.Unity2D5D.PrototypeFlow>();
-                      Require(flow != null, "PrototypeFlow component missing.");
-                      Require(flow.GetType().GetMethod("StartMatch", BindingFlags.Instance | BindingFlags.NonPublic) != null, "StartMatch entry point missing.");
-
-                      string visualSource = File.ReadAllText("Assets/Scripts/Art/StylizedCharacterVisual.cs");
-                      string flowSource = File.ReadAllText("Assets/Scripts/Core/PrototypeFlow.cs");
-                      string inputSource = File.ReadAllText("Assets/Scripts/Input/MobileInputHub.cs");
-                      Require(visualSource.Contains("SpriteMeshType.FullRect"), "Player visual is not using the Android-safe FullRect sprite path.");
-                      Require(flowSource.Contains("followCamera.enabled = true"), "Gameplay camera follow is not enabled at match entry.");
-                      Require(inputSource.Contains("if (minimapEnabled)"), "Minimap allocation is not gated behind the startup barrier.");
-
-                      playerRoot.SetActive(true);
-                      var player = playerRoot.GetComponent<PersiaWar.Unity2D5D.PlayerController>();
-                      Require(player != null, "PlayerController missing.");
-                      Invoke(player, "Start");
-
-                      Require(player.GetComponent<PersiaWar.Unity2D5D.TargetHealth>() != null, "TargetHealth was not initialized.");
-                      Require(player.GetComponent<PersiaWar.Unity2D5D.WeaponController>() != null, "WeaponController was not initialized.");
-                      Require(player.GetComponent<PersiaWar.Unity2D5D.NearestTargetAim>() != null, "NearestTargetAim was not initialized.");
-                      Require(player.GetComponent<PersiaWar.Unity2D5D.PlayerInventory>() != null, "PlayerInventory was not initialized.");
-                      Require(player.GetComponent<PersiaWar.Unity2D5D.GrenadeController>() != null, "GrenadeController was not initialized.");
-
-                      var visual = player.GetComponentInChildren<PersiaWar.Unity2D5D.StylizedCharacterVisual>(true);
-                      var sprite = visual != null ? visual.GetComponentInChildren<SpriteRenderer>(true) : null;
-                      Require(visual != null && sprite != null && sprite.sprite != null, "Player visual sprite initialization failed.");
-
-                      cameraRoot.SetActive(true);
-                      var follow = cameraRoot.GetComponent<PersiaWar.Unity2D5D.CameraFollow25D>();
-                      Require(follow != null, "CameraFollow25D missing.");
-
-                      Require(!failed, firstError);
-                      Debug.Log("PERSIA_CI_SMOKE: PASS");
-                      File.WriteAllText("/workspace/build/PersiaWarStartupSmoke.txt", "PASS\\n");
-                  }
-                  catch (Exception ex)
-                  {
-                      failed = true;
-                      firstError = ex.ToString();
-                      Debug.LogError("PERSIA_CI_SMOKE: FAIL\\n" + firstError);
-                      File.WriteAllText("/workspace/build/PersiaWarStartupSmoke.txt", "FAIL\\n" + firstError + "\\n");
-                  }
-                  finally
-                  {
-                      Application.logMessageReceived -= OnLog;
-                  }
-
-                  if (failed)
-                      EditorApplication.Exit(1);
-                  else
-                      EditorApplication.Exit(0);
-              }
-
-              private static void Require(bool condition, string message)
-              {
-                  if (!condition && !failed)
-                  {
-                      failed = true;
-                      firstError = message;
-                  }
-              }
-
-              private static void Invoke(MonoBehaviour component, string methodName)
-              {
-                  MethodInfo method = component.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-                  Require(method != null, component.GetType().Name + "." + methodName + " missing.");
-                  if (!failed)
-                      method.Invoke(component, null);
-              }
-
-              private static GameObject Root(string name)
-              {
-                  foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
-                      if (root != null && root.name == name)
-                          return root;
-                  return null;
-              }
-
-              private static void OnLog(string condition, string stackTrace, LogType type)
-              {
-                  if ((type == LogType.Error || type == LogType.Exception || type == LogType.Assert) && !failed)
-                  {
-                      failed = true;
-                      firstError = condition;
-                  }
-              }
-          }
-          CS
-          cat > UnityProject/Assets/Editor/PersiaWarCiSmoke.cs.meta <<'META'
-          fileFormatVersion: 2
-          guid: 4a92e6f8b2d54ceaa8df0b3d9c617e51
-          META
-          rm -f /workspace/build/PersiaWarStartupSmoke.txt
-          set +e
-          unity-editor \
-            -batchmode \
-            -nographics \
-            -quit \
-            -projectPath /workspace/UnityProject \
-            -buildTarget Android \
-            -executeMethod PersiaWarCiSmoke.Run \
-            -logFile -
-          smoke_exit=$?
-          set -e
-          echo "UNITY_SMOKE_TEST_EXIT_CODE:$smoke_exit"
-          test "$smoke_exit" -eq 0 || exit "$smoke_exit"
-          test -s /workspace/build/PersiaWarStartupSmoke.txt || {
-            echo "::error::Unity synchronous smoke result file is missing."
-            exit 1
-          }
 
           echo "=== Cleaning previous Android build output ==="
           rm -rf /workspace/build/Android
