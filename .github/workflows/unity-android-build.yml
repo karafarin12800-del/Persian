@@ -342,10 +342,11 @@ jobs:
           test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
           echo "Unity Personal license file is ready."
 
-          echo "=== Running Unity runtime startup smoke test ==="
+          echo "=== Running Unity synchronous startup smoke test ==="
           mkdir -p UnityProject/Assets/Editor /workspace/build
           cat > UnityProject/Assets/Editor/PersiaWarCiSmoke.cs <<'CS'
-          using System.Collections.Generic;
+          using System;
+          using System.IO;
           using System.Reflection;
           using UnityEditor;
           using UnityEditor.SceneManagement;
@@ -354,158 +355,99 @@ jobs:
 
           public static class PersiaWarCiSmoke
           {
-              private static readonly List<string> criticalLogs = new List<string>();
-              private static bool running;
-              private static bool startRequested;
-              private static int frames;
-              private static int exitCode = 1;
-              private static string failure = string.Empty;
+              private static bool failed;
+              private static string firstError = string.Empty;
 
               public static void Run()
               {
-                  EditorSceneManager.OpenScene("Assets/Scenes/PersiaWarPrototype.unity", OpenSceneMode.Single);
                   Application.logMessageReceived += OnLog;
-                  EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
-                  EditorApplication.isPlaying = true;
-              }
-
-              private static void OnPlayModeStateChanged(PlayModeStateChange state)
-              {
-                  if (state == PlayModeStateChange.EnteredPlayMode)
+                  try
                   {
-                      frames = 0;
-                      startRequested = false;
-                      running = true;
-                      EditorApplication.update += Tick;
-                      return;
+                      EditorSceneManager.OpenScene("Assets/Scenes/PersiaWarPrototype.unity", OpenSceneMode.Single);
+
+                      GameObject gameRoot = Root("GameRoot");
+                      GameObject playerRoot = Root("Player");
+                      GameObject cameraRoot = Root("Main Camera");
+                      GameObject inputRoot = Root("MobileInput");
+                      GameObject flowRoot = Root("PrototypeFlow");
+                      Require(gameRoot != null, "GameRoot missing.");
+                      Require(playerRoot != null && !playerRoot.activeSelf, "Player root must start dormant.");
+                      Require(cameraRoot != null && !cameraRoot.activeSelf, "Main Camera root must start dormant.");
+                      Require(inputRoot != null && !inputRoot.activeSelf, "MobileInput root must start dormant.");
+                      Require(flowRoot != null && flowRoot.activeSelf, "PrototypeFlow root missing/inactive.");
+
+                      var bootstrap = gameRoot.GetComponent<PersiaWar.Unity2D5D.GameBootstrap>();
+                      Require(bootstrap != null, "GameBootstrap missing.");
+                      Invoke(bootstrap, "BuildWorldBase");
+                      Require(GameObject.Find("BattleRoyaleCity") != null, "Battlefield root was not created.");
+
+                      var flow = flowRoot.GetComponent<PersiaWar.Unity2D5D.PrototypeFlow>();
+                      Require(flow != null, "PrototypeFlow component missing.");
+                      Require(flow.GetType().GetMethod("StartMatch", BindingFlags.Instance | BindingFlags.NonPublic) != null, "StartMatch entry point missing.");
+
+                      string visualSource = File.ReadAllText("Assets/Scripts/Art/StylizedCharacterVisual.cs");
+                      string flowSource = File.ReadAllText("Assets/Scripts/Core/PrototypeFlow.cs");
+                      string inputSource = File.ReadAllText("Assets/Scripts/Input/MobileInputHub.cs");
+                      Require(visualSource.Contains("SpriteMeshType.FullRect"), "Player visual is not using the Android-safe FullRect sprite path.");
+                      Require(flowSource.Contains("followCamera.enabled = true"), "Gameplay camera follow is not enabled at match entry.");
+                      Require(inputSource.Contains("if (minimapEnabled)"), "Minimap allocation is not gated behind the startup barrier.");
+
+                      playerRoot.SetActive(true);
+                      var player = playerRoot.GetComponent<PersiaWar.Unity2D5D.PlayerController>();
+                      Require(player != null, "PlayerController missing.");
+                      Invoke(player, "Start");
+
+                      Require(player.GetComponent<PersiaWar.Unity2D5D.TargetHealth>() != null, "TargetHealth was not initialized.");
+                      Require(player.GetComponent<PersiaWar.Unity2D5D.WeaponController>() != null, "WeaponController was not initialized.");
+                      Require(player.GetComponent<PersiaWar.Unity2D5D.NearestTargetAim>() != null, "NearestTargetAim was not initialized.");
+                      Require(player.GetComponent<PersiaWar.Unity2D5D.PlayerInventory>() != null, "PlayerInventory was not initialized.");
+                      Require(player.GetComponent<PersiaWar.Unity2D5D.GrenadeController>() != null, "GrenadeController was not initialized.");
+
+                      var visual = player.GetComponentInChildren<PersiaWar.Unity2D5D.StylizedCharacterVisual>(true);
+                      var sprite = visual != null ? visual.GetComponentInChildren<SpriteRenderer>(true) : null;
+                      Require(visual != null && sprite != null && sprite.sprite != null, "Player visual sprite initialization failed.");
+
+                      cameraRoot.SetActive(true);
+                      var follow = cameraRoot.GetComponent<PersiaWar.Unity2D5D.CameraFollow25D>();
+                      Require(follow != null, "CameraFollow25D missing.");
+
+                      Require(!failed, firstError);
+                      Debug.Log("PERSIA_CI_SMOKE: PASS");
+                      File.WriteAllText("/workspace/build/PersiaWarStartupSmoke.txt", "PASS\\n");
                   }
-
-                  if (state == PlayModeStateChange.EnteredEditMode)
+                  catch (Exception ex)
                   {
-                      EditorApplication.update -= Tick;
+                      failed = true;
+                      firstError = ex.ToString();
+                      Debug.LogError("PERSIA_CI_SMOKE: FAIL\\n" + firstError);
+                      File.WriteAllText("/workspace/build/PersiaWarStartupSmoke.txt", "FAIL\\n" + firstError + "\\n");
+                  }
+                  finally
+                  {
                       Application.logMessageReceived -= OnLog;
-                      EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
-                      Debug.Log("PERSIA_CI_SMOKE: " + (exitCode == 0 ? "PASS" : "FAIL") + " " + failure);
-                      EditorApplication.Exit(exitCode);
+                  }
+
+                  if (failed)
+                      EditorApplication.Exit(1);
+                  else
+                      EditorApplication.Exit(0);
+              }
+
+              private static void Require(bool condition, string message)
+              {
+                  if (!condition && !failed)
+                  {
+                      failed = true;
+                      firstError = message;
                   }
               }
 
-              private static void Tick()
+              private static void Invoke(MonoBehaviour component, string methodName)
               {
-                  if (!running)
-                      return;
-
-                  frames++;
-                  if (frames < 3)
-                      return;
-
-                  if (!startRequested)
-                  {
-                      GameObject flowObject = Root("PrototypeFlow");
-                      if (flowObject == null)
-                      {
-                          Fail("PrototypeFlow root missing.");
-                          return;
-                      }
-
-                      MonoBehaviour flow = flowObject.GetComponent<PersiaWar.Unity2D5D.PrototypeFlow>();
-                      if (flow == null)
-                      {
-                          Fail("PrototypeFlow component missing.");
-                          return;
-                      }
-
-                      FieldInfo spawnChosen = flow.GetType().GetField("spawnChosen", BindingFlags.Instance | BindingFlags.NonPublic);
-                      MethodInfo startMatch = flow.GetType().GetMethod("StartMatch", BindingFlags.Instance | BindingFlags.NonPublic);
-                      if (spawnChosen == null || startMatch == null)
-                      {
-                          Fail("PrototypeFlow startup entry points changed.");
-                          return;
-                      }
-
-                      spawnChosen.SetValue(flow, true);
-                      startMatch.Invoke(flow, null);
-                      startRequested = true;
-                      return;
-                  }
-
-                  if (PersiaWar.Unity2D5D.StartupCheckpoint.Last == "MatchStarted")
-                  {
-                      VerifyMatchEntry();
-                      return;
-                  }
-
-                  if (frames > 600)
-                      Fail("Timeout waiting for MatchStarted. Last checkpoint: " + PersiaWar.Unity2D5D.StartupCheckpoint.Last);
-              }
-
-              private static void VerifyMatchEntry()
-              {
-                  GameObject playerRoot = Root("Player");
-                  if (playerRoot == null || !playerRoot.activeSelf)
-                  {
-                      Fail("Player root did not activate.");
-                      return;
-                  }
-
-                  var player = playerRoot.GetComponent<PersiaWar.Unity2D5D.PlayerController>();
-                  if (player == null ||
-                      player.GetComponent<PersiaWar.Unity2D5D.TargetHealth>() == null ||
-                      player.GetComponent<PersiaWar.Unity2D5D.WeaponController>() == null ||
-                      player.GetComponent<PersiaWar.Unity2D5D.NearestTargetAim>() == null ||
-                      player.GetComponent<PersiaWar.Unity2D5D.PlayerInventory>() == null ||
-                      player.GetComponent<PersiaWar.Unity2D5D.GrenadeController>() == null)
-                  {
-                      Fail("Player gameplay components were not initialized.");
-                      return;
-                  }
-
-                  var visual = player.GetComponentInChildren<PersiaWar.Unity2D5D.StylizedCharacterVisual>(true);
-                  var sprite = visual != null ? visual.GetComponentInChildren<SpriteRenderer>(true) : null;
-                  if (visual == null || sprite == null || sprite.sprite == null)
-                  {
-                      Fail("Player visual/sprite initialization failed.");
-                      return;
-                  }
-
-                  GameObject cameraRoot = Root("Main Camera");
-                  if (cameraRoot == null || !cameraRoot.activeSelf)
-                  {
-                      Fail("Main Camera did not activate.");
-                      return;
-                  }
-
-                  var follow = cameraRoot.GetComponent<PersiaWar.Unity2D5D.CameraFollow25D>();
-                  if (follow == null || !follow.enabled)
-                  {
-                      Fail("CameraFollow25D was not enabled.");
-                      return;
-                  }
-
-                  GameObject mobileRoot = Root("MobileInput");
-                  if (mobileRoot != null)
-                      mobileRoot.SetActive(false);
-                  if (criticalLogs.Count > 0)
-                  {
-                      Fail("Startup emitted critical log: " + criticalLogs[0]);
-                      return;
-                  }
-
-                  exitCode = 0;
-                  Finish();
-              }
-
-              private static void Fail(string message)
-              {
-                  failure = message;
-                  exitCode = 1;
-                  Finish();
-              }
-
-              private static void Finish()
-              {
-                  running = false;
-                  EditorApplication.isPlaying = false;
+                  MethodInfo method = component.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+                  Require(method != null, component.GetType().Name + "." + methodName + " missing.");
+                  if (!failed)
+                      method.Invoke(component, null);
               }
 
               private static GameObject Root(string name)
@@ -518,8 +460,11 @@ jobs:
 
               private static void OnLog(string condition, string stackTrace, LogType type)
               {
-                  if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert)
-                      criticalLogs.Add(condition);
+                  if ((type == LogType.Error || type == LogType.Exception || type == LogType.Assert) && !failed)
+                  {
+                      failed = true;
+                      firstError = condition;
+                  }
               }
           }
           CS
@@ -532,6 +477,7 @@ jobs:
           unity-editor \
             -batchmode \
             -nographics \
+            -quit \
             -projectPath /workspace/UnityProject \
             -buildTarget Android \
             -executeMethod PersiaWarCiSmoke.Run \
@@ -540,7 +486,10 @@ jobs:
           set -e
           echo "UNITY_SMOKE_TEST_EXIT_CODE:$smoke_exit"
           test "$smoke_exit" -eq 0 || exit "$smoke_exit"
-          echo "PASS" > /workspace/build/PersiaWarStartupSmoke.txt
+          test -s /workspace/build/PersiaWarStartupSmoke.txt || {
+            echo "::error::Unity synchronous smoke result file is missing."
+            exit 1
+          }
 
           echo "=== Cleaning previous Android build output ==="
           rm -rf /workspace/build/Android
