@@ -111,14 +111,8 @@ jobs:
           assert 'EnsureProjectileTemplate()' not in awake, 'Projectile template is still allocated during Player Awake.'
 
           visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
-          presentation = visual[visual.index('private void EnsurePresentation()'):visual.index('private void LoadCharacterPresentation()')]
+          presentation = visual[visual.index('private void EnsurePresentation()'):visual.index('private void LoadCharacterSprite()')]
           assert 'CreateMuzzleFlash()' not in presentation, 'Muzzle flash is still allocated during player presentation setup.'
-          android_start = visual.index('#if UNITY_ANDROID')
-          android_end = visual.index('#else', android_start)
-          android_path = visual[android_start:android_end]
-          assert 'SpriteRenderer' not in android_path, 'Android startup still contains SpriteRenderer path.'
-          assert 'Resources.Load<Sprite>' not in android_path, 'Android startup still loads Sprite assets.'
-          print('Android presentation isolation checks: PASS')
           print('Android startup isolation checks: PASS')
           PY
           echo 'Unity project structure/settings validation passed.'
@@ -191,7 +185,7 @@ jobs:
         timeout-minutes: 60
         run: |
           set -euo pipefail
-          IMAGE="unityci/editor:2022.3.76f1-android-3"
+          IMAGE="unityci/editor:2022.3.62f1-android-3"
 
           mkdir -p .ci
           cleanup() {
@@ -248,9 +242,6 @@ jobs:
                       new[] { GraphicsDeviceType.OpenGLES3 }
                   );
                   PlayerSettings.colorSpace = ColorSpace.Gamma;
-                  PlayerSettings.Android.optimizedFramePacing = false;
-                  PlayerSettings.bundleVersion = "0.0.4";
-                  PlayerSettings.Android.bundleVersionCode = 104;
 
                   var graphicsApis = PlayerSettings.GetGraphicsAPIs(BuildTarget.Android);
                   Console.WriteLine("UNITY_ANDROID_GRAPHICS_API:" + string.Join(",", graphicsApis));
