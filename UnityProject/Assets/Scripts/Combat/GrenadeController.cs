@@ -88,6 +88,14 @@ namespace PersiaWar.Unity2D5D
 
         private static GameObject CreateRuntimeGrenade(Vector3 position)
         {
+#if UNITY_ANDROID
+            return AndroidSafeRuntimeFactory.CreateMarker(
+                "RuntimeGrenade",
+                position,
+                Vector3.one * 0.18f,
+                new Color(0.32f, 0.90f, 0.28f),
+                false);
+#else
             GameObject grenade = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             grenade.name = "RuntimeGrenade";
             grenade.transform.position = position;
@@ -96,6 +104,7 @@ namespace PersiaWar.Unity2D5D
             Collider collider = grenade.GetComponent<Collider>();
             if (collider != null) Destroy(collider);
             return grenade;
+#endif
         }
     }
 }
