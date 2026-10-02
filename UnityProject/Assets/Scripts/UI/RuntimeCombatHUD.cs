@@ -15,6 +15,11 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle bold;
         private Texture2D pixel;
 
+        public void ConfigurePlayer(PlayerController value)
+        {
+            player = value;
+        }
+
         private void Awake()
         {
             if (player == null) player = FindFirstObjectByType<PlayerController>();
