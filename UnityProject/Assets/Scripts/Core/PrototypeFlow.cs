@@ -119,7 +119,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            if (mode == ScreenMode.Match || player == null) return;
+            // The spawn map is part of the front-end and must remain interactive
+            // even while the gameplay roots are still dormant.
+            if (mode == ScreenMode.Match) return;
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
         }
@@ -247,6 +249,22 @@ namespace PersiaWar.Unity2D5D
             float size = Mathf.Min(Screen.width - 70f, Screen.height - 330f);
             Rect mapRect = new Rect((Screen.width - size) * 0.5f, 220f, size, size);
             DrawTacticalMap(mapRect);
+
+            // IMGUI receives Android touch events reliably even when the gameplay
+            // camera/player roots are inactive. Use the map itself as a touch target
+            // in addition to the Update() touch path.
+            GUIStyle mapTouchStyle = GUIStyle.none;
+            if (GUI.Button(mapRect, GUIContent.none, mapTouchStyle))
+            {
+                Vector2 p = Event.current.mousePosition;
+                float u = Mathf.Clamp01((p.x - mapRect.x) / mapRect.width);
+                float v = Mathf.Clamp01((p.y - mapRect.y) / mapRect.height);
+                spawnWorld = new Vector2(
+                    Mathf.Lerp(-96f, 96f, u),
+                    Mathf.Lerp(96f, -96f, v));
+                spawnChosen = true;
+                Debug.Log("PERSIA_FLOW: Spawn selected " + spawnWorld);
+            }
 
             if (spawnChosen)
             {
