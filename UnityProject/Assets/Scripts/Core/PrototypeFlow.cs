@@ -410,21 +410,10 @@ namespace PersiaWar.Unity2D5D
 
             startupStatus = "Stage 8: activating player...";
             yield return ActivateRoot(playerRoot, "Player");
-            // MobileInput owns GUI texture allocation in Awake(). Keep its GameObject
-            // inactive during the critical Android match-entry frame; it is activated only
-            // after the player/camera path has rendered cleanly.
-            StartupCheckpoint.Set("MobileInputActivationDeferred");
-            startupStatus = "Stage 9: deferring mobile input...";
-            yield return null;
-            startupStatus = "Stage 10: activating world bounds...";
-            yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
-            startupStatus = "Stage 11: activating main camera...";
-            yield return ActivateRoot(mainCameraRoot, "Main Camera");
 
-            player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
-            enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
-            mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
-            combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+            player = playerRoot != null
+                ? playerRoot.GetComponent<PlayerController>()
+                : player;
 
             if (player == null)
             {
@@ -434,19 +423,50 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            Camera activeCamera = mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null;
-            followCamera = activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null;
+            // GateGameplay(false) previously disabled PlayerController before Start could
+            // build its combat dependencies. That created a lifecycle race at match entry.
+            // Explicitly prepare the player, then wait until its full dependency graph exists.
+            player.enabled = true;
+            player.PrepareForMatch(selectedHero);
+            for (int frame = 0; frame < 30 && !player.IsGameplayReady; frame++)
+                yield return null;
+
+            if (!player.IsGameplayReady)
+            {
+                startupStatus = "Player systems did not finish initializing.";
+                StartupCheckpoint.Set("PlayerInitializationFailed");
+                startingMatch = false;
+                yield break;
+            }
+
+            StartupCheckpoint.Set("PlayerPreparedForMatch");
+
+            StartupCheckpoint.Set("MobileInputActivationDeferred");
+            startupStatus = "Stage 9: deferring mobile input...";
+            yield return null;
+
+            startupStatus = "Stage 10: activating world bounds...";
+            yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
+            startupStatus = "Stage 11: activating main camera...";
+            yield return ActivateRoot(mainCameraRoot, "Main Camera");
+
+            Camera activeCamera = mainCameraRoot != null
+                ? mainCameraRoot.GetComponent<Camera>()
+                : null;
+            followCamera = activeCamera != null
+                ? activeCamera.GetComponent<CameraFollow25D>()
+                : null;
+
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
+
             if (followCamera != null)
             {
                 followCamera.SetTarget(player.transform);
                 followCamera.enabled = true;
             }
 
-            // Enter gameplay with only the player/camera path armed. On Android, mobile
-            // touch input is intentionally enabled after a few clean frames so the tap
-            // that selected the spawn point can never leak into gameplay activation.
+            // Core gameplay is armed only after the player/camera path is initialized.
             GateGameplay(true);
             if (mobileInput != null)
                 mobileInput.enabled = false;
