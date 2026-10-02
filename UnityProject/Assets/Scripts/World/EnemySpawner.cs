@@ -105,8 +105,8 @@ namespace PersiaWar.Unity2D5D
         {
             int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
 #if UNITY_ANDROID
-            // Keep the Android combat path on explicit lightweight components.
-            // Do not introduce primitive mesh allocation after the player enters combat.
+            // Android combat keeps using explicit lightweight components after entry.
+            // Avoid GameObject.CreatePrimitive for enemies.
             GameObject enemy = new GameObject($"Enemy_W{currentWave}_{index}");
             enemy.transform.position = position;
             enemy.transform.localScale = new Vector3(0.9f, 0.9f, 0.9f);
