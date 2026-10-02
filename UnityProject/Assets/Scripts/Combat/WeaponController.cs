@@ -50,6 +50,16 @@ namespace PersiaWar.Unity2D5D
         {
             if (projectilePrefab != null) return;
 
+#if UNITY_ANDROID
+            GameObject projectileObject = AndroidSafeRuntimeFactory.CreateProjectile(
+                "RuntimeProjectileTemplate",
+                transform.position,
+                Quaternion.identity,
+                Vector3.one * 0.18f,
+                new Color(1f, 0.82f, 0.20f));
+            projectileObject.SetActive(false);
+            projectilePrefab = projectileObject.AddComponent<Projectile>();
+#else
             GameObject projectileObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             projectileObject.name = "RuntimeProjectileTemplate";
             projectileObject.SetActive(false);
@@ -66,6 +76,7 @@ namespace PersiaWar.Unity2D5D
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
             projectilePrefab = projectileObject.AddComponent<Projectile>();
+#endif
         }
 
         public bool TryFire(Vector3 targetWorldPosition)
