@@ -162,10 +162,7 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.fog = false;
 #if UNITY_ANDROID
             QualitySettings.antiAliasing = 0;
-            // Android gameplay materials are unlit; avoid creating/initializing a
-            // directional light during the fragile first-match render transition.
-            return;
-#else
+#endif
             Light sun = FindFirstObjectByType<Light>();
             if (sun == null)
             {
@@ -183,7 +180,6 @@ namespace PersiaWar.Unity2D5D
             sun.shadowStrength = 0.78f;
 #endif
             sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
-#endif
         }
 
         private void BuildWorldBase()
@@ -256,10 +252,6 @@ namespace PersiaWar.Unity2D5D
             filter.sharedMesh = mesh;
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-            renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
-            renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
             return obj;
         }
 
