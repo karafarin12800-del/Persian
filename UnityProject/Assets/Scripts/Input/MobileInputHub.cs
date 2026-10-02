@@ -47,9 +47,8 @@ namespace PersiaWar.Unity2D5D
             if (player != null) grenadeController = player.Grenades;
             if (moveRadius > 0f) joystickRadius = Mathf.Clamp(moveRadius * 0.86f, 90f, 150f);
 
-            // GUI assets are cheap and required only for the HUD. The second camera and
-            // render target are deliberately deferred until the real match starts.
-            CreateGuiTextures();
+            // GUI textures are created lazily from OnGUI after the match is already
+            // rendering. This keeps GameObject activation itself allocation-light.
         }
 
         private void OnDestroy()
@@ -247,16 +246,16 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateGuiTextures()
         {
-            circleTexture = new Texture2D(128, 128, TextureFormat.RGBA32, false);
+            circleTexture = new Texture2D(64, 64, TextureFormat.RGBA32, false);
             lineTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             lineTexture.SetPixel(0, 0, Color.white);
             lineTexture.Apply();
 
-            Vector2 center = new Vector2(63.5f, 63.5f);
-            float radius = 63f;
-            for (int y = 0; y < 128; y++)
+            Vector2 center = new Vector2(31.5f, 31.5f);
+            float radius = 31f;
+            for (int y = 0; y < 64; y++)
             {
-                for (int x = 0; x < 128; x++)
+                for (int x = 0; x < 64; x++)
                 {
                     float distance = Vector2.Distance(new Vector2(x, y), center);
                     float alpha = Mathf.Clamp01(radius + 0.5f - distance);
@@ -280,6 +279,8 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             if (!Application.isMobilePlatform && !Application.isEditor) return;
+            if (circleTexture == null || lineTexture == null)
+                CreateGuiTextures();
 
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
             float radius = joystickRadius * scale;
