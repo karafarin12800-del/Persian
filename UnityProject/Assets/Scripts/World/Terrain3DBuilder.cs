@@ -11,7 +11,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class Terrain3DBuilder : MonoBehaviour
     {
         [SerializeField] private float size = 220f;
-        [SerializeField] private int subdivisions = 40;
+        [SerializeField] private int subdivisions = 24;
         [SerializeField] private float height = 0.65f;
         [SerializeField] private float baseY = -0.35f;
         [SerializeField] private int seed = 32025;
@@ -71,12 +71,12 @@ namespace PersiaWar.Unity2D5D
             mesh.RecalculateBounds();
             filter.sharedMesh = mesh;
 
-            Texture2D grassTexture = BuildGrassTexture(96, seed);
-            Material material = RuntimeMaterialFactory.CreateTextured(
+            // Android startup must keep allocations conservative. The terrain mesh
+            // itself supplies the shape; use a shared unlit material instead of generating
+            // a procedural texture during the critical match transition.
+            Material material = RuntimeMaterialFactory.Create(
                 "Terrain3D",
-                new Color(0.72f, 0.82f, 0.62f),
-                grassTexture,
-                7.0f);
+                new Color(0.47f, 0.62f, 0.23f, 1f));
 
             if (material != null)
                 renderer.sharedMaterial = material;
