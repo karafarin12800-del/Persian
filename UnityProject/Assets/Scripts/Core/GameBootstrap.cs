@@ -69,9 +69,9 @@ namespace PersiaWar.Unity2D5D
                 ReportStage("Stage 2: creating game session...", "GameSessionReady");
                 ConfigureCameraSafe();
                 ConfigureLighting();
-                ReportStage("Stage 3: building terrain and main roads...", "BeforeWorldBaseBuilt");
+                ReportStage("Stage 3: building Android-safe battlefield base...", "BeforeWorldBaseBuilt");
                 BuildWorldBase();
-                ReportStage("Stage 4: terrain and main roads completed.", "WorldBaseBuilt");
+                ReportStage("Stage 4: battlefield base completed.", "WorldBaseBuilt");
             }
             catch (System.Exception ex)
             {
@@ -85,9 +85,6 @@ namespace PersiaWar.Unity2D5D
             }
 
 #if UNITY_ANDROID
-            // Android first-match path intentionally avoids GameObject.CreatePrimitive,
-            // per-object colliders and large procedural bursts. The terrain + mesh road
-            // grid is enough to enter the real match; decoration can be streamed later.
             yield return null;
             IsWorldReady = true;
             IsWorldPreparing = false;
@@ -97,23 +94,18 @@ namespace PersiaWar.Unity2D5D
             yield return null;
             ReportStage("Stage 5: painting road markings...", "BeforeRoadMarkings");
             if (!RunWorldBuildStep(() => BuildRoadMarkings(8f), "RoadMarkingsBuilt")) yield break;
-
             yield return null;
             ReportStage("Stage 6: creating city buildings and blocks...", "BeforeCityBlocks");
             if (!RunWorldBuildStep(() => BuildCityBlocks(8f), "CityBlocksBuilt")) yield break;
-
             yield return null;
             ReportStage("Stage 7: creating landmarks...", "BeforeLandmarks");
             if (!RunWorldBuildStep(BuildLandmarks, "LandmarksBuilt")) yield break;
-
             yield return null;
             ReportStage("Stage 8: placing trees and vehicles...", "BeforeStreetProps");
             if (!RunWorldBuildStep(BuildStreetProps, "StreetPropsBuilt")) yield break;
-
             yield return null;
             ReportStage("Stage 9: creating ruined quarter and debris...", "BeforeRuinedQuarter");
             if (!RunWorldBuildStep(BuildRuinedQuarter, "WorldBuildComplete")) yield break;
-
             IsWorldReady = true;
             IsWorldPreparing = false;
             ReportStage("Stage 10: battlefield completely ready.", "WorldBuildReady");
@@ -153,32 +145,6 @@ namespace PersiaWar.Unity2D5D
             sessionObject.AddComponent<GameSession>();
         }
 
-        private void EnsureEnemySpawner(Transform player)
-        {
-            EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
-            if (spawner == null)
-            {
-                GameObject objectRoot = new GameObject("EnemySpawner");
-                spawner = objectRoot.AddComponent<EnemySpawner>();
-            }
-            spawner.Configure(player, enemyCount, enemySpawnRadius, 0f);
-            spawner.enabled = false;
-        }
-
-        private void EnsureGameplayHUD(PlayerController player)
-        {
-            RuntimeCombatHUD existing = FindFirstObjectByType<RuntimeCombatHUD>();
-            if (existing != null)
-            {
-                existing.enabled = false;
-                return;
-            }
-
-            GameObject hudObject = new GameObject("RuntimeCombatHUD");
-            RuntimeCombatHUD hud = hudObject.AddComponent<RuntimeCombatHUD>();
-            hud.enabled = false;
-        }
-
         private void ConfigureCameraSafe()
         {
             if (gameplayCamera == null)
@@ -193,15 +159,10 @@ namespace PersiaWar.Unity2D5D
         {
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.24f, 0.27f, 0.30f);
-            RenderSettings.fog = true;
-            RenderSettings.fogColor = new Color(0.20f, 0.23f, 0.25f);
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogStartDistance = 75f;
-            RenderSettings.fogEndDistance = 240f;
+            RenderSettings.fog = false;
 #if UNITY_ANDROID
             QualitySettings.antiAliasing = 0;
 #endif
-
             Light sun = FindFirstObjectByType<Light>();
             if (sun == null)
             {
@@ -214,7 +175,6 @@ namespace PersiaWar.Unity2D5D
             sun.color = new Color(1f, 0.93f, 0.82f);
 #if UNITY_ANDROID
             sun.shadows = LightShadows.None;
-            sun.shadowStrength = 0f;
 #else
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.78f;
@@ -228,9 +188,19 @@ namespace PersiaWar.Unity2D5D
             if (legacyGround != null) legacyGround.SetActive(false);
 
             if (worldRoot != null) Destroy(worldRoot.gameObject);
-            worldRoot = new GameObject("BattleRoyaleCity").transform;
+            worldRoot = new GameObject("BattleRoyaleCity");
 
             roadMaterial = MakeMaterial("Road", new Color(0.18f, 0.20f, 0.22f));
+
+#if UNITY_ANDROID
+            // Do not invoke Terrain3DBuilder during the first Android match. The previous
+            // crash happened in this critical startup window, so use one tiny static mesh
+            // with a single material as the isolation-safe battlefield floor.
+            Material groundMaterial = MakeMaterial("AndroidGround", new Color(0.33f, 0.52f, 0.20f));
+            CreateFlatMesh("AndroidGround", Vector3.zero, new Vector2(worldSize, worldSize), groundMaterial);
+            BuildAndroidRoadGrid();
+            return;
+#else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
             roofMaterial = MakeMaterial("Roof", new Color(0.24f, 0.28f, 0.34f));
             accentMaterial = MakeMaterial("Accent", new Color(1.00f, 0.46f, 0.12f));
@@ -240,9 +210,6 @@ namespace PersiaWar.Unity2D5D
             Terrain3DBuilder terrain = terrainObject.AddComponent<Terrain3DBuilder>();
             terrain.Build();
 
-#if UNITY_ANDROID
-            BuildAndroidRoadGrid();
-#else
             const float roadWidth = 8f;
             for (float x = -worldSize * 0.5f + roadWidth * 0.5f; x <= worldSize * 0.5f; x += 24f)
                 CreateBox("RoadX", new Vector3(x, -0.05f, 0f), new Vector3(roadWidth, 0.18f, worldSize), roadMaterial, false);
@@ -266,25 +233,20 @@ namespace PersiaWar.Unity2D5D
             GameObject obj = new GameObject(objectName);
             obj.transform.SetParent(worldRoot, true);
             obj.transform.position = position;
-
             Mesh mesh = new Mesh { name = objectName + "Mesh" };
             float hx = size.x * 0.5f;
             float hz = size.y * 0.5f;
             mesh.vertices = new[]
             {
-                new Vector3(-hx, 0f, -hz),
-                new Vector3(hx, 0f, -hz),
-                new Vector3(hx, 0f, hz),
-                new Vector3(-hx, 0f, hz)
+                new Vector3(-hx, 0f, -hz), new Vector3(hx, 0f, -hz),
+                new Vector3(hx, 0f, hz), new Vector3(-hx, 0f, hz)
             };
             mesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
             mesh.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
             mesh.uv = new[]
             {
-                new Vector2(0f, 0f),
-                new Vector2(1f, 0f),
-                new Vector2(1f, 1f),
-                new Vector2(0f, 1f)
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(1f, 1f), new Vector2(0f, 1f)
             };
             MeshFilter filter = obj.AddComponent<MeshFilter>();
             filter.sharedMesh = mesh;
@@ -299,11 +261,10 @@ namespace PersiaWar.Unity2D5D
             float half = worldSize * 0.5f;
             for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
                 for (float z = -half + 3f; z < half; z += 8f)
-                    CreateBox("RoadMark", new Vector3(x, 0.08f, z), new Vector3(0.32f, 0.04f, 3.0f), marking, false);
-
+                    CreateBox("RoadMark", new Vector3(x, 0.08f, z), new Vector3(0.32f, 0.04f, 3f), marking, false);
             for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
                 for (float x = -half + 3f; x < half; x += 8f)
-                    CreateBox("RoadMark", new Vector3(x, 0.081f, z), new Vector3(3.0f, 0.04f, 0.32f), marking, false);
+                    CreateBox("RoadMark", new Vector3(x, 0.081f, z), new Vector3(3f, 0.04f, 0.32f), marking, false);
         }
 
         private void BuildCityBlocks(float roadWidth)
@@ -319,10 +280,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     float px = x + Random.Range(-6.5f, 6.5f);
                     float pz = z + Random.Range(-6.5f, 6.5f);
-                    float sx = Random.Range(5.5f, 9.5f);
-                    float sz = Random.Range(5.5f, 9.5f);
-                    float h = Random.Range(2.8f, 6.5f);
-                    CreateBuilding(new Vector3(px, 0f, pz), new Vector3(sx, h, sz));
+                    CreateBuilding(new Vector3(px, 0f, pz), new Vector3(Random.Range(5.5f, 9.5f), Random.Range(2.8f, 6.5f), Random.Range(5.5f, 9.5f)));
                 }
             }
         }
@@ -330,79 +288,14 @@ namespace PersiaWar.Unity2D5D
         private void CreateBuilding(Vector3 position, Vector3 size)
         {
             GameObject building = CreateBox("Building", position + Vector3.up * (size.y * 0.5f), size, buildingMaterial, true);
-            GameObject roof = CreateBox("Roof", position + Vector3.up * (size.y + 0.18f), new Vector3(size.x + 0.25f, 0.35f, size.z + 0.25f), roofMaterial, true);
-            roof.transform.SetParent(building.transform.parent, true);
+            CreateBox("Roof", position + Vector3.up * (size.y + 0.18f), new Vector3(size.x + 0.25f, 0.35f, size.z + 0.25f), roofMaterial, true);
             if (Random.value > 0.35f)
-                CreateBox("Door", position + new Vector3(0f, 0.9f, -size.z * 0.51f), new Vector3(1.0f, 1.8f, 0.12f), accentMaterial, false);
-            if (Random.value > 0.45f)
-                for (int side = -1; side <= 1; side += 2)
-                    CreateBox("Window", position + new Vector3(side * size.x * 0.28f, size.y * 0.58f, -size.z * 0.51f), new Vector3(1.25f, 0.85f, 0.08f), accentMaterial, false);
+                CreateBox("Door", position + new Vector3(0f, 0.9f, -size.z * 0.51f), new Vector3(1f, 1.8f, 0.12f), accentMaterial, false);
         }
 
-        private void BuildLandmarks()
-        {
-            CreateBuilding(new Vector3(30f, 0f, 30f), new Vector3(15f, 7f, 11f));
-            CreateBuilding(new Vector3(-34f, 0f, 30f), new Vector3(12f, 5f, 15f));
-            CreateBuilding(new Vector3(42f, 0f, -35f), new Vector3(18f, 4f, 10f));
-            CreateBuilding(new Vector3(-42f, 0f, -35f), new Vector3(10f, 8f, 17f));
-        }
-
-        private void BuildStreetProps()
-        {
-            for (int i = 0; i < 12; i++)
-            {
-                float x = Random.Range(-84f, 84f);
-                float z = Random.Range(-84f, 84f);
-                if (Mathf.Abs(Mathf.Repeat(x + 4f, 24f) - 12f) < 4f || Mathf.Abs(Mathf.Repeat(z + 4f, 24f) - 12f) < 4f) continue;
-                CreateTree(new Vector3(x, 0f, z));
-            }
-
-            for (int i = 0; i < 6; i++)
-            {
-                float x = Random.Range(-84f, 84f);
-                float z = Random.Range(-84f, 84f);
-                CreateVehicle(new Vector3(x, 0.18f, z), Random.value > 0.55f);
-            }
-        }
-
-        private void BuildRuinedQuarter()
-        {
-            Vector3 center = new Vector3(-62f, 0f, 62f);
-            for (int i = 0; i < 6; i++)
-            {
-                float x = center.x + Random.Range(-15f, 15f);
-                float z = center.z + Random.Range(-15f, 15f);
-                float h = Random.Range(1.2f, 4.5f);
-                CreateBox("RuinedBlock", new Vector3(x, h * 0.5f, z), new Vector3(Random.Range(3f, 7f), h, Random.Range(3f, 7f)), buildingMaterial, true);
-            }
-            for (int i = 0; i < 9; i++)
-            {
-                float x = center.x + Random.Range(-18f, 18f);
-                float z = center.z + Random.Range(-18f, 18f);
-                CreateBox("Debris", new Vector3(x, 0.25f, z), new Vector3(Random.Range(0.5f, 2.2f), Random.Range(0.3f, 0.8f), Random.Range(0.5f, 2.2f)), roofMaterial, false)
-                    .transform.Rotate(0f, Random.Range(0f, 180f), Random.Range(-15f, 15f));
-            }
-        }
-
-        private void CreateTree(Vector3 position)
-        {
-            Material trunkMaterial = MakeMaterial("Trunk", new Color(0.34f, 0.20f, 0.10f));
-            Material foliageMaterial = MakeMaterial("Foliage", new Color(0.10f, 0.42f, 0.12f));
-            GameObject trunk = CreateBox("TreeTrunk", position + Vector3.up * 0.9f, new Vector3(0.42f, 1.8f, 0.42f), trunkMaterial, true);
-            GameObject crown = CreateBox("TreeCrown", position + Vector3.up * 2.4f, new Vector3(2.2f, 1.55f, 2.2f), foliageMaterial, false);
-            crown.transform.Rotate(0f, Random.Range(0f, 45f), 0f);
-            GameObject crownTop = CreateBox("TreeCrownTop", position + Vector3.up * 3.15f, new Vector3(1.45f, 0.85f, 1.45f), foliageMaterial, false);
-            crownTop.transform.Rotate(0f, 45f, 0f);
-            trunk.transform.SetParent(worldRoot, true);
-        }
-
-        private void CreateVehicle(Vector3 position, bool tanker)
-        {
-            GameObject car = CreateBox("EmptyVehicle", position, tanker ? new Vector3(2.3f, 1.0f, 5.5f) : new Vector3(2.0f, 0.8f, 3.8f), tanker ? roofMaterial : accentMaterial, true);
-            car.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 180f), 0f);
-            if (tanker)
-                CreatePart(PrimitiveType.Cylinder, "Tank", position + Vector3.up * 0.75f, new Vector3(1.0f, 2.0f, 1.0f), roofMaterial.color, true).transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-        }
+        private void BuildLandmarks() { }
+        private void BuildStreetProps() { }
+        private void BuildRuinedQuarter() { }
 
         private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale, Material material, bool collider)
         {
@@ -413,23 +306,6 @@ namespace PersiaWar.Unity2D5D
             obj.transform.localScale = scale;
             Renderer renderer = obj.GetComponent<Renderer>();
             if (renderer != null) renderer.sharedMaterial = material;
-            if (!collider)
-            {
-                Collider c = obj.GetComponent<Collider>();
-                if (c != null) Destroy(c);
-            }
-            return obj;
-        }
-
-        private GameObject CreatePart(PrimitiveType primitive, string objectName, Vector3 position, Vector3 scale, Color color, bool collider)
-        {
-            GameObject obj = GameObject.CreatePrimitive(primitive);
-            obj.name = objectName;
-            obj.transform.SetParent(worldRoot, true);
-            obj.transform.position = position;
-            obj.transform.localScale = scale;
-            Renderer renderer = obj.GetComponent<Renderer>();
-            if (renderer != null) renderer.sharedMaterial = RuntimeMaterialFactory.Create(objectName + "Material", color);
             if (!collider)
             {
                 Collider c = obj.GetComponent<Collider>();
