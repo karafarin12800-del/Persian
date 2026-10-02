@@ -16,8 +16,6 @@ namespace PersiaWar.Unity2D5D
         private Transform muzzle;
         private SpriteRenderer sprite;
         private ParticleSystem muzzleFlash;
-        private Texture2D loadedTexture;
-        private Sprite loadedSprite;
 
         private bool moving;
         private bool playerCharacter;
@@ -187,36 +185,23 @@ namespace PersiaWar.Unity2D5D
                 ? HeroResource
                 : $"PersianCharacters/Enemy_0{archetype}";
 
-            Texture2D texture = Resources.Load<Texture2D>(resource);
-            if (texture == null)
+            // The PNG assets are already imported by Unity as Sprite assets. Load the
+            // Sprite object directly instead of reading the texture and constructing a
+            // new Sprite at runtime. This keeps Android match activation on the imported
+            // asset path and avoids a second CPU/GPU sprite-allocation step.
+            Sprite loaded = Resources.Load<Sprite>(resource);
+            if (loaded == null)
             {
-                Debug.LogError($"Missing character art resource: Resources/{resource}.png");
+                Debug.LogError($"Missing character sprite resource: Resources/{resource}.png");
+                StartupCheckpoint.Set("CharacterSpriteMissing");
                 sprite.sprite = null;
                 return;
             }
 
-            if (loadedTexture == texture && loadedSprite != null)
-            {
-                sprite.sprite = loadedSprite;
-                sprite.color = Color.white;
-                ApplyScale();
-                return;
-            }
-
-            // FullRect avoids generating an alpha-derived tight mesh from an imported
-            // non-readable texture. This keeps Android sprite activation on the simple
-            // renderer path and removes an unnecessary CPU-side texture dependency.
-            loadedSprite = Sprite.Create(
-                texture,
-                new Rect(0f, 0f, texture.width, texture.height),
-                new Vector2(0.5f, 0.08f),
-                64f,
-                0,
-                SpriteMeshType.FullRect);
-            loadedTexture = texture;
-            sprite.sprite = loadedSprite;
+            sprite.sprite = loaded;
             sprite.color = Color.white;
             ApplyScale();
+            StartupCheckpoint.Set(playerCharacter ? "PlayerSpriteReady" : "EnemySpriteReady");
         }
 
         private void ApplyScale()
