@@ -217,7 +217,9 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), selected ? "SELECTED" : "TAP TO SELECT", smallStyle);
         }
 
-        private void DrawChibiFigure(Rect rect, int index)        {            Color[] bodyColors =
+        private void DrawChibiFigure(Rect rect, int index)
+        {
+            Color[] bodyColors =
             {
                 new Color(0.45f, 0.17f, 0.10f),
                 new Color(0.08f, 0.37f, 0.48f),
@@ -245,7 +247,6 @@ namespace PersiaWar.Unity2D5D
                 Fill(new Rect(center.x - head * 0.82f, center.y - head * 1.45f, head * 1.64f, head * 0.18f), new Color(0.90f, 0.22f, 0.12f));
             }
         }
-
         private void DrawDropMap()
         {
             GUI.Label(new Rect(0f, 125f, Screen.width, 52f), "DROP INTO THE CITY", headerStyle);
@@ -435,8 +436,10 @@ namespace PersiaWar.Unity2D5D
             for (int frame = 0; frame < 30 && !player.IsGameplayReady; frame++)
                 yield return null;
 
-            if (!player.IsGameplayReady)            {
-                startupStatus = "Player systems did not finish initializing.";                StartupCheckpoint.Set("PlayerInitializationFailed");
+            if (!player.IsGameplayReady)
+            {
+                startupStatus = "Player systems did not finish initializing.";
+                StartupCheckpoint.Set("PlayerInitializationFailed");
                 startingMatch = false;
                 yield break;
             }
@@ -481,8 +484,8 @@ namespace PersiaWar.Unity2D5D
             // camera hand-off, so keep the camera completely out of the critical path
             // until several clean gameplay frames have elapsed.
 #if UNITY_ANDROID
-            // Android camera activation is performed once inside InitializeMatchServices()
-            // after the core/player path has remained stable for 120 frames.
+            // Android camera activation is performed once in InitializeMatchServices()
+            // after the core/player path has remained stable.
 #else
             if (followCamera != null)
                 followCamera.enabled = true;
@@ -494,10 +497,8 @@ namespace PersiaWar.Unity2D5D
             // first post-match frames are proven stable. We then enable camera, input,
             // enemies and HUD one at a time so the exact crashing subsystem is isolated.
             GateGameplay(false);
-            if (enemySpawner != null) enemySpawner.enabled = false;
-            if (combatHud != null) combatHud.enabled = false;
-            // Android MobileInput remains alive and enabled from scene load; its execution
-            // gate stays closed until InitializeMatchServices() arms it.
+            if (enemySpawner != null) enemySpawner.enabled = false;            if (combatHud != null) combatHud.enabled = false;
+            if (mobileInput != null) mobileInput.enabled = false;
             if (activeCamera != null) activeCamera.enabled = false;
             if (followCamera != null) followCamera.enabled = false;
 
@@ -550,7 +551,8 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator InitializeMatchServices()
         {
 #if UNITY_ANDROID
-            // 1) Core/player only: no MobileInput lifecycle transition occurs here.
+            // Core/player only. MobileInput remains alive from scene load, but its
+            // internal execution gate is closed, so no input lifecycle transition occurs.
             for (int i = 0; i < 120; i++)
                 yield return null;
 
@@ -581,15 +583,10 @@ namespace PersiaWar.Unity2D5D
             startupStatus = "STABLE TEST 2/3: arming touch controls...";
             StartupCheckpoint.Set("AndroidIsolationCameraStable");
 
-            // MobileInput is already active/enabled from the scene; only its internal
-            // execution gate changes here. No SetActive() and no enabled toggle.
+            // Do not SetActive() or toggle MobileInput.enabled here. Only open the
+            // internal execution gate after the camera has remained stable.
             MobileInputHub.SetAndroidExecutionArmed(true);
             matchInputArmed = true;
-
-            if (mobileInput != null)
-                mobileInput.EnableMinimap();
-
-            StartupCheckpoint.Set("AndroidIsolationInputArmed");
 
             for (int i = 0; i < 120; i++)
                 yield return null;
@@ -757,3 +754,13 @@ namespace PersiaWar.Unity2D5D
             GUI.color = color;
             GUI.DrawTexture(rect, pixel);
             GUI.color = old;
+        }
+
+        private void DrawCircle(Vector2 center, float radius, Color color)
+        {
+            Color old = GUI.color;
+            GUI.color = color;            GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), Texture2D.whiteTexture);
+            GUI.color = old;
+        }
+    }
+}
