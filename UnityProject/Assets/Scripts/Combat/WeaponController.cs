@@ -34,7 +34,8 @@ namespace PersiaWar.Unity2D5D
             player = GetComponent<PlayerController>();
             magazine = Mathf.Clamp(startingMagazine, 0, magazineSize);
             reserve = Mathf.Max(0, startingReserve);
-            EnsureProjectileTemplate();
+            // The projectile template creates a collider and Rigidbody. Defer that
+            // physics allocation until the player actually fires.
 
             if (muzzle == null)
             {
@@ -76,6 +77,7 @@ namespace PersiaWar.Unity2D5D
                 Reload();
                 return false;
             }
+            EnsureProjectileTemplate();
             if (projectilePrefab == null) return false;
 
             Vector3 origin = muzzle != null ? muzzle.position : transform.position + Vector3.up;
@@ -103,6 +105,7 @@ namespace PersiaWar.Unity2D5D
                 Reload();
                 return false;
             }
+            EnsureProjectileTemplate();
             if (projectilePrefab == null) return false;
 
             worldDirection.y = 0f;
