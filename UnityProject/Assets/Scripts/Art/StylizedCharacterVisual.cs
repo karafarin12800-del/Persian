@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
@@ -11,6 +12,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class StylizedCharacterVisual : MonoBehaviour
     {
         private const string HeroResource = "PersianCharacters/Hero";
+        private static readonly Dictionary<string, Sprite> SpriteCache = new Dictionary<string, Sprite>();
 
         private Transform artRoot;
         private Transform muzzle;
@@ -189,7 +191,14 @@ namespace PersiaWar.Unity2D5D
             // Sprite object directly instead of reading the texture and constructing a
             // new Sprite at runtime. This keeps Android match activation on the imported
             // asset path and avoids a second CPU/GPU sprite-allocation step.
-            Sprite loaded = Resources.Load<Sprite>(resource);
+            Sprite loaded;
+            if (!SpriteCache.TryGetValue(resource, out loaded) || loaded == null)
+            {
+                loaded = Resources.Load<Sprite>(resource);
+                if (loaded != null)
+                    SpriteCache[resource] = loaded;
+            }
+
             if (loaded == null)
             {
                 Debug.LogError($"Missing character sprite resource: Resources/{resource}.png");
