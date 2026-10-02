@@ -358,6 +358,24 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("MatchActivationStarted");
 
+            // GameBootstrap lives under the dormant GameRoot. A disabled/inactive
+            // MonoBehaviour cannot own a running coroutine, so wake the root first,
+            // then explicitly re-gate gameplay components before building the world.
+            if (gameRoot != null && !gameRoot.activeSelf)
+            {
+                startupStatus = "Stage 2: activating battlefield systems...";
+                gameRoot.SetActive(true);
+                yield return null;
+
+                CacheGameplayRoots();
+                gameBootstrap = gameRoot.GetComponent<GameBootstrap>();
+                player = playerRoot != null ? playerRoot.GetComponent<PlayerController>() : player;
+                mobileInput = mobileInputRoot != null ? mobileInputRoot.GetComponent<MobileInputHub>() : mobileInput;
+                enemySpawner = gameRoot.GetComponentInChildren<EnemySpawner>(true);
+                combatHud = gameRoot.GetComponentInChildren<RuntimeCombatHUD>(true);
+                GateGameplay(false);
+            }
+
             if (gameBootstrap == null)
                 gameBootstrap = gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
             if (gameBootstrap == null)
@@ -370,7 +388,7 @@ namespace PersiaWar.Unity2D5D
 
             if (!gameBootstrap.IsWorldReady && !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
             {
-                startupStatus = "Stage 2: requesting battlefield build...";
+                startupStatus = "Stage 3: requesting battlefield build...";
                 gameBootstrap.PrepareWorld();
             }
 
