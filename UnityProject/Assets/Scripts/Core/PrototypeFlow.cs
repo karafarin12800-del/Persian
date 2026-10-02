@@ -714,13 +714,35 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawAndroidStabilityStatus()
         {
+            // This is diagnostics only. The old implementation painted a full-screen
+            // opaque panel over the actual match, making a healthy match look frozen
+            // on "MATCH STABLE". Keep a compact status banner while isolation is active,
+            // then remove the banner completely once the gameplay stack is ready.
+            if (string.Equals(startupStatus, "MATCH STABLE", System.StringComparison.Ordinal))
+                return;
+
             EnsureUiInitialized();
-            Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.035f, 0.08f, 0.13f, 1f));
-            GUI.Label(new Rect(0f, Screen.height * 0.34f, Screen.width, 55f), "PERSIA WAR", headerStyle);
-            GUI.Label(new Rect(24f, Screen.height * 0.46f, Screen.width - 48f, 45f), startupStatus, bodyStyle);
-            GUI.Label(new Rect(24f, Screen.height * 0.54f, Screen.width - 48f, 80f),
-                "Android crash isolation is running.\nEach subsystem is enabled separately.",
+
+            float width = Mathf.Min(Screen.width - 32f, 720f);
+            float height = Mathf.Min(86f, Screen.height * 0.12f);
+            Rect panel = new Rect(
+                (Screen.width - width) * 0.5f,
+                14f,
+                width,
+                height);
+
+            Fill(panel, new Color(0.035f, 0.08f, 0.13f, 0.88f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 4f), new Color(0.92f, 0.66f, 0.18f, 1f));
+
+            GUI.Label(
+                new Rect(panel.x + 14f, panel.y + 8f, panel.width - 28f, 28f),
+                "PERSIA WAR  •  ANDROID ISOLATION",
                 smallStyle);
+
+            GUI.Label(
+                new Rect(panel.x + 14f, panel.y + 36f, panel.width - 28f, 30f),
+                startupStatus,
+                bodyStyle);
         }
 
         private void EnsureUiInitialized()
