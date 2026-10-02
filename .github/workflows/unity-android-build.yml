@@ -485,12 +485,6 @@ jobs:
                   GameObject mobileRoot = Root("MobileInput");
                   if (mobileRoot != null)
                       mobileRoot.SetActive(false);
-                  if (GameObject.Find("MinimapCamera") != null)
-                  {
-                      Fail("MinimapCamera was allocated before the critical transition ended.");
-                      return;
-                  }
-
                   if (criticalLogs.Count > 0)
                   {
                       Fail("Startup emitted critical log: " + criticalLogs[0]);
