@@ -591,29 +591,11 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < 120; i++)
                 yield return null;
 
-            startupStatus = "STABLE TEST 3/3: arming enemies (deferred)...";
+            // Enemy spawning is now deliberately outside the Android startup critical path.
+            // The previous "3/3" gate stayed visible when the process died immediately after
+            // EnemySpawner was enabled. Do not enable or initialize the enemy subsystem here.
+            startupStatus = "STABLE: match core ready; enemies deferred";
             StartupCheckpoint.Set("AndroidIsolationInputStable");
-
-            if (enemySpawner == null)
-                enemySpawner = gameRoot != null
-                    ? gameRoot.GetComponentInChildren<EnemySpawner>(true)
-                    : null;
-
-            if (enemySpawner != null)
-            {
-                // Do not make enemy construction part of the Android critical path.
-                // EnemySpawner now performs its first wave asynchronously and one enemy
-                // per frame, so the match can become visible before combat actors exist.
-                enemySpawner.Configure(player.transform, 8, 44f, 0f);
-                enemySpawner.enabled = true;
-            }
-
-            // Only cross one frame here. Waiting for a long "enemy stability" window
-            // while the spawner is still entering its lifecycle made startup look frozen.
-            yield return null;
-
-            startupStatus = "STABLE: enabling HUD...";
-            StartupCheckpoint.Set("AndroidIsolationEnemyStable");
 
             if (combatHud == null)
                 combatHud = gameRoot != null
@@ -626,8 +608,26 @@ namespace PersiaWar.Unity2D5D
                 combatHud.enabled = true;
             }
 
+            StartupCheckpoint.Set("AndroidIsolationEnemyStable");
             StartupCheckpoint.Set("MatchServicesReady");
             startupStatus = "MATCH STABLE";
+
+            // Let the fully visible match breathe before even touching EnemySpawner.
+            // If Android remains stable here, the enemy subsystem is conclusively isolated.
+            yield return new WaitForSecondsRealtime(5f);
+
+            if (this == null || !isActiveAndEnabled || player == null)
+                yield break;
+
+            enemySpawner = enemySpawner != null
+                ? enemySpawner
+                : (gameRoot != null ? gameRoot.GetComponentInChildren<EnemySpawner>(true) : null);
+
+            if (enemySpawner != null)
+            {
+                enemySpawner.Configure(player.transform, 1, 28f, 0f);
+                enemySpawner.enabled = true;
+            }
 #else
             yield return null;
 
