@@ -26,6 +26,7 @@ namespace PersiaWar.Unity2D5D
         private bool spawnChosen;
         private int selectedHero;
         private bool startingMatch;
+        private bool matchInputArmed;
         private string startupStatus = string.Empty;
         private GameObject mainCameraRoot;
         private GameObject playerRoot;
@@ -354,6 +355,7 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator BeginMatchSafely()
         {
             startingMatch = true;
+            matchInputArmed = false;
             startupStatus = "Stage 1: starting battlefield preparation...";
 
             StartupCheckpoint.Set("MatchActivationStarted");
@@ -438,7 +440,13 @@ namespace PersiaWar.Unity2D5D
                 followCamera.enabled = true;
             }
 
+            // Enter gameplay with only the player/camera path armed. On Android, mobile
+            // touch input is intentionally enabled after a few clean frames so the tap
+            // that selected the spawn point can never leak into gameplay activation.
             GateGameplay(true);
+            if (mobileInput != null)
+                mobileInput.enabled = false;
+
             startupStatus = "Stage 12: battlefield ready — starting match.";
             mode = ScreenMode.Match;
             startingMatch = false;
@@ -446,17 +454,28 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("MatchStarted");
 
             // Match-critical activation is finished. Build optional presentation/combat
-            // services only after one clean gameplay frame so the Android transition does
-            // not mix player activation, GPU allocation and enemy construction together.
+            // services only after clean gameplay frames.
             StartCoroutine(InitializeMatchServices());
         }
 
         private IEnumerator InitializeMatchServices()
         {
+#if UNITY_ANDROID
+            // Give the player, camera and first rendered gameplay frame time to settle
+            // before accepting any touch input. This isolates the spawn-point touch from
+            // the gameplay input layer and avoids competing activation work on one frame.
+            for (int i = 0; i < 8; i++)
+                yield return null;
+#else
             yield return null;
+#endif
 
+            matchInputArmed = true;
             if (mobileInput != null)
+            {
                 mobileInput.EnableMinimap();
+                mobileInput.enabled = true;
+            }
 
             yield return null;
 
@@ -506,9 +525,11 @@ namespace PersiaWar.Unity2D5D
         private void GateGameplay(bool enabled)
         {
             if (player != null) player.enabled = enabled;
-            if (mobileInput != null) mobileInput.enabled = enabled;
+            if (mobileInput != null) mobileInput.enabled = enabled && (matchInputArmed || !Application.isMobilePlatform);
             if (combatHud != null) combatHud.enabled = enabled;
             if (enemySpawner != null) enemySpawner.enabled = enabled;
+            if (!enabled)
+                matchInputArmed = false;
         }
 
         private void ApplyHeroStyle(int heroIndex)
