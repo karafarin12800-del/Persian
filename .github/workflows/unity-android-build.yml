@@ -164,6 +164,8 @@ jobs:
             sudo chown -R "$(id -u):$(id -g)" .ci UnityProject/Assets/Editor .ci-unity-home 2>/dev/null || true
             rm -f .ci/unity-build.sh
             rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs UnityProject/Assets/Editor/PersiaWarCiBuild.cs.meta
+            rm -f UnityProject/Assets/Tests/PersiaWarStartupSmokeTests.cs UnityProject/Assets/Tests/PersiaWarStartupSmokeTests.cs.meta
+            rmdir UnityProject/Assets/Tests 2>/dev/null || true
             rmdir UnityProject/Assets/Editor 2>/dev/null || true
             rm -rf .ci-unity-home
           }
@@ -337,6 +339,142 @@ jobs:
 
           test -s /root/.local/share/unity3d/Unity/Unity_lic.ulf
           echo "Unity Personal license file is ready."
+
+          echo "=== Running Unity PlayMode startup smoke test ==="
+          mkdir -p UnityProject/Assets/Tests /workspace/build
+          cat > UnityProject/Assets/Tests/PersiaWarStartupSmokeTests.cs <<'CS'
+          using System.Collections;
+          using System.Collections.Generic;
+          using System.Reflection;
+          using NUnit.Framework;
+          using UnityEngine;
+          using UnityEngine.SceneManagement;
+          using UnityEngine.TestTools;
+
+          public class PersiaWarStartupSmokeTests
+          {
+              [UnityTest]
+              public IEnumerator MatchEntry_CompletesWithoutStartupErrors()
+              {
+                  var criticalLogs = new List<string>();
+                  Application.LogCallback handler = (condition, stackTrace, type) =>
+                  {
+                      if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert)
+                          criticalLogs.Add(condition + "\\n" + stackTrace);
+                  };
+                  Application.logMessageReceived += handler;
+
+                  try
+                  {
+                      AsyncOperation load = SceneManager.LoadSceneAsync("PersiaWarPrototype", LoadSceneMode.Single);
+                      Assert.IsNotNull(load, "Gameplay scene load returned null.");
+                      while (!load.isDone) yield return null;
+                      yield return null;
+                      yield return null;
+
+                      GameObject flowObject = Root("PrototypeFlow");
+                      Assert.IsNotNull(flowObject, "PrototypeFlow root missing.");
+                      var flow = flowObject.GetComponent<MonoBehaviour>();
+                      Assert.IsNotNull(flow, "PrototypeFlow component missing.");
+
+                      FieldInfo spawnChosen = flow.GetType().GetField("spawnChosen", BindingFlags.Instance | BindingFlags.NonPublic);
+                      MethodInfo startMatch = flow.GetType().GetMethod("StartMatch", BindingFlags.Instance | BindingFlags.NonPublic);
+                      Assert.IsNotNull(spawnChosen, "PrototypeFlow.spawnChosen field missing.");
+                      Assert.IsNotNull(startMatch, "PrototypeFlow.StartMatch method missing.");
+
+                      spawnChosen.SetValue(flow, true);
+                      startMatch.Invoke(flow, null);
+
+                      int frames = 0;
+                      while (StartupCheckpoint.Last != "MatchStarted" && frames++ < 360)
+                          yield return null;
+
+                      Assert.AreEqual("MatchStarted", StartupCheckpoint.Last,
+                          "Match startup did not reach MatchStarted. Last checkpoint: " + StartupCheckpoint.Last);
+
+                      GameObject playerRoot = Root("Player");
+                      Assert.IsNotNull(playerRoot, "Player root missing after match startup.");
+                      Assert.IsTrue(playerRoot.activeSelf, "Player root was not activated.");
+
+                      var player = playerRoot.GetComponent<PersiaWar.Unity2D5D.PlayerController>();
+                      Assert.IsNotNull(player, "PlayerController missing after activation.");
+                      Assert.IsNotNull(player.GetComponent<PersiaWar.Unity2D5D.TargetHealth>(), "TargetHealth missing.");
+                      Assert.IsNotNull(player.GetComponent<PersiaWar.Unity2D5D.WeaponController>(), "WeaponController missing.");
+                      Assert.IsNotNull(player.GetComponent<PersiaWar.Unity2D5D.NearestTargetAim>(), "NearestTargetAim missing.");
+                      Assert.IsNotNull(player.GetComponent<PersiaWar.Unity2D5D.PlayerInventory>(), "PlayerInventory missing.");
+                      Assert.IsNotNull(player.GetComponent<PersiaWar.Unity2D5D.GrenadeController>(), "GrenadeController missing.");
+
+                      var visual = player.GetComponentInChildren<PersiaWar.Unity2D5D.StylizedCharacterVisual>(true);
+                      Assert.IsNotNull(visual, "StylizedCharacterVisual was not created.");
+                      var sprite = visual.GetComponentInChildren<SpriteRenderer>(true);
+                      Assert.IsNotNull(sprite, "Player SpriteRenderer was not created.");
+                      Assert.IsNotNull(sprite.sprite, "Player sprite could not be created from Resources.");
+
+                      GameObject cameraRoot = Root("Main Camera");
+                      Assert.IsNotNull(cameraRoot, "Main Camera root missing after match startup.");
+                      Assert.IsTrue(cameraRoot.activeSelf, "Main Camera root was not activated.");
+                      var follow = cameraRoot.GetComponent<PersiaWar.Unity2D5D.CameraFollow25D>();
+                      Assert.IsNotNull(follow, "CameraFollow25D missing.");
+                      Assert.IsTrue(follow.enabled, "CameraFollow25D was not enabled by match startup.");
+
+                      // The minimap must not be allocated during the critical transition.
+                      Assert.IsNull(GameObject.Find("MinimapCamera"),
+                          "MinimapCamera was allocated before the startup barrier completed.");
+                  }
+                  finally
+                  {
+                      Application.logMessageReceived -= handler;
+                  }
+
+                  Assert.IsEmpty(criticalLogs, "Startup emitted unexpected Error/Exception/Assert logs:\\n" + string.Join("\\n---\\n", criticalLogs));
+              }
+
+              private static GameObject Root(string name)
+              {
+                  foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
+                      if (root != null && root.name == name)
+                          return root;
+                  return null;
+              }
+          }
+          CS
+          cat > UnityProject/Assets/Tests/PersiaWarStartupSmokeTests.cs.meta <<'META'
+          fileFormatVersion: 2
+          guid: 8e6bd9f2a6b948c9b2eae2f1d2d83f70
+          META
+          rm -f /workspace/build/PersiaWarStartupSmoke.xml
+          set +e
+          unity-editor \
+            -batchmode \
+            -nographics \
+            -quit \
+            -projectPath /workspace/UnityProject \
+            -buildTarget Android \
+            -runTests \
+            -testPlatform PlayMode \
+            -testFilter PersiaWarStartupSmokeTests \
+            -testResults /workspace/build/PersiaWarStartupSmoke.xml \
+            -logFile -
+          test_exit=$?
+          set -e
+          echo "UNITY_SMOKE_TEST_EXIT_CODE:$test_exit"
+          test "$test_exit" -eq 0 || exit "$test_exit"
+          test -s /workspace/build/PersiaWarStartupSmoke.xml || {
+            echo "::error::Unity smoke test results file is missing."
+            exit 1
+          }
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          report = Path('/workspace/build/PersiaWarStartupSmoke.xml')
+          root = ET.parse(report).getroot()
+          total = int(root.attrib.get('total', 0))
+          passed = int(root.attrib.get('passed', 0))
+          failed = int(root.attrib.get('failed', 0))
+          skipped = int(root.attrib.get('skipped', 0))
+          print(f'UNITY_SMOKE_RESULTS: total={total} passed={passed} failed={failed} skipped={skipped}')
+          assert total >= 1 and passed >= 1 and failed == 0, 'Unity startup smoke test did not pass.'
+          PY
 
           echo "=== Cleaning previous Android build output ==="
           rm -rf /workspace/build/Android
