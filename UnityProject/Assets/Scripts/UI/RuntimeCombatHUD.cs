@@ -13,7 +13,7 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle small;
         private GUIStyle medium;
         private GUIStyle bold;
-        private Texture2D pixel;
+        private Texture2D pixel => Texture2D.whiteTexture;
 
         public void ConfigurePlayer(PlayerController value)
         {
@@ -23,10 +23,6 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
             if (player == null) player = FindFirstObjectByType<PlayerController>();
-
-            pixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            pixel.SetPixel(0, 0, Color.white);
-            pixel.Apply();
 
             small = new GUIStyle(GUI.skin.label)
             {
@@ -40,11 +36,6 @@ namespace PersiaWar.Unity2D5D
                 fontSize = 24,
                 alignment = TextAnchor.MiddleCenter
             };
-        }
-
-        private void OnDestroy()
-        {
-            if (pixel != null) Destroy(pixel);
         }
 
         private void OnGUI()
