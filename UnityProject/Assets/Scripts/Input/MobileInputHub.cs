@@ -22,8 +22,14 @@ namespace PersiaWar.Unity2D5D
         private Texture2D circleTexture;
         private Texture2D lineTexture;
         private GrenadeController grenadeController;
+        private bool minimapEnabled;
 
         public Vector2 MoveValue => moveValue;
+
+        public void EnableMinimap()
+        {
+            minimapEnabled = true;
+        }
 
         private void Awake()
         {
@@ -58,9 +64,10 @@ namespace PersiaWar.Unity2D5D
                 grenadeController = player.Grenades;
             }
 
-            // Minimap creation is intentionally lazy: PrototypeFlow disables this component
-            // during the hero/spawn menus, so no secondary render target is allocated at launch.
-            EnsureMinimap();
+            // The minimap is a secondary GPU allocation. Keep it out of the first gameplay
+            // frame and let PrototypeFlow enable it only after the match is visibly entered.
+            if (minimapEnabled)
+                EnsureMinimap();
 
 #if UNITY_EDITOR || UNITY_STANDALONE
             Vector2 keyboard = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
