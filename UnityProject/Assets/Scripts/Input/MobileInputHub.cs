@@ -50,10 +50,9 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
 #if UNITY_ANDROID
-            // Android isolation: keep GameObject activation free of scene searches,
-            // Camera.main access, and gameplay-reference traversal. References are
-            // resolved lazily from Update/OnGUI after the component is fully enabled.
-            StartupCheckpoint.Set("MobileInputAwake");
+            // Always keep the component alive; PrototypeFlow arms its internal execution
+            // gate only after the match/camera path is stable.
+            androidExecutionArmed = false;
 #else
             if (player == null) player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null) gameplayCamera = Camera.main;
