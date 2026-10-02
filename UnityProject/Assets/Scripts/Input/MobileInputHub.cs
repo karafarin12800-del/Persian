@@ -279,6 +279,12 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             if (!Application.isMobilePlatform && !Application.isEditor) return;
+
+#if UNITY_ANDROID
+            DrawAndroidControls();
+            return;
+#endif
+
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
 
@@ -294,11 +300,10 @@ namespace PersiaWar.Unity2D5D
 
             DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.34f));
             DrawCircle(knobPos, radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
-
             DrawCircle(firePos, radius * 0.72f, new Color(0.65f, 0.12f, 0.08f, firePointerId >= 0 ? 0.50f : 0.28f));
             DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
-
             DrawCircle(grenadePos, radius * 0.56f, new Color(0.32f, 0.24f, 0.10f, grenadePointerId >= 0 ? 0.55f : 0.32f));
+
             if (buttonTextStyle == null)
             {
                 buttonTextStyle = new GUIStyle(GUI.skin.label)
@@ -314,15 +319,23 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(basePos.x - radius, basePos.y + radius * 0.52f, radius * 2f, 26f * scale), "MOVE", buttonTextStyle);
 
             DrawAimGuide(scale);
-
-            if (minimapTexture != null)
-            {
-                float size = minimapSize * scale;
-                Rect rect = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
-                GUI.DrawTexture(rect, minimapTexture, ScaleMode.StretchToFill, false);
-                GUI.Box(rect, GUIContent.none);
-            }
         }
+
+        private void DrawAndroidControls()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
+            float button = 150f * scale;
+            float bottom = Screen.height - 180f * scale;
+
+            Rect moveRect = new Rect(30f * scale, bottom, button, 90f * scale);
+            Rect fireRect = new Rect(Screen.width - 180f * scale, bottom, button, 90f * scale);
+            Rect grenadeRect = new Rect(Screen.width - 300f * scale, bottom - 105f * scale, 110f * scale, 78f * scale);
+
+            GUI.Box(moveRect, "MOVE");
+            GUI.Box(fireRect, "AIM / FIRE");
+            GUI.Box(grenadeRect, "GRENADE");
+        }
+
 
         private void DrawAimGuide(float scale)
         {
