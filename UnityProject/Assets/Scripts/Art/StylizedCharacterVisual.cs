@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
     /// Presentation-only character layer.
-    /// Android uses a tiny untextured mesh during gameplay to avoid texture-backed
-    /// SpriteRenderer work during the Mali-sensitive first render transition.
+    /// Gameplay scripts keep owning movement, aiming, health and combat; this component
+    /// only selects a character texture, billboards it toward the camera and provides
+    /// a stable weapon muzzle transform.
     /// </summary>
     public sealed class StylizedCharacterVisual : MonoBehaviour
     {
@@ -16,12 +16,7 @@ namespace PersiaWar.Unity2D5D
 
         private Transform artRoot;
         private Transform muzzle;
-#if UNITY_ANDROID
-        private MeshFilter androidMeshFilter;
-        private MeshRenderer androidRenderer;
-#else
         private SpriteRenderer sprite;
-#endif
         private ParticleSystem muzzleFlash;
 
         private bool moving;
@@ -29,6 +24,8 @@ namespace PersiaWar.Unity2D5D
         private int archetype = 1;
         private float phase;
         private float fireUntil;
+        private Vector3 lastFacing = Vector3.forward;
+        private Vector3 baseLocalPosition;
 
         public Transform Muzzle => muzzle;
 
@@ -36,7 +33,9 @@ namespace PersiaWar.Unity2D5D
         {
             string objectName = isPlayer ? "PlayerVisual" : "EnemyVisual";
             Transform existing = owner.Find(objectName);
-            StylizedCharacterVisual visual = existing != null ? existing.GetComponent<StylizedCharacterVisual>() : null;
+            StylizedCharacterVisual visual = existing != null
+                ? existing.GetComponent<StylizedCharacterVisual>()
+                : null;
 
             if (visual == null)
             {
@@ -55,7 +54,7 @@ namespace PersiaWar.Unity2D5D
             archetype = Mathf.Clamp(characterArchetype, 1, 3);
 
             EnsurePresentation();
-            LoadCharacterPresentation();
+            LoadCharacterSprite();
             ApplyScale();
         }
 
@@ -65,25 +64,20 @@ namespace PersiaWar.Unity2D5D
             archetype = 1;
 
             EnsurePresentation();
-            LoadCharacterPresentation();
+            LoadCharacterSprite();
 
             int index = Mathf.Clamp(heroIndex, 0, 4);
             Color[] variants =
             {
-                new Color(1f, 1f, 1f, 1f),
-                new Color(0.86f, 0.95f, 1f, 1f),
-                new Color(0.86f, 1f, 0.90f, 1f),
-                new Color(1f, 0.89f, 0.93f, 1f),
-                new Color(1f, 0.96f, 0.84f, 1f)
+                new Color(1.00f, 1.00f, 1.00f, 1.00f),
+                new Color(0.86f, 0.95f, 1.00f, 1.00f),
+                new Color(0.86f, 1.00f, 0.90f, 1.00f),
+                new Color(1.00f, 0.89f, 0.93f, 1.00f),
+                new Color(1.00f, 0.96f, 0.84f, 1.00f)
             };
 
-#if UNITY_ANDROID
-            if (androidRenderer != null)
-                androidRenderer.sharedMaterial = RuntimeMaterialFactory.Create("AndroidPlayerVisual", variants[index]);
-#else
             if (sprite != null)
                 sprite.color = variants[index];
-#endif
         }
 
         public void SetFacing(Vector3 worldDirection)
@@ -92,31 +86,31 @@ namespace PersiaWar.Unity2D5D
             if (worldDirection.sqrMagnitude < 0.0005f)
                 return;
 
-            Quaternion target = Quaternion.LookRotation(worldDirection.normalized, Vector3.up);
+            lastFacing = worldDirection.normalized;
+            Quaternion target = Quaternion.LookRotation(lastFacing, Vector3.up);
             transform.rotation = Quaternion.Slerp(
                 transform.rotation,
                 target,
                 1f - Mathf.Exp(-18f * Time.deltaTime));
         }
 
-        public void SetMoving(bool value) => moving = value;
+        public void SetMoving(bool value)
+        {
+            moving = value;
+        }
 
         public void PlayFire()
         {
             fireUntil = Time.time + 0.07f;
-#if UNITY_ANDROID
-            // No runtime particle allocation on the Android compatibility path.
-            return;
-#else
+            // The muzzle flash is a presentation effect, not a dependency for entering
+            // the match. Allocate it only when the first shot is actually fired.
             if (muzzleFlash == null)
                 muzzleFlash = CreateMuzzleFlash();
-
             if (muzzleFlash == null)
                 return;
 
             muzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             muzzleFlash.Play();
-#endif
         }
 
         private void Awake()
@@ -126,6 +120,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (sprite == null)
+                return;
+
             Camera cam = Camera.main;
             if (cam != null && artRoot != null)
             {
@@ -136,28 +133,13 @@ namespace PersiaWar.Unity2D5D
             }
 
             float t = Time.time + phase;
-            float bob = moving
-                ? Mathf.Abs(Mathf.Sin(t * 11f)) * 0.045f
-                : Mathf.Sin(t * 2.2f) * 0.015f;
+            float bob = moving ? Mathf.Abs(Mathf.Sin(t * 11f)) * 0.045f : Mathf.Sin(t * 2.2f) * 0.015f;
+            sprite.transform.localPosition = new Vector3(0f, bob, 0f);
 
             float squash = moving
                 ? 1f + Mathf.Sin(t * 11f) * 0.018f
                 : 1f + Mathf.Sin(t * 2.2f) * 0.008f;
 
-#if UNITY_ANDROID
-            if (artRoot != null)
-            {
-                artRoot.localPosition = new Vector3(0f, bob, 0f);
-                artRoot.localScale = new Vector3(
-                    squash * 1.6f,
-                    (2f - squash) * 1.6f,
-                    1f);
-            }
-#else
-            if (sprite == null)
-                return;
-
-            sprite.transform.localPosition = new Vector3(0f, bob, 0f);
             sprite.transform.localScale = new Vector3(
                 transform.localScale.x * squash,
                 transform.localScale.y * (2f - squash),
@@ -167,7 +149,6 @@ namespace PersiaWar.Unity2D5D
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.62f);
             else if (muzzle != null)
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.56f);
-#endif
         }
 
         private void EnsurePresentation()
@@ -179,25 +160,6 @@ namespace PersiaWar.Unity2D5D
                 artRoot = art.transform;
             }
 
-#if UNITY_ANDROID
-            if (androidMeshFilter == null)
-            {
-                androidMeshFilter = artRoot.GetComponent<MeshFilter>();
-                if (androidMeshFilter == null)
-                    androidMeshFilter = artRoot.gameObject.AddComponent<MeshFilter>();
-
-                androidRenderer = artRoot.GetComponent<MeshRenderer>();
-                if (androidRenderer == null)
-                    androidRenderer = artRoot.gameObject.AddComponent<MeshRenderer>();
-
-                androidMeshFilter.sharedMesh = CreateAndroidQuad();
-                androidRenderer.sharedMaterial = RuntimeMaterialFactory.Create("AndroidCharacter", Color.white);
-                androidRenderer.shadowCastingMode = ShadowCastingMode.Off;
-                androidRenderer.receiveShadows = false;
-                androidRenderer.lightProbeUsage = LightProbeUsage.Off;
-                androidRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
-            }
-#else
             if (sprite == null)
             {
                 sprite = artRoot.GetComponent<SpriteRenderer>();
@@ -206,8 +168,8 @@ namespace PersiaWar.Unity2D5D
 
                 sprite.sortingOrder = 20;
                 sprite.maskInteraction = SpriteMaskInteraction.None;
+                baseLocalPosition = Vector3.zero;
             }
-#endif
 
             if (muzzle == null)
             {
@@ -216,34 +178,21 @@ namespace PersiaWar.Unity2D5D
                 muzzle = muzzleObject.transform;
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.56f);
             }
+
         }
 
-        private void LoadCharacterPresentation()
+        private void LoadCharacterSprite()
         {
-#if UNITY_ANDROID
-            Color color = playerCharacter
-                ? Color.white
-                : archetype == 1
-                    ? new Color(0.86f, 0.22f, 0.16f, 1f)
-                    : archetype == 2
-                        ? new Color(0.24f, 0.60f, 0.94f, 1f)
-                        : new Color(0.72f, 0.30f, 0.86f, 1f);
-
-            if (androidRenderer != null)
-            {
-                androidRenderer.sharedMaterial = RuntimeMaterialFactory.Create(
-                    playerCharacter ? "AndroidPlayerVisual" : "AndroidEnemyVisual",
-                    color);
-            }
-
-            ApplyScale();
-            StartupCheckpoint.Set(playerCharacter ? "PlayerVisualReadyAndroid" : "EnemyVisualReadyAndroid");
-#else
             string resource = playerCharacter
                 ? HeroResource
                 : $"PersianCharacters/Enemy_0{archetype}";
 
-            if (!SpriteCache.TryGetValue(resource, out Sprite loaded) || loaded == null)
+            // The PNG assets are already imported by Unity as Sprite assets. Load the
+            // Sprite object directly instead of reading the texture and constructing a
+            // new Sprite at runtime. This keeps Android match activation on the imported
+            // asset path and avoids a second CPU/GPU sprite-allocation step.
+            Sprite loaded;
+            if (!SpriteCache.TryGetValue(resource, out loaded) || loaded == null)
             {
                 loaded = Resources.Load<Sprite>(resource);
                 if (loaded != null)
@@ -262,7 +211,6 @@ namespace PersiaWar.Unity2D5D
             sprite.color = Color.white;
             ApplyScale();
             StartupCheckpoint.Set(playerCharacter ? "PlayerSpriteReady" : "EnemySpriteReady");
-#endif
         }
 
         private void ApplyScale()
@@ -273,33 +221,6 @@ namespace PersiaWar.Unity2D5D
                 : Vector3.one * scale;
         }
 
-#if UNITY_ANDROID
-        private static Mesh CreateAndroidQuad()
-        {
-            Mesh mesh = new Mesh { name = "AndroidCharacterQuad" };
-            mesh.vertices = new[]
-            {
-                new Vector3(-0.42f, 0f, 0f),
-                new Vector3(0.42f, 0f, 0f),
-                new Vector3(0.42f, 1.15f, 0f),
-                new Vector3(-0.42f, 1.15f, 0f)
-            };
-            mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
-            mesh.normals = new[]
-            {
-                Vector3.forward, Vector3.forward, Vector3.forward, Vector3.forward
-            };
-            mesh.uv = new[]
-            {
-                new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(1f, 1f), new Vector2(0f, 1f)
-            };
-            mesh.RecalculateBounds();
-            return mesh;
-        }
-#endif
-
-#if !UNITY_ANDROID
         private ParticleSystem CreateMuzzleFlash()
         {
             GameObject go = new GameObject("MuzzleFlash");
@@ -334,21 +255,12 @@ namespace PersiaWar.Unity2D5D
             colorOverLifetime.enabled = true;
             Gradient gradient = new Gradient();
             gradient.SetKeys(
-                new[]
-                {
-                    new GradientColorKey(new Color(1f, 0.75f, 0.18f), 0f),
-                    new GradientColorKey(new Color(1f, 0.2f, 0.03f), 1f)
-                },
-                new[]
-                {
-                    new GradientAlphaKey(1f, 0f),
-                    new GradientAlphaKey(0f, 1f)
-                });
+                new[] { new GradientColorKey(new Color(1f, 0.75f, 0.18f), 0f), new GradientColorKey(new Color(1f, 0.2f, 0.03f), 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
             colorOverLifetime.color = gradient;
 
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             return ps;
         }
-#endif
     }
 }
