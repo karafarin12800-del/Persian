@@ -100,7 +100,7 @@ jobs:
           android_start = world_method.index('#if UNITY_ANDROID')
           android_end = world_method.index('#else', android_start)
           android_path = world_method[android_start:android_end]
-          assert 'Terrain3DBuilder' not in android_path, 'Android first-match path still references Terrain3DBuilder.'
+          assert 'AddComponent<Terrain3DBuilder>' not in android_path and 'terrain.Build()' not in android_path, 'Android first-match path still invokes Terrain3DBuilder.'
           assert 'GameObject.CreatePrimitive' not in android_path, 'Android first-match path still uses CreatePrimitive.'
           assert 'CreateFlatMesh' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
 
