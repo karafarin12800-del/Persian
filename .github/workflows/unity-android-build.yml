@@ -15,7 +15,7 @@ on:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
   pull_request:
-    types: [synchronize]
+    types: [opened, synchronize]
 
 permissions:
   contents: read
@@ -50,6 +50,7 @@ jobs:
           test -f UnityProject/Assets/Resources/PersiaWarLit.shader
           test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
           test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
+          test -f UnityProject/Assets/Scripts/Core/AndroidSafeRuntimeFactory.cs
           grep -q 'Assets/Scenes/BootScene.unity' UnityProject/ProjectSettings/EditorBuildSettings.asset
           grep -q 'Assets/Scenes/PersiaWarPrototype.unity' UnityProject/ProjectSettings/EditorBuildSettings.asset
           python3 - <<'PY'
