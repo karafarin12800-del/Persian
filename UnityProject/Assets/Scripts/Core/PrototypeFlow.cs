@@ -447,9 +447,11 @@ namespace PersiaWar.Unity2D5D
 
             startupStatus = "Stage 10: activating world bounds...";
             yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
-            startupStatus = "Stage 11: activating main camera...";
-            yield return ActivateRoot(mainCameraRoot, "Main Camera");
-
+            startupStatus = "Stage 11: preparing main camera...";
+            // Do not let the camera render or run LateUpdate while its target/root is
+            // being activated. On Android the previous sequence exposed one frame where
+            // CameraFollow could scan for a target before the player/camera state was
+            // fully established. Keep both components disabled until the final hand-off.
             Camera activeCamera = mainCameraRoot != null
                 ? mainCameraRoot.GetComponent<Camera>()
                 : null;
@@ -457,14 +459,25 @@ namespace PersiaWar.Unity2D5D
                 ? activeCamera.GetComponent<CameraFollow25D>()
                 : null;
 
+            if (activeCamera != null)
+                activeCamera.enabled = false;
+            if (followCamera != null)
+                followCamera.enabled = false;
+
+            yield return ActivateRoot(mainCameraRoot, "Main Camera");
+
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
 
             if (followCamera != null)
-            {
                 followCamera.SetTarget(player.transform);
+
+            // Enable the follow script first with a valid target, then enable rendering.
+            // This removes the null-target/first-frame camera race from Android startup.
+            if (followCamera != null)
                 followCamera.enabled = true;
-            }
+            if (activeCamera != null)
+                activeCamera.enabled = true;
 
             // Core gameplay is armed only after the player/camera path is initialized.
             GateGameplay(true);
