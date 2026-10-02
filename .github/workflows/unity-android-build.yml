@@ -374,7 +374,7 @@ jobs:
 
                       GameObject flowObject = Root("PrototypeFlow");
                       Assert.IsNotNull(flowObject, "PrototypeFlow root missing.");
-                      var flow = flowObject.GetComponent<MonoBehaviour>();
+                      var flow = flowObject.GetComponent<PersiaWar.Unity2D5D.PrototypeFlow>();
                       Assert.IsNotNull(flow, "PrototypeFlow component missing.");
 
                       FieldInfo spawnChosen = flow.GetType().GetField("spawnChosen", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -386,11 +386,11 @@ jobs:
                       startMatch.Invoke(flow, null);
 
                       int frames = 0;
-                      while (StartupCheckpoint.Last != "MatchStarted" && frames++ < 360)
+                      while (PersiaWar.Unity2D5D.StartupCheckpoint.Last != "MatchStarted" && frames++ < 360)
                           yield return null;
 
-                      Assert.AreEqual("MatchStarted", StartupCheckpoint.Last,
-                          "Match startup did not reach MatchStarted. Last checkpoint: " + StartupCheckpoint.Last);
+                      Assert.AreEqual("MatchStarted", PersiaWar.Unity2D5D.StartupCheckpoint.Last,
+                          "Match startup did not reach MatchStarted. Last checkpoint: " + PersiaWar.Unity2D5D.StartupCheckpoint.Last);
 
                       GameObject playerRoot = Root("Player");
                       Assert.IsNotNull(playerRoot, "Player root missing after match startup.");
