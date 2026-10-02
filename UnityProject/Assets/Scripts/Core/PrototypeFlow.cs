@@ -440,6 +440,50 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             startupStatus = string.Empty;
             StartupCheckpoint.Set("MatchStarted");
+
+            // Match-critical activation is finished. Build optional presentation/combat
+            // services only after one clean gameplay frame so the Android transition does
+            // not mix player activation, GPU allocation and enemy construction together.
+            StartCoroutine(InitializeMatchServices());
+        }
+
+        private IEnumerator InitializeMatchServices()
+        {
+            yield return null;
+
+            if (mobileInput != null)
+                mobileInput.EnableMinimap();
+
+            yield return null;
+
+            if (player == null)
+                yield break;
+
+            if (enemySpawner == null)
+            {
+                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+                if (enemySpawner == null)
+                {
+                    GameObject spawnerObject = new GameObject("EnemySpawner");
+                    enemySpawner = spawnerObject.AddComponent<EnemySpawner>();
+                }
+            }
+            enemySpawner.Configure(player.transform, 8, 44f, 0f);
+            enemySpawner.enabled = true;
+
+            if (combatHud == null)
+            {
+                combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+                if (combatHud == null)
+                {
+                    GameObject hudObject = new GameObject("RuntimeCombatHUD");
+                    combatHud = hudObject.AddComponent<RuntimeCombatHUD>();
+                }
+            }
+            combatHud.ConfigurePlayer(player);
+            combatHud.enabled = true;
+
+            StartupCheckpoint.Set("MatchServicesReady");
         }
 
         private IEnumerator ActivateRoot(GameObject root, string rootName)
