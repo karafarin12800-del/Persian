@@ -27,7 +27,7 @@ namespace PersiaWar.Unity2D5D
             {
                 name = materialName,
                 color = color,
-                enableInstancing = false
+                enableInstancing = true
             };
             sharedMaterials[key] = material;
             return material;
@@ -62,7 +62,7 @@ namespace PersiaWar.Unity2D5D
             {
                 name = materialName,
                 color = color,
-                enableInstancing = false
+                enableInstancing = true
             };
         }
 
@@ -91,9 +91,11 @@ namespace PersiaWar.Unity2D5D
             }
 
 #if UNITY_ANDROID
-            // Mali-class Android devices are sensitive to runtime material/shader
-            // transitions. Use the simplest unlit color path and avoid texture sampling.
-            cachedShader = Shader.Find("Unlit/Color");
+            // Keep runtime primitive materials on a built-in unlit mobile shader.
+            // This avoids compiling the custom surface shader on the Android path.
+            cachedShader = Shader.Find("Unlit/Texture");
+            if (cachedShader == null)
+                cachedShader = Shader.Find("Unlit/Color");
 #endif
 
             if (cachedShader == null)
