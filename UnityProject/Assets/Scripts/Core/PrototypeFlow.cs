@@ -130,7 +130,13 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             EnsureUiInitialized();
-            if (mode == ScreenMode.Match) return;
+            if (mode == ScreenMode.Match)
+            {
+#if UNITY_ANDROID
+                DrawAndroidStabilityStatus();
+#endif
+                return;
+            }
             DrawBackdrop();
 
             if (startingMatch)
@@ -487,27 +493,36 @@ namespace PersiaWar.Unity2D5D
                 activeCamera.enabled = true;
 #endif
 
-            // Core gameplay is armed only after the player/camera path is initialized.
-            GateGameplay(true);
-            if (mobileInput != null)
-                mobileInput.enabled = false;
+            // Android diagnostic gate: keep every optional subsystem disabled while the
+            // first post-match frames are proven stable. We then enable camera, input,
+            // enemies and HUD one at a time so the exact crashing subsystem is isolated.
+            GateGameplay(false);
+            if (enemySpawner != null) enemySpawner.enabled = false;
+            if (combatHud != null) combatHud.enabled = false;
+            if (mobileInput != null) mobileInput.enabled = false;
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
 
-            startupStatus = "Stage 12: battlefield ready — starting match.";
+            startupStatus = "Stage 12: core stable — Android isolation test.";
             StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match;
             startingMatch = false;
+#if UNITY_ANDROID
+            startupStatus = "STABLE TEST 1/4: core only";
+            StartCoroutine(InitializeMatchServices());
+#else
             startupStatus = string.Empty;
             StartupCheckpoint.Set("MatchStarted");
-
-            // Match-critical activation is finished. Build optional presentation/combat
-            // services only after clean gameplay frames.
             StartCoroutine(InitializeMatchServices());
+#endif
         }
 
         private IEnumerator EnableCameraAfterSafeFrames(Camera activeCamera, CameraFollow25D followCamera)
         {
 #if UNITY_ANDROID
-            for (int i = 0; i < 30; i++)
+            // Deliberately hold rendering off for a long clean interval. If the process
+            // exits before this point, the camera/render hand-off is not the cause.
+            for (int i = 0; i < 120; i++)
                 yield return null;
 
             if (this == null || !isActiveAndEnabled)
@@ -524,7 +539,7 @@ namespace PersiaWar.Unity2D5D
             if (activeCamera != null)
                 activeCamera.enabled = true;
 
-            StartupCheckpoint.Set("AndroidCameraActivatedAfterSafeFrames");
+            StartupCheckpoint.Set("AndroidCameraActivatedAfterIsolation");
 #else
             if (followCamera != null)
                 followCamera.enabled = true;
@@ -533,63 +548,104 @@ namespace PersiaWar.Unity2D5D
 #endif
         }
 
+
         private IEnumerator InitializeMatchServices()
         {
 #if UNITY_ANDROID
-            // Give the player, camera and first rendered gameplay frame time to settle
-            // before accepting any touch input. This isolates the spawn-point touch from
-            // the gameplay input layer and avoids competing activation work on one frame.
-            for (int i = 0; i < 8; i++)
+            // Test 1: core scene/player stays alive for 120 frames.
+            for (int i = 0; i < 120; i++)
                 yield return null;
-#else
-            yield return null;
-#endif
 
+            startupStatus = "STABLE TEST 2/4: enabling camera...";
+            StartupCheckpoint.Set("AndroidIsolationCoreStable");
+            Camera activeCamera = mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null;
+            CameraFollow25D follow = activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null;
+            if (follow != null)
+            {
+                follow.SetTarget(player != null ? player.transform : null);
+                follow.enabled = true;
+            }
+            yield return null;
+            if (activeCamera != null)
+                activeCamera.enabled = true;
+
+            for (int i = 0; i < 120; i++)
+                yield return null;
+
+            startupStatus = "STABLE TEST 3/4: enabling mobile input...";
+            StartupCheckpoint.Set("AndroidIsolationCameraStable");
             if (mobileInputRoot != null && !mobileInputRoot.activeSelf)
             {
                 mobileInputRoot.SetActive(true);
                 yield return null;
                 mobileInput = mobileInputRoot.GetComponent<MobileInputHub>();
             }
+            if (mobileInput != null)
+            {
+                mobileInput.EnableMinimap();
+                mobileInput.enabled = true;
+            }
+            matchInputArmed = true;
 
+            for (int i = 0; i < 120; i++)
+                yield return null;
+
+            startupStatus = "STABLE TEST 4/4: enabling enemies...";
+            StartupCheckpoint.Set("AndroidIsolationInputStable");
+            if (enemySpawner == null)
+                enemySpawner = gameRoot != null ? gameRoot.GetComponentInChildren<EnemySpawner>(true) : null;
+            if (enemySpawner != null)
+            {
+                enemySpawner.Configure(player.transform, 8, 44f, 0f);
+                enemySpawner.enabled = true;
+            }
+
+            for (int i = 0; i < 120; i++)
+                yield return null;
+
+            startupStatus = "STABLE: enabling HUD...";
+            StartupCheckpoint.Set("AndroidIsolationEnemyStable");
+            if (combatHud == null)
+                combatHud = gameRoot != null ? gameRoot.GetComponentInChildren<RuntimeCombatHUD>(true) : null;
+            if (combatHud != null)
+            {
+                combatHud.ConfigurePlayer(player);
+                combatHud.enabled = true;
+            }
+
+            StartupCheckpoint.Set("MatchServicesReady");
+            startupStatus = "MATCH STABLE";
+#else
+            yield return null;
+            if (mobileInputRoot != null && !mobileInputRoot.activeSelf)
+            {
+                mobileInputRoot.SetActive(true);
+                yield return null;
+                mobileInput = mobileInputRoot.GetComponent<MobileInputHub>();
+            }
             matchInputArmed = true;
             if (mobileInput != null)
             {
                 mobileInput.EnableMinimap();
                 mobileInput.enabled = true;
-                StartupCheckpoint.Set("MobileInputActivated");
             }
-
-            yield return null;
-
-            if (player == null)
-                yield break;
-
+            if (player == null) yield break;
             if (enemySpawner == null)
-            {
                 enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
-                if (enemySpawner == null)
-                {
-                    GameObject spawnerObject = new GameObject("EnemySpawner");
-                    enemySpawner = spawnerObject.AddComponent<EnemySpawner>();
-                }
-            }
-            enemySpawner.Configure(player.transform, 8, 44f, 0f);
-            enemySpawner.enabled = true;
-
-            if (combatHud == null)
+            if (enemySpawner != null)
             {
-                combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
-                if (combatHud == null)
-                {
-                    GameObject hudObject = new GameObject("RuntimeCombatHUD");
-                    combatHud = hudObject.AddComponent<RuntimeCombatHUD>();
-                }
+                enemySpawner.Configure(player.transform, 8, 44f, 0f);
+                enemySpawner.enabled = true;
             }
-            combatHud.ConfigurePlayer(player);
-            combatHud.enabled = true;
-
+            if (combatHud == null)
+                combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+            if (combatHud != null)
+            {
+                combatHud.ConfigurePlayer(player);
+                combatHud.enabled = true;
+            }
             StartupCheckpoint.Set("MatchServicesReady");
+#endif
         }
 
         private IEnumerator ActivateRoot(GameObject root, string rootName)
@@ -642,6 +698,17 @@ namespace PersiaWar.Unity2D5D
             float x = Mathf.InverseLerp(-96f, 96f, world.x);
             float y = Mathf.InverseLerp(96f, -96f, world.y);
             return new Vector2(rect.x + x * rect.width, rect.y + y * rect.height);
+        }
+
+        private void DrawAndroidStabilityStatus()
+        {
+            EnsureUiInitialized();
+            Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.035f, 0.08f, 0.13f, 1f));
+            GUI.Label(new Rect(0f, Screen.height * 0.34f, Screen.width, 55f), "PERSIA WAR", headerStyle);
+            GUI.Label(new Rect(24f, Screen.height * 0.46f, Screen.width - 48f, 45f), startupStatus, bodyStyle);
+            GUI.Label(new Rect(24f, Screen.height * 0.54f, Screen.width - 48f, 80f),
+                "Android crash isolation is running.\nEach subsystem is enabled separately.",
+                smallStyle);
         }
 
         private void EnsureUiInitialized()
