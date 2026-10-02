@@ -17,6 +17,8 @@ namespace PersiaWar.Unity2D5D
         private bool spawning;
         private float nextEnemyCheckTime;
         private int failedSpawnAttempts;
+        private bool initialWavePending;
+        private bool initialWaveComplete;
         private const int MaxFailedSpawnAttempts = 2;
 
         public int CurrentWave => wave;
@@ -45,13 +47,18 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator SpawnInitialWaveAfterStartup()
         {
             yield return new WaitForSecondsRealtime(initialSpawnDelay);
+            initialWavePending = false;
+
             if (player != null && player.GetComponent<PlayerController>()?.IsDefeated != true)
+            {
                 SpawnWave();
+                initialWaveComplete = true;
+            }
         }
 
         private void Update()
         {
-            if (player == null || spawning || Time.unscaledTime < nextEnemyCheckTime) return;
+            if (player == null || spawning || initialWavePending || !initialWaveComplete || Time.unscaledTime < nextEnemyCheckTime) return;
             nextEnemyCheckTime = Time.unscaledTime + enemyCheckInterval;
 
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
@@ -64,8 +71,12 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnNextWave()
         {
-            spawning = false;
-            if (player == null || player.GetComponent<PlayerController>()?.IsDefeated == true) return;
+            if (player == null || player.GetComponent<PlayerController>()?.IsDefeated == true)
+            {
+                spawning = false;
+                return;
+            }
+
             wave++;
             SpawnWave();
         }
@@ -73,6 +84,14 @@ namespace PersiaWar.Unity2D5D
         private void SpawnWave()
         {
             int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
+
+#if UNITY_ANDROID
+            // Never construct the whole wave in one main-thread burst on Android.
+            // Keep the spawner occupied while one enemy is created per frame.
+            spawning = true;
+            StartCoroutine(SpawnAndroidWaveGradually(count, wave));
+            return;
+#else
             int spawned = 0;
 
             for (int i = 0; i < count * 3 && spawned < count; i++)
@@ -99,7 +118,52 @@ namespace PersiaWar.Unity2D5D
                 GameSession.Instance.SetWave(wave);
 
             SpawnWaveReward();
+#endif
         }
+
+#if UNITY_ANDROID
+        private IEnumerator SpawnAndroidWaveGradually(int count, int currentWave)
+        {
+            int spawned = 0;
+            int attempts = 0;
+
+            for (int i = 0; i < count * 3 && spawned < count; i++)
+            {
+                attempts++;
+
+                float angle = Random.Range(0f, Mathf.PI * 2f);
+                float distance = Random.Range(spawnRadius * 0.72f, spawnRadius);
+                Vector3 position = player.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
+                position.y = 1f;
+
+                if (!Physics.CheckSphere(position + Vector3.up * 0.7f, 0.85f, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    SpawnEnemy(position, spawned, currentWave);
+                    spawned++;
+                }
+
+                // Give Unity a frame between enemy constructions. This is the key
+                // Android-safe change: no 8-enemy hierarchy/sprite burst in one frame.
+                yield return null;
+            }
+
+            if (spawned == 0)
+            {
+                failedSpawnAttempts++;
+                Debug.LogWarning($"PERSIA_COMBAT: Android enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}); retries are bounded.");
+            }
+            else
+            {
+                failedSpawnAttempts = 0;
+                if (GameSession.Instance != null)
+                    GameSession.Instance.SetWave(currentWave);
+
+                SpawnWaveReward();
+            }
+
+            spawning = false;
+        }
+#endif
 
         private void SpawnEnemy(Vector3 position, int index, int currentWave)
         {
