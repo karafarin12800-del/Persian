@@ -16,6 +16,8 @@ namespace PersiaWar.Unity2D5D
         private Transform muzzle;
         private SpriteRenderer sprite;
         private ParticleSystem muzzleFlash;
+        private Texture2D loadedTexture;
+        private Sprite loadedSprite;
 
         private bool moving;
         private bool playerCharacter;
@@ -100,6 +102,9 @@ namespace PersiaWar.Unity2D5D
         public void PlayFire()
         {
             fireUntil = Time.time + 0.07f;
+            // Muzzle flash is intentionally lazy. It is a presentation effect, not a
+            // dependency for entering the match, so do not allocate a ParticleSystem
+            // during the critical Android player activation path.
             if (muzzleFlash == null)
                 return;
 
@@ -191,14 +196,26 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            sprite.sprite = Sprite.Create(
+            if (loadedTexture == texture && loadedSprite != null)
+            {
+                sprite.sprite = loadedSprite;
+                sprite.color = Color.white;
+                ApplyScale();
+                return;
+            }
+
+            // FullRect avoids generating an alpha-derived tight mesh from an imported
+            // non-readable texture. This keeps Android sprite activation on the simple
+            // renderer path and removes an unnecessary CPU-side texture dependency.
+            loadedSprite = Sprite.Create(
                 texture,
                 new Rect(0f, 0f, texture.width, texture.height),
                 new Vector2(0.5f, 0.08f),
                 64f,
                 0,
-                SpriteMeshType.Tight);
-
+                SpriteMeshType.FullRect);
+            loadedTexture = texture;
+            sprite.sprite = loadedSprite;
             sprite.color = Color.white;
             ApplyScale();
         }
