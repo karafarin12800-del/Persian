@@ -43,6 +43,10 @@ namespace PersiaWar.Unity2D5D
                 SphereCollider collider = obj.AddComponent<SphereCollider>();
                 collider.isTrigger = true;
                 collider.radius = 0.7f;
+
+                Rigidbody body = obj.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
             }
 
             return obj;
@@ -58,7 +62,9 @@ namespace PersiaWar.Unity2D5D
             GameObject obj = CreateMarker(objectName, position, scale, tint, true);
             obj.transform.rotation = rotation;
 
-            Rigidbody body = obj.AddComponent<Rigidbody>();
+            Rigidbody body = obj.GetComponent<Rigidbody>();
+            if (body == null)
+                body = obj.AddComponent<Rigidbody>();
             body.isKinematic = true;
             body.useGravity = false;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
