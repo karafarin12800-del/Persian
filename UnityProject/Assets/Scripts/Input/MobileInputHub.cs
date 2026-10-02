@@ -28,7 +28,15 @@ namespace PersiaWar.Unity2D5D
 
         public void EnableMinimap()
         {
+#if UNITY_ANDROID
+            // The Android match path must not allocate a second camera/render target.
+            // Keep the minimap disabled on this device profile until a dedicated,
+            // device-tested minimap path exists.
+            minimapEnabled = false;
+            StartupCheckpoint.Set("MinimapDisabledAndroid");
+#else
             minimapEnabled = true;
+#endif
         }
 
         private void Awake()
@@ -259,9 +267,13 @@ namespace PersiaWar.Unity2D5D
 
         private void UpdateMinimap()
         {
+#if UNITY_ANDROID
+            return;
+#else
             if (minimapCamera == null || player == null) return;
             minimapCamera.transform.position = player.transform.position + Vector3.up * 120f;
             minimapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+#endif
         }
 
         private void OnGUI()
