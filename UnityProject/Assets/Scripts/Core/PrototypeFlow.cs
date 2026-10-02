@@ -474,10 +474,18 @@ namespace PersiaWar.Unity2D5D
 
             // Enable the follow script first with a valid target, then enable rendering.
             // This removes the null-target/first-frame camera race from Android startup.
+            // Android isolation mode: do not render the gameplay camera on the same
+            // frame as match activation. The previous crash still occurred after the
+            // camera hand-off, so keep the camera completely out of the critical path
+            // until several clean gameplay frames have elapsed.
+#if UNITY_ANDROID
+            StartCoroutine(EnableCameraAfterSafeFrames(activeCamera, followCamera));
+#else
             if (followCamera != null)
                 followCamera.enabled = true;
             if (activeCamera != null)
                 activeCamera.enabled = true;
+#endif
 
             // Core gameplay is armed only after the player/camera path is initialized.
             GateGameplay(true);
@@ -494,6 +502,35 @@ namespace PersiaWar.Unity2D5D
             // Match-critical activation is finished. Build optional presentation/combat
             // services only after clean gameplay frames.
             StartCoroutine(InitializeMatchServices());
+        }
+
+        private IEnumerator EnableCameraAfterSafeFrames(Camera activeCamera, CameraFollow25D followCamera)
+        {
+#if UNITY_ANDROID
+            for (int i = 0; i < 30; i++)
+                yield return null;
+
+            if (this == null || !isActiveAndEnabled)
+                yield break;
+
+            if (followCamera != null)
+            {
+                followCamera.SetTarget(player != null ? player.transform : null);
+                followCamera.enabled = true;
+            }
+
+            yield return null;
+
+            if (activeCamera != null)
+                activeCamera.enabled = true;
+
+            StartupCheckpoint.Set("AndroidCameraActivatedAfterSafeFrames");
+#else
+            if (followCamera != null)
+                followCamera.enabled = true;
+            if (activeCamera != null)
+                activeCamera.enabled = true;
+#endif
         }
 
         private IEnumerator InitializeMatchServices()
