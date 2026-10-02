@@ -52,28 +52,54 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
-            CreateTextures();
-            BuildStyles();
+            // Keep scene activation as cheap as possible. Do not touch GUI skin/textures
+            // or scan the scene during Awake: this method runs on the critical Unity
+            // scene-activation path on Android.
+            StartupCheckpoint.Set("PrototypeFlowAwake");
+            Debug.Log("PERSIA_FLOW: PrototypeFlow Awake");
         }
 
         private void Start()
         {
-            // Include inactive gameplay objects: BootLoader intentionally leaves them dormant
-            // so the hero/drop menu can render without starting the battlefield.
-            player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
-            enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
-            mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
-            combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
-            CacheGameplayRoots();
-            gameBootstrap = gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
-            // Do not start procedural world generation while the front-end menu is opening.
-            // GameRoot remains dormant until START MATCH so Android can finish scene activation
-            // and render the menu without a large main-thread workload.
-            // The boot flow intentionally keeps the camera inactive while the menu is shown.
-            // IMGUI does not require a Camera; activate and bind it only when the match starts.
+            // Defer all menu initialization by one frame. This lets Unity finish
+            // activating the gameplay scene and gives BootLoader a chance to complete
+            // its LoadSceneAsync operation before any discovery/UI work runs.
+            StartCoroutine(InitializeMenuAfterActivation());
+        }
 
+        private IEnumerator InitializeMenuAfterActivation()
+        {
+            yield return null;
+
+            EnsureUiInitialized();
+            CacheGameplayRoots();
+
+            // Resolve the known dormant roots directly instead of performing several
+            // global FindFirstObjectByType(..., Include) scans during scene entry.
+            player = playerRoot != null
+                ? playerRoot.GetComponent<PlayerController>()
+                : null;
+            mobileInput = mobileInputRoot != null
+                ? mobileInputRoot.GetComponent<MobileInputHub>()
+                : null;
+
+            gameBootstrap = gameRoot != null
+                ? gameRoot.GetComponent<GameBootstrap>()
+                : null;
+
+            enemySpawner = gameRoot != null
+                ? gameRoot.GetComponentInChildren<EnemySpawner>(true)
+                : null;
+            combatHud = gameRoot != null
+                ? gameRoot.GetComponentInChildren<RuntimeCombatHUD>(true)
+                : null;
+
+            // Do not start procedural world generation while the front-end menu is opening.
+            // GameRoot remains dormant until START MATCH so Android can finish scene
+            // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
             StartupCheckpoint.Set("PrototypeFlowMenuReady");
+            Debug.Log("PERSIA_FLOW: PrototypeFlow menu initialized");
         }
 
         private void CacheGameplayRoots()
@@ -100,6 +126,7 @@ namespace PersiaWar.Unity2D5D
 
         private void OnGUI()
         {
+            EnsureUiInitialized();
             if (mode == ScreenMode.Match) return;
             DrawBackdrop();
 
@@ -427,6 +454,14 @@ namespace PersiaWar.Unity2D5D
             float x = Mathf.InverseLerp(-96f, 96f, world.x);
             float y = Mathf.InverseLerp(96f, -96f, world.y);
             return new Vector2(rect.x + x * rect.width, rect.y + y * rect.height);
+        }
+
+        private void EnsureUiInitialized()
+        {
+            if (pixel == null)
+                CreateTextures();
+            if (titleStyle == null)
+                BuildStyles();
         }
 
         private void CreateTextures()
