@@ -41,6 +41,11 @@ namespace PersiaWar.Unity2D5D
             rangedRange = archetype == 3 ? 46f : (archetype == 2 ? 40f : 34f);
             meleeCooldown = archetype == 3 ? 1.05f : (archetype == 2 ? 1.25f : 1.5f);
             rangedCooldown = archetype == 3 ? 0.90f : (archetype == 2 ? 1.10f : 1.35f);
+            if (visual == null)
+                visual = StylizedCharacterVisual.Attach(transform, false, archetype);
+            else
+                visual.Configure(false, archetype);
+
 
             if (visual != null)
                 visual.Configure(false, archetype);
@@ -54,7 +59,7 @@ namespace PersiaWar.Unity2D5D
                     0.35f,
                     capsule.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
 
-            visual = StylizedCharacterVisual.Attach(transform, false, archetype);
+            // Wait for Configure() so the correct archetype is known before loading art.
         }
 
         private void Update()
@@ -170,6 +175,14 @@ namespace PersiaWar.Unity2D5D
 
             shotDirection.Normalize();
 
+#if UNITY_ANDROID
+            GameObject projectile = AndroidSafeRuntimeFactory.CreateProjectile(
+                "EnemyProjectile",
+                origin + shotDirection * 0.16f,
+                Quaternion.LookRotation(shotDirection, Vector3.up),
+                new Vector3(0.07f, 0.07f, 0.07f),
+                new Color(0.92f, 0.18f, 0.10f));
+#else
             GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             projectile.name = "EnemyProjectile";
             projectile.transform.position = origin + shotDirection * 0.16f;
@@ -196,7 +209,10 @@ namespace PersiaWar.Unity2D5D
 
             Renderer renderer = projectile.GetComponent<Renderer>();
             if (renderer != null)
-                renderer.sharedMaterial = RuntimeMaterialFactory.Create("EnemyProjectileMaterial", new Color(0.92f, 0.18f, 0.10f));
+                renderer.sharedMaterial = RuntimeMaterialFactory.Create(
+                    "EnemyProjectileMaterial",
+                    new Color(0.92f, 0.18f, 0.10f));
+#endif
 
             EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
             shot.Configure(shotDirection, rangedDamage, transform);
