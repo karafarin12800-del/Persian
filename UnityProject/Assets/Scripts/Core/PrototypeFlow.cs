@@ -410,8 +410,12 @@ namespace PersiaWar.Unity2D5D
 
             startupStatus = "Stage 8: activating player...";
             yield return ActivateRoot(playerRoot, "Player");
-            startupStatus = "Stage 9: activating mobile input...";
-            yield return ActivateRoot(mobileInputRoot, "MobileInput");
+            // MobileInput owns GUI texture allocation in Awake(). Keep its GameObject
+            // inactive during the critical Android match-entry frame; it is activated only
+            // after the player/camera path has rendered cleanly.
+            StartupCheckpoint.Set("MobileInputActivationDeferred");
+            startupStatus = "Stage 9: deferring mobile input...";
+            yield return null;
             startupStatus = "Stage 10: activating world bounds...";
             yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
             startupStatus = "Stage 11: activating main camera...";
@@ -470,11 +474,19 @@ namespace PersiaWar.Unity2D5D
             yield return null;
 #endif
 
+            if (mobileInputRoot != null && !mobileInputRoot.activeSelf)
+            {
+                mobileInputRoot.SetActive(true);
+                yield return null;
+                mobileInput = mobileInputRoot.GetComponent<MobileInputHub>();
+            }
+
             matchInputArmed = true;
             if (mobileInput != null)
             {
                 mobileInput.EnableMinimap();
                 mobileInput.enabled = true;
+                StartupCheckpoint.Set("MobileInputActivated");
             }
 
             yield return null;
