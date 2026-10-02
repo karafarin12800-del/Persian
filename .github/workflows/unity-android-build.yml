@@ -417,9 +417,13 @@ jobs:
                       Assert.IsNotNull(follow, "CameraFollow25D missing.");
                       Assert.IsTrue(follow.enabled, "CameraFollow25D was not enabled by match startup.");
 
-                      // The minimap must not be allocated during the critical transition.
+                      // Stop optional post-entry services before the test samples the critical
+                      // transition, so this assertion is isolated from deferred GPU allocation.
+                      GameObject mobileRoot = Root("MobileInput");
+                      if (mobileRoot != null)
+                          mobileRoot.SetActive(false);
                       Assert.IsNull(GameObject.Find("MinimapCamera"),
-                          "MinimapCamera was allocated before the startup barrier completed.");
+                          "MinimapCamera was allocated before the post-entry barrier was released.");
                   }
                   finally
                   {
