@@ -185,7 +185,7 @@ jobs:
         timeout-minutes: 60
         run: |
           set -euo pipefail
-          IMAGE="unityci/editor:2022.3.62f1-android-3"
+          IMAGE="unityci/editor:2022.3.76f1-android-3"
 
           mkdir -p .ci
           cleanup() {
@@ -242,6 +242,9 @@ jobs:
                       new[] { GraphicsDeviceType.OpenGLES3 }
                   );
                   PlayerSettings.colorSpace = ColorSpace.Gamma;
+                  PlayerSettings.Android.optimizedFramePacing = false;
+                  PlayerSettings.bundleVersion = "0.0.4";
+                  PlayerSettings.Android.bundleVersionCode = 104;
 
                   var graphicsApis = PlayerSettings.GetGraphicsAPIs(BuildTarget.Android);
                   Console.WriteLine("UNITY_ANDROID_GRAPHICS_API:" + string.Join(",", graphicsApis));
