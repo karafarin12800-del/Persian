@@ -104,8 +104,8 @@ namespace PersiaWar.Unity2D5D
             fireUntil = Time.time + 0.07f;
             // The muzzle flash is a presentation effect, not a dependency for entering
             // the match. Allocate it only when the first shot is actually fired.
-            // Keep muzzle flash creation out of EnsurePresentation so player activation
-            // does not allocate a ParticleSystem before the match is stable.
+            if (muzzleFlash == null)
+                muzzleFlash = CreateMuzzleFlash();
             if (muzzleFlash == null)
                 return;
 
