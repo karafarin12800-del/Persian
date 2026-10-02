@@ -179,8 +179,6 @@ namespace PersiaWar.Unity2D5D
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.56f);
             }
 
-            if (muzzleFlash == null)
-                muzzleFlash = CreateMuzzleFlash();
         }
 
         private void LoadCharacterSprite()
