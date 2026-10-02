@@ -580,13 +580,15 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < 120; i++)
                 yield return null;
 
-            startupStatus = "STABLE TEST 2/3: arming touch controls...";
+            // Touch input is deliberately excluded from Android startup for this build.
+            // The previous 2/3 gate armed MobileInputHub and then executed HandleTouches()
+            // on the live match. That made input a second native/runtime transition instead
+            // of a passive subsystem. Keep it completely dormant until the match is visible.
+            startupStatus = "STABLE TEST 2/3: touch controls deferred";
             StartupCheckpoint.Set("AndroidIsolationCameraStable");
 
-            // Do not SetActive() or toggle MobileInput.enabled here. Only open the
-            // internal execution gate after the camera has remained stable.
-            MobileInputHub.SetAndroidExecutionArmed(true);
-            matchInputArmed = true;
+            matchInputArmed = false;
+            MobileInputHub.SetAndroidExecutionArmed(false);
 
             for (int i = 0; i < 120; i++)
                 yield return null;
