@@ -42,13 +42,17 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+#if UNITY_ANDROID
+            // Android isolation: keep GameObject activation free of scene searches,
+            // Camera.main access, and gameplay-reference traversal. References are
+            // resolved lazily from Update/OnGUI after the component is fully enabled.
+            StartupCheckpoint.Set("MobileInputAwake");
+#else
             if (player == null) player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null) gameplayCamera = Camera.main;
             if (player != null) grenadeController = player.Grenades;
+#endif
             if (moveRadius > 0f) joystickRadius = Mathf.Clamp(moveRadius * 0.86f, 90f, 150f);
-
-            // GUI textures are created lazily from OnGUI after the match is already
-            // rendering. This keeps GameObject activation itself allocation-light.
         }
 
         private void OnDestroy()
@@ -279,6 +283,18 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             if (!Application.isMobilePlatform && !Application.isEditor) return;
+
+#if UNITY_ANDROID
+            // Android stability path: avoid Texture2D creation, GUI.skin access and
+            // custom texture drawing during the first activation of mobile input.
+            // Touch handling remains in Update(); this is presentation-only.
+            float androidScale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
+            GUI.Box(new Rect(24f, Screen.height - 92f * androidScale, 150f * androidScale, 54f * androidScale), "MOVE");
+            GUI.Box(new Rect(Screen.width - 174f * androidScale, Screen.height - 92f * androidScale, 150f * androidScale, 54f * androidScale), "AIM / FIRE");
+            GUI.Box(new Rect(Screen.width - 270f * androidScale, Screen.height - 170f * androidScale, 88f * androidScale, 58f * androidScale), "G");
+            return;
+#endif
+
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
 
