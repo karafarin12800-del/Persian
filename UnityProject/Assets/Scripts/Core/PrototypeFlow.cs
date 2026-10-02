@@ -551,20 +551,18 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator InitializeMatchServices()
         {
 #if UNITY_ANDROID
-            // Core/player only. MobileInput remains alive from scene load, but its
-            // internal execution gate is closed, so no input lifecycle transition occurs.
-            for (int i = 0; i < 120; i++)
-                yield return null;
-
-            startupStatus = "STABLE TEST 1/3: activating camera...";
-            StartupCheckpoint.Set("AndroidIsolationCoreStable");
-
+            // Android smoke path: render the actual gameplay camera and stop the
+            // startup isolation sequence here. Touch, HUD and enemies stay disabled
+            // until the basic match is visibly running; there is no timed multi-stage
+            // gate that can make the game appear frozen.
             Camera activeCamera = mainCameraRoot != null
                 ? mainCameraRoot.GetComponent<Camera>()
                 : null;
             CameraFollow25D follow = activeCamera != null
                 ? activeCamera.GetComponent<CameraFollow25D>()
                 : null;
+
+            StartupCheckpoint.Set("AndroidCameraActivationStarted");
 
             if (follow != null)
             {
@@ -577,59 +575,28 @@ namespace PersiaWar.Unity2D5D
             if (activeCamera != null)
                 activeCamera.enabled = true;
 
-            for (int i = 0; i < 120; i++)
+            // Give Unity only a few frames to complete the camera hand-off.
+            for (int i = 0; i < 10; i++)
                 yield return null;
 
-            // Touch input is deliberately excluded from Android startup for this build.
-            // The previous 2/3 gate armed MobileInputHub and then executed HandleTouches()
-            // on the live match. That made input a second native/runtime transition instead
-            // of a passive subsystem. Keep it completely dormant until the match is visible.
-            startupStatus = "STABLE TEST 2/3: touch controls deferred";
-            StartupCheckpoint.Set("AndroidIsolationCameraStable");
+            startupStatus = "MATCH STABLE";
+            StartupCheckpoint.Set("AndroidMatchVisible");
+            StartupCheckpoint.Set("MatchServicesReady");
 
+            // Leave optional systems dormant on Android until a real device smoke test
+            // proves the base match is stable. This is intentionally not a gameplay
+            // freeze: the player/camera/world are already live.
             matchInputArmed = false;
             MobileInputHub.SetAndroidExecutionArmed(false);
 
-            for (int i = 0; i < 120; i++)
-                yield return null;
-
-            // Enemy spawning is now deliberately outside the Android startup critical path.
-            // The previous "3/3" gate stayed visible when the process died immediately after
-            // EnemySpawner was enabled. Do not enable or initialize the enemy subsystem here.
-            startupStatus = "STABLE: match core ready; enemies deferred";
-            StartupCheckpoint.Set("AndroidIsolationInputStable");
-
-            if (combatHud == null)
-                combatHud = gameRoot != null
-                    ? gameRoot.GetComponentInChildren<RuntimeCombatHUD>(true)
-                    : null;
-
+            if (mobileInput != null)
+                mobileInput.enabled = false;
             if (combatHud != null)
-            {
-                combatHud.ConfigurePlayer(player);
-                combatHud.enabled = true;
-            }
-
-            StartupCheckpoint.Set("AndroidIsolationEnemyStable");
-            StartupCheckpoint.Set("MatchServicesReady");
-            startupStatus = "MATCH STABLE";
-
-            // Let the fully visible match breathe before even touching EnemySpawner.
-            // If Android remains stable here, the enemy subsystem is conclusively isolated.
-            yield return new WaitForSecondsRealtime(5f);
-
-            if (this == null || !isActiveAndEnabled || player == null)
-                yield break;
-
-            enemySpawner = enemySpawner != null
-                ? enemySpawner
-                : (gameRoot != null ? gameRoot.GetComponentInChildren<EnemySpawner>(true) : null);
-
+                combatHud.enabled = false;
             if (enemySpawner != null)
-            {
-                enemySpawner.Configure(player.transform, 1, 28f, 0f);
-                enemySpawner.enabled = true;
-            }
+                enemySpawner.enabled = false;
+
+            yield break;
 #else
             yield return null;
 
