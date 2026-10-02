@@ -452,6 +452,7 @@ namespace PersiaWar.Unity2D5D
                 mobileInput.enabled = false;
 
             startupStatus = "Stage 12: battlefield ready — starting match.";
+            StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match;
             startingMatch = false;
             startupStatus = string.Empty;
