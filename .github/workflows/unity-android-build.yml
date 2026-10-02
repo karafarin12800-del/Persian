@@ -111,8 +111,14 @@ jobs:
           assert 'EnsureProjectileTemplate()' not in awake, 'Projectile template is still allocated during Player Awake.'
 
           visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
-          presentation = visual[visual.index('private void EnsurePresentation()'):visual.index('private void LoadCharacterSprite()')]
+          presentation = visual[visual.index('private void EnsurePresentation()'):visual.index('private void LoadCharacterPresentation()')]
           assert 'CreateMuzzleFlash()' not in presentation, 'Muzzle flash is still allocated during player presentation setup.'
+          android_start = visual.index('#if UNITY_ANDROID')
+          android_end = visual.index('#else', android_start)
+          android_path = visual[android_start:android_end]
+          assert 'SpriteRenderer' not in android_path, 'Android startup still contains SpriteRenderer path.'
+          assert 'Resources.Load<Sprite>' not in android_path, 'Android startup still loads Sprite assets.'
+          print('Android presentation isolation checks: PASS')
           print('Android startup isolation checks: PASS')
           PY
           echo 'Unity project structure/settings validation passed.'
