@@ -27,6 +27,13 @@ namespace PersiaWar.Unity2D5D
 
         public Vector2 MoveValue => moveValue;
 
+#if UNITY_ANDROID
+        // Diagnostic gate: lets PrototypeFlow enable the component without executing
+        // touch/UI code, so native activation can be isolated from input processing.
+        private static bool androidExecutionArmed;
+        public static void SetAndroidExecutionArmed(bool armed) => androidExecutionArmed = armed;
+#endif
+
         public void EnableMinimap()
         {
 #if UNITY_ANDROID
@@ -69,6 +76,10 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+#if UNITY_ANDROID
+            if (!androidExecutionArmed)
+                return;
+#endif
             if (player == null)
             {
                 player = FindFirstObjectByType<PlayerController>();
@@ -283,6 +294,9 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             if (!Application.isMobilePlatform && !Application.isEditor) return;
+#if UNITY_ANDROID
+            if (!androidExecutionArmed) return;
+#endif
 
 #if UNITY_ANDROID
             // Android stability path: avoid Texture2D creation, GUI.skin access and
