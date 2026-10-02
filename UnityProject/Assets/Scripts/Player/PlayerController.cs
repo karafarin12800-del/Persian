@@ -25,6 +25,7 @@ namespace PersiaWar.Unity2D5D
         public int Shield => shield;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
+        public bool IsGameplayReady => health != null && weapon != null && aim != null && inventory != null && grenadeController != null;
 
         private void OnEnable()
         {
@@ -46,6 +47,16 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("PlayerVisualBuilt");
             EnsureGameplayComponents();
             StartupCheckpoint.Set("PlayerComponentsReady");
+        }
+
+        public void PrepareForMatch(int heroIndex)
+        {
+            EnsurePlayerVisual();
+            EnsureGameplayComponents();
+            StylizedCharacterVisual visual = GetComponentInChildren<StylizedCharacterVisual>(true);
+            if (visual != null)
+                visual.ConfigurePlayerHero(heroIndex);
+            StartupCheckpoint.Set("PlayerPreparedForMatch");
         }
 
         public void SetMoveInput(Vector2 value)
