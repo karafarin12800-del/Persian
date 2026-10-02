@@ -217,8 +217,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), selected ? "SELECTED" : "TAP TO SELECT", smallStyle);
         }
 
-        private void DrawChibiFigure(Rect rect, int index)        {
-            Color[] bodyColors =
+        private void DrawChibiFigure(Rect rect, int index)        {            Color[] bodyColors =
             {
                 new Color(0.45f, 0.17f, 0.10f),
                 new Color(0.08f, 0.37f, 0.48f),
@@ -437,8 +436,7 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
 
             if (!player.IsGameplayReady)            {
-                startupStatus = "Player systems did not finish initializing.";
-                StartupCheckpoint.Set("PlayerInitializationFailed");
+                startupStatus = "Player systems did not finish initializing.";                StartupCheckpoint.Set("PlayerInitializationFailed");
                 startingMatch = false;
                 yield break;
             }
@@ -498,7 +496,8 @@ namespace PersiaWar.Unity2D5D
             GateGameplay(false);
             if (enemySpawner != null) enemySpawner.enabled = false;
             if (combatHud != null) combatHud.enabled = false;
-            if (mobileInput != null) mobileInput.enabled = false;
+            // Android MobileInput remains alive and enabled from scene load; its execution
+            // gate stays closed until InitializeMatchServices() arms it.
             if (activeCamera != null) activeCamera.enabled = false;
             if (followCamera != null) followCamera.enabled = false;
 
@@ -758,14 +757,3 @@ namespace PersiaWar.Unity2D5D
             GUI.color = color;
             GUI.DrawTexture(rect, pixel);
             GUI.color = old;
-        }
-
-        private void DrawCircle(Vector2 center, float radius, Color color)
-        {
-            Color old = GUI.color;
-            GUI.color = color;
-            GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), Texture2D.whiteTexture);
-            GUI.color = old;
-        }
-    }
-}
