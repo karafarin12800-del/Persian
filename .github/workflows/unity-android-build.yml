@@ -94,9 +94,12 @@ jobs:
           from pathlib import Path
 
           bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')
-          android_start = bootstrap.index('#if UNITY_ANDROID')
-          android_end = bootstrap.index('#else', android_start)
-          android_path = bootstrap[android_start:android_end]
+          world_start = bootstrap.index('private void BuildWorldBase()')
+          road_start = bootstrap.index('private void BuildAndroidRoadGrid()', world_start)
+          world_method = bootstrap[world_start:road_start]
+          android_start = world_method.index('#if UNITY_ANDROID')
+          android_end = world_method.index('#else', android_start)
+          android_path = world_method[android_start:android_end]
           assert 'Terrain3DBuilder' not in android_path, 'Android first-match path still references Terrain3DBuilder.'
           assert 'GameObject.CreatePrimitive' not in android_path, 'Android first-match path still uses CreatePrimitive.'
           assert 'CreateFlatMesh' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
