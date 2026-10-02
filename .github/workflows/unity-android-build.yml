@@ -87,7 +87,8 @@ jobs:
             fi
           done < <(find UnityProject/Assets -type f -print0)
           test "${missing_meta}" -eq 0
-          grep -q 'SpriteMeshType.FullRect' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
+          grep -q 'Resources.Load<Sprite>' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
+          ! grep -q 'Sprite.Create(' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
           grep -q 'followCamera.enabled = true' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
           grep -q 'if (minimapEnabled)' UnityProject/Assets/Scripts/Input/MobileInputHub.cs
           python3 - <<'PY'
