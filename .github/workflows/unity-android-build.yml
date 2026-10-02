@@ -161,10 +161,11 @@ jobs:
 
           mkdir -p .ci
           cleanup() {
-            sudo chown -R "$(id -u):$(id -g)" .ci UnityProject/Assets/Editor .ci-unity-home 2>/dev/null || true
+            sudo chown -R "$(id -u):$(id -g)" .ci UnityProject/Assets/Editor UnityProject/Assets/Tests .ci-unity-home 2>/dev/null || true
             rm -f .ci/unity-build.sh
             rm -f UnityProject/Assets/Editor/PersiaWarCiBuild.cs UnityProject/Assets/Editor/PersiaWarCiBuild.cs.meta
             rm -f UnityProject/Assets/Tests/PersiaWarStartupSmokeTests.cs UnityProject/Assets/Tests/PersiaWarStartupSmokeTests.cs.meta
+            rm -f UnityProject/Assets/Tests/PersiaWarStartupTests.asmdef UnityProject/Assets/Tests/PersiaWarStartupTests.asmdef.meta
             rmdir UnityProject/Assets/Tests 2>/dev/null || true
             rmdir UnityProject/Assets/Editor 2>/dev/null || true
             rm -rf .ci-unity-home
@@ -342,6 +343,30 @@ jobs:
 
           echo "=== Running Unity PlayMode startup smoke test ==="
           mkdir -p UnityProject/Assets/Tests /workspace/build
+          cat > UnityProject/Assets/Tests/PersiaWarStartupTests.asmdef <<'ASMDEF'
+          {
+            "name": "PersiaWarStartupTests",
+            "rootNamespace": "",
+            "references": [
+              "UnityEngine.TestRunner",
+              "UnityEditor.TestRunner"
+            ],
+            "includePlatforms": ["Editor"],
+            "excludePlatforms": [],
+            "allowUnsafeCode": false,
+            "overrideReferences": false,
+            "precompiledReferences": [],
+            "autoReferenced": true,
+            "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+            "versionDefines": [],
+            "noEngineReferences": false,
+            "optionalUnityReferences": ["TestAssemblies"]
+          }
+          ASMDEF
+          cat > UnityProject/Assets/Tests/PersiaWarStartupTests.asmdef.meta <<'META'
+          fileFormatVersion: 2
+          guid: 58c4d0e2c6f94767b19a0db5ce3b7a10
+          META
           cat > UnityProject/Assets/Tests/PersiaWarStartupSmokeTests.cs <<'CS'
           using System.Collections;
           using System.Collections.Generic;
