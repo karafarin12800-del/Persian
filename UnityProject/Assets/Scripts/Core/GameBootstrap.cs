@@ -188,7 +188,7 @@ namespace PersiaWar.Unity2D5D
             if (legacyGround != null) legacyGround.SetActive(false);
 
             if (worldRoot != null) Destroy(worldRoot.gameObject);
-            worldRoot = new GameObject("BattleRoyaleCity");
+            worldRoot = new GameObject("BattleRoyaleCity").transform;
 
             roadMaterial = MakeMaterial("Road", new Color(0.18f, 0.20f, 0.22f));
 
