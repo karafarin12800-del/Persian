@@ -24,6 +24,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+#if UNITY_ANDROID
+            androidTargetScanArmed = false;
+#endif
             if (weapon == null)
                 weapon = GetComponent<WeaponController>();
         }
