@@ -24,6 +24,8 @@ namespace PersiaWar.Unity2D5D
         private GrenadeController grenadeController;
         private bool minimapEnabled;
         private GUIStyle buttonTextStyle;
+        private EnemyChase[] androidRadarEnemies = System.Array.Empty<EnemyChase>();
+        private float nextAndroidRadarScanTime;
 
         public Vector2 MoveValue => moveValue;
 
@@ -81,6 +83,9 @@ namespace PersiaWar.Unity2D5D
             }
 
             if (minimapEnabled) EnsureMinimap();
+#if UNITY_ANDROID
+            UpdateAndroidRadarCache();
+#endif
 
 #if UNITY_EDITOR || UNITY_STANDALONE
             Vector2 keyboard = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
@@ -288,9 +293,18 @@ namespace PersiaWar.Unity2D5D
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f); float size = 150f * scale; Rect radar = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
             Color old = GUI.color; GUI.color = new Color(0.02f, 0.05f, 0.06f, 0.58f); GUI.DrawTexture(radar, Texture2D.whiteTexture); GUI.color = new Color(0.70f, 0.86f, 0.42f, 0.95f); GUI.Box(radar, GUIContent.none);
             Vector2 center = radar.center; float radarWorldRadius = 68f; DrawRadarBlip(center, 8f * scale, new Color(0.98f, 0.82f, 0.20f, 1f));
-            EnemyChase[] enemies = Object.FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+            EnemyChase[] enemies = androidRadarEnemies;
             for (int i = 0; i < enemies.Length; i++) { EnemyChase enemy = enemies[i]; if (enemy == null) continue; Vector3 delta = enemy.transform.position - player.transform.position; delta.y = 0f; if (delta.magnitude > radarWorldRadius) continue; Vector2 p = center + new Vector2(delta.x / radarWorldRadius, delta.z / radarWorldRadius) * (size * 0.44f); DrawRadarBlip(p, 6f * scale, new Color(0.95f, 0.18f, 0.12f, 1f)); }
             GUI.color = old;
+        }
+
+        private void UpdateAndroidRadarCache()
+        {
+#if UNITY_ANDROID
+            if (Time.unscaledTime < nextAndroidRadarScanTime) return;
+            nextAndroidRadarScanTime = Time.unscaledTime + 0.25f;
+            androidRadarEnemies = Object.FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+#endif
         }
 
         private void DrawRadarBlip(Vector2 center, float radius, Color color) { Color old = GUI.color; GUI.color = color; GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), Texture2D.whiteTexture); GUI.color = old; }
