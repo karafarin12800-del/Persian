@@ -225,10 +225,16 @@ namespace PersiaWar.Unity2D5D
 
         private void EnsureMinimap()
         {
+#if UNITY_ANDROID
+            // Android uses a draw-only radar below. Do not allocate a second camera or
+            // RenderTexture during live combat.
+            return;
+#else
             if (minimapCamera != null && minimapTexture != null)
                 return;
 
             CreateMinimap();
+#endif
         }
 
         private void CreateMinimap()
@@ -294,13 +300,8 @@ namespace PersiaWar.Unity2D5D
 #endif
 
 #if UNITY_ANDROID
-            // Android stability path: avoid Texture2D creation, GUI.skin access and
-            // custom texture drawing during the first activation of mobile input.
-            // Touch handling remains in Update(); this is presentation-only.
-            float androidScale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-            GUI.Box(new Rect(24f, Screen.height - 92f * androidScale, 150f * androidScale, 54f * androidScale), "MOVE");
-            GUI.Box(new Rect(Screen.width - 174f * androidScale, Screen.height - 92f * androidScale, 150f * androidScale, 54f * androidScale), "AIM / FIRE");
-            GUI.Box(new Rect(Screen.width - 270f * androidScale, Screen.height - 170f * androidScale, 88f * androidScale, 58f * androidScale), "G");
+            DrawAndroidTouchHud();
+            DrawAndroidRadar();
             return;
 #endif
 
@@ -347,6 +348,57 @@ namespace PersiaWar.Unity2D5D
                 GUI.DrawTexture(rect, minimapTexture, ScaleMode.StretchToFill, false);
                 GUI.Box(rect, GUIContent.none);
             }
+        }
+
+        private void DrawAndroidTouchHud()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
+            GUI.Box(new Rect(24f, Screen.height - 108f * scale, 175f * scale, 70f * scale), "MOVE");
+            GUI.Box(new Rect(Screen.width - 200f * scale, Screen.height - 108f * scale, 175f * scale, 70f * scale), "AIM / FIRE");
+            GUI.Box(new Rect(Screen.width - 302f * scale, Screen.height - 205f * scale, 92f * scale, 66f * scale), "G");
+        }
+
+        private void DrawAndroidRadar()
+        {
+            if (player == null) return;
+
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
+            float size = 150f * scale;
+            Rect radar = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
+
+            Color old = GUI.color;
+            GUI.color = new Color(0.02f, 0.05f, 0.06f, 0.58f);
+            GUI.DrawTexture(radar, Texture2D.whiteTexture);
+            GUI.color = new Color(0.70f, 0.86f, 0.42f, 0.95f);
+            GUI.Box(radar, GUIContent.none);
+
+            Vector2 center = radar.center;
+            float radarWorldRadius = 68f;
+            DrawRadarBlip(center, 8f * scale, new Color(0.98f, 0.82f, 0.20f, 1f));
+
+            EnemyChase[] enemies = Object.FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+            for (int i = 0; i < enemies.Length; i++)
+            {
+                EnemyChase enemy = enemies[i];
+                if (enemy == null) continue;
+
+                Vector3 delta = enemy.transform.position - player.transform.position;
+                delta.y = 0f;
+                if (delta.magnitude > radarWorldRadius) continue;
+
+                Vector2 p = center + new Vector2(delta.x / radarWorldRadius, delta.z / radarWorldRadius) * (size * 0.44f);
+                DrawRadarBlip(p, 6f * scale, new Color(0.95f, 0.18f, 0.12f, 1f));
+            }
+
+            GUI.color = old;
+        }
+
+        private void DrawRadarBlip(Vector2 center, float radius, Color color)
+        {
+            Color old = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), Texture2D.whiteTexture);
+            GUI.color = old;
         }
 
         private void DrawAimGuide(float scale)
