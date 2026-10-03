@@ -28,17 +28,14 @@ namespace PersiaWar.Unity2D5D
         public Vector2 MoveValue => moveValue;
 
 #if UNITY_ANDROID
-        // Diagnostic gate: lets PrototypeFlow enable the component without executing
-        // touch/UI code, so native activation can be isolated from input processing.
         private static bool androidExecutionArmed;
+        private static bool androidTouchProcessingArmed;
         public static void SetAndroidExecutionArmed(bool armed) => androidExecutionArmed = armed;
+        public static void SetAndroidTouchProcessingArmed(bool armed) => androidTouchProcessingArmed = armed;
 #endif
 
         public void EnableMinimap()
         {
-            // The production match enables the minimap after the main camera and player
-            // are ready. It uses the same lightweight secondary-camera path on Android
-            // as the established desktop implementation.
             minimapEnabled = true;
             StartupCheckpoint.Set("MinimapEnabled");
         }
@@ -46,9 +43,8 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
 #if UNITY_ANDROID
-            // Always keep the component alive; PrototypeFlow arms its internal execution
-            // gate only after the match/camera path is stable.
             androidExecutionArmed = false;
+            androidTouchProcessingArmed = false;
 #else
             if (player == null) player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null) gameplayCamera = Camera.main;
@@ -59,11 +55,7 @@ namespace PersiaWar.Unity2D5D
 
         private void OnDestroy()
         {
-            if (minimapTexture != null)
-            {
-                minimapTexture.Release();
-                Destroy(minimapTexture);
-            }
+            if (minimapTexture != null) { minimapTexture.Release(); Destroy(minimapTexture); }
             if (minimapCamera != null) Destroy(minimapCamera.gameObject);
             if (circleTexture != null) Destroy(circleTexture);
             if (lineTexture != null) Destroy(lineTexture);
@@ -72,7 +64,7 @@ namespace PersiaWar.Unity2D5D
         private void Update()
         {
 #if UNITY_ANDROID
-            if (!androidExecutionArmed)
+            if (!androidExecutionArmed || !androidTouchProcessingArmed)
                 return;
 #endif
             if (player == null)
@@ -82,25 +74,19 @@ namespace PersiaWar.Unity2D5D
                 grenadeController = player.Grenades;
             }
 
-            // The minimap is a secondary GPU allocation. Keep it out of the first gameplay
-            // frame and let PrototypeFlow enable it only after the match is visibly entered.
-            if (minimapEnabled)
-                EnsureMinimap();
+            if (minimapEnabled) EnsureMinimap();
 
 #if UNITY_EDITOR || UNITY_STANDALONE
             Vector2 keyboard = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
             if (keyboard.sqrMagnitude > 1f) keyboard.Normalize();
             player.SetMoveInput(keyboard);
-
             if (Input.GetKeyDown(KeyCode.R)) player.Weapon?.Reload();
             if (Input.GetKeyDown(KeyCode.Space)) player.Weapon?.TryMelee();
             if (Input.GetKeyDown(KeyCode.G)) ThrowGrenadeAtTarget();
-            if (Input.GetMouseButton(0) && Time.time >= nextFireTime)
-                FireAtNearestTarget();
+            if (Input.GetMouseButton(0) && Time.time >= nextFireTime) FireAtNearestTarget();
 #else
             HandleTouches();
 #endif
-
             UpdateMinimap();
         }
 
@@ -115,29 +101,11 @@ namespace PersiaWar.Unity2D5D
             {
                 Touch touch = Input.GetTouch(i);
                 if (touch.phase != TouchPhase.Began) continue;
-
                 bool leftSide = touch.position.x < Screen.width * 0.48f;
-                if (leftSide && movePointerId < 0)
-                {
-                    movePointerId = touch.fingerId;
-                    moveStartScreen = touch.position;
-                    moveValue = Vector2.zero;
-                    continue;
-                }
-
+                if (leftSide && movePointerId < 0) { movePointerId = touch.fingerId; moveStartScreen = touch.position; moveValue = Vector2.zero; continue; }
                 Vector2 touchGuiPosition = new Vector2(touch.position.x, Screen.height - touch.position.y);
-                if (!leftSide && grenadePointerId < 0 && Vector2.Distance(touchGuiPosition, grenadeGuiPos) <= grenadeRadius)
-                {
-                    grenadePointerId = touch.fingerId;
-                    ThrowGrenadeAtTarget();
-                    continue;
-                }
-
-                if (!leftSide && firePointerId < 0)
-                {
-                    firePointerId = touch.fingerId;
-                    FireAtNearestTarget();
-                }
+                if (!leftSide && grenadePointerId < 0 && Vector2.Distance(touchGuiPosition, grenadeGuiPos) <= grenadeRadius) { grenadePointerId = touch.fingerId; ThrowGrenadeAtTarget(); continue; }
+                if (!leftSide && firePointerId < 0) { firePointerId = touch.fingerId; FireAtNearestTarget(); }
             }
 
             if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch moveTouch))
@@ -145,63 +113,32 @@ namespace PersiaWar.Unity2D5D
                 Vector2 delta = moveTouch.position - moveStartScreen;
                 moveValue = Vector2.ClampMagnitude(delta / joystickRadius, 1f);
                 player.SetMoveInput(moveValue);
-
-                if (moveTouch.phase == TouchPhase.Ended || moveTouch.phase == TouchPhase.Canceled)
-                {
-                    movePointerId = -1;
-                    moveValue = Vector2.zero;
-                    player.SetMoveInput(Vector2.zero);
-                }
+                if (moveTouch.phase == TouchPhase.Ended || moveTouch.phase == TouchPhase.Canceled) { movePointerId = -1; moveValue = Vector2.zero; player.SetMoveInput(Vector2.zero); }
             }
-            else if (movePointerId >= 0)
-            {
-                movePointerId = -1;
-                moveValue = Vector2.zero;
-                player.SetMoveInput(Vector2.zero);
-            }
-            else
-            {
-                player.SetMoveInput(Vector2.zero);
-            }
+            else if (movePointerId >= 0) { movePointerId = -1; moveValue = Vector2.zero; player.SetMoveInput(Vector2.zero); }
+            else player.SetMoveInput(Vector2.zero);
 
             if (firePointerId >= 0 && TryGetTouch(firePointerId, out Touch fireTouch))
             {
-                if (Time.time >= nextFireTime)
-                    FireAtNearestTarget();
-
-                if (fireTouch.phase == TouchPhase.Ended || fireTouch.phase == TouchPhase.Canceled)
-                    firePointerId = -1;
+                if (Time.time >= nextFireTime) FireAtNearestTarget();
+                if (fireTouch.phase == TouchPhase.Ended || fireTouch.phase == TouchPhase.Canceled) firePointerId = -1;
             }
-            else if (firePointerId >= 0)
-            {
-                firePointerId = -1;
-            }
+            else if (firePointerId >= 0) firePointerId = -1;
 
             if (grenadePointerId >= 0 && TryGetTouch(grenadePointerId, out Touch grenadeTouch))
             {
-                if (grenadeTouch.phase == TouchPhase.Ended || grenadeTouch.phase == TouchPhase.Canceled)
-                    grenadePointerId = -1;
+                if (grenadeTouch.phase == TouchPhase.Ended || grenadeTouch.phase == TouchPhase.Canceled) grenadePointerId = -1;
             }
-            else if (grenadePointerId >= 0)
-            {
-                grenadePointerId = -1;
-            }
+            else if (grenadePointerId >= 0) grenadePointerId = -1;
         }
 
         private void FireAtNearestTarget()
         {
             if (player == null || player.IsDefeated || player.Aim == null) return;
             if (Time.time < nextFireTime) return;
-
             TargetHealth target = player.Aim.CurrentTarget;
-            if (target != null && player.Aim.FireAt(target.transform.position))
-            {
-                nextFireTime = Time.time + fireRepeatInterval;
-            }
-            else if (player.Weapon != null && player.Weapon.Magazine <= 0)
-            {
-                player.Weapon.Reload();
-            }
+            if (target != null && player.Aim.FireAt(target.transform.position)) nextFireTime = Time.time + fireRepeatInterval;
+            else if (player.Weapon != null && player.Weapon.Magazine <= 0) player.Weapon.Reload();
         }
 
         private void ThrowGrenadeAtTarget()
@@ -209,75 +146,39 @@ namespace PersiaWar.Unity2D5D
             if (player == null || player.IsDefeated) return;
             if (grenadeController == null) grenadeController = player.Grenades;
             if (grenadeController == null || grenadeController.Grenades <= 0) return;
-
             Vector3 direction = player.transform.forward;
             TargetHealth target = player.Aim != null ? player.Aim.CurrentTarget : null;
-            if (target != null)
-            {
-                Vector3 delta = target.transform.position - player.transform.position;
-                delta.y = 0f;
-                if (delta.sqrMagnitude > 0.001f)
-                    direction = delta.normalized;
-            }
-
+            if (target != null) { Vector3 delta = target.transform.position - player.transform.position; delta.y = 0f; if (delta.sqrMagnitude > 0.001f) direction = delta.normalized; }
             grenadeController.Throw(new Vector2(direction.x, direction.z));
         }
 
         private void EnsureMinimap()
         {
 #if UNITY_ANDROID
-            // Android uses a draw-only radar below. Do not allocate a second camera or
-            // RenderTexture during live combat.
             return;
 #else
-            if (minimapCamera != null && minimapTexture != null)
-                return;
-
+            if (minimapCamera != null && minimapTexture != null) return;
             CreateMinimap();
 #endif
         }
 
         private void CreateMinimap()
         {
-            if (minimapCamera != null || minimapTexture != null)
-                return;
-
+            if (minimapCamera != null || minimapTexture != null) return;
             GameObject mapObject = new GameObject("MinimapCamera");
             mapObject.hideFlags = HideFlags.HideAndDontSave;
             minimapCamera = mapObject.AddComponent<Camera>();
-            minimapCamera.orthographic = true;
-            minimapCamera.orthographicSize = 96f;
-            minimapCamera.nearClipPlane = 0.1f;
-            minimapCamera.farClipPlane = 350f;
-            minimapCamera.clearFlags = CameraClearFlags.SolidColor;
-            minimapCamera.backgroundColor = new Color(0.06f, 0.07f, 0.08f, 1f);
-            minimapCamera.enabled = true;
-
-            minimapTexture = new RenderTexture(256, 256, 16, RenderTextureFormat.ARGB32);
-            minimapTexture.name = "GameplayMinimap";
-            minimapTexture.filterMode = FilterMode.Bilinear;
-            minimapTexture.Create();
-            minimapCamera.targetTexture = minimapTexture;
+            minimapCamera.orthographic = true; minimapCamera.orthographicSize = 96f; minimapCamera.nearClipPlane = 0.1f; minimapCamera.farClipPlane = 350f;
+            minimapCamera.clearFlags = CameraClearFlags.SolidColor; minimapCamera.backgroundColor = new Color(0.06f, 0.07f, 0.08f, 1f); minimapCamera.enabled = true;
+            minimapTexture = new RenderTexture(256, 256, 16, RenderTextureFormat.ARGB32); minimapTexture.name = "GameplayMinimap"; minimapTexture.filterMode = FilterMode.Bilinear; minimapTexture.Create(); minimapCamera.targetTexture = minimapTexture;
         }
 
         private void CreateGuiTextures()
         {
             circleTexture = new Texture2D(64, 64, TextureFormat.RGBA32, false);
-            lineTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            lineTexture.SetPixel(0, 0, Color.white);
-            lineTexture.Apply();
-
-            Vector2 center = new Vector2(31.5f, 31.5f);
-            float radius = 31f;
-            for (int y = 0; y < 64; y++)
-            {
-                for (int x = 0; x < 64; x++)
-                {
-                    float distance = Vector2.Distance(new Vector2(x, y), center);
-                    float alpha = Mathf.Clamp01(radius + 0.5f - distance);
-                    circleTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
-                }
-            }
+            lineTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false); lineTexture.SetPixel(0, 0, Color.white); lineTexture.Apply();
+            Vector2 center = new Vector2(31.5f, 31.5f); float radius = 31f;
+            for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++) { float distance = Vector2.Distance(new Vector2(x, y), center); float alpha = Mathf.Clamp01(radius + 0.5f - distance); circleTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha)); }
             circleTexture.Apply();
         }
 
@@ -287,8 +188,7 @@ namespace PersiaWar.Unity2D5D
             return;
 #else
             if (minimapCamera == null || player == null) return;
-            minimapCamera.transform.position = player.transform.position + Vector3.up * 120f;
-            minimapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            minimapCamera.transform.position = player.transform.position + Vector3.up * 120f; minimapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
 #endif
         }
 
@@ -298,56 +198,24 @@ namespace PersiaWar.Unity2D5D
 #if UNITY_ANDROID
             if (!androidExecutionArmed) return;
 #endif
-
-#if UNITY_ANDROID
             DrawAndroidTouchHud();
+#if UNITY_ANDROID
             DrawAndroidRadar();
             return;
 #endif
-
-            if (circleTexture == null || lineTexture == null)
-                CreateGuiTextures();
-
+            if (circleTexture == null || lineTexture == null) CreateGuiTextures();
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-            float radius = joystickRadius * scale;
-            Vector2 defaultBase = new Vector2(120f * scale, Screen.height - 140f * scale);
-            Vector2 basePos = movePointerId >= 0
-                ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y)
-                : defaultBase;
-            Vector2 knobPos = basePos + new Vector2(moveValue.x, -moveValue.y) * radius;
-            Vector2 firePos = new Vector2(Screen.width - 120f * scale, Screen.height - 140f * scale);
-            Vector2 grenadePos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
-
-            DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.34f));
-            DrawCircle(knobPos, radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
-
-            DrawCircle(firePos, radius * 0.72f, new Color(0.65f, 0.12f, 0.08f, firePointerId >= 0 ? 0.50f : 0.28f));
-            DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
-
+            float radius = joystickRadius * scale; Vector2 defaultBase = new Vector2(120f * scale, Screen.height - 140f * scale);
+            Vector2 basePos = movePointerId >= 0 ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y) : defaultBase;
+            Vector2 knobPos = basePos + new Vector2(moveValue.x, -moveValue.y) * radius; Vector2 firePos = new Vector2(Screen.width - 120f * scale, Screen.height - 140f * scale); Vector2 grenadePos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
+            DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.34f)); DrawCircle(knobPos, radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
+            DrawCircle(firePos, radius * 0.72f, new Color(0.65f, 0.12f, 0.08f, firePointerId >= 0 ? 0.50f : 0.28f)); DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
             DrawCircle(grenadePos, radius * 0.56f, new Color(0.32f, 0.24f, 0.10f, grenadePointerId >= 0 ? 0.55f : 0.32f));
-            if (buttonTextStyle == null)
-            {
-                buttonTextStyle = new GUIStyle(GUI.skin.label)
-                {
-                    fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleCenter
-                };
-            }
+            if (buttonTextStyle == null) buttonTextStyle = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             buttonTextStyle.fontSize = Mathf.RoundToInt(20f * scale);
-
-            GUI.Label(new Rect(grenadePos.x - radius * 0.5f, grenadePos.y - radius * 0.5f, radius, radius), "G", buttonTextStyle);
-            GUI.Label(new Rect(firePos.x - radius, firePos.y + radius * 0.52f, radius * 2f, 26f * scale), "AIM / FIRE", buttonTextStyle);
-            GUI.Label(new Rect(basePos.x - radius, basePos.y + radius * 0.52f, radius * 2f, 26f * scale), "MOVE", buttonTextStyle);
-
+            GUI.Label(new Rect(grenadePos.x - radius * 0.5f, grenadePos.y - radius * 0.5f, radius, radius), "G", buttonTextStyle); GUI.Label(new Rect(firePos.x - radius, firePos.y + radius * 0.52f, radius * 2f, 26f * scale), "AIM / FIRE", buttonTextStyle); GUI.Label(new Rect(basePos.x - radius, basePos.y + radius * 0.52f, radius * 2f, 26f * scale), "MOVE", buttonTextStyle);
             DrawAimGuide(scale);
-
-            if (minimapTexture != null)
-            {
-                float size = minimapSize * scale;
-                Rect rect = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
-                GUI.DrawTexture(rect, minimapTexture, ScaleMode.StretchToFill, false);
-                GUI.Box(rect, GUIContent.none);
-            }
+            if (minimapTexture != null) { float size = minimapSize * scale; Rect rect = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size); GUI.DrawTexture(rect, minimapTexture, ScaleMode.StretchToFill, false); GUI.Box(rect, GUIContent.none); }
         }
 
         private void DrawAndroidTouchHud()
@@ -361,103 +229,39 @@ namespace PersiaWar.Unity2D5D
         private void DrawAndroidRadar()
         {
             if (player == null) return;
-
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-            float size = 150f * scale;
-            Rect radar = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
-
-            Color old = GUI.color;
-            GUI.color = new Color(0.02f, 0.05f, 0.06f, 0.58f);
-            GUI.DrawTexture(radar, Texture2D.whiteTexture);
-            GUI.color = new Color(0.70f, 0.86f, 0.42f, 0.95f);
-            GUI.Box(radar, GUIContent.none);
-
-            Vector2 center = radar.center;
-            float radarWorldRadius = 68f;
-            DrawRadarBlip(center, 8f * scale, new Color(0.98f, 0.82f, 0.20f, 1f));
-
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f); float size = 150f * scale; Rect radar = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
+            Color old = GUI.color; GUI.color = new Color(0.02f, 0.05f, 0.06f, 0.58f); GUI.DrawTexture(radar, Texture2D.whiteTexture); GUI.color = new Color(0.70f, 0.86f, 0.42f, 0.95f); GUI.Box(radar, GUIContent.none);
+            Vector2 center = radar.center; float radarWorldRadius = 68f; DrawRadarBlip(center, 8f * scale, new Color(0.98f, 0.82f, 0.20f, 1f));
             EnemyChase[] enemies = Object.FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
-            for (int i = 0; i < enemies.Length; i++)
-            {
-                EnemyChase enemy = enemies[i];
-                if (enemy == null) continue;
-
-                Vector3 delta = enemy.transform.position - player.transform.position;
-                delta.y = 0f;
-                if (delta.magnitude > radarWorldRadius) continue;
-
-                Vector2 p = center + new Vector2(delta.x / radarWorldRadius, delta.z / radarWorldRadius) * (size * 0.44f);
-                DrawRadarBlip(p, 6f * scale, new Color(0.95f, 0.18f, 0.12f, 1f));
-            }
-
+            for (int i = 0; i < enemies.Length; i++) { EnemyChase enemy = enemies[i]; if (enemy == null) continue; Vector3 delta = enemy.transform.position - player.transform.position; delta.y = 0f; if (delta.magnitude > radarWorldRadius) continue; Vector2 p = center + new Vector2(delta.x / radarWorldRadius, delta.z / radarWorldRadius) * (size * 0.44f); DrawRadarBlip(p, 6f * scale, new Color(0.95f, 0.18f, 0.12f, 1f)); }
             GUI.color = old;
         }
 
-        private void DrawRadarBlip(Vector2 center, float radius, Color color)
-        {
-            Color old = GUI.color;
-            GUI.color = color;
-            GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), Texture2D.whiteTexture);
-            GUI.color = old;
-        }
+        private void DrawRadarBlip(Vector2 center, float radius, Color color) { Color old = GUI.color; GUI.color = color; GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), Texture2D.whiteTexture); GUI.color = old; }
 
         private void DrawAimGuide(float scale)
         {
-            if (player == null || player.Aim == null || player.Aim.CurrentTarget == null || lineTexture == null)
-                return;
-
-            Camera cam = gameplayCamera != null ? gameplayCamera : Camera.main;
-            if (cam == null) return;
-
-            Vector3 from = cam.WorldToScreenPoint(player.transform.position + Vector3.up * 0.8f);
-            Vector3 to = cam.WorldToScreenPoint(player.Aim.CurrentTarget.transform.position + Vector3.up * 0.75f);
-            if (from.z <= 0f || to.z <= 0f) return;
-            from.y = Screen.height - from.y;
-            to.y = Screen.height - to.y;
-
-            DrawLine(from, to, Mathf.Max(2f, 3f * scale), new Color(1f, 0.85f, 0.2f, 0.55f));
-            float targetSize = 18f * scale;
-            DrawCircle(new Vector2(to.x, to.y), targetSize, new Color(1f, 0.18f, 0.10f, 0.32f));
+            if (player == null || player.Aim == null || player.Aim.CurrentTarget == null || lineTexture == null) return;
+            Camera cam = gameplayCamera != null ? gameplayCamera : Camera.main; if (cam == null) return;
+            Vector3 from = cam.WorldToScreenPoint(player.transform.position + Vector3.up * 0.8f); Vector3 to = cam.WorldToScreenPoint(player.Aim.CurrentTarget.transform.position + Vector3.up * 0.75f); if (from.z <= 0f || to.z <= 0f) return;
+            from.y = Screen.height - from.y; to.y = Screen.height - to.y; DrawLine(from, to, Mathf.Max(2f, 3f * scale), new Color(1f, 0.85f, 0.2f, 0.55f)); DrawCircle(new Vector2(to.x, to.y), 18f * scale, new Color(1f, 0.18f, 0.10f, 0.32f));
         }
 
         private void DrawLine(Vector2 start, Vector2 end, float width, Color color)
         {
-            Vector2 delta = end - start;
-            float length = delta.magnitude;
-            if (length <= 0.01f) return;
-
-            Matrix4x4 oldMatrix = GUI.matrix;
-            Color oldColor = GUI.color;
-            GUI.color = color;
-            GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, start);
-            GUI.DrawTexture(new Rect(start.x, start.y - width * 0.5f, length, width), lineTexture);
-            GUI.matrix = oldMatrix;
-            GUI.color = oldColor;
+            Vector2 delta = end - start; float length = delta.magnitude; if (length <= 0.01f) return;
+            Matrix4x4 oldMatrix = GUI.matrix; Color oldColor = GUI.color; GUI.color = color; GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, start); GUI.DrawTexture(new Rect(start.x, start.y - width * 0.5f, length, width), lineTexture); GUI.matrix = oldMatrix; GUI.color = oldColor;
         }
 
         private void DrawCircle(Vector2 center, float radius, Color color)
         {
-            if (circleTexture == null) return;
-            Color old = GUI.color;
-            GUI.color = color;
-            GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), circleTexture, ScaleMode.StretchToFill, true);
-            GUI.color = old;
+            if (circleTexture == null) return; Color old = GUI.color; GUI.color = color; GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), circleTexture, ScaleMode.StretchToFill, true); GUI.color = old;
         }
 
         private static bool TryGetTouch(int fingerId, out Touch touch)
         {
-            for (int i = 0; i < Input.touchCount; i++)
-            {
-                Touch current = Input.GetTouch(i);
-                if (current.fingerId == fingerId)
-                {
-                    touch = current;
-                    return true;
-                }
-            }
-
-            touch = default;
-            return false;
+            for (int i = 0; i < Input.touchCount; i++) { Touch current = Input.GetTouch(i); if (current.fingerId == fingerId) { touch = current; return true; } }
+            touch = default; return false;
         }
     }
 }
