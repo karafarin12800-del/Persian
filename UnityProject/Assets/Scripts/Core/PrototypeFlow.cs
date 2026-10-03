@@ -135,7 +135,10 @@ namespace PersiaWar.Unity2D5D
             if (mode == ScreenMode.Match)
             {
 #if UNITY_ANDROID
-                DrawAndroidStabilityStatus();
+                if (string.Equals(startupStatus, "MATCH STABLE", System.StringComparison.Ordinal))
+                    DrawAndroidMatchHud();
+                else
+                    DrawAndroidStabilityStatus();
 #endif
                 return;
             }
@@ -525,9 +528,10 @@ namespace PersiaWar.Unity2D5D
         {
             GameObject cameraObject = new GameObject("AndroidGameplayCamera");
             Camera camera = cameraObject.AddComponent<Camera>();
+            camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.08f, 0.09f, 0.10f, 1f);
-            camera.fieldOfView = 55f;
+            camera.fieldOfView = 48f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
             camera.allowHDR = false;
@@ -535,12 +539,31 @@ namespace PersiaWar.Unity2D5D
 
             if (target != null)
             {
-                cameraObject.transform.position = target.position + new Vector3(0f, 14f, -14f);
-                cameraObject.transform.rotation = Quaternion.Euler(52f, 0f, 0f);
+                cameraObject.transform.position = target.position + new Vector3(0f, 9.5f, -11f);
+                cameraObject.transform.LookAt(target.position + Vector3.up * 0.8f);
             }
 
             camera.enabled = false;
             return camera;
+        }
+
+        private void LateUpdate()
+        {
+#if UNITY_ANDROID
+            if (androidRuntimeCamera == null || player == null)
+                return;
+
+            Vector3 desired = player.transform.position + new Vector3(0f, 9.5f, -11f);
+            androidRuntimeCamera.transform.position = Vector3.Lerp(
+                androidRuntimeCamera.transform.position,
+                desired,
+                1f - Mathf.Exp(-10f * Time.deltaTime));
+
+            Vector3 lookTarget = player.transform.position + Vector3.up * 0.8f;
+            Vector3 direction = lookTarget - androidRuntimeCamera.transform.position;
+            if (direction.sqrMagnitude > 0.001f)
+                androidRuntimeCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+#endif
         }
 
         private IEnumerator EnableCameraAfterSafeFrames(Camera activeCamera, CameraFollow25D followCamera)
@@ -610,19 +633,34 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("AndroidMatchVisible");
             StartupCheckpoint.Set("MatchServicesReady");
 
-            // Leave optional systems dormant on Android until a real device smoke test
-            // proves the base match is stable. This is intentionally not a gameplay
-            // freeze: the player/camera/world are already live.
-            matchInputArmed = false;
-            MobileInputHub.SetAndroidExecutionArmed(false);
+            // Optional gameplay systems are opened only after the camera/world has
+            // rendered cleanly. This keeps scene activation isolated while still making
+            // the resulting match genuinely playable on a normal device.
+            matchInputArmed = true;
+            MobileInputHub.SetAndroidExecutionArmed(true);
 
             if (mobileInput != null)
-                mobileInput.enabled = false;
-            if (combatHud != null)
-                combatHud.enabled = false;
-            if (enemySpawner != null)
-                enemySpawner.enabled = false;
+            {
+                mobileInput.enabled = true;
+                StartupCheckpoint.Set("AndroidMobileInputEnabled");
+            }
 
+            // Let the input stack establish its first clean frame before starting the
+            // first enemy wave. Enemy creation remains deliberately deferred.
+            for (int i = 0; i < 90; i++)
+                yield return null;
+
+            if (this == null || !isActiveAndEnabled)
+                yield break;
+
+            if (enemySpawner != null && player != null)
+            {
+                enemySpawner.Configure(player.transform, 4, 32f, 0f);
+                enemySpawner.enabled = true;
+                StartupCheckpoint.Set("AndroidEnemySpawnerEnabled");
+            }
+
+            StartupCheckpoint.Set("AndroidGameplaySystemsEnabled");
             yield break;
 #else
             yield return null;
@@ -710,6 +748,40 @@ namespace PersiaWar.Unity2D5D
             float x = Mathf.InverseLerp(-96f, 96f, world.x);
             float y = Mathf.InverseLerp(96f, -96f, world.y);
             return new Vector2(rect.x + x * rect.width, rect.y + y * rect.height);
+        }
+
+        private void DrawAndroidMatchHud()
+        {
+            EnsureUiInitialized();
+
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
+
+            Rect card = new Rect(18f * scale, 18f * scale, 315f * scale, 92f * scale);
+            Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.88f));
+            Fill(new Rect(card.x, card.y, 5f * scale, card.height), new Color(0.92f, 0.66f, 0.18f, 1f));
+
+            GUI.Label(
+                new Rect(card.x + 18f * scale, card.y + 8f * scale, card.width - 26f * scale, 28f * scale),
+                "PERSIA WAR  •  BATTLEFIELD 01",
+                smallStyle);
+
+            int hp = player != null && player.Health != null ? player.Health.CurrentHealth : 100;
+            int maxHp = player != null && player.Health != null ? player.Health.MaxHealth : 100;
+            float hp01 = maxHp > 0 ? Mathf.Clamp01(hp / (float)maxHp) : 0f;
+
+            Rect hpBack = new Rect(card.x + 18f * scale, card.y + 47f * scale, 205f * scale, 14f * scale);
+            Fill(hpBack, new Color(0.10f, 0.12f, 0.14f, 1f));
+            Fill(new Rect(hpBack.x, hpBack.y, hpBack.width * hp01, hpBack.height),
+                new Color(0.18f, 0.72f, 0.32f, 1f));
+            GUI.Label(
+                new Rect(hpBack.x + hpBack.width + 10f * scale, hpBack.y - 5f * scale, 72f * scale, 24f * scale),
+                hp + " / " + maxHp,
+                smallStyle);
+
+            GUI.Label(
+                new Rect(card.x + 18f * scale, card.y + 67f * scale, card.width - 25f * scale, 22f * scale),
+                "MOVE  •  AIM / FIRE  •  G = GRENADE",
+                smallStyle);
         }
 
         private void DrawAndroidStabilityStatus()
