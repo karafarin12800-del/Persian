@@ -169,6 +169,9 @@ namespace PersiaWar.Unity2D5D
             else
             {
                 failedSpawnAttempts = 0;
+#if UNITY_ANDROID
+                NearestTargetAim.SetAndroidTargetScanArmed(true);
+#endif
                 if (GameSession.Instance != null)
                     GameSession.Instance.SetWave(currentWave);
 
