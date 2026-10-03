@@ -22,6 +22,7 @@ namespace PersiaWar.Unity2D5D
         private MobileInputHub mobileInput;
         private RuntimeCombatHUD combatHud;
         private CameraFollow25D followCamera;
+        private Camera androidRuntimeCamera;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
@@ -453,11 +454,23 @@ namespace PersiaWar.Unity2D5D
             startupStatus = "Stage 10: activating world bounds...";
             yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
             startupStatus = "Stage 11: preparing main camera...";
-            // Do not let the camera render or run LateUpdate while its target/root is
-            // being activated. On Android the previous sequence exposed one frame where
-            // CameraFollow could scan for a target before the player/camera state was
-            // fully established. Keep both components disabled until the final hand-off.
-            Camera activeCamera = mainCameraRoot != null
+
+            // Set the player position before touching any camera lifecycle. On Android,
+            // the scene camera root is intentionally left dormant: activating that
+            // serialized GameObject can invoke camera-side OnEnable callbacks during
+            // the same critical frame as match startup.
+            player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
+            ApplyHeroStyle(selectedHero);
+
+#if UNITY_ANDROID
+            // Use a completely isolated runtime camera for Android. It has no
+            // CameraFollow component and therefore cannot trigger the previous
+            // target/lifecycle race when the scene camera is activated.
+            androidRuntimeCamera = CreateAndroidRuntimeCamera(player.transform);
+            activeCamera = androidRuntimeCamera;
+            followCamera = null;
+#else
+            activeCamera = mainCameraRoot != null
                 ? mainCameraRoot.GetComponent<Camera>()
                 : null;
             followCamera = activeCamera != null
@@ -471,27 +484,18 @@ namespace PersiaWar.Unity2D5D
 
             yield return ActivateRoot(mainCameraRoot, "Main Camera");
 
-            player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
-            ApplyHeroStyle(selectedHero);
-
             if (followCamera != null)
                 followCamera.SetTarget(player.transform);
-
-            // Enable the follow script first with a valid target, then enable rendering.
-            // This removes the null-target/first-frame camera race from Android startup.
-            // Android isolation mode: do not render the gameplay camera on the same
-            // frame as match activation. The previous crash still occurred after the
-            // camera hand-off, so keep the camera completely out of the critical path
-            // until several clean gameplay frames have elapsed.
-#if UNITY_ANDROID
-            // Android camera activation is performed once in InitializeMatchServices()
-            // after the core/player path has remained stable.
-#else
             if (followCamera != null)
                 followCamera.enabled = true;
             if (activeCamera != null)
                 activeCamera.enabled = true;
 #endif
+
+            if (activeCamera != null)
+                activeCamera.enabled = false;
+            if (followCamera != null)
+                followCamera.enabled = false;
 
             // Android diagnostic gate: keep every optional subsystem disabled while the
             // first post-match frames are proven stable. We then enable camera, input,
@@ -514,6 +518,28 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("MatchStarted");
             StartCoroutine(InitializeMatchServices());
 #endif
+        }
+
+        private Camera CreateAndroidRuntimeCamera(Transform target)
+        {
+            GameObject cameraObject = new GameObject("AndroidGameplayCamera");
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.08f, 0.09f, 0.10f, 1f);
+            camera.fieldOfView = 55f;
+            camera.nearClipPlane = 0.1f;
+            camera.farClipPlane = 240f;
+            camera.allowHDR = false;
+            camera.allowMSAA = false;
+
+            if (target != null)
+            {
+                cameraObject.transform.position = target.position + new Vector3(0f, 14f, -14f);
+                cameraObject.transform.rotation = Quaternion.Euler(52f, 0f, 0f);
+            }
+
+            camera.enabled = false;
+            return camera;
         }
 
         private IEnumerator EnableCameraAfterSafeFrames(Camera activeCamera, CameraFollow25D followCamera)
@@ -555,12 +581,12 @@ namespace PersiaWar.Unity2D5D
             // startup isolation sequence here. Touch, HUD and enemies stay disabled
             // until the basic match is visibly running; there is no timed multi-stage
             // gate that can make the game appear frozen.
-            Camera activeCamera = mainCameraRoot != null
-                ? mainCameraRoot.GetComponent<Camera>()
-                : null;
-            CameraFollow25D follow = activeCamera != null
-                ? activeCamera.GetComponent<CameraFollow25D>()
-                : null;
+            Camera activeCamera = androidRuntimeCamera != null
+                ? androidRuntimeCamera
+                : (mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null);
+            CameraFollow25D follow = androidRuntimeCamera != null
+                ? null
+                : (activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null);
 
             StartupCheckpoint.Set("AndroidCameraActivationStarted");
 
