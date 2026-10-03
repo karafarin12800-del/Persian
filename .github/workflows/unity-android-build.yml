@@ -91,7 +91,10 @@ jobs:
           grep -q 'Resources.Load<Sprite>' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
           ! grep -q 'Sprite.Create(' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
           grep -q 'followCamera.enabled = true' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
-          grep -q 'if (minimapEnabled)' UnityProject/Assets/Scripts/Input/MobileInputHub.cs
+          grep -q 'combatHud.enabled = true' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
+          grep -q 'enemySpawner.Configure(player.transform, 8, 44f, 0f)' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
+          grep -q 'minimapEnabled = true' UnityProject/Assets/Scripts/Input/MobileInputHub.cs
+          ! grep -q 'PrototypeFlowMainGameLaunchQueued' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
           python3 - <<'PY'
           from pathlib import Path
 
@@ -102,9 +105,9 @@ jobs:
           android_start = world_method.index('#if UNITY_ANDROID')
           android_end = world_method.index('#else', android_start)
           android_path = world_method[android_start:android_end]
-          assert 'AddComponent<Terrain3DBuilder>' not in android_path and 'terrain.Build()' not in android_path, 'Android first-match path still invokes Terrain3DBuilder.'
-          assert 'GameObject.CreatePrimitive' not in android_path, 'Android first-match path still uses CreatePrimitive.'
-          assert 'CreateFlatMesh' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
+          assert 'GameObject.CreatePrimitive' not in android_path, 'Android production path still uses GameObject.CreatePrimitive.'
+          assert 'CreateFlatMesh' in android_path, 'Android production path must keep the lightweight flat-mesh ground helper.'
+          assert 'BuildAndroidCityPresentation' in android_path, 'Android production path must build the city presentation.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           awake = weapon[weapon.index('private void Awake()'):weapon.index('private void EnsureProjectileTemplate()')]
