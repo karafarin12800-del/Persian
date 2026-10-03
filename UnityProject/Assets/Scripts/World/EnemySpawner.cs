@@ -28,6 +28,14 @@ namespace PersiaWar.Unity2D5D
             player = playerTransform;
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
+            initialWaveComplete = false;
+            failedSpawnAttempts = 0;
+            TryStartInitialWave();
+        }
+
+        private void OnEnable()
+        {
+            TryStartInitialWave();
         }
 
         private void Start()
@@ -38,10 +46,16 @@ namespace PersiaWar.Unity2D5D
                 if (found != null) player = found.transform;
             }
 
-            // Enemy construction is deliberately delayed until the gameplay scene has
-            // had time to render and finish its procedural world startup on Android.
-            if (player != null)
-                StartCoroutine(SpawnInitialWaveAfterStartup());
+            TryStartInitialWave();
+        }
+
+        private void TryStartInitialWave()
+        {
+            if (player == null || !isActiveAndEnabled || initialWavePending || initialWaveComplete)
+                return;
+
+            initialWavePending = true;
+            StartCoroutine(SpawnInitialWaveAfterStartup());
         }
 
         private IEnumerator SpawnInitialWaveAfterStartup()
