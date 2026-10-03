@@ -504,10 +504,31 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             startupStatus = string.Empty;
             StartupCheckpoint.Set("MatchStarted");
-            // Diagnostic step: enable ONLY mobile input. Combat HUD and enemy spawning stay\n            // dormant so the next phone test isolates MobileInput from the other post-match services.\n            StartCoroutine(InitializeMobileInputOnly());
+            // Diagnostic step: enable ONLY mobile input. Combat HUD and enemy spawning stay
+            // dormant so the next phone test isolates MobileInput from the other post-match services.
+            StartCoroutine(InitializeMobileInputOnly());
         }
 
-        private IEnumerator InitializeMobileInputOnly()\n        {\n            yield return null;\n            if (mobileInput == null)\n                mobileInput = mobileInputRoot != null ? mobileInputRoot.GetComponent<MobileInputHub>() : null;\n            if (mobileInput == null)\n            {\n                StartupCheckpoint.Set("MobileInputMissing");\n                yield break;\n            }\n#if UNITY_ANDROID\n            MobileInputHub.SetAndroidExecutionArmed(true);\n#endif\n            matchInputArmed = true;\n            mobileInput.enabled = true;\n            mobileInput.EnableMinimap();\n            StartupCheckpoint.Set("MobileInputEnabledOnly");\n        }\n\n        private IEnumerator InitializeMatchServices()
+        private IEnumerator InitializeMobileInputOnly()
+        {
+            yield return null;
+            if (mobileInput == null)
+                mobileInput = mobileInputRoot != null ? mobileInputRoot.GetComponent<MobileInputHub>() : null;
+            if (mobileInput == null)
+            {
+                StartupCheckpoint.Set("MobileInputMissing");
+                yield break;
+            }
+#if UNITY_ANDROID
+            MobileInputHub.SetAndroidExecutionArmed(true);
+#endif
+            matchInputArmed = true;
+            mobileInput.enabled = true;
+            mobileInput.EnableMinimap();
+            StartupCheckpoint.Set("MobileInputEnabledOnly");
+        }
+
+        private IEnumerator InitializeMatchServices()
         {
             yield return null;
 
