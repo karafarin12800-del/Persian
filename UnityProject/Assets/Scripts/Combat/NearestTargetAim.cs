@@ -9,8 +9,16 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private WeaponController weapon;
         [SerializeField] private float autoFireInterval = 0.20f;
         [SerializeField] private bool autoFire;
+        [SerializeField] private float targetScanInterval = 0.12f;
 
         private float nextFire;
+        private float nextTargetScanTime;
+        private readonly Collider[] targetHits = new Collider[64];
+
+#if UNITY_ANDROID
+        private static bool androidTargetScanArmed;
+        public static void SetAndroidTargetScanArmed(bool armed) => androidTargetScanArmed = armed;
+#endif
 
         public TargetHealth CurrentTarget { get; private set; }
 
@@ -22,7 +30,18 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            CurrentTarget = FindNearestTarget();
+#if UNITY_ANDROID
+            if (!androidTargetScanArmed)
+            {
+                CurrentTarget = null;
+                return;
+            }
+#endif
+            if (Time.unscaledTime >= nextTargetScanTime)
+            {
+                nextTargetScanTime = Time.unscaledTime + Mathf.Max(0.05f, targetScanInterval);
+                CurrentTarget = FindNearestTarget();
+            }
 
             if (!autoFire || Time.time < nextFire)
                 return;
@@ -75,17 +94,20 @@ namespace PersiaWar.Unity2D5D
 
         private TargetHealth FindNearestTarget()
         {
-            Collider[] hits = Physics.OverlapSphere(
+            int hitCount = Physics.OverlapSphereNonAlloc(
                 transform.position,
                 range,
+                targetHits,
                 targetMask,
                 QueryTriggerInteraction.Ignore);
 
             TargetHealth best = null;
             float bestDistance = float.PositiveInfinity;
 
-            foreach (Collider hit in hits)
+            for (int i = 0; i < hitCount; i++)
             {
+                Collider hit = targetHits[i];
+                if (hit == null) continue;
                 TargetHealth candidate = hit.GetComponentInParent<TargetHealth>();
                 if (candidate == null || !candidate.isActiveAndEnabled)
                     continue;
