@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - unity-2.5d
+      - unity-2.5d-production-restoration-ci
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
