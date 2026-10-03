@@ -69,7 +69,7 @@ namespace PersiaWar.Unity2D5D
                 ReportStage("Stage 2: creating game session...", "GameSessionReady");
                 ConfigureCameraSafe();
                 ConfigureLighting();
-                ReportStage("Stage 3: building Android-safe battlefield base...", "BeforeWorldBaseBuilt");
+                ReportStage("Stage 3: building the production battlefield base...", "BeforeWorldBaseBuilt");
                 BuildWorldBase();
                 ReportStage("Stage 4: battlefield base completed.", "WorldBaseBuilt");
             }
@@ -86,9 +86,12 @@ namespace PersiaWar.Unity2D5D
 
 #if UNITY_ANDROID
             yield return null;
+            ReportStage("Stage 5: building the Persian city around the player...", "BeforeAndroidCityPresentation");
+            yield return BuildAndroidCityPresentationGradually();
+            yield return null;
             IsWorldReady = true;
             IsWorldPreparing = false;
-            ReportStage("Stage 5: Android-safe battlefield ready.", "WorldBuildReady");
+            ReportStage("Stage 6: production battlefield ready.", "WorldBuildReady");
             yield break;
 #else
             yield return null;
@@ -202,7 +205,8 @@ namespace PersiaWar.Unity2D5D
             accentMaterial = MakeMaterial("AndroidAccent", new Color(0.82f, 0.62f, 0.22f));
             CreateFlatMesh("AndroidGround", Vector3.zero, new Vector2(worldSize, worldSize), groundMaterial);
             BuildAndroidRoadGrid();
-            BuildAndroidCityPresentation();
+            // City detail is built from a coroutine after the base is visible. This avoids
+            // the old one-frame allocation spike while keeping the production presentation.
             return;
 #else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
@@ -232,11 +236,63 @@ namespace PersiaWar.Unity2D5D
                 CreateFlatMesh("RoadZ", new Vector3(0f, -0.015f, z), new Vector2(worldSize, roadWidth), roadMaterial);
         }
 
-        private void BuildAndroidCityPresentation()
+        private IEnumerator BuildAndroidCityPresentationGradually()
         {
-            // Android main-game presentation: keep the real battlefield/combat path,
-            // but avoid a large allocation burst when the match starts. The previous
-            // 8x8 procedural pass created hundreds of Mesh objects in one frame.
+            // Production Android city: preserve the lightweight custom-mesh renderer but
+            // construct each city block on its own frame. This spreads CPU/GPU allocation
+            // without replacing the real battlefield with a flat diagnostic screen.
+            Vector3[] buildingPoints =
+            {
+                new Vector3(-60f, 0f, -60f), new Vector3(-36f, 0f, -60f), new Vector3(-12f, 0f, -60f),
+                new Vector3(12f, 0f, -60f),  new Vector3(36f, 0f, -60f),  new Vector3(60f, 0f, -60f),
+                new Vector3(-60f, 0f, -36f), new Vector3(-36f, 0f, -36f), new Vector3(36f, 0f, -36f), new Vector3(60f, 0f, -36f),
+                new Vector3(-60f, 0f, -12f), new Vector3(-36f, 0f, -12f), new Vector3(36f, 0f, -12f), new Vector3(60f, 0f, -12f),
+                new Vector3(-60f, 0f, 12f),  new Vector3(-36f, 0f, 12f),  new Vector3(36f, 0f, 12f),  new Vector3(60f, 0f, 12f),
+                new Vector3(-60f, 0f, 36f),  new Vector3(-36f, 0f, 36f),  new Vector3(36f, 0f, 36f),  new Vector3(60f, 0f, 36f),
+                new Vector3(-60f, 0f, 60f),  new Vector3(-36f, 0f, 60f),  new Vector3(-12f, 0f, 60f),
+                new Vector3(12f, 0f, 60f),  new Vector3(36f, 0f, 60f),  new Vector3(60f, 0f, 60f)
+            };
+
+            for (int i = 0; i < buildingPoints.Length; i++)
+            {
+                float footprint = (i % 3 == 0) ? 9f : 7.5f;
+                float height = (i % 4 == 0) ? 10f : 7.5f;
+                float depth = (i % 2 == 0) ? 8f : 7f;
+                CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
+                StartupCheckpoint.Set("AndroidCityBuilding_" + (i + 1));
+                yield return null;
+            }
+
+            Vector3[] treePoints =
+            {
+                new Vector3(-30f, 0f, -30f), new Vector3(30f, 0f, 30f),
+                new Vector3(-30f, 0f, 30f),  new Vector3(30f, 0f, -30f),
+                new Vector3(-72f, 0f, -12f), new Vector3(72f, 0f, 12f),
+                new Vector3(-12f, 0f, -72f), new Vector3(12f, 0f, 72f)
+            };
+
+            for (int i = 0; i < treePoints.Length; i++)
+            {
+                CreateAndroidTree(treePoints[i], 2.8f + (i % 3) * 0.35f);
+                yield return null;
+            }
+
+            Vector3[] plazaPillars =
+            {
+                new Vector3(-8f, 0f, 8f), new Vector3(8f, 0f, 8f),
+                new Vector3(-8f, 0f, -8f), new Vector3(8f, 0f, -8f)
+            };
+
+            for (int i = 0; i < plazaPillars.Length; i++)
+            {
+                CreateAndroidStreetLamp(plazaPillars[i]);
+                yield return null;
+            }
+
+            StartupCheckpoint.Set("AndroidCityPresentationReady");
+        }
+
+
             Vector3[] buildingPoints =
             {
                 new Vector3(-60f, 0f, -60f), new Vector3(-36f, 0f, -60f), new Vector3(-12f, 0f, -60f),
