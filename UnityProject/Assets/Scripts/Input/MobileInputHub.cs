@@ -26,6 +26,7 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle buttonTextStyle;
         private EnemyChase[] androidRadarEnemies = System.Array.Empty<EnemyChase>();
         private float nextAndroidRadarScanTime;
+        private EnemySpawner radarSpawner;
 
         public Vector2 MoveValue => moveValue;
 
@@ -301,6 +302,13 @@ namespace PersiaWar.Unity2D5D
         private void UpdateAndroidRadarCache()
         {
 #if UNITY_ANDROID
+            if (radarSpawner == null)
+                radarSpawner = Object.FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+            if (radarSpawner == null || !radarSpawner.enabled)
+            {
+                androidRadarEnemies = System.Array.Empty<EnemyChase>();
+                return;
+            }
             if (Time.unscaledTime < nextAndroidRadarScanTime) return;
             nextAndroidRadarScanTime = Time.unscaledTime + 0.25f;
             androidRadarEnemies = Object.FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
