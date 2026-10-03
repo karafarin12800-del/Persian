@@ -97,7 +97,8 @@ namespace PersiaWar.Unity2D5D
             if (Input.GetKeyDown(KeyCode.G)) ThrowGrenadeAtTarget();
             if (Input.GetMouseButton(0) && Time.time >= nextFireTime) FireAtNearestTarget();
  #else
-            HandleTouches();
+            if (Input.touchCount > 0 || movePointerId >= 0 || firePointerId >= 0 || grenadePointerId >= 0)
+                HandleTouches();
 #endif
             UpdateMinimap();
         }
@@ -178,8 +179,6 @@ namespace PersiaWar.Unity2D5D
                 if (moveTouch.phase == TouchPhase.Ended || moveTouch.phase == TouchPhase.Canceled) { movePointerId = -1; moveValue = Vector2.zero; player.SetMoveInput(Vector2.zero); }
             }
             else if (movePointerId >= 0) { movePointerId = -1; moveValue = Vector2.zero; player.SetMoveInput(Vector2.zero); }
-            else player.SetMoveInput(Vector2.zero);
-
             if (firePointerId >= 0 && TryGetTouch(firePointerId, out Touch fireTouch))
             {
                 if (Time.time >= nextFireTime) FireAtNearestTarget();
