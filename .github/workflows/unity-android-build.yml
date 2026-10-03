@@ -148,7 +148,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.build_ref || github.sha }}
+          ref: ${{ inputs.build_ref || github.event.pull_request.head.sha || github.sha }}
           lfs: true
 
       - name: Validate Unity Personal credentials
@@ -167,7 +167,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Unity APK source commit: $(git rev-parse HEAD)"
-          expected_ref="${{ inputs.build_ref || github.sha }}"
+          expected_ref="${{ inputs.build_ref || github.event.pull_request.head.sha || github.sha }}"
           expected_sha="$(git rev-parse "$expected_ref^{commit}")"
           actual_sha="$(git rev-parse HEAD)"
           echo "Expected build source: $expected_sha"
@@ -465,7 +465,7 @@ jobs:
       - name: Upload Unity APK
         uses: actions/upload-artifact@v4
         with:
-          name: PersiaWar-Unity-Android-${{ github.sha }}
+          name: PersiaWar-Unity-Android-${{ inputs.build_ref || github.event.pull_request.head.sha || github.sha }}
           path: |
             build/Android/*.apk
             build/Android/BUILD_PROVENANCE.txt
