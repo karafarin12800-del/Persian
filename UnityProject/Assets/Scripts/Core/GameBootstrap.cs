@@ -239,12 +239,14 @@ namespace PersiaWar.Unity2D5D
             // 8x8 procedural pass created hundreds of Mesh objects in one frame.
             Vector3[] buildingPoints =
             {
-                new Vector3(-48f, 0f, -48f), new Vector3(-24f, 0f, -48f),
-                new Vector3(24f, 0f, -48f),  new Vector3(48f, 0f, -48f),
-                new Vector3(-48f, 0f, 48f),  new Vector3(-24f, 0f, 48f),
-                new Vector3(24f, 0f, 48f),   new Vector3(48f, 0f, 48f),
-                new Vector3(-48f, 0f, 24f),  new Vector3(48f, 0f, 24f),
-                new Vector3(-48f, 0f, -24f), new Vector3(48f, 0f, -24f)
+                new Vector3(-60f, 0f, -60f), new Vector3(-36f, 0f, -60f), new Vector3(-12f, 0f, -60f),
+                new Vector3(12f, 0f, -60f),  new Vector3(36f, 0f, -60f),  new Vector3(60f, 0f, -60f),
+                new Vector3(-60f, 0f, -36f), new Vector3(-36f, 0f, -36f), new Vector3(36f, 0f, -36f), new Vector3(60f, 0f, -36f),
+                new Vector3(-60f, 0f, -12f), new Vector3(-36f, 0f, -12f), new Vector3(36f, 0f, -12f), new Vector3(60f, 0f, -12f),
+                new Vector3(-60f, 0f, 12f),  new Vector3(-36f, 0f, 12f),  new Vector3(36f, 0f, 12f),  new Vector3(60f, 0f, 12f),
+                new Vector3(-60f, 0f, 36f),  new Vector3(-36f, 0f, 36f),  new Vector3(36f, 0f, 36f),  new Vector3(60f, 0f, 36f),
+                new Vector3(-60f, 0f, 60f),  new Vector3(-36f, 0f, 60f),  new Vector3(-12f, 0f, 60f),
+                new Vector3(12f, 0f, 60f),  new Vector3(36f, 0f, 60f),  new Vector3(60f, 0f, 60f)
             };
 
             for (int i = 0; i < buildingPoints.Length; i++)
