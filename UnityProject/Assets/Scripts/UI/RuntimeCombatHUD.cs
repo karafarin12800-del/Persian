@@ -9,6 +9,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class RuntimeCombatHUD : MonoBehaviour
     {
         [SerializeField] private PlayerController player;
+        private EnemySpawner spawner;
 
         private GUIStyle small;
         private GUIStyle medium;
@@ -18,6 +19,13 @@ namespace PersiaWar.Unity2D5D
         public void ConfigurePlayer(PlayerController value)
         {
             player = value;
+            CacheSpawner();
+        }
+
+        private void CacheSpawner()
+        {
+            if (spawner == null)
+                spawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
         }
 
         private void Awake()
@@ -55,7 +63,7 @@ namespace PersiaWar.Unity2D5D
             TargetHealth health = player.Health;
             WeaponController weapon = player.Weapon;
             PlayerInventory inventory = player.Inventory;
-            EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
+            CacheSpawner();
             GameSession session = GameSession.Instance;
 
             float hp = health != null && health.MaxHealth > 0f ? health.CurrentHealth / health.MaxHealth : 0f;
