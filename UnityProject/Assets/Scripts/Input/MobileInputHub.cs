@@ -30,8 +30,10 @@ namespace PersiaWar.Unity2D5D
 #if UNITY_ANDROID
         private static bool androidExecutionArmed;
         private static bool androidTouchProcessingArmed;
+        private static bool androidTouchGameplayArmed;
         public static void SetAndroidExecutionArmed(bool armed) => androidExecutionArmed = armed;
         public static void SetAndroidTouchProcessingArmed(bool armed) => androidTouchProcessingArmed = armed;
+        public static void SetAndroidTouchGameplayArmed(bool armed) => androidTouchGameplayArmed = armed;
 #endif
 
         public void EnableMinimap()
@@ -45,6 +47,7 @@ namespace PersiaWar.Unity2D5D
 #if UNITY_ANDROID
             androidExecutionArmed = false;
             androidTouchProcessingArmed = false;
+            androidTouchGameplayArmed = false;
 #else
             if (player == null) player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null) gameplayCamera = Camera.main;
@@ -84,7 +87,7 @@ namespace PersiaWar.Unity2D5D
             if (Input.GetKeyDown(KeyCode.Space)) player.Weapon?.TryMelee();
             if (Input.GetKeyDown(KeyCode.G)) ThrowGrenadeAtTarget();
             if (Input.GetMouseButton(0) && Time.time >= nextFireTime) FireAtNearestTarget();
-#else
+ #else
             HandleTouches();
 #endif
             UpdateMinimap();
@@ -92,6 +95,17 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleTouches()
         {
+            if (!androidTouchGameplayArmed)
+            {
+                int count = Input.touchCount;
+                for (int i = 0; i < count; i++)
+                {
+                    Touch diagnosticTouch = Input.GetTouch(i);
+                    _ = diagnosticTouch.fingerId;
+                }
+                return;
+            }
+
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
             float radius = joystickRadius * scale;
             Vector2 grenadeGuiPos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
