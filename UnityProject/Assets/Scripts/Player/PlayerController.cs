@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
         private TargetHealth health;
         private PlayerInventory inventory;
         private GrenadeController grenadeController;
+        private readonly Collider[] movementCollisionHits = new Collider[32];
 
         public NearestTargetAim Aim => aim;
         public WeaponController Weapon => weapon;
@@ -35,9 +36,6 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
             StartupCheckpoint.Set("PlayerAwakeEntered");
-            // Keep scene activation lightweight on Android. Visual construction is deferred
-            // until Start and uses the shared sprite presentation path instead of a large
-            // set of runtime 3D primitives.
             StartupCheckpoint.Set("PlayerAwakeStarted");
         }
 
@@ -130,14 +128,17 @@ namespace PersiaWar.Unity2D5D
 
         private bool WouldCollide(Vector3 position)
         {
-            Collider[] hits = Physics.OverlapSphere(
+            int hitCount = Physics.OverlapSphereNonAlloc(
                 position + Vector3.up * 0.7f,
                 collisionRadius,
+                movementCollisionHits,
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
-            foreach (Collider hit in hits)
+            for (int i = 0; i < hitCount; i++)
             {
+                Collider hit = movementCollisionHits[i];
+                if (hit == null) continue;
                 if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
                 if (hit.GetComponentInParent<EnemyChase>() != null) continue;
                 if (hit.GetComponentInParent<Projectile>() != null) continue;
