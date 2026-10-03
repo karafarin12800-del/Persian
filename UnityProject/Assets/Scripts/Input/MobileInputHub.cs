@@ -36,15 +36,11 @@ namespace PersiaWar.Unity2D5D
 
         public void EnableMinimap()
         {
-#if UNITY_ANDROID
-            // The Android match path must not allocate a second camera/render target.
-            // Keep the minimap disabled on this device profile until a dedicated,
-            // device-tested minimap path exists.
-            minimapEnabled = false;
-            StartupCheckpoint.Set("MinimapDisabledAndroid");
-#else
+            // The production match enables the minimap after the main camera and player
+            // are ready. It uses the same lightweight secondary-camera path on Android
+            // as the established desktop implementation.
             minimapEnabled = true;
-#endif
+            StartupCheckpoint.Set("MinimapEnabled");
         }
 
         private void Awake()
