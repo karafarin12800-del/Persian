@@ -22,6 +22,7 @@ namespace PersiaWar.Unity2D5D
         private MobileInputHub mobileInput;
         private RuntimeCombatHUD combatHud;
         private CameraFollow25D followCamera;
+        private Camera activeCamera;
         private Camera androidRuntimeCamera;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
