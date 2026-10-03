@@ -21,6 +21,7 @@ namespace PersiaWar.Unity2D5D
         private int archetype = 1;
         private float collisionRadius = 0.55f;
         private StylizedCharacterVisual visual;
+        private readonly Collider[] movementHits = new Collider[24];
 
         public void SetTarget(Transform targetTransform)
         {
@@ -114,14 +115,16 @@ namespace PersiaWar.Unity2D5D
 
         private bool CanMoveTo(Vector3 position)
         {
-            Collider[] hits = Physics.OverlapSphere(
+            int hitCount = Physics.OverlapSphereNonAlloc(
                 position + Vector3.up * 0.75f,
                 collisionRadius,
+                movementHits,
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
-            foreach (Collider hit in hits)
+            for (int i = 0; i < hitCount; i++)
             {
+                Collider hit = movementHits[i];
                 if (hit == null || hit.transform == transform || hit.transform.IsChildOf(transform))
                     continue;
                 if (hit.GetComponentInParent<EnemyChase>() != null)

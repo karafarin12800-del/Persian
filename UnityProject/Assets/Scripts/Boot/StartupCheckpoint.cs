@@ -25,8 +25,16 @@ namespace PersiaWar.Unity2D5D
             "PlayerComponentsReady",
             "PlayerPreparedForMatch",
             "MatchActivationStarted",
+            "MainCameraRootActivationStarted",
+            "MainCameraRootActivated",
+            "MainCameraTargetReady",
+            "MainCameraEnableStarted",
+            "MainCameraEnabled",
+            "CameraFollowEnabled",
             "MatchCoreReady",
             "MatchStarted",
+            "CameraFollowIsolated",
+            "PostMatchServicesIsolated",
             "WorldBuildFailed",
             "MatchActivationFailed"
         };
