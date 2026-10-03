@@ -472,15 +472,32 @@ namespace PersiaWar.Unity2D5D
             if (followCamera != null)
                 followCamera.enabled = false;
 
+            StartupCheckpoint.Set("MainCameraRootActivationStarted");
             yield return ActivateRoot(mainCameraRoot, "Main Camera");
+            StartupCheckpoint.Set("MainCameraRootActivated");
+
+            // Keep the camera rig's follow behaviour dormant until the native Camera
+            // component has completed one clean enable/render handoff on Android.
+            if (followCamera != null)
+                followCamera.SetTarget(player.transform);
+            StartupCheckpoint.Set("MainCameraTargetReady");
+
+            if (activeCamera != null)
+            {
+                StartupCheckpoint.Set("MainCameraEnableStarted");
+                activeCamera.enabled = true;
+                StartupCheckpoint.Set("MainCameraEnabled");
+            }
+
+            // Let Unity complete one render frame before CameraFollow25D starts moving
+            // the authored camera. This separates camera activation from follow lifecycle.
+            yield return null;
 
             if (followCamera != null)
             {
-                followCamera.SetTarget(player.transform);
                 followCamera.enabled = true;
+                StartupCheckpoint.Set("CameraFollowEnabled");
             }
-            if (activeCamera != null)
-                activeCamera.enabled = true;
 
             StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match;
