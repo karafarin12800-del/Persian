@@ -115,7 +115,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(panel.x + 28f, panel.y + 162f, panel.width - 56f, 30f), "Camera: ENABLED   •   Follow: ISOLATED", smallStyle);
             GUI.Label(new Rect(panel.x + 28f, panel.y + 196f, panel.width - 56f, 30f), "Player: PREPARED   •   HUD: ACTIVE • MobileInput: TESTING", smallStyle);
             GUI.Label(new Rect(panel.x + 28f, panel.y + 232f, panel.width - 56f, 44f), "Diagnostic mode — RuntimeCombatHUD + MobileInput only; EnemySpawner remains isolated.", smallStyle);
-            GUI.Label(new Rect(panel.x + 28f, panel.y + 280f, panel.width - 56f, 30f), "MobileInput touch-processing test: HandleTouches is now enabled. No EnemySpawner is running.", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 280f, panel.width - 56f, 30f), "MobileInput touch API test: Input.GetTouch is enabled, but Player/Weapon/Grenade actions are isolated. No EnemySpawner is running.", smallStyle);
         }
 
         private void DrawBackdrop()
@@ -289,6 +289,7 @@ namespace PersiaWar.Unity2D5D
 #if UNITY_ANDROID
             MobileInputHub.SetAndroidExecutionArmed(true);
             MobileInputHub.SetAndroidTouchProcessingArmed(true);
+            MobileInputHub.SetAndroidTouchGameplayArmed(false);
 #endif
             if (mobileInput == null) mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
             if (mobileInput != null)
