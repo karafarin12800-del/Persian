@@ -197,8 +197,12 @@ namespace PersiaWar.Unity2D5D
             // crash happened in this critical startup window, so use one tiny static mesh
             // with a single material as the isolation-safe battlefield floor.
             Material groundMaterial = MakeMaterial("AndroidGround", new Color(0.33f, 0.52f, 0.20f));
+            buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.50f, 0.38f, 0.25f));
+            roofMaterial = MakeMaterial("AndroidRoof", new Color(0.16f, 0.19f, 0.23f));
+            accentMaterial = MakeMaterial("AndroidAccent", new Color(0.82f, 0.62f, 0.22f));
             CreateFlatMesh("AndroidGround", Vector3.zero, new Vector2(worldSize, worldSize), groundMaterial);
             BuildAndroidRoadGrid();
+            BuildAndroidCityPresentation();
             return;
 #else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
@@ -226,6 +230,185 @@ namespace PersiaWar.Unity2D5D
                 CreateFlatMesh("RoadX", new Vector3(x, -0.02f, 0f), new Vector2(roadWidth, worldSize), roadMaterial);
             for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
                 CreateFlatMesh("RoadZ", new Vector3(0f, -0.015f, z), new Vector2(worldSize, roadWidth), roadMaterial);
+        }
+
+        private void BuildAndroidCityPresentation()
+        {
+            // Presentation-only Android environment: low-poly, static, and intentionally
+            // bounded so scene entry never performs a large allocation burst.
+            float[] lanes = { -84f, -60f, -36f, -12f, 12f, 36f, 60f, 84f };
+
+            for (int xi = 0; xi < lanes.Length; xi++)
+            {
+                for (int zi = 0; zi < lanes.Length; zi++)
+                {
+                    float x = lanes[xi];
+                    float z = lanes[zi];
+
+                    // Keep the player's starting crossroads open.
+                    if (Mathf.Abs(x) < 18f && Mathf.Abs(z) < 18f)
+                        continue;
+
+                    // Alternate building footprints to create distinct city blocks.
+                    if ((xi + zi) % 3 == 0)
+                    {
+                        CreateAndroidBuilding(new Vector3(x, 0f, z), 9.5f, 11f + ((xi + zi) % 3) * 2.5f, 8.5f);
+                    }
+                    else if ((xi * 2 + zi) % 5 == 0)
+                    {
+                        CreateAndroidBuilding(new Vector3(x + 2.5f, 0f, z - 1.5f), 7.5f, 8.5f, 7f);
+                    }
+                }
+            }
+
+            // Small trees and street furniture soften the repetition without creating
+            // physics-heavy hierarchies.
+            Vector3[] treePoints =
+            {
+                new Vector3(-30f, 0f, -30f), new Vector3(30f, 30f, 30f),
+                new Vector3(-30f, 0f, 30f), new Vector3(30f, 0f, -30f),
+                new Vector3(-72f, 0f, -12f), new Vector3(72f, 0f, 12f),
+                new Vector3(-12f, 0f, -72f), new Vector3(12f, 0f, 72f)
+            };
+
+            for (int i = 0; i < treePoints.Length; i++)
+                CreateAndroidTree(treePoints[i], 2.8f + (i % 3) * 0.35f);
+
+            Vector3[] plazaPillars =
+            {
+                new Vector3(-8f, 0f, 8f), new Vector3(8f, 0f, 8f),
+                new Vector3(-8f, 0f, -8f), new Vector3(8f, 0f, -8f)
+            };
+
+            for (int i = 0; i < plazaPillars.Length; i++)
+                CreateAndroidStreetLamp(plazaPillars[i]);
+        }
+
+        private void CreateAndroidBuilding(Vector3 position, float footprint, float height, float depth)
+        {
+            float bodyHeight = Mathf.Max(4.5f, height);
+
+            CreateAndroidBox(
+                "CityBuilding",
+                position + Vector3.up * (bodyHeight * 0.5f),
+                new Vector3(footprint, bodyHeight, depth),
+                buildingMaterial,
+                true);
+
+            CreateAndroidBox(
+                "CityRoof",
+                position + Vector3.up * (bodyHeight + 0.22f),
+                new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
+                roofMaterial,
+                false);
+
+            // Three slim facade bands read as windows from the isometric camera.
+            for (int row = 0; row < 3; row++)
+            {
+                float y = 1.6f + row * Mathf.Max(1.6f, (bodyHeight - 2.7f) / 2f);
+                for (int col = -1; col <= 1; col++)
+                {
+                    float x = col * footprint * 0.23f;
+                    CreateAndroidBox(
+                        "Window",
+                        position + new Vector3(x, y, -depth * 0.512f),
+                        new Vector3(Mathf.Min(1.35f, footprint * 0.16f), 0.72f, 0.10f),
+                        accentMaterial,
+                        false);
+                }
+            }
+
+            // One entrance canopy gives larger blocks a distinctive silhouette.
+            CreateAndroidBox(
+                "DoorCanopy",
+                position + new Vector3(0f, 1.45f, -depth * 0.54f),
+                new Vector3(Mathf.Min(2.8f, footprint * 0.28f), 0.22f, 0.75f),
+                roofMaterial,
+                false);
+        }
+
+        private void CreateAndroidTree(Vector3 position, float scale)
+        {
+            Material trunk = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+            Material crown = MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
+
+            CreateAndroidBox(
+                "TreeTrunk",
+                position + Vector3.up * (scale * 0.8f),
+                new Vector3(scale * 0.22f, scale * 1.6f, scale * 0.22f),
+                trunk,
+                false);
+
+            CreateAndroidBox(
+                "TreeCrown",
+                position + Vector3.up * (scale * 2.0f),
+                new Vector3(scale * 1.35f, scale * 1.15f, scale * 1.35f),
+                crown,
+                false);
+        }
+
+        private void CreateAndroidStreetLamp(Vector3 position)
+        {
+            Material lampMaterial = MakeMaterial("AndroidLamp", new Color(0.10f, 0.12f, 0.14f));
+            Material lightMaterial = MakeMaterial("AndroidLampGlow", new Color(0.95f, 0.78f, 0.30f));
+
+            CreateAndroidBox(
+                "LampPost",
+                position + Vector3.up * 2.0f,
+                new Vector3(0.16f, 4.0f, 0.16f),
+                lampMaterial,
+                false);
+
+            CreateAndroidBox(
+                "LampHead",
+                position + Vector3.up * 4.0f,
+                new Vector3(0.65f, 0.18f, 0.38f),
+                lightMaterial,
+                false);
+        }
+
+        private GameObject CreateAndroidBox(string objectName, Vector3 position, Vector3 size, Material material, bool collider)
+        {
+            GameObject obj = new GameObject(objectName);
+            obj.transform.SetParent(worldRoot, true);
+            obj.transform.position = position;
+
+            Mesh mesh = new Mesh { name = objectName + "Mesh" };
+            float x = size.x * 0.5f;
+            float y = size.y * 0.5f;
+            float z = size.z * 0.5f;
+
+            mesh.vertices = new[]
+            {
+                new Vector3(-x, -y, -z), new Vector3(x, -y, -z), new Vector3(x, -y, z), new Vector3(-x, -y, z),
+                new Vector3(-x, y, -z), new Vector3(x, y, -z), new Vector3(x, y, z), new Vector3(-x, y, z)
+            };
+
+            mesh.triangles = new[]
+            {
+                0,2,1, 0,3,2,
+                4,5,6, 4,6,7,
+                0,1,5, 0,5,4,
+                1,2,6, 1,6,5,
+                2,3,7, 2,7,6,
+                3,0,4, 3,4,7
+            };
+            mesh.RecalculateNormals();
+
+            MeshFilter filter = obj.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+
+            MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+
+            if (collider)
+            {
+                BoxCollider box = obj.AddComponent<BoxCollider>();
+                box.center = Vector3.zero;
+                box.size = size;
+            }
+
+            return obj;
         }
 
         private GameObject CreateFlatMesh(string objectName, Vector3 position, Vector2 size, Material material)
