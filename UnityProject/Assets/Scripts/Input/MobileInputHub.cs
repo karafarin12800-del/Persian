@@ -98,17 +98,6 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleTouches()
         {
-            if (!androidTouchGameplayArmed)
-            {
-                int count = Input.touchCount;
-                for (int i = 0; i < count; i++)
-                {
-                    Touch diagnosticTouch = Input.GetTouch(i);
-                    _ = diagnosticTouch.fingerId;
-                }
-                return;
-            }
-
             if (androidTouchMoveGameplayArmed && !androidTouchGameplayArmed)
             {
                 for (int i = 0; i < Input.touchCount; i++)
@@ -122,12 +111,12 @@ namespace PersiaWar.Unity2D5D
                     }
                 }
 
-                if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch moveTouch))
+                if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch isolatedMoveTouch))
                 {
-                    Vector2 delta = moveTouch.position - moveStartScreen;
+                    Vector2 delta = isolatedMoveTouch.position - moveStartScreen;
                     moveValue = Vector2.ClampMagnitude(delta / joystickRadius, 1f);
                     player.SetMoveInput(moveValue);
-                    if (moveTouch.phase == TouchPhase.Ended || moveTouch.phase == TouchPhase.Canceled)
+                    if (isolatedMoveTouch.phase == TouchPhase.Ended || isolatedMoveTouch.phase == TouchPhase.Canceled)
                     {
                         movePointerId = -1;
                         moveValue = Vector2.zero;
@@ -145,6 +134,17 @@ namespace PersiaWar.Unity2D5D
                     player.SetMoveInput(Vector2.zero);
                 }
 
+                return;
+            }
+
+            if (!androidTouchGameplayArmed)
+            {
+                int count = Input.touchCount;
+                for (int i = 0; i < count; i++)
+                {
+                    Touch diagnosticTouch = Input.GetTouch(i);
+                    _ = diagnosticTouch.fingerId;
+                }
                 return;
             }
 
