@@ -493,11 +493,11 @@ namespace PersiaWar.Unity2D5D
             // the authored camera. This separates camera activation from follow lifecycle.
             yield return null;
 
+            // Camera isolation test: keep the authored Main Camera active, but do not
+            // enter CameraFollow25D.LateUpdate until the native camera path is proven stable.
+            StartupCheckpoint.Set("CameraFollowIsolated");
             if (followCamera != null)
-            {
-                followCamera.enabled = true;
-                StartupCheckpoint.Set("CameraFollowEnabled");
-            }
+                followCamera.enabled = false;
 
             StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match;
