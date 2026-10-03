@@ -101,22 +101,8 @@ namespace PersiaWar.Unity2D5D
             // GameRoot remains dormant until START MATCH so Android can finish scene
             // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
-#if UNITY_ANDROID
-            // Android production path: do not leave the player on the diagnostic
-            // hero/drop-map front end. The real match is the first playable screen.
-            // The selected hero and spawn point remain deterministic for a stable
-            // startup while the full gameplay systems are brought online.
-            selectedHero = 0;
-            spawnWorld = new Vector2(0f, -4f);
-            spawnChosen = true;
-            StartupCheckpoint.Set("PrototypeFlowMainGameLaunchQueued");
-            Debug.Log("PERSIA_FLOW: Android main-game launch queued");
-            StartCoroutine(BeginMainGameAfterMenuFrame());
-            yield break;
-#else
             StartupCheckpoint.Set("PrototypeFlowMenuReady");
             Debug.Log("PERSIA_FLOW: PrototypeFlow menu initialized");
-#endif
         }
 
         private void CacheGameplayRoots()
@@ -132,18 +118,6 @@ namespace PersiaWar.Unity2D5D
                 else if (root.name == "WorldBounds") worldBoundsRoot = root;
                 else if (root.name == "GameRoot") gameRoot = root;
             }
-        }
-
-        private IEnumerator BeginMainGameAfterMenuFrame()
-        {
-            // One clean frame after scene activation keeps the transition deterministic
-            // without showing the old green tactical-map screen on Android.
-            yield return null;
-            if (this == null || !isActiveAndEnabled)
-                yield break;
-
-            mode = ScreenMode.DropMap;
-            StartMatch();
         }
 
         private void Update()
@@ -492,14 +466,9 @@ namespace PersiaWar.Unity2D5D
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
             ApplyHeroStyle(selectedHero);
 
-#if UNITY_ANDROID
-            // Use a completely isolated runtime camera for Android. It has no
-            // CameraFollow component and therefore cannot trigger the previous
-            // target/lifecycle race when the scene camera is activated.
-            androidRuntimeCamera = CreateAndroidRuntimeCamera(player.transform);
-            activeCamera = androidRuntimeCamera;
-            followCamera = null;
-#else
+            // Production path uses the authored Main Camera and CameraFollow25D on every platform.
+            // We still activate it only after Player and WorldBounds are ready so the camera never
+            // participates in the fragile scene-activation window.
             activeCamera = mainCameraRoot != null
                 ? mainCameraRoot.GetComponent<Camera>()
                 : null;
@@ -515,211 +484,67 @@ namespace PersiaWar.Unity2D5D
             yield return ActivateRoot(mainCameraRoot, "Main Camera");
 
             if (followCamera != null)
+            {
                 followCamera.SetTarget(player.transform);
-            if (followCamera != null)
                 followCamera.enabled = true;
+            }
             if (activeCamera != null)
                 activeCamera.enabled = true;
-#endif
 
-            if (activeCamera != null)
-                activeCamera.enabled = false;
-            if (followCamera != null)
-                followCamera.enabled = false;
-
-            // Android diagnostic gate: keep every optional subsystem disabled while the
-            // first post-match frames are proven stable. We then enable camera, input,
-            // enemies and HUD one at a time so the exact crashing subsystem is isolated.
-            GateGameplay(false);
-            if (enemySpawner != null) enemySpawner.enabled = false;            if (combatHud != null) combatHud.enabled = false;
-            if (mobileInput != null) mobileInput.enabled = false;
-            if (activeCamera != null) activeCamera.enabled = false;
-            if (followCamera != null) followCamera.enabled = false;
-
-            startupStatus = "Stage 12: core stable — Android isolation test.";
             StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match;
             startingMatch = false;
-#if UNITY_ANDROID
-            startupStatus = "STABLE TEST 1/4: core only";
-            StartCoroutine(InitializeMatchServices());
-#else
             startupStatus = string.Empty;
             StartupCheckpoint.Set("MatchStarted");
             StartCoroutine(InitializeMatchServices());
-#endif
-        }
-
-        private Camera CreateAndroidRuntimeCamera(Transform target)
-        {
-            GameObject cameraObject = new GameObject("AndroidGameplayCamera");
-            Camera camera = cameraObject.AddComponent<Camera>();
-            camera.tag = "MainCamera";
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.08f, 0.09f, 0.10f, 1f);
-            camera.fieldOfView = 48f;
-            camera.nearClipPlane = 0.1f;
-            camera.farClipPlane = 240f;
-            camera.allowHDR = false;
-            camera.allowMSAA = false;
-
-            if (target != null)
-            {
-                cameraObject.transform.position = target.position + new Vector3(0f, 9.5f, -11f);
-                cameraObject.transform.LookAt(target.position + Vector3.up * 0.8f);
-            }
-
-            camera.enabled = false;
-            return camera;
         }
 
         private void LateUpdate()
         {
-#if UNITY_ANDROID
-            if (androidRuntimeCamera == null || player == null)
+if (activeCamera == null || followCamera == null || player == null)
                 return;
-
-            Vector3 desired = player.transform.position + new Vector3(0f, 9.5f, -11f);
-            androidRuntimeCamera.transform.position = Vector3.Lerp(
-                androidRuntimeCamera.transform.position,
-                desired,
-                1f - Mathf.Exp(-10f * Time.deltaTime));
-
-            Vector3 lookTarget = player.transform.position + Vector3.up * 0.8f;
-            Vector3 direction = lookTarget - androidRuntimeCamera.transform.position;
-            if (direction.sqrMagnitude > 0.001f)
-                androidRuntimeCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
-#endif
         }
-
-        private IEnumerator EnableCameraAfterSafeFrames(Camera activeCamera, CameraFollow25D followCamera)
-        {
-#if UNITY_ANDROID
-            // Deliberately hold rendering off for a long clean interval. If the process
-            // exits before this point, the camera/render hand-off is not the cause.
-            for (int i = 0; i < 120; i++)
-                yield return null;
-
-            if (this == null || !isActiveAndEnabled)
-                yield break;
-
-            if (followCamera != null)
-            {
-                followCamera.SetTarget(player != null ? player.transform : null);
-                followCamera.enabled = true;
-            }
-
-            yield return null;
-
-            if (activeCamera != null)
-                activeCamera.enabled = true;
-
-            StartupCheckpoint.Set("AndroidCameraActivatedAfterIsolation");
-#else
-            if (followCamera != null)
-                followCamera.enabled = true;
-            if (activeCamera != null)
-                activeCamera.enabled = true;
-#endif
-        }
-
 
         private IEnumerator InitializeMatchServices()
         {
-#if UNITY_ANDROID
-            // Android smoke path: render the actual gameplay camera and stop the
-            // startup isolation sequence here. Touch, HUD and enemies stay disabled
-            // until the basic match is visibly running; there is no timed multi-stage
-            // gate that can make the game appear frozen.
-            Camera activeCamera = androidRuntimeCamera != null
-                ? androidRuntimeCamera
-                : (mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null);
-            CameraFollow25D follow = androidRuntimeCamera != null
-                ? null
-                : (activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null);
-
-            StartupCheckpoint.Set("AndroidCameraActivationStarted");
-
-            if (follow != null)
-            {
-                follow.SetTarget(player != null ? player.transform : null);
-                follow.enabled = true;
-            }
-
             yield return null;
 
-            if (activeCamera != null)
-                activeCamera.enabled = true;
-
-            // Give Unity only a few frames to complete the camera hand-off.
-            for (int i = 0; i < 10; i++)
-                yield return null;
-
-            startupStatus = "MATCH STABLE";
-            StartupCheckpoint.Set("AndroidMatchVisible");
-            StartupCheckpoint.Set("MatchServicesReady");
-
-            // Optional gameplay systems are opened only after the camera/world has
-            // rendered cleanly. This keeps scene activation isolated while still making
-            // the resulting match genuinely playable on a normal device.
-            matchInputArmed = true;
-            MobileInputHub.SetAndroidExecutionArmed(true);
-
-            if (mobileInput != null)
-            {
-                mobileInput.enabled = true;
-                StartupCheckpoint.Set("AndroidMobileInputEnabled");
-            }
-
-            // Let the input stack establish its first clean frame before starting the
-            // first enemy wave. Enemy creation remains deliberately deferred.
-            for (int i = 0; i < 90; i++)
-                yield return null;
-
-            if (this == null || !isActiveAndEnabled)
+            if (player == null)
                 yield break;
 
-            if (enemySpawner != null && player != null)
-            {
-                enemySpawner.Configure(player.transform, 4, 32f, 0f);
-                enemySpawner.enabled = true;
-                StartupCheckpoint.Set("AndroidEnemySpawnerEnabled");
-            }
-
-            StartupCheckpoint.Set("AndroidGameplaySystemsEnabled");
-            yield break;
-#else
-            yield return null;
-
             matchInputArmed = true;
+#if UNITY_ANDROID
+            MobileInputHub.SetAndroidExecutionArmed(true);
+#endif
+
+            if (mobileInput == null)
+                mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
             if (mobileInput != null)
             {
-                mobileInput.EnableMinimap();
                 mobileInput.enabled = true;
-            }
-
-            if (player == null) yield break;
-
-            if (enemySpawner == null)
-                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
-
-            if (enemySpawner != null)
-            {
-                enemySpawner.Configure(player.transform, 8, 44f, 0f);
-                enemySpawner.enabled = true;
+                mobileInput.EnableMinimap();
+                StartupCheckpoint.Set("MobileInputEnabled");
             }
 
             if (combatHud == null)
                 combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
-
             if (combatHud != null)
             {
                 combatHud.ConfigurePlayer(player);
                 combatHud.enabled = true;
+                StartupCheckpoint.Set("CombatHudEnabled");
             }
 
-            StartupCheckpoint.Set("MatchServicesReady");
-#endif
+            if (enemySpawner == null)
+                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+            if (enemySpawner != null)
+            {
+                enemySpawner.Configure(player.transform, 8, 44f, 0f);
+                enemySpawner.enabled = true;
+                StartupCheckpoint.Set("EnemySpawnerEnabled");
+            }
+
+            StartupCheckpoint.Set("GameplaySystemsEnabled");
         }
 
         private IEnumerator ActivateRoot(GameObject root, string rootName)
