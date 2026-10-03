@@ -31,9 +31,11 @@ namespace PersiaWar.Unity2D5D
         private static bool androidExecutionArmed;
         private static bool androidTouchProcessingArmed;
         private static bool androidTouchGameplayArmed;
+        private static bool androidTouchMoveGameplayArmed;
         public static void SetAndroidExecutionArmed(bool armed) => androidExecutionArmed = armed;
         public static void SetAndroidTouchProcessingArmed(bool armed) => androidTouchProcessingArmed = armed;
         public static void SetAndroidTouchGameplayArmed(bool armed) => androidTouchGameplayArmed = armed;
+        public static void SetAndroidTouchMoveGameplayArmed(bool armed) => androidTouchMoveGameplayArmed = armed;
 #endif
 
         public void EnableMinimap()
@@ -48,6 +50,7 @@ namespace PersiaWar.Unity2D5D
             androidExecutionArmed = false;
             androidTouchProcessingArmed = false;
             androidTouchGameplayArmed = false;
+            androidTouchMoveGameplayArmed = false;
 #else
             if (player == null) player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null) gameplayCamera = Camera.main;
@@ -103,6 +106,45 @@ namespace PersiaWar.Unity2D5D
                     Touch diagnosticTouch = Input.GetTouch(i);
                     _ = diagnosticTouch.fingerId;
                 }
+                return;
+            }
+
+            if (androidTouchMoveGameplayArmed && !androidTouchGameplayArmed)
+            {
+                for (int i = 0; i < Input.touchCount; i++)
+                {
+                    Touch touch = Input.GetTouch(i);
+                    if (touch.phase == TouchPhase.Began && touch.position.x < Screen.width * 0.48f && movePointerId < 0)
+                    {
+                        movePointerId = touch.fingerId;
+                        moveStartScreen = touch.position;
+                        moveValue = Vector2.zero;
+                    }
+                }
+
+                if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch moveTouch))
+                {
+                    Vector2 delta = moveTouch.position - moveStartScreen;
+                    moveValue = Vector2.ClampMagnitude(delta / joystickRadius, 1f);
+                    player.SetMoveInput(moveValue);
+                    if (moveTouch.phase == TouchPhase.Ended || moveTouch.phase == TouchPhase.Canceled)
+                    {
+                        movePointerId = -1;
+                        moveValue = Vector2.zero;
+                        player.SetMoveInput(Vector2.zero);
+                    }
+                }
+                else if (movePointerId >= 0)
+                {
+                    movePointerId = -1;
+                    moveValue = Vector2.zero;
+                    player.SetMoveInput(Vector2.zero);
+                }
+                else
+                {
+                    player.SetMoveInput(Vector2.zero);
+                }
+
                 return;
             }
 
