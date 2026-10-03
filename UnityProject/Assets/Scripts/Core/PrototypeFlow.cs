@@ -101,8 +101,22 @@ namespace PersiaWar.Unity2D5D
             // GameRoot remains dormant until START MATCH so Android can finish scene
             // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
+#if UNITY_ANDROID
+            // Android production path: do not leave the player on the diagnostic
+            // hero/drop-map front end. The real match is the first playable screen.
+            // The selected hero and spawn point remain deterministic for a stable
+            // startup while the full gameplay systems are brought online.
+            selectedHero = 0;
+            spawnWorld = new Vector2(0f, -4f);
+            spawnChosen = true;
+            StartupCheckpoint.Set("PrototypeFlowMainGameLaunchQueued");
+            Debug.Log("PERSIA_FLOW: Android main-game launch queued");
+            StartCoroutine(BeginMainGameAfterMenuFrame());
+            yield break;
+#else
             StartupCheckpoint.Set("PrototypeFlowMenuReady");
             Debug.Log("PERSIA_FLOW: PrototypeFlow menu initialized");
+#endif
         }
 
         private void CacheGameplayRoots()
@@ -118,6 +132,18 @@ namespace PersiaWar.Unity2D5D
                 else if (root.name == "WorldBounds") worldBoundsRoot = root;
                 else if (root.name == "GameRoot") gameRoot = root;
             }
+        }
+
+        private IEnumerator BeginMainGameAfterMenuFrame()
+        {
+            // One clean frame after scene activation keeps the transition deterministic
+            // without showing the old green tactical-map screen on Android.
+            yield return null;
+            if (this == null || !isActiveAndEnabled)
+                yield break;
+
+            mode = ScreenMode.DropMap;
+            StartMatch();
         }
 
         private void Update()
