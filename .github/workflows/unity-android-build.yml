@@ -107,7 +107,7 @@ jobs:
           android_path = world_method[android_start:android_end]
           assert 'GameObject.CreatePrimitive' not in android_path, 'Android production path still uses GameObject.CreatePrimitive.'
           assert 'CreateFlatMesh' in android_path, 'Android production path must keep the lightweight flat-mesh ground helper.'
-          assert 'BuildAndroidCityPresentation' in android_path, 'Android production path must build the city presentation.'
+          assert 'BuildAndroidCityPresentationGradually' in bootstrap, 'Android production path is missing staged city construction.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           awake = weapon[weapon.index('private void Awake()'):weapon.index('private void EnsureProjectileTemplate()')]
