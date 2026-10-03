@@ -113,9 +113,9 @@ namespace PersiaWar.Unity2D5D
 
             GUI.Label(new Rect(panel.x + 28f, panel.y + 118f, panel.width - 56f, 34f), "Last checkpoint: " + StartupCheckpoint.Last, bodyStyle);
             GUI.Label(new Rect(panel.x + 28f, panel.y + 162f, panel.width - 56f, 30f), "Camera: ENABLED   •   Follow: ISOLATED", smallStyle);
-            GUI.Label(new Rect(panel.x + 28f, panel.y + 196f, panel.width - 56f, 30f), "Player: PREPARED   •   Gameplay services: ISOLATED", smallStyle);
-            GUI.Label(new Rect(panel.x + 28f, panel.y + 232f, panel.width - 56f, 44f), "Diagnostic mode — no MobileInput / HUD / EnemySpawner is running.", smallStyle);
-            GUI.Label(new Rect(panel.x + 28f, panel.y + 280f, panel.width - 56f, 30f), "This screen proves whether the core match transition is stable.", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 196f, panel.width - 56f, 30f), "Player: PREPARED   •   HUD: TESTING • Input/Spawner: ISOLATED", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 232f, panel.width - 56f, 44f), "Diagnostic mode — RuntimeCombatHUD only; MobileInput / EnemySpawner remain isolated.", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 280f, panel.width - 56f, 30f), "HUD-only test: if this remains stable, the next isolated test is MobileInput.", smallStyle);
         }
 
         private void DrawBackdrop()
@@ -274,8 +274,16 @@ namespace PersiaWar.Unity2D5D
             if (followCamera != null) followCamera.enabled = false;
             StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match; startingMatch = false; startupStatus = string.Empty; StartupCheckpoint.Set("MatchStarted");
-            // INTENTIONAL ISOLATION: do not start MobileInput or any post-match service.
-            // If the app still exits, the failure is in the core match transition/render path.
+            // DIAGNOSTIC STEP 1: enable HUD only. MobileInput and EnemySpawner remain isolated.
+            yield return null;
+            if (combatHud == null) combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+            if (combatHud != null)
+            {
+                combatHud.ConfigurePlayer(player);
+                combatHud.enabled = true;
+                StartupCheckpoint.Set("CombatHudEnabled");
+            }
+            StartupCheckpoint.Set("HudOnlyEnabled");
             StartupCheckpoint.Set("PostMatchServicesIsolated");
         }
 
