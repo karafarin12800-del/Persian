@@ -33,6 +33,8 @@ namespace PersiaWar.Unity2D5D
             "CameraFollowEnabled",
             "MatchCoreReady",
             "MatchStarted",
+            "CameraFollowIsolated",
+            "PostMatchServicesIsolated",
             "WorldBuildFailed",
             "MatchActivationFailed"
         };
