@@ -113,9 +113,9 @@ namespace PersiaWar.Unity2D5D
 
             GUI.Label(new Rect(panel.x + 28f, panel.y + 118f, panel.width - 56f, 34f), "Last checkpoint: " + StartupCheckpoint.Last, bodyStyle);
             GUI.Label(new Rect(panel.x + 28f, panel.y + 162f, panel.width - 56f, 30f), "Camera: ENABLED   •   Follow: ISOLATED", smallStyle);
-            GUI.Label(new Rect(panel.x + 28f, panel.y + 196f, panel.width - 56f, 30f), "Player: PREPARED   •   HUD: TESTING • Input/Spawner: ISOLATED", smallStyle);
-            GUI.Label(new Rect(panel.x + 28f, panel.y + 232f, panel.width - 56f, 44f), "Diagnostic mode — RuntimeCombatHUD only; MobileInput / EnemySpawner remain isolated.", smallStyle);
-            GUI.Label(new Rect(panel.x + 28f, panel.y + 280f, panel.width - 56f, 30f), "HUD-only test: if this remains stable, the next isolated test is MobileInput.", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 196f, panel.width - 56f, 30f), "Player: PREPARED   •   HUD: ACTIVE • MobileInput: TESTING", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 232f, panel.width - 56f, 44f), "Diagnostic mode — RuntimeCombatHUD + MobileInput only; EnemySpawner remains isolated.", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 280f, panel.width - 56f, 30f), "MobileInput-only test: if this remains stable, the next isolated test is EnemySpawner.", smallStyle);
         }
 
         private void DrawBackdrop()
@@ -284,7 +284,19 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("CombatHudEnabled");
             }
             StartupCheckpoint.Set("HudOnlyEnabled");
-            StartupCheckpoint.Set("PostMatchServicesIsolated");
+            // DIAGNOSTIC STEP 2: enable MobileInput execution only. Keep EnemySpawner isolated.
+            yield return null;
+#if UNITY_ANDROID
+            MobileInputHub.SetAndroidExecutionArmed(true);
+#endif
+            if (mobileInput == null) mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
+            if (mobileInput != null)
+            {
+                mobileInput.enabled = true;
+                StartupCheckpoint.Set("MobileInputEnabled");
+            }
+            StartupCheckpoint.Set("MobileInputOnlyEnabled");
+            StartupCheckpoint.Set("EnemySpawnerIsolated");
         }
 
         private IEnumerator InitializeMatchServices()
