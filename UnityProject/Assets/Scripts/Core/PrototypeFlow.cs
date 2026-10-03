@@ -504,7 +504,7 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             startupStatus = string.Empty;
             StartupCheckpoint.Set("MatchStarted");
-            StartCoroutine(InitializeMatchServices());
+            // Diagnostic isolation: leave MobileInput, CombatHUD and EnemySpawner dormant.\n            // If this build stays alive, the crash is in post-match service activation.\n            StartupCheckpoint.Set("PostMatchServicesIsolated");
         }
 
         private IEnumerator InitializeMatchServices()
