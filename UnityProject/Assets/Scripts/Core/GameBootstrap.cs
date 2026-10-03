@@ -293,45 +293,6 @@ namespace PersiaWar.Unity2D5D
         }
 
 
-            Vector3[] buildingPoints =
-            {
-                new Vector3(-60f, 0f, -60f), new Vector3(-36f, 0f, -60f), new Vector3(-12f, 0f, -60f),
-                new Vector3(12f, 0f, -60f),  new Vector3(36f, 0f, -60f),  new Vector3(60f, 0f, -60f),
-                new Vector3(-60f, 0f, -36f), new Vector3(-36f, 0f, -36f), new Vector3(36f, 0f, -36f), new Vector3(60f, 0f, -36f),
-                new Vector3(-60f, 0f, -12f), new Vector3(-36f, 0f, -12f), new Vector3(36f, 0f, -12f), new Vector3(60f, 0f, -12f),
-                new Vector3(-60f, 0f, 12f),  new Vector3(-36f, 0f, 12f),  new Vector3(36f, 0f, 12f),  new Vector3(60f, 0f, 12f),
-                new Vector3(-60f, 0f, 36f),  new Vector3(-36f, 0f, 36f),  new Vector3(36f, 0f, 36f),  new Vector3(60f, 0f, 36f),
-                new Vector3(-60f, 0f, 60f),  new Vector3(-36f, 0f, 60f),  new Vector3(-12f, 0f, 60f),
-                new Vector3(12f, 0f, 60f),  new Vector3(36f, 0f, 60f),  new Vector3(60f, 0f, 60f)
-            };
-
-            for (int i = 0; i < buildingPoints.Length; i++)
-            {
-                float footprint = (i % 3 == 0) ? 9f : 7.5f;
-                float height = (i % 4 == 0) ? 10f : 7.5f;
-                float depth = (i % 2 == 0) ? 8f : 7f;
-                CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
-            }
-
-            Vector3[] treePoints =
-            {
-                new Vector3(-30f, 0f, -30f), new Vector3(30f, 0f, 30f),
-                new Vector3(-30f, 0f, 30f),  new Vector3(30f, 0f, -30f)
-            };
-
-            for (int i = 0; i < treePoints.Length; i++)
-                CreateAndroidTree(treePoints[i], 2.8f + (i % 2) * 0.35f);
-
-            Vector3[] plazaPillars =
-            {
-                new Vector3(-8f, 0f, 8f), new Vector3(8f, 0f, 8f),
-                new Vector3(-8f, 0f, -8f), new Vector3(8f, 0f, -8f)
-            };
-
-            for (int i = 0; i < plazaPillars.Length; i++)
-                CreateAndroidStreetLamp(plazaPillars[i]);
-        }
-
         private void CreateAndroidBuilding(Vector3 position, float footprint, float height, float depth)
         {
             float bodyHeight = Mathf.Max(4.5f, height);
