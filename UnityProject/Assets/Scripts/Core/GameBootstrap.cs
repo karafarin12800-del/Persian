@@ -234,45 +234,35 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidCityPresentation()
         {
-            // Presentation-only Android environment: low-poly, static, and intentionally
-            // bounded so scene entry never performs a large allocation burst.
-            float[] lanes = { -84f, -60f, -36f, -12f, 12f, 36f, 60f, 84f };
-
-            for (int xi = 0; xi < lanes.Length; xi++)
+            // Android main-game presentation: keep the real battlefield/combat path,
+            // but avoid a large allocation burst when the match starts. The previous
+            // 8x8 procedural pass created hundreds of Mesh objects in one frame.
+            Vector3[] buildingPoints =
             {
-                for (int zi = 0; zi < lanes.Length; zi++)
-                {
-                    float x = lanes[xi];
-                    float z = lanes[zi];
+                new Vector3(-48f, 0f, -48f), new Vector3(-24f, 0f, -48f),
+                new Vector3(24f, 0f, -48f),  new Vector3(48f, 0f, -48f),
+                new Vector3(-48f, 0f, 48f),  new Vector3(-24f, 0f, 48f),
+                new Vector3(24f, 0f, 48f),   new Vector3(48f, 0f, 48f),
+                new Vector3(-48f, 0f, 24f),  new Vector3(48f, 0f, 24f),
+                new Vector3(-48f, 0f, -24f), new Vector3(48f, 0f, -24f)
+            };
 
-                    // Keep the player's starting crossroads open.
-                    if (Mathf.Abs(x) < 18f && Mathf.Abs(z) < 18f)
-                        continue;
-
-                    // Alternate building footprints to create distinct city blocks.
-                    if ((xi + zi) % 3 == 0)
-                    {
-                        CreateAndroidBuilding(new Vector3(x, 0f, z), 9.5f, 11f + ((xi + zi) % 3) * 2.5f, 8.5f);
-                    }
-                    else if ((xi * 2 + zi) % 5 == 0)
-                    {
-                        CreateAndroidBuilding(new Vector3(x + 2.5f, 0f, z - 1.5f), 7.5f, 8.5f, 7f);
-                    }
-                }
+            for (int i = 0; i < buildingPoints.Length; i++)
+            {
+                float footprint = (i % 3 == 0) ? 9f : 7.5f;
+                float height = (i % 4 == 0) ? 10f : 7.5f;
+                float depth = (i % 2 == 0) ? 8f : 7f;
+                CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
             }
 
-            // Small trees and street furniture soften the repetition without creating
-            // physics-heavy hierarchies.
             Vector3[] treePoints =
             {
-                new Vector3(-30f, 0f, -30f), new Vector3(30f, 30f, 30f),
-                new Vector3(-30f, 0f, 30f), new Vector3(30f, 0f, -30f),
-                new Vector3(-72f, 0f, -12f), new Vector3(72f, 0f, 12f),
-                new Vector3(-12f, 0f, -72f), new Vector3(12f, 0f, 72f)
+                new Vector3(-30f, 0f, -30f), new Vector3(30f, 0f, 30f),
+                new Vector3(-30f, 0f, 30f),  new Vector3(30f, 0f, -30f)
             };
 
             for (int i = 0; i < treePoints.Length; i++)
-                CreateAndroidTree(treePoints[i], 2.8f + (i % 3) * 0.35f);
+                CreateAndroidTree(treePoints[i], 2.8f + (i % 2) * 0.35f);
 
             Vector3[] plazaPillars =
             {
@@ -327,43 +317,52 @@ namespace PersiaWar.Unity2D5D
                 false);
         }
 
+        private Material androidTreeTrunkMaterial;
+        private Material androidTreeCrownMaterial;
+        private Material androidLampMaterial;
+        private Material androidLampGlowMaterial;
+
         private void CreateAndroidTree(Vector3 position, float scale)
         {
-            Material trunk = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
-            Material crown = MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
+            if (androidTreeTrunkMaterial == null)
+                androidTreeTrunkMaterial = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+            if (androidTreeCrownMaterial == null)
+                androidTreeCrownMaterial = MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
 
             CreateAndroidBox(
                 "TreeTrunk",
                 position + Vector3.up * (scale * 0.8f),
                 new Vector3(scale * 0.22f, scale * 1.6f, scale * 0.22f),
-                trunk,
+                androidTreeTrunkMaterial,
                 false);
 
             CreateAndroidBox(
                 "TreeCrown",
                 position + Vector3.up * (scale * 2.0f),
                 new Vector3(scale * 1.35f, scale * 1.15f, scale * 1.35f),
-                crown,
+                androidTreeCrownMaterial,
                 false);
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
         {
-            Material lampMaterial = MakeMaterial("AndroidLamp", new Color(0.10f, 0.12f, 0.14f));
-            Material lightMaterial = MakeMaterial("AndroidLampGlow", new Color(0.95f, 0.78f, 0.30f));
+            if (androidLampMaterial == null)
+                androidLampMaterial = MakeMaterial("AndroidLamp", new Color(0.10f, 0.12f, 0.14f));
+            if (androidLampGlowMaterial == null)
+                androidLampGlowMaterial = MakeMaterial("AndroidLampGlow", new Color(0.95f, 0.78f, 0.30f));
 
             CreateAndroidBox(
                 "LampPost",
                 position + Vector3.up * 2.0f,
                 new Vector3(0.16f, 4.0f, 0.16f),
-                lampMaterial,
+                androidLampMaterial,
                 false);
 
             CreateAndroidBox(
                 "LampHead",
                 position + Vector3.up * 4.0f,
                 new Vector3(0.65f, 0.18f, 0.38f),
-                lightMaterial,
+                androidLampGlowMaterial,
                 false);
         }
 
