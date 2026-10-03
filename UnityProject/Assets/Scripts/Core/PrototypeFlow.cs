@@ -73,7 +73,11 @@ namespace PersiaWar.Unity2D5D
         private void OnGUI()
         {
             EnsureUiInitialized();
-            if (mode == ScreenMode.Match) return;
+            if (mode == ScreenMode.Match)
+            {
+                DrawMatchDiagnosticOverlay();
+                return;
+            }
             DrawBackdrop();
             if (startingMatch)
             {
@@ -89,6 +93,29 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
             if (mode == ScreenMode.HeroSelect) DrawHeroSelect(); else DrawDropMap();
+        }
+
+        private void DrawMatchDiagnosticOverlay()
+        {
+            Color old = GUI.color;
+            GUI.color = new Color(0.015f, 0.025f, 0.04f, 0.94f);
+            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), pixel);
+            GUI.color = old;
+
+            float width = Mathf.Min(Screen.width - 48f, 820f);
+            float height = Mathf.Min(Screen.height - 80f, 330f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Fill(panel, new Color(0.04f, 0.07f, 0.11f, 0.98f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 7f), new Color(0.92f, 0.66f, 0.18f, 1f));
+
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 22f, panel.width - 40f, 42f), "PERSIA WAR", headerStyle);
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 68f, panel.width - 40f, 34f), "CORE MATCH REACHED", bodyStyle);
+
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 118f, panel.width - 56f, 34f), "Last checkpoint: " + StartupCheckpoint.Last, bodyStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 162f, panel.width - 56f, 30f), "Camera: ENABLED   •   Follow: ISOLATED", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 196f, panel.width - 56f, 30f), "Player: PREPARED   •   Gameplay services: ISOLATED", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 232f, panel.width - 56f, 44f), "Diagnostic mode — no MobileInput / HUD / EnemySpawner is running.", smallStyle);
+            GUI.Label(new Rect(panel.x + 28f, panel.y + 280f, panel.width - 56f, 30f), "This screen proves whether the core match transition is stable.", smallStyle);
         }
 
         private void DrawBackdrop()
