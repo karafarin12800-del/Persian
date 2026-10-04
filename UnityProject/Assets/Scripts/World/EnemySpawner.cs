@@ -12,6 +12,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float initialSpawnDelay = 4f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
         [SerializeField] private int maxPerWave = 15;
+        [SerializeField] private int victoryWave = 5;
 
         private int wave = 1;
         private bool spawning;
@@ -58,12 +59,26 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (GameSession.Instance != null && GameSession.Instance.IsFinished)
+                return;
+
             if (player == null || spawning || initialWavePending || !initialWaveComplete || Time.unscaledTime < nextEnemyCheckTime) return;
             nextEnemyCheckTime = Time.unscaledTime + enemyCheckInterval;
 
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
-            if (enemies.Length == 0 && failedSpawnAttempts < MaxFailedSpawnAttempts)
+            if (enemies.Length == 0)
             {
+                if (wave >= Mathf.Max(1, victoryWave))
+                {
+                    GameSession.Instance?.EndMission(true);
+                    enabled = false;
+                    return;
+                }
+
+                if (failedSpawnAttempts >= MaxFailedSpawnAttempts)
+                    return;
+
+
                 spawning = true;
                 Invoke(nameof(SpawnNextWave), nextWaveDelay);
             }

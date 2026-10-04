@@ -272,6 +272,79 @@ namespace PersiaWar.Unity2D5D
 
             for (int i = 0; i < plazaPillars.Length; i++)
                 CreateAndroidStreetLamp(plazaPillars[i]);
+
+            BuildAndroidAlleysAndVehicles();
+        }
+
+        private void BuildAndroidAlleysAndVehicles()
+        {
+            const float alleyWidth = 4.5f;
+            const float alleySpacing = 12f;
+            const int alleyCountPerAxis = 15;
+            float half = worldSize * 0.5f - alleySpacing;
+
+            // 15 lanes in each axis = 30 secondary alleys, kept much narrower
+            // than the main roads so the city reads as streets + side lanes.
+            for (int i = 0; i < alleyCountPerAxis; i++)
+            {
+                float offset = -half + i * alleySpacing;
+                CreateFlatMesh(
+                    "Alley_V_" + i,
+                    new Vector3(offset, -0.01f, 0f),
+                    new Vector2(alleyWidth, worldSize),
+                    roadMaterial);
+
+                CreateFlatMesh(
+                    "Alley_H_" + i,
+                    new Vector3(0f, -0.005f, offset),
+                    new Vector2(worldSize, alleyWidth),
+                    roadMaterial);
+            }
+
+            Material[] vehicleMaterials =
+            {
+                MakeMaterial("VehicleSand", new Color(0.52f, 0.38f, 0.19f)),
+                MakeMaterial("VehicleBlue", new Color(0.12f, 0.28f, 0.46f)),
+                MakeMaterial("VehicleIvory", new Color(0.72f, 0.68f, 0.57f)),
+                MakeMaterial("VehicleRed", new Color(0.48f, 0.16f, 0.12f))
+            };
+
+            Vector3[] vehiclePoints =
+            {
+                new Vector3(-36f, 0f, -12f), new Vector3(36f, 0f, 12f),
+                new Vector3(-60f, 0f, 60f),  new Vector3(60f, 0f, -60f),
+                new Vector3(-12f, 0f, 60f),  new Vector3(12f, 0f, -60f),
+                new Vector3(-72f, 0f, 24f),  new Vector3(72f, 0f, -24f)
+            };
+
+            for (int i = 0; i < vehiclePoints.Length; i++)
+                CreateAndroidVehicle(vehiclePoints[i], vehicleMaterials[i % vehicleMaterials.Length], i % 2 == 0);
+        }
+
+        private void CreateAndroidVehicle(Vector3 position, Material body, bool longAxisZ)
+        {
+            float length = longAxisZ ? 5.2f : 2.9f;
+            float width = longAxisZ ? 2.8f : 5.2f;
+            CreateAndroidBox(
+                "CityVehicleBody",
+                position + Vector3.up * 0.45f,
+                new Vector3(width, 0.9f, length),
+                body,
+                false);
+
+            CreateAndroidBox(
+                "CityVehicleCabin",
+                position + Vector3.up * 0.92f,
+                new Vector3(width * 0.68f, 0.38f, length * 0.55f),
+                roofMaterial,
+                false);
+
+            CreateAndroidBox(
+                "CityVehicleBumper",
+                position + Vector3.up * 0.28f,
+                new Vector3(width * 0.88f, 0.16f, length * 0.90f),
+                accentMaterial,
+                false);
         }
 
         private void CreateAndroidBuilding(Vector3 position, float footprint, float height, float depth)

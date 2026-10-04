@@ -162,7 +162,11 @@ namespace PersiaWar.Unity2D5D
             {
 #if UNITY_ANDROID
                 if (string.Equals(startupStatus, "MATCH STABLE", System.StringComparison.Ordinal))
+                {
                     DrawAndroidMatchHud();
+                    if (GameSession.Instance != null && GameSession.Instance.IsFinished)
+                        DrawAndroidResultOverlay();
+                }
                 else
                     DrawAndroidStabilityStatus();
 #endif
@@ -842,6 +846,54 @@ namespace PersiaWar.Unity2D5D
                 new Rect(card.x + 18f * scale, card.y + 67f * scale, card.width - 25f * scale, 22f * scale),
                 "MOVE  •  AIM / FIRE  •  G = GRENADE",
                 smallStyle);
+        }
+
+        private void DrawAndroidResultOverlay()
+        {
+            EnsureUiInitialized();
+
+            GameSession session = GameSession.Instance;
+            if (session == null || !session.IsFinished)
+                return;
+
+            float width = Mathf.Min(Screen.width - 64f, 720f);
+            float height = Mathf.Min(Screen.height - 80f, 340f);
+            Rect panel = new Rect(
+                (Screen.width - width) * 0.5f,
+                (Screen.height - height) * 0.5f,
+                width,
+                height);
+
+            Fill(panel, new Color(0.025f, 0.05f, 0.08f, 0.97f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 6f),
+                session.PlayerWon
+                    ? new Color(0.22f, 0.78f, 0.34f, 1f)
+                    : new Color(0.84f, 0.24f, 0.20f, 1f));
+
+            GUI.Label(
+                new Rect(panel.x + 20f, panel.y + 36f, panel.width - 40f, 60f),
+                session.PlayerWon ? "VICTORY" : "GAME OVER",
+                headerStyle);
+
+            GUI.Label(
+                new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
+                session.PlayerWon
+                    ? "All five enemy waves defeated."
+                    : "Your fighter was defeated.",
+                bodyStyle);
+
+            GUI.Label(
+                new Rect(panel.x + 20f, panel.y + 146f, panel.width - 40f, 28f),
+                "SCORE  " + session.Score + "    ENEMIES  " + session.EnemiesDefeated,
+                smallStyle);
+
+            if (GUI.Button(
+                new Rect(panel.x + 80f, panel.y + panel.height - 82f, panel.width - 160f, 54f),
+                "PLAY AGAIN",
+                buttonStyle))
+            {
+                session.RestartMission();
+            }
         }
 
         private void DrawAndroidStabilityStatus()
