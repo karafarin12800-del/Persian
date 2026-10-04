@@ -102,16 +102,16 @@ namespace PersiaWar.Unity2D5D
             // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
 #if UNITY_ANDROID
-            // Android production path: do not leave the player on the diagnostic
-            // hero/drop-map front end. The real match is the first playable screen.
-            // The selected hero and spawn point remain deterministic for a stable
-            // startup while the full gameplay systems are brought online.
+            // Android production path: keep the real front-end interactive.
+            // Do NOT auto-start the match. The previous isolation build skipped the
+            // hero/drop-map screens and immediately activated the heaviest gameplay
+            // systems, which made the app appear to "rush through" the choices.
             selectedHero = 0;
             spawnWorld = new Vector2(0f, -4f);
-            spawnChosen = true;
-            StartupCheckpoint.Set("PrototypeFlowMainGameLaunchQueued");
-            Debug.Log("PERSIA_FLOW: Android main-game launch queued");
-            StartCoroutine(BeginMainGameAfterMenuFrame());
+            spawnChosen = false;
+            mode = ScreenMode.HeroSelect;
+            StartupCheckpoint.Set("PrototypeFlowMenuReady");
+            Debug.Log("PERSIA_FLOW: Android menu ready; waiting for player selection");
             yield break;
 #else
             StartupCheckpoint.Set("PrototypeFlowMenuReady");
