@@ -299,7 +299,6 @@ namespace PersiaWar.Unity2D5D
                 CreateGuiTextures();
 
             float radius = joystickRadius * scale;
-            Vector2 defaultMove = new Vector2(120f * scale, 140f * scale);
             Vector2 moveBase = movePointerId >= 0
                 ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y)
                 : new Vector2(120f * scale, Screen.height - 140f * scale);
