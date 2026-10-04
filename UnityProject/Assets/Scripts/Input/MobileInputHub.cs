@@ -14,6 +14,8 @@ namespace PersiaWar.Unity2D5D
         private int movePointerId = -1;
         private int firePointerId = -1;
         private int grenadePointerId = -1;
+        private int swordPointerId = -1;
+        private int reloadPointerId = -1;
         private Vector2 moveStartScreen;
         private Vector2 moveValue;
         private float nextFireTime;
@@ -31,10 +33,13 @@ namespace PersiaWar.Unity2D5D
         public Vector2 MoveValue => moveValue;
 
 #if UNITY_ANDROID
+        // Kept for backward compatibility with older startup code. The production
+        // match uses a single authoritative execution gate; touch sub-gates no longer
+        // disable movement/fire once gameplay has started.
         private static bool androidExecutionArmed;
-        private static bool androidTouchProcessingArmed;
-        private static bool androidTouchGameplayArmed;
-        private static bool androidTouchMoveGameplayArmed;
+        private static bool androidTouchProcessingArmed = true;
+        private static bool androidTouchGameplayArmed = true;
+        private static bool androidTouchMoveGameplayArmed = true;
         public static void SetAndroidExecutionArmed(bool armed) => androidExecutionArmed = armed;
         public static void SetAndroidTouchProcessingArmed(bool armed) => androidTouchProcessingArmed = armed;
         public static void SetAndroidTouchGameplayArmed(bool armed) => androidTouchGameplayArmed = armed;
@@ -51,9 +56,9 @@ namespace PersiaWar.Unity2D5D
         {
 #if UNITY_ANDROID
             androidExecutionArmed = false;
-            androidTouchProcessingArmed = false;
-            androidTouchGameplayArmed = false;
-            androidTouchMoveGameplayArmed = false;
+            androidTouchProcessingArmed = true;
+            androidTouchGameplayArmed = true;
+            androidTouchMoveGameplayArmed = true;
 #else
             if (player == null) player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null) gameplayCamera = Camera.main;
@@ -73,7 +78,7 @@ namespace PersiaWar.Unity2D5D
         private void Update()
         {
 #if UNITY_ANDROID
-            if (!androidExecutionArmed || !androidTouchProcessingArmed)
+            if (!androidExecutionArmed)
                 return;
 #endif
             if (player == null)
@@ -105,70 +110,66 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleTouches()
         {
-            if (androidTouchMoveGameplayArmed && !androidTouchGameplayArmed)
-            {
-                for (int i = 0; i < Input.touchCount; i++)
-                {
-                    Touch touch = Input.GetTouch(i);
-                    if (touch.phase == TouchPhase.Began && touch.position.x < Screen.width * 0.48f && movePointerId < 0)
-                    {
-                        movePointerId = touch.fingerId;
-                        moveStartScreen = touch.position;
-                        moveValue = Vector2.zero;
-                    }
-                }
-
-                if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch isolatedMoveTouch))
-                {
-                    Vector2 delta = isolatedMoveTouch.position - moveStartScreen;
-                    moveValue = Vector2.ClampMagnitude(delta / joystickRadius, 1f);
-                    player.SetMoveInput(moveValue);
-                    if (isolatedMoveTouch.phase == TouchPhase.Ended || isolatedMoveTouch.phase == TouchPhase.Canceled)
-                    {
-                        movePointerId = -1;
-                        moveValue = Vector2.zero;
-                        player.SetMoveInput(Vector2.zero);
-                    }
-                }
-                else if (movePointerId >= 0)
-                {
-                    movePointerId = -1;
-                    moveValue = Vector2.zero;
-                    player.SetMoveInput(Vector2.zero);
-                }
-                else
-                {
-                    player.SetMoveInput(Vector2.zero);
-                }
-
-                return;
-            }
-
-            if (!androidTouchGameplayArmed)
-            {
-                int count = Input.touchCount;
-                for (int i = 0; i < count; i++)
-                {
-                    Touch diagnosticTouch = Input.GetTouch(i);
-                    _ = diagnosticTouch.fingerId;
-                }
-                return;
-            }
-
+            // Production mobile input: the left side creates a genuinely floating
+            // joystick at the initial finger position. The right side contains the
+            // four action buttons used by the previous gameplay version.
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
             float radius = joystickRadius * scale;
-            Vector2 grenadeGuiPos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
-            float grenadeRadius = radius * 0.56f;
+
+            Vector2 fireGuiPos = new Vector2(Screen.width - 120f * scale, Screen.height - 155f * scale);
+            Vector2 swordGuiPos = new Vector2(Screen.width - 270f * scale, Screen.height - 85f * scale);
+            Vector2 bombGuiPos = new Vector2(Screen.width - 165f * scale, Screen.height - 85f * scale);
+            Vector2 reloadGuiPos = new Vector2(Screen.width - 60f * scale, Screen.height - 85f * scale);
+
+            float fireRadius = radius * 0.72f;
+            float actionRadius = radius * 0.42f;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch touch = Input.GetTouch(i);
                 if (touch.phase != TouchPhase.Began) continue;
+
                 bool leftSide = touch.position.x < Screen.width * 0.48f;
-                if (leftSide && movePointerId < 0) { movePointerId = touch.fingerId; moveStartScreen = touch.position; moveValue = Vector2.zero; continue; }
                 Vector2 touchGuiPosition = new Vector2(touch.position.x, Screen.height - touch.position.y);
-                if (!leftSide && grenadePointerId < 0 && Vector2.Distance(touchGuiPosition, grenadeGuiPos) <= grenadeRadius) { grenadePointerId = touch.fingerId; ThrowGrenadeAtTarget(); continue; }
-                if (!leftSide && firePointerId < 0) { firePointerId = touch.fingerId; FireAtNearestTarget(); }
+
+                if (leftSide && movePointerId < 0)
+                {
+                    movePointerId = touch.fingerId;
+                    moveStartScreen = touch.position;
+                    moveValue = Vector2.zero;
+                    continue;
+                }
+
+                if (!leftSide && swordPointerId < 0 &&
+                    Vector2.Distance(touchGuiPosition, swordGuiPos) <= actionRadius)
+                {
+                    swordPointerId = touch.fingerId;
+                    player.Weapon?.TryMelee();
+                    continue;
+                }
+
+                if (!leftSide && grenadePointerId < 0 &&
+                    Vector2.Distance(touchGuiPosition, bombGuiPos) <= actionRadius)
+                {
+                    grenadePointerId = touch.fingerId;
+                    ThrowGrenadeAtTarget();
+                    continue;
+                }
+
+                if (!leftSide && reloadPointerId < 0 &&
+                    Vector2.Distance(touchGuiPosition, reloadGuiPos) <= actionRadius)
+                {
+                    reloadPointerId = touch.fingerId;
+                    player.Weapon?.Reload();
+                    continue;
+                }
+
+                if (!leftSide && firePointerId < 0 &&
+                    Vector2.Distance(touchGuiPosition, fireGuiPos) <= fireRadius)
+                {
+                    firePointerId = touch.fingerId;
+                    FireAtNearestTarget();
+                }
             }
 
             if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch moveTouch))
@@ -191,6 +192,18 @@ namespace PersiaWar.Unity2D5D
                 if (grenadeTouch.phase == TouchPhase.Ended || grenadeTouch.phase == TouchPhase.Canceled) grenadePointerId = -1;
             }
             else if (grenadePointerId >= 0) grenadePointerId = -1;
+
+            if (swordPointerId >= 0 && TryGetTouch(swordPointerId, out Touch swordTouch))
+            {
+                if (swordTouch.phase == TouchPhase.Ended || swordTouch.phase == TouchPhase.Canceled) swordPointerId = -1;
+            }
+            else if (swordPointerId >= 0) swordPointerId = -1;
+
+            if (reloadPointerId >= 0 && TryGetTouch(reloadPointerId, out Touch reloadTouch))
+            {
+                if (reloadTouch.phase == TouchPhase.Ended || reloadTouch.phase == TouchPhase.Canceled) reloadPointerId = -1;
+            }
+            else if (reloadPointerId >= 0) reloadPointerId = -1;
         }
 
         private void FireAtNearestTarget()
@@ -258,10 +271,10 @@ namespace PersiaWar.Unity2D5D
             if (!Application.isMobilePlatform && !Application.isEditor) return;
 #if UNITY_ANDROID
             if (!androidExecutionArmed) return;
-#endif
+            if (circleTexture == null || lineTexture == null) CreateGuiTextures();
             DrawAndroidTouchHud();
-#if UNITY_ANDROID
             DrawAndroidRadar();
+            DrawAimGuide(Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f));
             return;
 #endif
             if (circleTexture == null || lineTexture == null) CreateGuiTextures();
@@ -282,9 +295,41 @@ namespace PersiaWar.Unity2D5D
         private void DrawAndroidTouchHud()
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-            GUI.Box(new Rect(24f, Screen.height - 108f * scale, 175f * scale, 70f * scale), "MOVE");
-            GUI.Box(new Rect(Screen.width - 200f * scale, Screen.height - 108f * scale, 175f * scale, 70f * scale), "AIM / FIRE");
-            GUI.Box(new Rect(Screen.width - 302f * scale, Screen.height - 205f * scale, 92f * scale, 66f * scale), "G");
+            if (circleTexture == null)
+                CreateGuiTextures();
+
+            float radius = joystickRadius * scale;
+            Vector2 defaultMove = new Vector2(120f * scale, 140f * scale);
+            Vector2 moveBase = movePointerId >= 0
+                ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y)
+                : new Vector2(120f * scale, Screen.height - 140f * scale);
+            Vector2 moveKnob = moveBase + new Vector2(moveValue.x, -moveValue.y) * radius;
+
+            DrawCircle(moveBase, radius, new Color(0f, 0f, 0f, 0.38f));
+            DrawCircle(moveKnob, radius * 0.42f, new Color(0.92f, 0.90f, 0.78f, 0.82f));
+
+            Vector2 firePos = new Vector2(Screen.width - 120f * scale, Screen.height - 155f * scale);
+            Vector2 swordPos = new Vector2(Screen.width - 270f * scale, Screen.height - 85f * scale);
+            Vector2 bombPos = new Vector2(Screen.width - 165f * scale, Screen.height - 85f * scale);
+            Vector2 reloadPos = new Vector2(Screen.width - 60f * scale, Screen.height - 85f * scale);
+
+            DrawAndroidButton(firePos, radius * 0.72f, "FIRE", firePointerId >= 0);
+            DrawAndroidButton(swordPos, radius * 0.42f, "SWORD", swordPointerId >= 0);
+            DrawAndroidButton(bombPos, radius * 0.42f, "BOMB", grenadePointerId >= 0);
+            DrawAndroidButton(reloadPos, radius * 0.42f, "RELOAD", reloadPointerId >= 0);
+        }
+
+        private void DrawAndroidButton(Vector2 center, float radius, string label, bool pressed)
+        {
+            DrawCircle(center, radius, pressed
+                ? new Color(0.45f, 0.50f, 0.25f, 0.82f)
+                : new Color(0.10f, 0.12f, 0.14f, 0.68f));
+            GUIStyle style = buttonTextStyle ?? new GUIStyle(GUI.skin.label);
+            style.fontStyle = FontStyle.Bold;
+            style.fontSize = Mathf.Max(11, Mathf.RoundToInt(radius * 0.22f));
+            style.alignment = TextAnchor.MiddleCenter;
+            GUI.Label(new Rect(center.x - radius, center.y - radius * 0.38f,
+                radius * 2f, radius * 0.76f), label, style);
         }
 
         private void DrawAndroidRadar()
