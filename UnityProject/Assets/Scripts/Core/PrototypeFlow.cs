@@ -405,6 +405,7 @@ namespace PersiaWar.Unity2D5D
                 gameRoot.SetActive(true);
                 yield return null;
 
+                EnsureRuntimeGameplayServices();
                 CacheGameplayRoots();
                 gameBootstrap = gameRoot.GetComponent<GameBootstrap>();
                 player = playerRoot != null ? playerRoot.GetComponent<PlayerController>() : player;
@@ -499,6 +500,9 @@ namespace PersiaWar.Unity2D5D
             androidRuntimeCamera = CreateAndroidRuntimeCamera(player.transform);
             activeCamera = androidRuntimeCamera;
             followCamera = null;
+
+            if (mobileInput != null)
+                mobileInput.SetGameplayCamera(activeCamera);
 #else
             activeCamera = mainCameraRoot != null
                 ? mainCameraRoot.GetComponent<Camera>()
@@ -720,6 +724,33 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("MatchServicesReady");
 #endif
+        }
+
+        private void EnsureRuntimeGameplayServices()
+        {
+            if (gameRoot == null)
+                return;
+
+            if (enemySpawner == null)
+            {
+                enemySpawner = gameRoot.GetComponentInChildren<EnemySpawner>(true);
+                if (enemySpawner == null)
+                    enemySpawner = gameRoot.AddComponent<EnemySpawner>();
+
+                enemySpawner.enabled = false;
+            }
+
+            if (combatHud == null)
+            {
+                combatHud = gameRoot.GetComponentInChildren<RuntimeCombatHUD>(true);
+                if (combatHud == null)
+                    combatHud = gameRoot.AddComponent<RuntimeCombatHUD>();
+
+                combatHud.enabled = false;
+            }
+
+            if (combatHud != null && player != null)
+                combatHud.ConfigurePlayer(player);
         }
 
         private IEnumerator ActivateRoot(GameObject root, string rootName)

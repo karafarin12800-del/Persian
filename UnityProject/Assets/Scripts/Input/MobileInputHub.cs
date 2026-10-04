@@ -34,6 +34,12 @@ namespace PersiaWar.Unity2D5D
         public static void SetAndroidExecutionArmed(bool armed) => androidExecutionArmed = armed;
 #endif
 
+        public void SetGameplayCamera(Camera camera)
+        {
+            if (camera != null)
+                gameplayCamera = camera;
+        }
+
         public void EnableMinimap()
         {
 #if UNITY_ANDROID
