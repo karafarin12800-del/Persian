@@ -74,10 +74,7 @@ namespace PersiaWar.Unity2D5D
         {
             EnsureUiInitialized();
             if (mode == ScreenMode.Match)
-            {
-                DrawMatchDiagnosticOverlay();
                 return;
-            }
             DrawBackdrop();
             if (startingMatch)
             {
@@ -274,34 +271,56 @@ namespace PersiaWar.Unity2D5D
             if (followCamera != null) followCamera.enabled = false;
             StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match; startingMatch = false; startupStatus = string.Empty; StartupCheckpoint.Set("MatchStarted");
-            // DIAGNOSTIC STEP 1: enable HUD only. MobileInput and EnemySpawner remain isolated.
+            // Production match services are restored in small staged steps so the
+            // stable core path is preserved while the real game systems come online.
             yield return null;
-            if (combatHud == null) combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+
+            if (combatHud == null)
+                combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
             if (combatHud != null)
             {
                 combatHud.ConfigurePlayer(player);
                 combatHud.enabled = true;
                 StartupCheckpoint.Set("CombatHudEnabled");
             }
-            StartupCheckpoint.Set("HudOnlyEnabled");
-            // DIAGNOSTIC STEP 2: enable MobileInput execution only. Keep EnemySpawner isolated.
-            yield return null;
+
 #if UNITY_ANDROID
             MobileInputHub.SetAndroidExecutionArmed(true);
             MobileInputHub.SetAndroidTouchProcessingArmed(true);
             MobileInputHub.SetAndroidTouchGameplayArmed(true);
             MobileInputHub.SetAndroidTouchMoveGameplayArmed(false);
 #endif
-            if (mobileInput == null) mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
+            if (mobileInput == null)
+                mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
             if (mobileInput != null)
             {
                 mobileInput.enabled = true;
                 StartupCheckpoint.Set("MobileInputEnabled");
             }
-            StartupCheckpoint.Set("MobileInputOnlyEnabled");
-            StartupCheckpoint.Set("MobileInputTouchProcessingEnabled");
             StartupCheckpoint.Set("MobileInputGameplayEnabled");
-            StartupCheckpoint.Set("EnemySpawnerIsolated");
+
+            yield return new WaitForSecondsRealtime(0.25f);
+
+            if (followCamera != null)
+            {
+                followCamera.SetTarget(player.transform);
+                followCamera.enabled = true;
+                StartupCheckpoint.Set("CameraFollowEnabled");
+            }
+
+            yield return new WaitForSecondsRealtime(0.25f);
+
+            if (enemySpawner == null)
+                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+            if (enemySpawner != null)
+            {
+                enemySpawner.Configure(player.transform, 8, 44f, 0f);
+                enemySpawner.enabled = true;
+                StartupCheckpoint.Set("EnemySpawnerEnabled");
+            }
+
+            matchInputArmed = true;
+            StartupCheckpoint.Set("GameplaySystemsEnabled");
         }
 
         private IEnumerator InitializeMatchServices()
