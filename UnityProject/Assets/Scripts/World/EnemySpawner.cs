@@ -12,6 +12,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float initialSpawnDelay = 4f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
         [SerializeField] private int maxPerWave = 15;
+        [SerializeField] private int maxWaves = 5;
 
         private int wave = 1;
         private bool spawning;
@@ -28,6 +29,16 @@ namespace PersiaWar.Unity2D5D
             player = playerTransform;
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
+            initialWaveComplete = false;
+            failedSpawnAttempts = 0;
+            wave = 1;
+            GameSession.Instance?.SetWave(wave);
+            TryStartInitialWave();
+        }
+
+        private void OnEnable()
+        {
+            TryStartInitialWave();
         }
 
         private void Start()
@@ -38,10 +49,16 @@ namespace PersiaWar.Unity2D5D
                 if (found != null) player = found.transform;
             }
 
-            // Enemy construction is deliberately delayed until the gameplay scene has
-            // had time to render and finish its procedural world startup on Android.
-            if (player != null)
-                StartCoroutine(SpawnInitialWaveAfterStartup());
+            TryStartInitialWave();
+        }
+
+        private void TryStartInitialWave()
+        {
+            if (player == null || !isActiveAndEnabled || initialWavePending || initialWaveComplete)
+                return;
+
+            initialWavePending = true;
+            StartCoroutine(SpawnInitialWaveAfterStartup());
         }
 
         private IEnumerator SpawnInitialWaveAfterStartup()
@@ -62,7 +79,17 @@ namespace PersiaWar.Unity2D5D
             nextEnemyCheckTime = Time.unscaledTime + enemyCheckInterval;
 
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
-            if (enemies.Length == 0 && failedSpawnAttempts < MaxFailedSpawnAttempts)
+            if (enemies.Length != 0)
+                return;
+
+            GameSession session = GameSession.Instance;
+            if (session != null && wave >= Mathf.Max(1, maxWaves))
+            {
+                session.EndMission(true);
+                return;
+            }
+
+            if (failedSpawnAttempts < MaxFailedSpawnAttempts)
             {
                 spawning = true;
                 Invoke(nameof(SpawnNextWave), nextWaveDelay);
@@ -155,6 +182,9 @@ namespace PersiaWar.Unity2D5D
             else
             {
                 failedSpawnAttempts = 0;
+#if UNITY_ANDROID
+                NearestTargetAim.SetAndroidTargetScanArmed(true);
+#endif
                 if (GameSession.Instance != null)
                     GameSession.Instance.SetWave(currentWave);
 
