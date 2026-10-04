@@ -359,7 +359,12 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator ActivateRoot(GameObject root, string rootName)
         {
             if (root == null) yield break;
-            if (!root.activeSelf) { startupStatus = "Starting " + rootName + "..."; root.SetActive(true); yield return null; }
+            if (!root.activeSelf)
+            {
+                startupStatus = "Starting " + rootName + "...";
+                root.SetActive(true);
+            }
+            yield return null;
         }
 
         private void GateGameplay(bool enabled)
