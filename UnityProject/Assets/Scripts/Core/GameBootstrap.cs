@@ -22,6 +22,10 @@ namespace PersiaWar.Unity2D5D
         private Material buildingMaterial;
         private Material roofMaterial;
         private Material accentMaterial;
+        private Material alleyMaterial;
+        private Material carBodyMaterial;
+        private Material carGlassMaterial;
+        private Material carWheelMaterial;
         private bool prepareRequested;
 
         private void ReportStage(string message, string checkpoint)
@@ -255,11 +259,30 @@ namespace PersiaWar.Unity2D5D
 
             for (int i = 0; i < buildingPoints.Length; i++)
             {
-                float footprint = (i % 3 == 0) ? 9f : 7.5f;
-                float height = (i % 4 == 0) ? 10f : 7.5f;
-                float depth = (i % 2 == 0) ? 8f : 7f;
+                float footprint = (i % 3 == 0) ? 10.5f : 9f;
+                float height = (i % 4 == 0) ? 10.5f : 8.2f;
+                float depth = (i % 2 == 0) ? 9f : 8f;
                 CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
                 StartupCheckpoint.Set("AndroidCityBuilding_" + (i + 1));
+                yield return null;
+            }
+
+            // Thirty narrow pedestrian alleys connect the main 24 m road grid.
+            // They are visual-only strips so the player remains free to move through them.
+            if (alleyMaterial == null)
+                alleyMaterial = MakeMaterial("AndroidAlley", new Color(0.25f, 0.27f, 0.28f));
+
+            for (int i = -7; i <= 7; i++)
+            {
+                float z = i * 12f + 6f;
+                CreateFlatMesh("AlleyEW", new Vector3(0f, 0.005f, z), new Vector2(worldSize, 2.4f), alleyMaterial);
+                yield return null;
+            }
+
+            for (int i = -7; i <= 7; i++)
+            {
+                float x = i * 12f + 6f;
+                CreateFlatMesh("AlleyNS", new Vector3(x, 0.006f, 0f), new Vector2(2.4f, worldSize), alleyMaterial);
                 yield return null;
             }
 
@@ -286,6 +309,20 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < plazaPillars.Length; i++)
             {
                 CreateAndroidStreetLamp(plazaPillars[i]);
+                yield return null;
+            }
+
+            Vector3[] carPoints =
+            {
+                new Vector3(-48f, 0f, -16f), new Vector3(48f, 0f, 16f),
+                new Vector3(-16f, 0f, 48f), new Vector3(16f, 0f, -48f),
+                new Vector3(-72f, 0f, 24f), new Vector3(72f, 0f, -24f),
+                new Vector3(-24f, 0f, 72f), new Vector3(24f, 0f, -72f)
+            };
+
+            for (int i = 0; i < carPoints.Length; i++)
+            {
+                CreateAndroidCar(carPoints[i], i % 2 == 0 ? 0f : 90f, i % 3);
                 yield return null;
             }
 
@@ -361,6 +398,42 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(scale * 1.35f, scale * 1.15f, scale * 1.35f),
                 androidTreeCrownMaterial,
                 false);
+        }
+
+        private void CreateAndroidCar(Vector3 position, float yaw, int variant)
+        {
+            if (carBodyMaterial == null)
+                carBodyMaterial = MakeMaterial("AndroidCarBody", new Color(0.18f, 0.22f, 0.25f));
+            if (carGlassMaterial == null)
+                carGlassMaterial = MakeMaterial("AndroidCarGlass", new Color(0.10f, 0.18f, 0.23f));
+            if (carWheelMaterial == null)
+                carWheelMaterial = MakeMaterial("AndroidCarWheel", new Color(0.06f, 0.07f, 0.08f));
+
+            GameObject car = new GameObject("StreetCar");
+            car.transform.SetParent(worldRoot, true);
+            car.transform.position = position + Vector3.up * 0.45f;
+            car.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+
+            Color bodyColor = variant == 0
+                ? new Color(0.52f, 0.12f, 0.09f)
+                : (variant == 1 ? new Color(0.18f, 0.28f, 0.36f) : new Color(0.45f, 0.36f, 0.15f));
+            Material bodyMaterial = MakeMaterial("AndroidCarBody_" + variant, bodyColor);
+
+            CreateAndroidBox("CarBody", car.transform.position, new Vector3(3.4f, 0.65f, 1.7f), bodyMaterial, false)
+                .transform.SetParent(car.transform, true);
+            CreateAndroidBox("CarCabin", car.transform.position + Vector3.up * 0.48f, new Vector3(1.8f, 0.55f, 1.35f), carGlassMaterial, false)
+                .transform.SetParent(car.transform, true);
+
+            Vector3[] wheels =
+            {
+                new Vector3(-1.15f, -0.18f, -0.78f), new Vector3(1.15f, -0.18f, -0.78f),
+                new Vector3(-1.15f, -0.18f, 0.78f), new Vector3(1.15f, -0.18f, 0.78f)
+            };
+            for (int i = 0; i < wheels.Length; i++)
+            {
+                GameObject wheel = CreateAndroidBox("CarWheel", car.transform.position + wheels[i], new Vector3(0.46f, 0.30f, 0.22f), carWheelMaterial, false);
+                wheel.transform.SetParent(car.transform, true);
+            }
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
