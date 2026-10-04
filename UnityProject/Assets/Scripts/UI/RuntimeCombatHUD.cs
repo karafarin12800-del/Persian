@@ -14,6 +14,7 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle small;
         private GUIStyle medium;
         private GUIStyle bold;
+        private GUIStyle actionButton;
         private Texture2D pixel;
 
         public void ConfigurePlayer(PlayerController value)
@@ -48,6 +49,12 @@ namespace PersiaWar.Unity2D5D
                 fontSize = 24,
                 alignment = TextAnchor.MiddleCenter
             };
+            actionButton = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 18,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter
+            };
         }
 
         private void OnDestroy()
@@ -80,12 +87,24 @@ namespace PersiaWar.Unity2D5D
             DrawTopStatus(margin, scale, hp, shield, ammo, reserve, grenades);
             DrawCounters(margin, scale, wave, score);
 
-            if (player.IsDefeated)
+            if (session != null && session.IsFinished)
             {
-                float w = 360f * scale;
-                Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - 48f * scale, w, 96f * scale);
-                Fill(panel, new Color(0.05f, 0.06f, 0.08f, 0.86f));
-                GUI.Label(panel, "GAME OVER", bold);
+                float w = 430f * scale;
+                float h = 190f * scale;
+                Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - h * 0.5f, w, h);
+                Fill(panel, new Color(0.03f, 0.045f, 0.07f, 0.94f));
+
+                string title = session.PlayerWon ? "VICTORY" : "GAME OVER";
+                string detail = session.PlayerWon
+                    ? "THE PERSIAN BATTLEFIELD IS SECURED"
+                    : "YOUR WARRIOR HAS FALLEN";
+
+                GUI.Label(new Rect(panel.x, panel.y + 18f * scale, panel.width, 42f * scale), title, bold);
+                GUI.Label(new Rect(panel.x + 20f * scale, panel.y + 65f * scale, panel.width - 40f * scale, 30f * scale), detail, small);
+
+                Rect restart = new Rect(panel.x + 55f * scale, panel.y + 112f * scale, panel.width - 110f * scale, 48f * scale);
+                if (GUI.Button(restart, "PLAY AGAIN", actionButton))
+                    session.RestartMission();
             }
         }
 
