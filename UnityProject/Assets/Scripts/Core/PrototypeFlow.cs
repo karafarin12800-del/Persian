@@ -259,38 +259,41 @@ namespace PersiaWar.Unity2D5D
             activeCamera = mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null;
             followCamera = activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null;
 
-            // The gameplay camera root is authored in the scene. Do not perform a
-            // scene-root activation coroutine here; on Android that transition was
-            // the last observed startup stall. Recover the root synchronously if a
-            // previous bootstrap stage left it inactive, then enable only the Camera.
+            // Production 3D camera path: enable the authored perspective camera
+            // and its follow controller as one atomic match transition. There is no
+            // diagnostic "camera isolated" phase in the production build.
             StartupCheckpoint.Set("MainCameraRootActivationStarted");
             if (mainCameraRoot != null && !mainCameraRoot.activeSelf)
                 mainCameraRoot.SetActive(true);
             StartupCheckpoint.Set("MainCameraRootActivated");
 
-            if (activeCamera != null)
-                activeCamera.enabled = false;
             if (followCamera != null)
             {
                 followCamera.SetTarget(player.transform);
-                followCamera.enabled = false;
+                followCamera.enabled = true;
             }
-            StartupCheckpoint.Set("MainCameraTargetReady");
-
             if (activeCamera != null)
-            {
-                StartupCheckpoint.Set("MainCameraEnableStarted");
                 activeCamera.enabled = true;
-                StartupCheckpoint.Set("MainCameraEnabled");
+            StartupCheckpoint.Set("CameraFollowEnabled");
+
+            // Restore the complete previous-game interaction set immediately:
+            // floating movement, auto-aim fire, sword, bomb, reload, HUD, minimap
+            // and enemy simulation. Nothing waits for a diagnostic delay.
+#if UNITY_ANDROID
+            MobileInputHub.SetAndroidExecutionArmed(true);
+            MobileInputHub.SetAndroidTouchProcessingArmed(true);
+            MobileInputHub.SetAndroidTouchGameplayArmed(true);
+            MobileInputHub.SetAndroidTouchMoveGameplayArmed(true);
+#endif
+
+            if (mobileInput == null)
+                mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
+            if (mobileInput != null)
+            {
+                mobileInput.enabled = true;
+                mobileInput.EnableMinimap();
+                StartupCheckpoint.Set("MobileInputEnabled");
             }
-            yield return null;
-            StartupCheckpoint.Set("CameraFollowIsolated");
-            if (followCamera != null) followCamera.enabled = false;
-            StartupCheckpoint.Set("MatchCoreReady");
-            mode = ScreenMode.Match; startingMatch = false; startupStatus = string.Empty; StartupCheckpoint.Set("MatchStarted");
-            // Production match services are restored in small staged steps so the
-            // stable core path is preserved while the real game systems come online.
-            yield return null;
 
             if (combatHud == null)
                 combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
@@ -300,32 +303,6 @@ namespace PersiaWar.Unity2D5D
                 combatHud.enabled = true;
                 StartupCheckpoint.Set("CombatHudEnabled");
             }
-
-#if UNITY_ANDROID
-            MobileInputHub.SetAndroidExecutionArmed(true);
-            MobileInputHub.SetAndroidTouchProcessingArmed(true);
-            MobileInputHub.SetAndroidTouchGameplayArmed(true);
-            MobileInputHub.SetAndroidTouchMoveGameplayArmed(false);
-#endif
-            if (mobileInput == null)
-                mobileInput = FindFirstObjectByType<MobileInputHub>(FindObjectsInactive.Include);
-            if (mobileInput != null)
-            {
-                mobileInput.enabled = true;
-                StartupCheckpoint.Set("MobileInputEnabled");
-            }
-            StartupCheckpoint.Set("MobileInputGameplayEnabled");
-
-            yield return new WaitForSecondsRealtime(0.25f);
-
-            if (followCamera != null)
-            {
-                followCamera.SetTarget(player.transform);
-                followCamera.enabled = true;
-                StartupCheckpoint.Set("CameraFollowEnabled");
-            }
-
-            yield return new WaitForSecondsRealtime(0.25f);
 
             if (enemySpawner == null)
                 enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
@@ -338,6 +315,11 @@ namespace PersiaWar.Unity2D5D
 
             matchInputArmed = true;
             StartupCheckpoint.Set("GameplaySystemsEnabled");
+            StartupCheckpoint.Set("MatchCoreReady");
+            mode = ScreenMode.Match;
+            startingMatch = false;
+            startupStatus = string.Empty;
+            StartupCheckpoint.Set("MatchStarted");
         }
 
         private IEnumerator InitializeMatchServices()
