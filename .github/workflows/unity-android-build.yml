@@ -6,7 +6,7 @@ on:
       build_ref:
         description: 'Unity branch or commit to build'
         required: true
-        default: 'unity-2.5d'
+        default: 'unity-2.5d-production-restoration-ci'
         type: string
   push:
     branches:
@@ -79,11 +79,15 @@ jobs:
           test "${missing_meta}" -eq 0
           grep -q 'Resources.Load<Sprite>' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
           ! grep -q 'Sprite.Create(' UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs
-          # CameraFollow is intentionally isolated for this diagnostic build.
-          grep -q 'followCamera.enabled = false' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
+          # Production build must use the real perspective camera follow controller.
+          grep -q 'followCamera.enabled = true' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
+          ! grep -q 'CameraFollowIsolated' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
+          grep -q 'SetAndroidTouchMoveGameplayArmed(true)' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
           grep -q 'combatHud.enabled = true' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
           grep -q 'enemySpawner.Configure(player.transform, 8, 44f, 0f)' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
           grep -q 'minimapEnabled = true' UnityProject/Assets/Scripts/Input/MobileInputHub.cs
+          grep -q 'SWORD' UnityProject/Assets/Scripts/Input/MobileInputHub.cs
+          grep -q 'RELOAD' UnityProject/Assets/Scripts/Input/MobileInputHub.cs
           ! grep -q 'PrototypeFlowMainGameLaunchQueued' UnityProject/Assets/Scripts/Core/PrototypeFlow.cs
           python3 - <<'PY'
           from pathlib import Path
