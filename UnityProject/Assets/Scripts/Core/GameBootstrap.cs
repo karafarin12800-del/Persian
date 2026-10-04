@@ -190,16 +190,19 @@ namespace PersiaWar.Unity2D5D
             if (worldRoot != null) Destroy(worldRoot.gameObject);
             worldRoot = new GameObject("BattleRoyaleCity").transform;
 
-            roadMaterial = MakeMaterial("Road", new Color(0.18f, 0.20f, 0.22f));
+            roadMaterial = MakeMaterial("Road", new Color(0.105f, 0.12f, 0.135f));
 
 #if UNITY_ANDROID
             // Do not invoke Terrain3DBuilder during the first Android match. The previous
             // crash happened in this critical startup window, so use one tiny static mesh
             // with a single material as the isolation-safe battlefield floor.
-            Material groundMaterial = MakeMaterial("AndroidGround", new Color(0.33f, 0.52f, 0.20f));
-            buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.50f, 0.38f, 0.25f));
-            roofMaterial = MakeMaterial("AndroidRoof", new Color(0.16f, 0.19f, 0.23f));
-            accentMaterial = MakeMaterial("AndroidAccent", new Color(0.82f, 0.62f, 0.22f));
+            Material groundMaterial = MakeMaterial("AndroidGround", new Color(0.25f, 0.44f, 0.18f));
+            buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
+            roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
+            accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
+            androidWindowMaterial = MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
+            androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
+            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.38f, 0.36f, 0.31f));
             CreateFlatMesh("AndroidGround", Vector3.zero, new Vector2(worldSize, worldSize), groundMaterial);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
@@ -224,12 +227,22 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidRoadGrid()
         {
-            const float roadWidth = 8f;
+            const float roadWidth = 10f;
+            const float sidewalkWidth = 1.35f;
             float half = worldSize * 0.5f;
             for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+            {
                 CreateFlatMesh("RoadX", new Vector3(x, -0.02f, 0f), new Vector2(roadWidth, worldSize), roadMaterial);
+                CreateFlatMesh("SidewalkX_L", new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, -0.012f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
+                CreateFlatMesh("SidewalkX_R", new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, -0.012f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
+            }
             for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
+            {
                 CreateFlatMesh("RoadZ", new Vector3(0f, -0.015f, z), new Vector2(worldSize, roadWidth), roadMaterial);
+                CreateFlatMesh("SidewalkZ_B", new Vector3(0f, -0.008f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
+                CreateFlatMesh("SidewalkZ_T", new Vector3(0f, -0.008f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
+            }
+            BuildAndroidIntersectionsAndLaneMarks(roadWidth);
         }
 
         private void BuildAndroidCityPresentation()
@@ -249,16 +262,18 @@ namespace PersiaWar.Unity2D5D
 
             for (int i = 0; i < buildingPoints.Length; i++)
             {
-                float footprint = (i % 3 == 0) ? 9f : 7.5f;
-                float height = (i % 4 == 0) ? 10f : 7.5f;
-                float depth = (i % 2 == 0) ? 8f : 7f;
+                float footprint = (i % 3 == 0) ? 11.5f : 9.5f;
+                float height = (i % 4 == 0) ? 12.5f : 9.0f;
+                float depth = (i % 2 == 0) ? 10f : 8.5f;
                 CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
             }
 
             Vector3[] treePoints =
             {
                 new Vector3(-30f, 0f, -30f), new Vector3(30f, 0f, 30f),
-                new Vector3(-30f, 0f, 30f),  new Vector3(30f, 0f, -30f)
+                new Vector3(-30f, 0f, 30f),  new Vector3(30f, 0f, -30f),
+                new Vector3(-68f, 0f, 0f), new Vector3(68f, 0f, 0f),
+                new Vector3(0f, 0f, 68f), new Vector3(0f, 0f, -68f)
             };
 
             for (int i = 0; i < treePoints.Length; i++)
@@ -345,6 +360,51 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(width * 0.88f, 0.16f, length * 0.90f),
                 accentMaterial,
                 false);
+
+            Material wheel = MakeMaterial("VehicleWheel", new Color(0.035f, 0.045f, 0.055f));
+            Material glass = MakeMaterial("VehicleGlass", new Color(0.08f, 0.18f, 0.22f));
+            Material light = MakeMaterial("VehicleLight", new Color(0.95f, 0.82f, 0.45f));
+
+            float wheelY = 0.34f;
+            Vector3[] wheels =
+            {
+                position + new Vector3(-width * 0.36f, wheelY, -length * 0.34f),
+                position + new Vector3(width * 0.36f, wheelY, -length * 0.34f),
+                position + new Vector3(-width * 0.36f, wheelY, length * 0.34f),
+                position + new Vector3(width * 0.36f, wheelY, length * 0.34f)
+            };
+            for (int i = 0; i < wheels.Length; i++)
+                CreateAndroidBox("VehicleWheel", wheels[i], new Vector3(0.42f, 0.30f, 0.58f), wheel, false);
+
+            CreateAndroidBox("VehicleGlass", position + Vector3.up * 1.10f,
+                new Vector3(width * 0.72f, 0.22f, length * 0.47f), glass, false);
+
+            CreateAndroidBox("VehicleLights",
+                position + Vector3.up * 0.52f + (longAxisZ ? Vector3.forward : Vector3.right) * (longAxisZ ? length : width) * 0.39f,
+                new Vector3(longAxisZ ? width * 0.38f : 0.34f, 0.16f, longAxisZ ? 0.16f : length * 0.38f),
+                light,
+                false);
+        }
+
+        private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
+        {
+            Material lane = MakeMaterial("AndroidLane", new Color(0.78f, 0.68f, 0.34f));
+            Material curb = MakeMaterial("AndroidCurb", new Color(0.56f, 0.54f, 0.49f));
+            float half = worldSize * 0.5f;
+
+            for (float x = -half + 5f; x < half; x += 10f)
+                for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
+                    CreateFlatMesh("LaneDashV", new Vector3(x, -0.006f, z), new Vector2(0.28f, 4.2f), lane);
+
+            for (float z = -half + 5f; z < half; z += 10f)
+                for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+                    CreateFlatMesh("LaneDashH", new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f), lane);
+
+            for (float x = -half + 0.68f; x <= half; x += 24f)
+            {
+                CreateFlatMesh("CurbV_L", new Vector3(x - roadWidth * 0.5f, 0.01f, 0f), new Vector2(0.08f, worldSize), curb);
+                CreateFlatMesh("CurbV_R", new Vector3(x + roadWidth * 0.5f, 0.01f, 0f), new Vector2(0.08f, worldSize), curb);
+            }
         }
 
         private void CreateAndroidBuilding(Vector3 position, float footprint, float height, float depth)
@@ -375,13 +435,28 @@ namespace PersiaWar.Unity2D5D
                     CreateAndroidBox(
                         "Window",
                         position + new Vector3(x, y, -depth * 0.512f),
-                        new Vector3(Mathf.Min(1.35f, footprint * 0.16f), 0.72f, 0.10f),
-                        accentMaterial,
+                        new Vector3(Mathf.Min(1.45f, footprint * 0.17f), 0.78f, 0.10f),
+                        androidWindowMaterial,
                         false);
                 }
             }
 
-            // One entrance canopy gives larger blocks a distinctive silhouette.
+            // Layered facade detail keeps buildings readable from the 2.5D camera.
+            CreateAndroidBox(
+                "FacadeShadow",
+                position + new Vector3(0f, bodyHeight * 0.52f, -depth * 0.515f),
+                new Vector3(footprint * 0.88f, 0.32f, 0.08f),
+                androidShadowMaterial,
+                false);
+
+            for (int side = -1; side <= 1; side += 2)
+                CreateAndroidBox(
+                    "FacadePillar",
+                    position + new Vector3(side * footprint * 0.38f, bodyHeight * 0.52f, -depth * 0.52f),
+                    new Vector3(0.28f, bodyHeight * 0.88f, 0.12f),
+                    accentMaterial,
+                    false);
+
             CreateAndroidBox(
                 "DoorCanopy",
                 position + new Vector3(0f, 1.45f, -depth * 0.54f),
@@ -394,6 +469,9 @@ namespace PersiaWar.Unity2D5D
         private Material androidTreeCrownMaterial;
         private Material androidLampMaterial;
         private Material androidLampGlowMaterial;
+        private Material androidWindowMaterial;
+        private Material androidShadowMaterial;
+        private Material androidSidewalkMaterial;
 
         private void CreateAndroidTree(Vector3 position, float scale)
         {
@@ -410,9 +488,16 @@ namespace PersiaWar.Unity2D5D
                 false);
 
             CreateAndroidBox(
-                "TreeCrown",
-                position + Vector3.up * (scale * 2.0f),
-                new Vector3(scale * 1.35f, scale * 1.15f, scale * 1.35f),
+                "TreeCrownLower",
+                position + Vector3.up * (scale * 1.75f),
+                new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
+                androidTreeCrownMaterial,
+                false);
+
+            CreateAndroidBox(
+                "TreeCrownUpper",
+                position + Vector3.up * (scale * 2.30f),
+                new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
                 androidTreeCrownMaterial,
                 false);
         }

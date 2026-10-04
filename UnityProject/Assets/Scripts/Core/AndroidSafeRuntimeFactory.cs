@@ -68,6 +68,17 @@ namespace PersiaWar.Unity2D5D
             body.isKinematic = true;
             body.useGravity = false;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+            TrailRenderer trail = obj.AddComponent<TrailRenderer>();
+            trail.time = 0.08f;
+            trail.minVertexDistance = 0.03f;
+            trail.startWidth = Mathf.Max(0.035f, scale.x * 0.55f);
+            trail.endWidth = 0f;
+            trail.material = RuntimeMaterialFactory.Create(objectName + "TrailMaterial", tint);
+            trail.startColor = tint;
+            trail.endColor = new Color(tint.r, tint.g, tint.b, 0f);
+            trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            trail.receiveShadows = false;
             return obj;
         }
     }

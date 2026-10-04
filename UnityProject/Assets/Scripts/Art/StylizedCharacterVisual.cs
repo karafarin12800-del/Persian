@@ -17,6 +17,7 @@ namespace PersiaWar.Unity2D5D
         private Transform artRoot;
         private Transform muzzle;
         private SpriteRenderer sprite;
+        private SpriteRenderer shadowSprite;
         private ParticleSystem muzzleFlash;
 
         private bool moving;
@@ -169,6 +170,15 @@ namespace PersiaWar.Unity2D5D
                 sprite.sortingOrder = 20;
                 sprite.maskInteraction = SpriteMaskInteraction.None;
                 baseLocalPosition = Vector3.zero;
+
+                shadowSprite = new GameObject("CharacterShadow").AddComponent<SpriteRenderer>();
+                shadowSprite.transform.SetParent(artRoot, false);
+                shadowSprite.transform.localPosition = new Vector3(0.10f, -0.48f, 0f);
+                shadowSprite.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                shadowSprite.transform.localScale = new Vector3(0.78f, 0.28f, 1f);
+                shadowSprite.sortingOrder = 19;
+                shadowSprite.color = new Color(0f, 0f, 0f, 0.30f);
+                shadowSprite.maskInteraction = SpriteMaskInteraction.None;
             }
 
             if (muzzle == null)
@@ -208,6 +218,11 @@ namespace PersiaWar.Unity2D5D
             }
 
             sprite.sprite = loaded;
+            if (shadowSprite != null)
+            {
+                shadowSprite.sprite = loaded;
+                shadowSprite.color = new Color(0f, 0f, 0f, 0.30f);
+            }
             sprite.color = Color.white;
             ApplyScale();
             StartupCheckpoint.Set(playerCharacter ? "PlayerSpriteReady" : "EnemySpriteReady");

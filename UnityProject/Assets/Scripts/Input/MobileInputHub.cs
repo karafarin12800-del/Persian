@@ -308,9 +308,9 @@ namespace PersiaWar.Unity2D5D
             // custom texture drawing during the first activation of mobile input.
             // Touch handling remains in Update(); this is presentation-only.
             float androidScale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-            GUI.Box(new Rect(24f, Screen.height - 92f * androidScale, 150f * androidScale, 54f * androidScale), "MOVE");
-            GUI.Box(new Rect(Screen.width - 174f * androidScale, Screen.height - 92f * androidScale, 150f * androidScale, 54f * androidScale), "AIM / FIRE");
-            GUI.Box(new Rect(Screen.width - 270f * androidScale, Screen.height - 170f * androidScale, 88f * androidScale, 58f * androidScale), "G");
+            DrawAndroidControl(new Rect(22f, Screen.height - 106f * androidScale, 170f * androidScale, 68f * androidScale), "MOVE", new Color(0.12f, 0.18f, 0.22f, 0.78f));
+            DrawAndroidControl(new Rect(Screen.width - 192f * androidScale, Screen.height - 106f * androidScale, 170f * androidScale, 68f * androidScale), "AIM / FIRE", new Color(0.38f, 0.12f, 0.08f, 0.82f));
+            DrawAndroidControl(new Rect(Screen.width - 292f * androidScale, Screen.height - 194f * androidScale, 92f * androidScale, 62f * androidScale), "G", new Color(0.25f, 0.20f, 0.08f, 0.82f));
             return;
 #endif
 
@@ -357,6 +357,23 @@ namespace PersiaWar.Unity2D5D
                 GUI.DrawTexture(rect, minimapTexture, ScaleMode.StretchToFill, false);
                 GUI.Box(rect, GUIContent.none);
             }
+        }
+
+        private void DrawAndroidControl(Rect rect, string label, Color fill)
+        {
+            Color old = GUI.color;
+            GUI.color = fill;
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = new Color(0.88f, 0.66f, 0.20f, 0.90f);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(rect, label, new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.RoundToInt(18f * Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f)),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter
+            });
+            GUI.color = old;
         }
 
         private void DrawAimGuide(float scale)
