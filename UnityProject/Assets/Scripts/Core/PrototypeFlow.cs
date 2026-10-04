@@ -479,6 +479,9 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("PlayerPreparedForMatch");
 
             StartupCheckpoint.Set("MobileInputActivationDeferred");
+            if (combatHud != null)
+                combatHud.ConfigurePlayer(player);
+
             startupStatus = "Stage 9: deferring mobile input...";
             yield return null;
 
