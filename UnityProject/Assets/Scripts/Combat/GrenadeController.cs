@@ -14,6 +14,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float fuse = 0.8f;
 
         private PlayerInventory inventory;
+        private readonly Collider[] explosionHits = new Collider[64];
 
         public int Grenades => inventory != null ? inventory.Grenades : grenades;
 
@@ -68,9 +69,18 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
             }
 
-            Collider[] hits = Physics.OverlapSphere(target, explosionRadius, ~0, QueryTriggerInteraction.Collide);
-            foreach (Collider hit in hits)
+            int hitCount = Physics.OverlapSphereNonAlloc(
+                target,
+                explosionRadius,
+                explosionHits,
+                ~0,
+                QueryTriggerInteraction.Collide);
+
+            for (int i = 0; i < hitCount; i++)
             {
+                Collider hit = explosionHits[i];
+                if (hit == null) continue;
+
                 TargetHealth health = hit.GetComponentInParent<TargetHealth>();
                 EnemyChase enemy = hit.GetComponentInParent<EnemyChase>();
                 if (health == null || enemy == null) continue;
