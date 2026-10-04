@@ -22,6 +22,7 @@ namespace PersiaWar.Unity2D5D
         private int magazine;
         private int reserve;
         private PlayerController player;
+        private readonly Collider[] meleeHits = new Collider[32];
 
         public Transform Muzzle => muzzle != null ? muzzle : transform;
         public int Magazine => magazine;
@@ -157,13 +158,23 @@ namespace PersiaWar.Unity2D5D
             nextMeleeTime = Time.time + meleeCooldown;
             IsMelee = true;
 
-            TargetHealth[] targets = Object.FindObjectsByType<TargetHealth>(FindObjectsSortMode.None);
+            int hitCount = Physics.OverlapSphereNonAlloc(
+                transform.position,
+                meleeRange,
+                meleeHits,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
             Vector3 origin = transform.position;
             Vector3 forward = transform.forward;
             bool hitSomething = false;
 
-            foreach (TargetHealth target in targets)
+            for (int i = 0; i < hitCount; i++)
             {
+                Collider collider = meleeHits[i];
+                if (collider == null) continue;
+
+                TargetHealth target = collider.GetComponentInParent<TargetHealth>();
                 if (target == null || target.transform == transform || target.GetComponentInParent<EnemyChase>() == null) continue;
                 Vector3 delta = target.transform.position - origin;
                 delta.y = 0f;
