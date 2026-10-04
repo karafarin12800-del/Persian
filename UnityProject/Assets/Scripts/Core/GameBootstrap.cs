@@ -196,6 +196,8 @@ namespace PersiaWar.Unity2D5D
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
             // green isolation floor. It keeps geometry/collider cost bounded while giving
             // the camera genuine height, slope and depth information.
+            // The old CreateFlatMesh battlefield floor is intentionally not used here;
+            // this path now owns the actual 3D terrain geometry.
             Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.25f, 0.44f, 0.18f));
             buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
             roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
