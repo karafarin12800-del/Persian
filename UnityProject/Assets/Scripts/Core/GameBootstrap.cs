@@ -193,17 +193,17 @@ namespace PersiaWar.Unity2D5D
             roadMaterial = MakeMaterial("Road", new Color(0.105f, 0.12f, 0.135f));
 
 #if UNITY_ANDROID
-            // Do not invoke Terrain3DBuilder during the first Android match. The previous
-            // crash happened in this critical startup window, so use one tiny static mesh
-            // with a single material as the isolation-safe battlefield floor.
-            Material groundMaterial = MakeMaterial("AndroidGround", new Color(0.25f, 0.44f, 0.18f));
+            // Android uses a lightweight real 3D terrain mesh rather than the old flat
+            // green isolation floor. It keeps geometry/collider cost bounded while giving
+            // the camera genuine height, slope and depth information.
+            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.25f, 0.44f, 0.18f));
             buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
             roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
             accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
             androidWindowMaterial = MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
             androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
             androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.38f, 0.36f, 0.31f));
-            CreateFlatMesh("AndroidGround", Vector3.zero, new Vector2(worldSize, worldSize), groundMaterial);
+            BuildAndroidTerrain3D(groundMaterial);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
             return;
@@ -223,6 +223,71 @@ namespace PersiaWar.Unity2D5D
             for (float z = -worldSize * 0.5f + roadWidth * 0.5f; z <= worldSize * 0.5f; z += 24f)
                 CreateBox("RoadZ", new Vector3(0f, -0.04f, z), new Vector3(worldSize, 0.18f, roadWidth), roadMaterial, false);
 #endif
+        }
+
+        private void BuildAndroidTerrain3D(Material material)
+        {
+            const int grid = 17;
+            float half = worldSize * 0.5f;
+            float step = worldSize / (grid - 1);
+
+            GameObject obj = new GameObject("AndroidTerrain3D");
+            obj.transform.SetParent(worldRoot, true);
+
+            Mesh mesh = new Mesh { name = "AndroidTerrain3DMesh" };
+            Vector3[] vertices = new Vector3[grid * grid];
+            Vector2[] uv = new Vector2[vertices.Length];
+            int[] triangles = new int[(grid - 1) * (grid - 1) * 6];
+
+            for (int z = 0; z < grid; z++)
+            {
+                float worldZ = -half + z * step;
+                for (int x = 0; x < grid; x++)
+                {
+                    float worldX = -half + x * step;
+                    float radial = Vector2.Distance(new Vector2(worldX, worldZ), Vector2.zero) / half;
+                    float edge = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((radial - 0.52f) / 0.48f));
+                    float undulation =
+                        Mathf.Sin(worldX * 0.075f) * 0.045f +
+                        Mathf.Cos(worldZ * 0.065f) * 0.04f +
+                        Mathf.Sin((worldX + worldZ) * 0.035f) * 0.025f;
+
+                    // Keep the playable city on a broad, stable plateau while the
+                    // outer terrain gently rises/falls so the 3D camera reads depth.
+                    float y = -0.62f + edge * 0.30f + undulation;
+                    vertices[z * grid + x] = new Vector3(worldX, y, worldZ);
+                    uv[z * grid + x] = new Vector2((float)x / (grid - 1), (float)z / (grid - 1));
+                }
+            }
+
+            int t = 0;
+            for (int z = 0; z < grid - 1; z++)
+            {
+                for (int x = 0; x < grid - 1; x++)
+                {
+                    int i = z * grid + x;
+                    triangles[t++] = i;
+                    triangles[t++] = i + grid;
+                    triangles[t++] = i + 1;
+                    triangles[t++] = i + 1;
+                    triangles[t++] = i + grid;
+                    triangles[t++] = i + grid + 1;
+                }
+            }
+
+            mesh.vertices = vertices;
+            mesh.triangles = triangles;
+            mesh.uv = uv;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            MeshFilter filter = obj.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+            MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+
+            MeshCollider collider = obj.AddComponent<MeshCollider>();
+            collider.sharedMesh = mesh;
         }
 
         private void BuildAndroidRoadGrid()
