@@ -258,14 +258,31 @@ namespace PersiaWar.Unity2D5D
             player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y); ApplyHeroStyle(selectedHero);
             activeCamera = mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null;
             followCamera = activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null;
-            if (activeCamera != null) activeCamera.enabled = false;
-            if (followCamera != null) followCamera.enabled = false;
+
+            // The gameplay camera root is authored in the scene. Do not perform a
+            // scene-root activation coroutine here; on Android that transition was
+            // the last observed startup stall. Recover the root synchronously if a
+            // previous bootstrap stage left it inactive, then enable only the Camera.
             StartupCheckpoint.Set("MainCameraRootActivationStarted");
-            yield return ActivateRoot(mainCameraRoot, "Main Camera");
+            if (mainCameraRoot != null && !mainCameraRoot.activeSelf)
+                mainCameraRoot.SetActive(true);
             StartupCheckpoint.Set("MainCameraRootActivated");
-            if (followCamera != null) followCamera.SetTarget(player.transform);
+
+            if (activeCamera != null)
+                activeCamera.enabled = false;
+            if (followCamera != null)
+            {
+                followCamera.SetTarget(player.transform);
+                followCamera.enabled = false;
+            }
             StartupCheckpoint.Set("MainCameraTargetReady");
-            if (activeCamera != null) { StartupCheckpoint.Set("MainCameraEnableStarted"); activeCamera.enabled = true; StartupCheckpoint.Set("MainCameraEnabled"); }
+
+            if (activeCamera != null)
+            {
+                StartupCheckpoint.Set("MainCameraEnableStarted");
+                activeCamera.enabled = true;
+                StartupCheckpoint.Set("MainCameraEnabled");
+            }
             yield return null;
             StartupCheckpoint.Set("CameraFollowIsolated");
             if (followCamera != null) followCamera.enabled = false;
