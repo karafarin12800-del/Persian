@@ -662,42 +662,32 @@ namespace PersiaWar.Unity2D5D
             if (activeCamera != null)
                 activeCamera.enabled = true;
 
-            // Give Unity only a few frames to complete the camera hand-off.
-            for (int i = 0; i < 10; i++)
+            // Give Unity enough clean frames to render the real 3D battlefield.
+            // Do not arm input/HUD/enemies in this pass: the purpose of this checkpoint
+            // is to prove that terrain + world meshes + player + Android camera are
+            // stable before another subsystem is allowed to enter the scene.
+            for (int i = 0; i < 20; i++)
                 yield return null;
 
-            startupStatus = "MATCH STABLE";
-            StartupCheckpoint.Set("AndroidMatchVisible");
+            startupStatus = "3D WORLD READY";
+            StartupCheckpoint.Set("Android3DWorldVisible");
             StartupCheckpoint.Set("MatchServicesReady");
 
-            // Optional gameplay systems are opened only after the camera/world has
-            // rendered cleanly. This keeps scene activation isolated while still making
-            // the resulting match genuinely playable on a normal device.
-            matchInputArmed = true;
-            MobileInputHub.SetAndroidExecutionArmed(true);
-
+            // Deliberately stop here for this validation build. The player remains
+            // visible, while touch input, HUD and enemy spawning stay disabled.
+            // Once this frame is stable on the phone, the next change can enable only
+            // MobileInputHub and identify any remaining crash without changing terrain
+            // or camera again.
+            matchInputArmed = false;
+            MobileInputHub.SetAndroidExecutionArmed(false);
             if (mobileInput != null)
-            {
-                mobileInput.enabled = true;
-                StartupCheckpoint.Set("AndroidMobileInputEnabled");
-            }
+                mobileInput.enabled = false;
+            if (combatHud != null)
+                combatHud.enabled = false;
+            if (enemySpawner != null)
+                enemySpawner.enabled = false;
 
-            // Let the input stack establish its first clean frame before starting the
-            // first enemy wave. Enemy creation remains deliberately deferred.
-            for (int i = 0; i < 90; i++)
-                yield return null;
-
-            if (this == null || !isActiveAndEnabled)
-                yield break;
-
-            if (enemySpawner != null && player != null)
-            {
-                enemySpawner.Configure(player.transform, 4, 32f, 0f);
-                enemySpawner.enabled = true;
-                StartupCheckpoint.Set("AndroidEnemySpawnerEnabled");
-            }
-
-            StartupCheckpoint.Set("AndroidGameplaySystemsEnabled");
+            StartupCheckpoint.Set("Android3DWorldValidationComplete");
             yield break;
 #else
             yield return null;
