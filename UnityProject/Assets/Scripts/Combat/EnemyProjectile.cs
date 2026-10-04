@@ -10,6 +10,7 @@ namespace PersiaWar.Unity2D5D
 
         private Vector3 direction;
         private Transform owner;
+        private readonly RaycastHit[] sweepHits = new RaycastHit[16];
 
         public void Configure(Vector3 launchDirection, int damageAmount)
         {
@@ -39,46 +40,41 @@ namespace PersiaWar.Unity2D5D
 
         private bool TryResolveSweep(float distance)
         {
-            RaycastHit[] hits = Physics.RaycastAll(
+            int hitCount = Physics.RaycastNonAlloc(
                 transform.position,
                 direction,
+                sweepHits,
                 distance + 0.08f,
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
-            if (hits == null || hits.Length == 0)
-                return false;
-
-            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-
-            foreach (RaycastHit hit in hits)
+            float closestDistance = float.PositiveInfinity;
+            Collider closestCollider = null;
+            for (int i = 0; i < hitCount; i++)
             {
-                Collider collider = hit.collider;
-                if (collider == null)
-                    continue;
-
-                if (owner != null &&
-                    (collider.transform == owner || collider.transform.IsChildOf(owner)))
-                    continue;
-
+                Collider collider = sweepHits[i].collider;
+                if (collider == null) continue;
+                if (owner != null && (collider.transform == owner || collider.transform.IsChildOf(owner))) continue;
                 if (collider.GetComponentInParent<Projectile>() != null ||
                     collider.GetComponentInParent<EnemyProjectile>() != null ||
                     collider.GetComponentInParent<EnemyChase>() != null)
                     continue;
-
-                PlayerController player = collider.GetComponentInParent<PlayerController>();
-                if (player != null)
+                if (sweepHits[i].distance < closestDistance)
                 {
-                    player.ReceiveDamage(damage);
-                    Destroy(gameObject);
-                    return true;
+                    closestDistance = sweepHits[i].distance;
+                    closestCollider = collider;
                 }
-
-                Destroy(gameObject);
-                return true;
             }
 
-            return false;
+            if (closestCollider == null)
+                return false;
+
+            PlayerController player = closestCollider.GetComponentInParent<PlayerController>();
+            if (player != null)
+                player.ReceiveDamage(damage);
+
+            Destroy(gameObject);
+            return true;
         }
 
         private void OnTriggerEnter(Collider other)
