@@ -256,7 +256,7 @@ namespace PersiaWar.Unity2D5D
 
                     // Keep the playable city on a broad, stable plateau while the
                     // outer terrain gently rises/falls so the 3D camera reads depth.
-                    float y = -0.62f + edge * 0.30f + undulation;
+                    float y = edge * 0.18f + undulation * 0.35f;
                     vertices[z * grid + x] = new Vector3(worldX, y, worldZ);
                     uv[z * grid + x] = new Vector2((float)x / (grid - 1), (float)z / (grid - 1));
                 }
@@ -299,15 +299,15 @@ namespace PersiaWar.Unity2D5D
             float half = worldSize * 0.5f;
             for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
             {
-                CreateFlatMesh("RoadX", new Vector3(x, -0.02f, 0f), new Vector2(roadWidth, worldSize), roadMaterial);
-                CreateFlatMesh("SidewalkX_L", new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, -0.012f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
-                CreateFlatMesh("SidewalkX_R", new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, -0.012f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
+                CreateFlatMesh("RoadX", new Vector3(x, 0.025f, 0f), new Vector2(roadWidth, worldSize), roadMaterial);
+                CreateFlatMesh("SidewalkX_L", new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
+                CreateFlatMesh("SidewalkX_R", new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
             }
             for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
             {
-                CreateFlatMesh("RoadZ", new Vector3(0f, -0.015f, z), new Vector2(worldSize, roadWidth), roadMaterial);
-                CreateFlatMesh("SidewalkZ_B", new Vector3(0f, -0.008f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
-                CreateFlatMesh("SidewalkZ_T", new Vector3(0f, -0.008f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
+                CreateFlatMesh("RoadZ", new Vector3(0f, 0.025f, z), new Vector2(worldSize, roadWidth), roadMaterial);
+                CreateFlatMesh("SidewalkZ_B", new Vector3(0f, 0.035f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
+                CreateFlatMesh("SidewalkZ_T", new Vector3(0f, 0.035f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
             }
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
         }
