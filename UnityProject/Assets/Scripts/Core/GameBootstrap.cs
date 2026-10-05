@@ -247,7 +247,6 @@ namespace PersiaWar.Unity2D5D
                 CreateBox("RoadZ", new Vector3(0f, -0.04f, z), new Vector3(worldSize, 0.18f, roadWidth), roadMaterial, false);
 #endif
         }
-
         private void BuildAndroidTerrain3D(Material material)
         {
             const int grid = 17;
@@ -380,15 +379,22 @@ namespace PersiaWar.Unity2D5D
 
             for (int i = 0; i < buildingPoints.Length; i++)
             {
+                StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_START");
                 float footprint = i % 5 == 0 ? 13.5f : (i % 2 == 0 ? 11.5f : 10.0f);
                 float height = i % 4 == 0 ? 13.5f : (i % 3 == 0 ? 11.0f : 9.0f);
                 float depth = i % 3 == 0 ? 10.5f : 9.0f;
                 CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
+                StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_DONE");
             }
+
+            StartupCheckpoint.Set("CITY_BUILDINGS_ALL_DONE");
+            StartupCheckpoint.Set("CITY_FLUSH_START");
+            StartupCheckpoint.Set("CITY_BUILDINGS_22_EXPECTED");
 
             // One renderer per material group replaces hundreds of tiny facade/window
             // renderers while preserving the exact box-based visual language.
             FlushAndroidBoxBatches();
+            StartupCheckpoint.Set("CITY_FLUSH_DONE");
 
             Vector3[] treePoints =
             {
@@ -398,8 +404,14 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(0f, 0f, 66f),    new Vector3(0f, 0f, -66f)
             };
 
+            StartupCheckpoint.Set("CITY_TREES_START");
             for (int i = 0; i < treePoints.Length; i++)
+            {
+                StartupCheckpoint.Set("CITY_TREE_" + (i + 1) + "_START");
                 CreateAndroidTree(treePoints[i], 2.9f + (i % 2) * 0.35f);
+                StartupCheckpoint.Set("CITY_TREE_" + (i + 1) + "_DONE");
+            }
+            StartupCheckpoint.Set("CITY_TREES_DONE");
 
             Vector3[] plazaPillars =
             {
@@ -407,14 +419,24 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(-7f, 0f, -7f), new Vector3(7f, 0f, -7f)
             };
 
+            StartupCheckpoint.Set("CITY_LAMPS_START");
             for (int i = 0; i < plazaPillars.Length; i++)
+            {
+                StartupCheckpoint.Set("CITY_LAMP_" + (i + 1) + "_START");
                 CreateAndroidStreetLamp(plazaPillars[i]);
+                StartupCheckpoint.Set("CITY_LAMP_" + (i + 1) + "_DONE");
+            }
+            StartupCheckpoint.Set("CITY_LAMPS_DONE");
 
+            StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_START");
             BuildAndroidAlleysAndVehicles();
+            StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_DONE");
+            StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
         }
 
         private void BuildAndroidAlleysAndVehicles()
         {
+            StartupCheckpoint.Set("CITY_ALLEYS_START");
             const float alleyWidth = 4.5f;
             const float alleySpacing = 12f;
             const int alleyCountPerAxis = 15;
@@ -435,6 +457,7 @@ namespace PersiaWar.Unity2D5D
                     new Vector2(worldSize, alleyWidth));
             }
             CreateAndroidQuadBatch("AndroidSecondaryAlleys", alleyVertices, alleyTriangles, roadMaterial);
+            StartupCheckpoint.Set("CITY_ALLEYS_DONE");
 
             Material[] vehicleMaterials =
             {
@@ -453,7 +476,12 @@ namespace PersiaWar.Unity2D5D
             };
 
             for (int i = 0; i < vehiclePoints.Length; i++)
+            {
+                StartupCheckpoint.Set("CITY_VEHICLE_" + (i + 1) + "_START");
                 CreateAndroidVehicle(vehiclePoints[i], vehicleMaterials[i % vehicleMaterials.Length], i % 2 == 0);
+                StartupCheckpoint.Set("CITY_VEHICLE_" + (i + 1) + "_DONE");
+            }
+            StartupCheckpoint.Set("CITY_VEHICLES_DONE");
         }
 
         private void CreateAndroidVehicle(Vector3 position, Material body, bool longAxisZ)
@@ -498,7 +526,6 @@ namespace PersiaWar.Unity2D5D
 
             CreateAndroidBox("VehicleGlass", position + Vector3.up * 1.10f,
                 new Vector3(width * 0.72f, 0.22f, length * 0.47f), glass, false);
-
             CreateAndroidBox("VehicleLights",
                 position + Vector3.up * 0.52f + (longAxisZ ? Vector3.forward : Vector3.right) * (longAxisZ ? length : width) * 0.39f,
                 new Vector3(longAxisZ ? width * 0.38f : 0.34f, 0.16f, longAxisZ ? 0.16f : length * 0.38f),
@@ -747,8 +774,7 @@ namespace PersiaWar.Unity2D5D
                 "LampHead",
                 position + Vector3.up * 4.0f,
                 new Vector3(0.65f, 0.18f, 0.38f),
-                androidLampGlowMaterial,
-                false);
+                androidLampGlowMaterial,                false);
         }
 
         private void QueueAndroidBox(string objectName, Vector3 position, Vector3 size, Material material)
@@ -998,27 +1024,3 @@ namespace PersiaWar.Unity2D5D
         private void BuildLandmarks() { }
         private void BuildStreetProps() { }
         private void BuildRuinedQuarter() { }
-
-        private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale, Material material, bool collider)
-        {
-            GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            obj.name = objectName;
-            obj.transform.SetParent(worldRoot, true);
-            obj.transform.position = position;
-            obj.transform.localScale = scale;
-            Renderer renderer = obj.GetComponent<Renderer>();
-            if (renderer != null) renderer.sharedMaterial = material;
-            if (!collider)
-            {
-                Collider c = obj.GetComponent<Collider>();
-                if (c != null) Destroy(c);
-            }
-            return obj;
-        }
-
-        private Material MakeMaterial(string name, Color color)
-        {
-            return RuntimeMaterialFactory.Create(name, color);
-        }
-    }
-}
