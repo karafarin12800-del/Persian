@@ -756,29 +756,11 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("AndroidHudStable120Frames");
 
-            // PASS 4: enable the minimap only after the HUD has survived a clean window.
-            StartupCheckpoint.Set("AndroidMinimapActivationStarted");
-            if (mobileInput != null)
-                mobileInput.EnableMinimap();
-
-            for (int i = 0; i < 120; i++)
-                yield return null;
-
-            StartupCheckpoint.Set("AndroidMinimapStable120Frames");
-
-            // PASS 5: reopen enemy gameplay in the safest possible configuration.
-            // Start with exactly one enemy. EnemySpawner grows later by completed waves.
-            StartupCheckpoint.Set("AndroidEnemyActivationStarted");
-            if (enemySpawner == null)
-                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
-
-            if (enemySpawner != null && player != null)
-            {
-                enemySpawner.Configure(player.transform, 1, 44f, 0f);
-                enemySpawner.enabled = true;
-            }
-
-            startupStatus = "GAMEPLAY SERVICES ACTIVE — enemy wave 1 is staged";
+            // DIAGNOSTIC STOP: the previous run crashed immediately after
+            // AndroidHudStable120Frames. Do not enable minimap or enemies yet.
+            // This isolates HUD-only stability from the next native-risk subsystem.
+            StartupCheckpoint.Set("AndroidHudOnlyStop");
+            startupStatus = "HUD ONLY STABLE — MINIMAP AND ENEMIES DISABLED";
             yield break;
 #else
             yield return null;
