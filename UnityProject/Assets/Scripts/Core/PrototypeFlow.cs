@@ -24,6 +24,8 @@ namespace PersiaWar.Unity2D5D
         private CameraFollow25D followCamera;
         private Camera activeCamera;
         private Camera androidRuntimeCamera;
+        private MobileMovementJoystick mobileMovementJoystick;
+        private AndroidMinimapOverlay androidMinimap;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
@@ -568,7 +570,7 @@ namespace PersiaWar.Unity2D5D
             camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.08f, 0.09f, 0.10f, 1f);
-            camera.fieldOfView = 48f;
+            camera.fieldOfView = 52f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
             camera.allowHDR = false;
@@ -576,7 +578,7 @@ namespace PersiaWar.Unity2D5D
 
             if (target != null)
             {
-                cameraObject.transform.position = target.position + new Vector3(0f, 9.5f, -11f);
+                cameraObject.transform.position = target.position + new Vector3(0f, 11.5f, -13.5f);
                 cameraObject.transform.LookAt(target.position + Vector3.up * 0.8f);
             }
 
@@ -590,7 +592,7 @@ namespace PersiaWar.Unity2D5D
             if (androidRuntimeCamera == null || player == null)
                 return;
 
-            Vector3 desired = player.transform.position + new Vector3(0f, 9.5f, -11f);
+            Vector3 desired = player.transform.position + new Vector3(0f, 11.5f, -13.5f);
             androidRuntimeCamera.transform.position = Vector3.Lerp(
                 androidRuntimeCamera.transform.position,
                 desired,
@@ -669,15 +671,22 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < 20; i++)
                 yield return null;
 
-            startupStatus = "3D WORLD READY";
+            startupStatus = "MATCH STABLE";
             StartupCheckpoint.Set("Android3DWorldVisible");
-            StartupCheckpoint.Set("MatchServicesReady");
 
-            // Deliberately stop here for this validation build. The player remains
-            // visible, while touch input, HUD and enemy spawning stay disabled.
-            // Once this frame is stable on the phone, the next change can enable only
-            // MobileInputHub and identify any remaining crash without changing terrain
-            // or camera again.
+            // Keep the original combat stack isolated, but make the 3D presentation
+            // genuinely interactive on mobile: movement joystick + independent minimap.
+            // These two services do not depend on combat input.
+            if (mobileMovementJoystick == null)
+                mobileMovementJoystick = gameObject.AddComponent<MobileMovementJoystick>();
+            mobileMovementJoystick.Configure(player);
+            mobileMovementJoystick.enabled = true;
+
+            if (androidMinimap == null)
+                androidMinimap = gameObject.AddComponent<AndroidMinimapOverlay>();
+            androidMinimap.Configure(player != null ? player.transform : null);
+            androidMinimap.enabled = true;
+
             matchInputArmed = false;
             MobileInputHub.SetAndroidExecutionArmed(false);
             if (mobileInput != null)
@@ -688,6 +697,7 @@ namespace PersiaWar.Unity2D5D
                 enemySpawner.enabled = false;
 
             StartupCheckpoint.Set("Android3DWorldValidationComplete");
+            StartupCheckpoint.Set("Android3DPresentationReady");
             yield break;
 #else
             yield return null;
@@ -834,7 +844,7 @@ namespace PersiaWar.Unity2D5D
 
             GUI.Label(
                 new Rect(card.x + 18f * scale, card.y + 67f * scale, card.width - 25f * scale, 22f * scale),
-                "MOVE  •  AIM / FIRE  •  G = GRENADE",
+                "3D CITY  •  MOVE  •  MINIMAP",
                 smallStyle);
         }
 
