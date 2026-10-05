@@ -481,57 +481,121 @@ namespace PersiaWar.Unity2D5D
         {
             float bodyHeight = Mathf.Max(4.5f, height);
 
+            // Varied facade palette gives the city a stylized, readable look instead
+            // of one continuous primitive-block color.
+            Color[] palette =
+            {
+                new Color(0.58f, 0.31f, 0.24f),
+                new Color(0.70f, 0.52f, 0.34f),
+                new Color(0.36f, 0.43f, 0.49f),
+                new Color(0.62f, 0.40f, 0.29f),
+                new Color(0.43f, 0.50f, 0.36f)
+            };
+            int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
+            Material facade = MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
+            Material trim = MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
+            Material darkWindow = androidWindowMaterial != null
+                ? androidWindowMaterial
+                : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f));
+
             CreateAndroidBox(
                 "CityBuilding",
                 position + Vector3.up * (bodyHeight * 0.5f),
                 new Vector3(footprint, bodyHeight, depth),
-                buildingMaterial,
+                facade,
                 true);
 
             CreateAndroidBox(
                 "CityRoof",
                 position + Vector3.up * (bodyHeight + 0.22f),
                 new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
-                roofMaterial,
+                trim,
                 false);
 
-            // Three slim facade bands read as windows from the isometric camera.
+            // Strong horizontal facade trim.
             for (int row = 0; row < 3; row++)
             {
-                float y = 1.6f + row * Mathf.Max(1.6f, (bodyHeight - 2.7f) / 2f);
-                for (int col = -1; col <= 1; col++)
+                float y = 1.25f + row * Mathf.Max(1.7f, (bodyHeight - 2.4f) / 3f);
+                CreateAndroidBox(
+                    "FacadeBand",
+                    position + new Vector3(0f, y, -depth * 0.515f),
+                    new Vector3(footprint * 0.92f, 0.16f, 0.10f),
+                    trim,
+                    false);
+            }
+
+            // Windows on the camera-facing side.
+            int columns = Mathf.Clamp(Mathf.FloorToInt(footprint / 2.5f), 2, 4);
+            float spacing = footprint / (columns + 1);
+            for (int row = 0; row < 3; row++)
+            {
+                float y = 1.75f + row * Mathf.Max(1.7f, (bodyHeight - 3.1f) / 3f);
+                for (int col = 0; col < columns; col++)
                 {
-                    float x = col * footprint * 0.23f;
+                    float x = -footprint * 0.5f + spacing * (col + 1);
                     CreateAndroidBox(
                         "Window",
-                        position + new Vector3(x, y, -depth * 0.512f),
-                        new Vector3(Mathf.Min(1.45f, footprint * 0.17f), 0.78f, 0.10f),
-                        androidWindowMaterial,
+                        position + new Vector3(x, y, -depth * 0.522f),
+                        new Vector3(Mathf.Min(1.15f, spacing * 0.48f), 0.72f, 0.11f),
+                        darkWindow,
+                        false);
+
+                    // Small frame underneath each window.
+                    CreateAndroidBox(
+                        "WindowSill",
+                        position + new Vector3(x, y - 0.46f, -depth * 0.53f),
+                        new Vector3(Mathf.Min(1.32f, spacing * 0.56f), 0.10f, 0.16f),
+                        trim,
                         false);
                 }
             }
 
-            // Layered facade detail keeps buildings readable from the 2.5D camera.
+            // Door + canopy make the street-facing entrance readable.
+            Material door = MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
             CreateAndroidBox(
-                "FacadeShadow",
-                position + new Vector3(0f, bodyHeight * 0.52f, -depth * 0.515f),
-                new Vector3(footprint * 0.88f, 0.32f, 0.08f),
-                androidShadowMaterial,
+                "Door",
+                position + new Vector3(0f, 1.10f, -depth * 0.54f),
+                new Vector3(Mathf.Min(1.35f, footprint * 0.18f), 2.15f, 0.14f),
+                door,
                 false);
-
-            for (int side = -1; side <= 1; side += 2)
-                CreateAndroidBox(
-                    "FacadePillar",
-                    position + new Vector3(side * footprint * 0.38f, bodyHeight * 0.52f, -depth * 0.52f),
-                    new Vector3(0.28f, bodyHeight * 0.88f, 0.12f),
-                    accentMaterial,
-                    false);
-
             CreateAndroidBox(
                 "DoorCanopy",
-                position + new Vector3(0f, 1.45f, -depth * 0.54f),
-                new Vector3(Mathf.Min(2.8f, footprint * 0.28f), 0.22f, 0.75f),
-                roofMaterial,
+                position + new Vector3(0f, 2.30f, -depth * 0.56f),
+                new Vector3(Mathf.Min(2.4f, footprint * 0.30f), 0.18f, 0.72f),
+                trim,
+                false);
+
+            // Rooftop HVAC boxes add depth when the camera looks down.
+            Material rooftop = MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 offset = new Vector3(
+                    (i == 0 ? -0.28f : 0.28f) * footprint,
+                    bodyHeight + 0.70f,
+                    (i == 0 ? -0.20f : 0.22f) * depth);
+                CreateAndroidBox(
+                    "RooftopUnit",
+                    position + offset,
+                    new Vector3(1.15f, 0.55f, 0.85f),
+                    rooftop,
+                    false);
+            }
+
+            // Short fence/planter pieces create the layered streetscape seen in the
+            // reference without introducing expensive physics.
+            Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
+            Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
+            CreateAndroidBox(
+                "Planter",
+                position + new Vector3(-footprint * 0.30f, 0.34f, -depth * 0.66f),
+                new Vector3(Mathf.Min(2.6f, footprint * 0.22f), 0.68f, 0.55f),
+                planter,
+                false);
+            CreateAndroidBox(
+                "Hedge",
+                position + new Vector3(footprint * 0.30f, 0.55f, -depth * 0.66f),
+                new Vector3(Mathf.Min(3.0f, footprint * 0.26f), 1.10f, 0.65f),
+                hedge,
                 false);
         }
 
