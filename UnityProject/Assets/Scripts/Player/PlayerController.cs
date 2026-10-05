@@ -193,6 +193,13 @@ namespace PersiaWar.Unity2D5D
                 if (hit.GetComponentInParent<EnemyChase>() != null) continue;
                 if (hit.GetComponentInParent<Projectile>() != null) continue;
                 if (hit.GetComponentInParent<EnemyProjectile>() != null) continue;
+
+                // The procedural battlefield terrain uses a MeshCollider covering
+                // the whole ground. It must not block the player's horizontal
+                // movement query; only solid world props/buildings should do so.
+                if (hit is MeshCollider && hit.GetComponentInParent<Building>() == null)
+                    continue;
+
                 return true;
             }
 
