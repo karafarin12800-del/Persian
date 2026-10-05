@@ -570,7 +570,7 @@ namespace PersiaWar.Unity2D5D
             camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.08f, 0.09f, 0.10f, 1f);
-            camera.fieldOfView = 52f;
+            camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
             camera.allowHDR = false;
@@ -578,8 +578,11 @@ namespace PersiaWar.Unity2D5D
 
             if (target != null)
             {
-                cameraObject.transform.position = target.position + new Vector3(0f, 11.5f, -13.5f);
-                cameraObject.transform.LookAt(target.position + Vector3.up * 0.8f);
+                Quaternion orbit = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
+                cameraObject.transform.position = target.position + orbit * Vector3.back * AndroidCameraDistance;
+                cameraObject.transform.rotation = Quaternion.LookRotation(
+                    (target.position + Vector3.up * AndroidCameraLookHeight) - cameraObject.transform.position,
+                    Vector3.up);
             }
 
             camera.enabled = false;
@@ -592,13 +595,14 @@ namespace PersiaWar.Unity2D5D
             if (androidRuntimeCamera == null || player == null)
                 return;
 
-            Vector3 desired = player.transform.position + new Vector3(0f, 11.5f, -13.5f);
+            Quaternion orbit = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
+            Vector3 desired = player.transform.position + orbit * Vector3.back * AndroidCameraDistance;
             androidRuntimeCamera.transform.position = Vector3.Lerp(
                 androidRuntimeCamera.transform.position,
                 desired,
-                1f - Mathf.Exp(-10f * Time.deltaTime));
+                1f - Mathf.Exp(-12f * Time.deltaTime));
 
-            Vector3 lookTarget = player.transform.position + Vector3.up * 0.8f;
+            Vector3 lookTarget = player.transform.position + Vector3.up * AndroidCameraLookHeight;
             Vector3 direction = lookTarget - androidRuntimeCamera.transform.position;
             if (direction.sqrMagnitude > 0.001f)
                 androidRuntimeCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
@@ -674,30 +678,47 @@ namespace PersiaWar.Unity2D5D
             startupStatus = "MATCH STABLE";
             StartupCheckpoint.Set("Android3DWorldVisible");
 
-            // Keep the original combat stack isolated, but make the 3D presentation
-            // genuinely interactive on mobile: movement joystick + independent minimap.
-            // These two services do not depend on combat input.
-            if (mobileMovementJoystick == null)
-                mobileMovementJoystick = gameObject.AddComponent<MobileMovementJoystick>();
-            mobileMovementJoystick.Configure(player);
-            mobileMovementJoystick.enabled = true;
+            // The 3D world is now stable, so restore the original gameplay stack:
+            // circular movement joystick, aim/fire, grenade, combat HUD and enemies.
+            // The minimap is enabled only after the safe rendering window.
+            matchInputArmed = true;
 
-            if (androidMinimap == null)
-                androidMinimap = gameObject.AddComponent<AndroidMinimapOverlay>();
-            androidMinimap.Configure(player != null ? player.transform : null);
-            androidMinimap.enabled = true;
-
-            matchInputArmed = false;
-            MobileInputHub.SetAndroidExecutionArmed(false);
             if (mobileInput != null)
-                mobileInput.enabled = false;
+            {
+                mobileInput.SetGameplayCamera(activeCamera);
+                MobileInputHub.SetAndroidExecutionArmed(true);
+                mobileInput.EnableMinimap();
+                mobileInput.enabled = true;
+            }
+
+            if (enemySpawner == null)
+                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+
+            if (enemySpawner != null && player != null)
+            {
+                enemySpawner.Configure(player.transform, 8, 44f, 0f);
+                enemySpawner.enabled = true;
+            }
+
+            if (combatHud == null)
+                combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+
             if (combatHud != null)
-                combatHud.enabled = false;
-            if (enemySpawner != null)
-                enemySpawner.enabled = false;
+            {
+                combatHud.ConfigurePlayer(player);
+                combatHud.enabled = true;
+            }
+
+            // These were temporary isolation helpers. Do not render a second joystick
+            // or second minimap on top of the production MobileInputHub.
+            if (mobileMovementJoystick != null)
+                mobileMovementJoystick.enabled = false;
+            if (androidMinimap != null)
+                androidMinimap.enabled = false;
 
             StartupCheckpoint.Set("Android3DWorldValidationComplete");
             StartupCheckpoint.Set("Android3DPresentationReady");
+            StartupCheckpoint.Set("AndroidGameplayStackReady");
             yield break;
 #else
             yield return null;
