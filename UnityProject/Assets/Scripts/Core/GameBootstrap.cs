@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
@@ -467,19 +468,80 @@ namespace PersiaWar.Unity2D5D
             Material curb = MakeMaterial("AndroidCurb", new Color(0.56f, 0.54f, 0.49f));
             float half = worldSize * 0.5f;
 
+            // Build all repeated road markings into a few shared meshes instead of
+            // hundreds of separate GameObjects. This preserves the same visual grid
+            // while dramatically reducing Android hierarchy/renderer overhead.
+            List<Vector3> verticalVertices = new List<Vector3>(1024);
+            List<int> verticalTriangles = new List<int>(1536);
+            List<Vector3> horizontalVertices = new List<Vector3>(1024);
+            List<int> horizontalTriangles = new List<int>(1536);
+            List<Vector3> curbVertices = new List<Vector3>(256);
+            List<int> curbTriangles = new List<int>(384);
+
             for (float x = -half + 5f; x < half; x += 10f)
+            {
                 for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
-                    CreateFlatMesh("LaneDashV", new Vector3(x, -0.006f, z), new Vector2(0.28f, 4.2f), lane);
+                    AddAndroidQuad(verticalVertices, verticalTriangles, new Vector3(x, -0.006f, z), new Vector2(0.28f, 4.2f));
+            }
 
             for (float z = -half + 5f; z < half; z += 10f)
+            {
                 for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
-                    CreateFlatMesh("LaneDashH", new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f), lane);
+                    AddAndroidQuad(horizontalVertices, horizontalTriangles, new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f));
+            }
 
             for (float x = -half + 0.68f; x <= half; x += 24f)
             {
-                CreateFlatMesh("CurbV_L", new Vector3(x - roadWidth * 0.5f, 0.01f, 0f), new Vector2(0.08f, worldSize), curb);
-                CreateFlatMesh("CurbV_R", new Vector3(x + roadWidth * 0.5f, 0.01f, 0f), new Vector2(0.08f, worldSize), curb);
+                AddAndroidQuad(curbVertices, curbTriangles,
+                    new Vector3(x - roadWidth * 0.5f, 0.01f, 0f),
+                    new Vector2(0.08f, worldSize));
+                AddAndroidQuad(curbVertices, curbTriangles,
+                    new Vector3(x + roadWidth * 0.5f, 0.01f, 0f),
+                    new Vector2(0.08f, worldSize));
             }
+
+            CreateAndroidQuadBatch("AndroidLaneDashV", verticalVertices, verticalTriangles, lane);
+            CreateAndroidQuadBatch("AndroidLaneDashH", horizontalVertices, horizontalTriangles, lane);
+            CreateAndroidQuadBatch("AndroidCurbs", curbVertices, curbTriangles, curb);
+        }
+
+        private static void AddAndroidQuad(List<Vector3> vertices, List<int> triangles, Vector3 center, Vector2 size)
+        {
+            int start = vertices.Count;
+            float hx = size.x * 0.5f;
+            float hz = size.y * 0.5f;
+            vertices.Add(center + new Vector3(-hx, 0f, -hz));
+            vertices.Add(center + new Vector3(hx, 0f, -hz));
+            vertices.Add(center + new Vector3(hx, 0f, hz));
+            vertices.Add(center + new Vector3(-hx, 0f, hz));
+            triangles.Add(start + 0);
+            triangles.Add(start + 2);
+            triangles.Add(start + 1);
+            triangles.Add(start + 0);
+            triangles.Add(start + 3);
+            triangles.Add(start + 2);
+        }
+
+        private GameObject CreateAndroidQuadBatch(string objectName, List<Vector3> vertices, List<int> triangles, Material material)
+        {
+            if (vertices == null || vertices.Count == 0)
+                return null;
+
+            GameObject obj = new GameObject(objectName);
+            obj.transform.SetParent(worldRoot, true);
+            obj.transform.position = Vector3.zero;
+
+            Mesh mesh = new Mesh { name = objectName + "Mesh" };
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0, true);
+            mesh.RecalculateBounds();
+            mesh.UploadMeshData(true);
+
+            MeshFilter filter = obj.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+            MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            return obj;
         }
 
         private void CreateAndroidBuilding(Vector3 position, float footprint, float height, float depth)
