@@ -63,6 +63,7 @@ namespace PersiaWar.Unity2D5D
             groundY = 0f;
             movementLockUntil = Time.time + Mathf.Max(0f, spawnMovementLockSeconds);
 
+            EnsureStablePhysics();
             EnsurePlayerVisual();
             EnsureGameplayComponents();
             visual = GetComponentInChildren<StylizedCharacterVisual>(true);
@@ -196,6 +197,28 @@ namespace PersiaWar.Unity2D5D
             }
 
             return false;
+        }
+
+        private void EnsureStablePhysics()
+        {
+            // Player movement is transform-driven, not Rigidbody-driven. If an old
+            // scene component ever carries a Rigidbody, gravity/velocity can launch
+            // the player during match activation. Neutralize that path completely.
+            Rigidbody body = GetComponent<Rigidbody>();
+            if (body != null)
+            {
+                body.isKinematic = true;
+                body.useGravity = false;
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+            }
+
+            // Keep the player collider as a trigger so it cannot physically push or
+            // bounce against the procedural city while our explicit collision query
+            // remains responsible for movement blocking.
+            Collider ownCollider = GetComponent<Collider>();
+            if (ownCollider != null)
+                ownCollider.isTrigger = true;
         }
 
         private void EnsureGameplayComponents()
