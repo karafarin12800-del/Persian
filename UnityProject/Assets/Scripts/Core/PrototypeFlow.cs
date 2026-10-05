@@ -711,6 +711,18 @@ namespace PersiaWar.Unity2D5D
 
             // DIAGNOSTIC PASS 2: camera is proven stable. Now enable ONLY the mobile
             // input/UI layer. HUD, minimap rendering and enemies remain disabled.
+            StartupCheckpoint.Set("AndroidPlayerActivationStarted");
+
+            // GateGameplay(false) deliberately disabled the player during the
+            // crash-isolation phase. Re-enable it before arming touch input so
+            // SetMoveInput/Weapon/Aim can actually drive the live player.
+            if (player != null)
+            {
+                player.enabled = true;
+                player.SetMovementEnabled(true);
+                StartupCheckpoint.Set("AndroidPlayerActivated");
+            }
+
             StartupCheckpoint.Set("AndroidInputActivationStarted");
 
             if (mobileInput != null)
