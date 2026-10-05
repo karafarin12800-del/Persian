@@ -26,8 +26,8 @@ namespace PersiaWar.Unity2D5D
         private Camera androidRuntimeCamera;
         private const float AndroidCameraPitch = 52f;
         private const float AndroidCameraYaw = 32f;
-        private const float AndroidCameraDistance = 15.0f;
-        private const float AndroidCameraLookHeight = 0.80f;
+        private const float AndroidCameraDistance = 13.2f;
+        private const float AndroidCameraLookHeight = 0.90f;
         private MobileMovementJoystick mobileMovementJoystick;
         private AndroidMinimapOverlay androidMinimap;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
@@ -497,7 +497,8 @@ namespace PersiaWar.Unity2D5D
             // the scene camera root is intentionally left dormant: activating that
             // serialized GameObject can invoke camera-side OnEnable callbacks during
             // the same critical frame as match startup.
-            player.transform.position = new Vector3(spawnWorld.x, 0f, spawnWorld.y);
+            player.SetGroundedPosition(new Vector3(spawnWorld.x, 0f, spawnWorld.y));
+            player.LockMovementFor(0.50f);
             ApplyHeroStyle(selectedHero);
 
 #if UNITY_ANDROID
@@ -665,6 +666,11 @@ namespace PersiaWar.Unity2D5D
 
             if (activeCamera != null)
                 activeCamera.enabled = true;
+
+            // Keep the player locked briefly after the camera becomes live so touch/UI
+            // initialization cannot translate the character during the hand-off frame.
+            if (player != null)
+                player.LockMovementFor(0.20f);
 
             // Give Unity enough clean frames to render the real 3D battlefield.
             // Do not arm input/HUD/enemies in this pass: the purpose of this checkpoint
