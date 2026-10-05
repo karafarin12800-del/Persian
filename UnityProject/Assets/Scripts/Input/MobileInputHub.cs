@@ -146,7 +146,8 @@ namespace PersiaWar.Unity2D5D
 
                 // Movement owns only the visible lower-left joystick zone.
                 if (movePointerId < 0 &&
-                    Vector2.Distance(gui, joystickBaseGui) <= joystickHit)
+                    gui.x <= Screen.width * 0.58f &&
+                    gui.y >= Screen.height * 0.38f)
                 {
                     movePointerId = touch.fingerId;
                     moveStartScreen = touch.position;
@@ -353,7 +354,8 @@ namespace PersiaWar.Unity2D5D
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
             float radius = joystickRadius * scale;
             Vector2 defaultBase = new Vector2(120f * scale, Screen.height - 140f * scale);
-            Vector2 basePos = movePointerId >= 0
+            bool showFloatingJoystick = movePointerId >= 0;
+            Vector2 basePos = showFloatingJoystick
                 ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y)
                 : defaultBase;
             Vector2 knobPos = basePos + new Vector2(moveValue.x, -moveValue.y) * radius;
@@ -362,8 +364,11 @@ namespace PersiaWar.Unity2D5D
             Vector2 grenadePos = new Vector2(Screen.width - 235f * scale, Screen.height - 222f * scale);
             Vector2 reloadPos = new Vector2(Screen.width - 115f * scale, Screen.height - 260f * scale);
 
-            DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.42f));
-            DrawCircle(knobPos, radius * 0.42f, new Color(0.92f, 0.95f, 0.98f, 0.78f));
+            if (showFloatingJoystick)
+            {
+                DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.42f));
+                DrawCircle(knobPos, radius * 0.42f, new Color(0.92f, 0.95f, 0.98f, 0.78f));
+            }
 
             DrawCircle(firePos, radius * 0.64f, new Color(0.72f, 0.12f, 0.08f, firePointerId >= 0 ? 0.62f : 0.42f));
             DrawCircle(firePos, radius * 0.38f, new Color(1f, 0.92f, 0.72f, 0.72f));
