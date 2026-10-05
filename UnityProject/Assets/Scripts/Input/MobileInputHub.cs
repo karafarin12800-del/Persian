@@ -251,7 +251,11 @@ namespace PersiaWar.Unity2D5D
             if (Time.time < nextFireTime) return;
 
             TargetHealth target = player.Aim.CurrentTarget;
-            if (target != null && player.Aim.FireAt(target.transform.position))
+            bool fired = target != null
+                ? player.Aim.FireAt(target.transform.position)
+                : player.Aim.FireForward(player.transform.forward);
+
+            if (fired)
             {
                 nextFireTime = Time.time + fireRepeatInterval;
             }
