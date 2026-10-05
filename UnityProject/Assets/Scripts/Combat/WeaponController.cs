@@ -22,6 +22,9 @@ namespace PersiaWar.Unity2D5D
         private int magazine;
         private int reserve;
         private PlayerController player;
+        private Transform gunRoot;
+        private Vector3 gunRestLocalPosition;
+        private float recoilAmount;
 
         public Transform Muzzle => muzzle != null ? muzzle : transform;
         public int Magazine => magazine;
@@ -42,8 +45,10 @@ namespace PersiaWar.Unity2D5D
                 GameObject muzzleObject = new GameObject("WeaponMuzzle");
                 muzzle = muzzleObject.transform;
                 muzzle.SetParent(transform, false);
-                muzzle.localPosition = new Vector3(0f, 1.05f, 0.8f);
+                muzzle.localPosition = new Vector3(0.36f, 1.02f, 1.12f);
             }
+
+            EnsureWeaponVisual();
         }
 
         private void EnsureProjectileTemplate()
@@ -135,7 +140,91 @@ namespace PersiaWar.Unity2D5D
             projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
             projectile.SetOwner(transform);
             projectile.Launch(direction);
+            recoilAmount = 0.12f;
+            StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
+            if (characterVisual != null)
+                characterVisual.PlayFire();
             return true;
+        }
+
+        private void Update()
+        {
+            if (gunRoot == null) return;
+
+            recoilAmount = Mathf.MoveTowards(recoilAmount, 0f, 5.5f * Time.deltaTime);
+            Vector3 target = gunRestLocalPosition + Vector3.back * recoilAmount;
+            gunRoot.localPosition = Vector3.Lerp(
+                gunRoot.localPosition,
+                target,
+                1f - Mathf.Exp(-24f * Time.deltaTime));
+        }
+
+        private void EnsureWeaponVisual()
+        {
+            if (gunRoot != null)
+                return;
+
+            gunRoot = new GameObject("PlayerRifle").transform;
+            gunRoot.SetParent(transform, false);
+            gunRestLocalPosition = new Vector3(0.34f, 1.02f, 0.42f);
+            gunRoot.localPosition = gunRestLocalPosition;
+            gunRoot.localRotation = Quaternion.identity;
+
+            Material receiver = RuntimeMaterialFactory.Create(
+                "RifleReceiver", new Color(0.07f, 0.09f, 0.12f));
+            Material metal = RuntimeMaterialFactory.Create(
+                "RifleMetal", new Color(0.18f, 0.21f, 0.24f));
+            Material accent = RuntimeMaterialFactory.Create(
+                "RifleAccent", new Color(0.86f, 0.62f, 0.14f));
+            Material grip = RuntimeMaterialFactory.Create(
+                "RifleGrip", new Color(0.10f, 0.12f, 0.14f));
+
+            CreateWeaponPart("Receiver", PrimitiveType.Cube, gunRoot,
+                new Vector3(0f, 0f, 0f), new Vector3(0.22f, 0.18f, 0.56f), receiver);
+            CreateWeaponPart("Stock", PrimitiveType.Cube, gunRoot,
+                new Vector3(0f, 0.015f, -0.38f), new Vector3(0.16f, 0.14f, 0.34f), grip);
+            CreateWeaponPart("Magazine", PrimitiveType.Cube, gunRoot,
+                new Vector3(0.01f, -0.15f, 0.03f), new Vector3(0.13f, 0.28f, 0.18f), accent);
+            CreateWeaponPart("TopRail", PrimitiveType.Cube, gunRoot,
+                new Vector3(0f, 0.13f, 0.08f), new Vector3(0.13f, 0.06f, 0.45f), metal);
+            CreateWeaponPart("Barrel", PrimitiveType.Cylinder, gunRoot,
+                new Vector3(0f, 0f, 0.58f), new Vector3(0.065f, 0.33f, 0.065f), metal,
+                Quaternion.Euler(90f, 0f, 0f));
+            CreateWeaponPart("MuzzleBreak", PrimitiveType.Cube, gunRoot,
+                new Vector3(0f, 0f, 0.94f), new Vector3(0.12f, 0.10f, 0.10f), accent);
+            CreateWeaponPart("FrontGrip", PrimitiveType.Cube, gunRoot,
+                new Vector3(0f, -0.12f, 0.43f), new Vector3(0.11f, 0.20f, 0.12f), grip);
+
+            // Prevent the decorative weapon from participating in collision queries.
+            Collider[] colliders = gunRoot.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < colliders.Length; i++)
+                if (colliders[i] != null) Object.Destroy(colliders[i]);
+        }
+
+        private static void CreateWeaponPart(
+            string partName,
+            PrimitiveType primitiveType,
+            Transform parent,
+            Vector3 localPosition,
+            Vector3 localScale,
+            Material material,
+            Quaternion? localRotation = null)
+        {
+            GameObject part = GameObject.CreatePrimitive(primitiveType);
+            part.name = partName;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+            if (localRotation.HasValue)
+                part.transform.localRotation = localRotation.Value;
+
+            Renderer renderer = part.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
         }
 
         public void Reload()
