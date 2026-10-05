@@ -189,30 +189,25 @@ namespace PersiaWar.Unity2D5D
             mobileModelRoot.localRotation = Quaternion.identity;
             mobileModelRoot.localScale = Vector3.one;
 
-            mobileHead = CreateMobilePrimitive(PrimitiveType.Sphere, "Head", mobileModelRoot,
-                new Vector3(0f, 1.35f, 0f), new Vector3(0.62f, 0.62f, 0.62f));
-            mobileBody = CreateMobilePrimitive(PrimitiveType.Capsule, "Body", mobileModelRoot,
-                new Vector3(0f, 0.72f, 0f), new Vector3(0.72f, 0.82f, 0.52f));
-            mobileShirt = CreateMobilePrimitive(PrimitiveType.Cube, "Shirt", mobileModelRoot,
-                new Vector3(0f, 0.78f, 0f), new Vector3(0.78f, 0.42f, 0.56f));
-            mobilePants = CreateMobilePrimitive(PrimitiveType.Cube, "Pants", mobileModelRoot,
-                new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.28f, 0.48f));
-            mobileShoes = CreateMobilePrimitive(PrimitiveType.Cube, "Shoes", mobileModelRoot,
-                new Vector3(0f, 0.05f, 0f), new Vector3(0.78f, 0.14f, 0.56f));
-            mobileHair = CreateMobilePrimitive(PrimitiveType.Cylinder, "Hair", mobileModelRoot,
-                new Vector3(0f, 1.67f, 0f), new Vector3(0.48f, 0.16f, 0.48f));
-            mobileArmor = CreateMobilePrimitive(PrimitiveType.Cube, "Armor", mobileModelRoot,
-                new Vector3(0f, 0.92f, 0.10f), new Vector3(0.66f, 0.48f, 0.20f));
-            mobileLeftArm = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftArm", mobileModelRoot,
-                new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
-            mobileRightArm = CreateMobilePrimitive(PrimitiveType.Capsule, "RightArm", mobileModelRoot,
-                new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
-
-            // Enemy bodies do not need the player's backpack/visor detail. Keeping the
-            // first wave at this lighter presentation level avoids a second primitive
-            // allocation burst while retaining a clearly 3D readable enemy silhouette.
             if (!playerCharacter)
             {
+                // Android enemy silhouettes use a reduced primitive set to avoid a native
+                // allocation spike when a wave is created. The player keeps the full model.
+                mobileHead = CreateMobilePrimitive(PrimitiveType.Sphere, "Head", mobileModelRoot,
+                    new Vector3(0f, 1.35f, 0f), new Vector3(0.62f, 0.62f, 0.62f));
+                mobileBody = CreateMobilePrimitive(PrimitiveType.Capsule, "Body", mobileModelRoot,
+                    new Vector3(0f, 0.72f, 0f), new Vector3(0.72f, 0.82f, 0.52f));
+                mobileShirt = CreateMobilePrimitive(PrimitiveType.Cube, "Shirt", mobileModelRoot,
+                    new Vector3(0f, 0.78f, 0f), new Vector3(0.78f, 0.42f, 0.56f));
+                mobilePants = CreateMobilePrimitive(PrimitiveType.Cube, "Pants", mobileModelRoot,
+                    new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.28f, 0.48f));
+                mobileShoes = null;
+                mobileHair = null;
+                mobileArmor = null;
+                mobileLeftArm = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftArm", mobileModelRoot,
+                    new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
+                mobileRightArm = CreateMobilePrimitive(PrimitiveType.Capsule, "RightArm", mobileModelRoot,
+                    new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
                 mobilePack = null;
                 mobileHelmet = CreateMobilePrimitive(PrimitiveType.Sphere, "Helmet", mobileModelRoot,
                     new Vector3(0f, 1.57f, 0.01f), new Vector3(0.70f, 0.38f, 0.66f));
@@ -220,6 +215,24 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
+                mobileHead = CreateMobilePrimitive(PrimitiveType.Sphere, "Head", mobileModelRoot,
+                    new Vector3(0f, 1.35f, 0f), new Vector3(0.62f, 0.62f, 0.62f));
+                mobileBody = CreateMobilePrimitive(PrimitiveType.Capsule, "Body", mobileModelRoot,
+                    new Vector3(0f, 0.72f, 0f), new Vector3(0.72f, 0.82f, 0.52f));
+                mobileShirt = CreateMobilePrimitive(PrimitiveType.Cube, "Shirt", mobileModelRoot,
+                    new Vector3(0f, 0.78f, 0f), new Vector3(0.78f, 0.42f, 0.56f));
+                mobilePants = CreateMobilePrimitive(PrimitiveType.Cube, "Pants", mobileModelRoot,
+                    new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.28f, 0.48f));
+                mobileShoes = CreateMobilePrimitive(PrimitiveType.Cube, "Shoes", mobileModelRoot,
+                    new Vector3(0f, 0.05f, 0f), new Vector3(0.78f, 0.14f, 0.56f));
+                mobileHair = CreateMobilePrimitive(PrimitiveType.Cylinder, "Hair", mobileModelRoot,
+                    new Vector3(0f, 1.67f, 0f), new Vector3(0.48f, 0.16f, 0.48f));
+                mobileArmor = CreateMobilePrimitive(PrimitiveType.Cube, "Armor", mobileModelRoot,
+                    new Vector3(0f, 0.92f, 0.10f), new Vector3(0.66f, 0.48f, 0.20f));
+                mobileLeftArm = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftArm", mobileModelRoot,
+                    new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
+                mobileRightArm = CreateMobilePrimitive(PrimitiveType.Capsule, "RightArm", mobileModelRoot,
+                    new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
                 mobilePack = CreateMobilePrimitive(PrimitiveType.Cube, "Backpack", mobileModelRoot,
                     new Vector3(0f, 0.88f, -0.30f), new Vector3(0.46f, 0.55f, 0.20f));
                 mobileHelmet = CreateMobilePrimitive(PrimitiveType.Sphere, "Helmet", mobileModelRoot,
@@ -249,6 +262,9 @@ namespace PersiaWar.Unity2D5D
                 ApplyMobilePlayerColors(0);
             else
                 ApplyMobileEnemyColors(archetype);
+
+            if (!playerCharacter)
+                StartupCheckpoint.Set("AndroidEnemyVisualReady");
 
             transform.localScale = Vector3.one;
             StartupCheckpoint.Set("Mobile3DCharacterReady");
