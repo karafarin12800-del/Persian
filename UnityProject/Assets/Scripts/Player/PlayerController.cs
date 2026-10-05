@@ -209,7 +209,7 @@ namespace PersiaWar.Unity2D5D
             {
                 body.isKinematic = true;
                 body.useGravity = false;
-                body.linearVelocity = Vector3.zero;
+                body.velocity = Vector3.zero;
                 body.angularVelocity = Vector3.zero;
             }
 
