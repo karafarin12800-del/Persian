@@ -121,16 +121,16 @@ namespace PersiaWar.Unity2D5D
             float radius = joystickRadius * scale;
 
             Vector2 joystickBaseGui = new Vector2(128f * scale, Screen.height - 142f * scale);
-            Vector2 fireGui = new Vector2(Screen.width - 118f * scale, Screen.height - 142f * scale);
-            Vector2 meleeGui = new Vector2(Screen.width - 235f * scale, Screen.height - 92f * scale);
-            Vector2 grenadeGui = new Vector2(Screen.width - 235f * scale, Screen.height - 222f * scale);
-            Vector2 reloadGui = new Vector2(Screen.width - 115f * scale, Screen.height - 260f * scale);
+            Vector2 fireGui = new Vector2(Screen.width - 105f * scale, Screen.height - 128f * scale);
+            Vector2 meleeGui = new Vector2(Screen.width - 225f * scale, Screen.height - 128f * scale);
+            Vector2 grenadeGui = new Vector2(Screen.width - 225f * scale, Screen.height - 272f * scale);
+            Vector2 reloadGui = new Vector2(Screen.width - 105f * scale, Screen.height - 272f * scale);
 
             float joystickHit = radius * 1.45f;
-            float fireHit = radius * 0.78f;
-            float meleeHit = radius * 0.58f;
-            float grenadeHit = radius * 0.62f;
-            float reloadHit = radius * 0.58f;
+            float fireHit = radius * 0.68f;
+            float meleeHit = radius * 0.50f;
+            float grenadeHit = radius * 0.50f;
+            float reloadHit = radius * 0.50f;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -358,12 +358,12 @@ namespace PersiaWar.Unity2D5D
             DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.42f));
             DrawCircle(knobPos, radius * 0.42f, new Color(0.92f, 0.95f, 0.98f, 0.78f));
 
-            DrawCircle(firePos, radius * 0.72f, new Color(0.72f, 0.12f, 0.08f, firePointerId >= 0 ? 0.62f : 0.42f));
+            DrawCircle(firePos, radius * 0.64f, new Color(0.72f, 0.12f, 0.08f, firePointerId >= 0 ? 0.62f : 0.42f));
             DrawCircle(firePos, radius * 0.38f, new Color(1f, 0.92f, 0.72f, 0.72f));
 
-            DrawCircle(meleePos, radius * 0.54f, new Color(0.16f, 0.18f, 0.22f, meleePointerId >= 0 ? 0.72f : 0.52f));
-            DrawCircle(grenadePos, radius * 0.56f, new Color(0.18f, 0.40f, 0.16f, grenadePointerId >= 0 ? 0.68f : 0.48f));
-            DrawCircle(reloadPos, radius * 0.50f, new Color(0.16f, 0.22f, 0.32f, reloadPointerId >= 0 ? 0.72f : 0.48f));
+            DrawCircle(meleePos, radius * 0.48f, new Color(0.16f, 0.18f, 0.22f, meleePointerId >= 0 ? 0.72f : 0.52f));
+            DrawCircle(grenadePos, radius * 0.48f, new Color(0.18f, 0.40f, 0.16f, grenadePointerId >= 0 ? 0.68f : 0.48f));
+            DrawCircle(reloadPos, radius * 0.46f, new Color(0.16f, 0.22f, 0.32f, reloadPointerId >= 0 ? 0.72f : 0.48f));
             if (buttonTextStyle == null)
             {
                 buttonTextStyle = new GUIStyle(GUI.skin.label)
@@ -384,10 +384,14 @@ namespace PersiaWar.Unity2D5D
 
             if (minimapTexture != null)
             {
-                float size = minimapSize * scale;
-                Rect rect = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
+                float size = Mathf.Clamp(minimapSize * scale, 170f, 220f);
+                Rect rect = new Rect(Screen.width - size - 16f * scale, 14f * scale, size, size);
                 GUI.DrawTexture(rect, minimapTexture, ScaleMode.StretchToFill, false);
+                Color oldMap = GUI.color;
+                GUI.color = new Color(0.95f, 0.72f, 0.20f, 0.95f);
                 GUI.Box(rect, GUIContent.none);
+                GUI.color = oldMap;
+                GUI.Label(new Rect(rect.x + 7f, rect.y + 5f, 70f, 24f), "MAP", buttonTextStyle);
             }
         }
 
