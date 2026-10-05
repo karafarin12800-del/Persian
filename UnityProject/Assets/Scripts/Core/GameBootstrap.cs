@@ -389,7 +389,6 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("CITY_BUILDINGS_ALL_DONE");
             StartupCheckpoint.Set("CITY_FLUSH_START");
-            StartupCheckpoint.Set("CITY_BUILDINGS_22_EXPECTED");
 
             // One renderer per material group replaces hundreds of tiny facade/window
             // renderers while preserving the exact box-based visual language.
@@ -1024,3 +1023,26 @@ namespace PersiaWar.Unity2D5D
         private void BuildLandmarks() { }
         private void BuildStreetProps() { }
         private void BuildRuinedQuarter() { }
+        private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale, Material material, bool collider)
+        {
+            GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            obj.name = objectName;
+            obj.transform.SetParent(worldRoot, true);
+            obj.transform.position = position;
+            obj.transform.localScale = scale;
+            Renderer renderer = obj.GetComponent<Renderer>();
+            if (renderer != null) renderer.sharedMaterial = material;
+            if (!collider)
+            {
+                Collider c = obj.GetComponent<Collider>();
+                if (c != null) Destroy(c);
+            }
+            return obj;
+        }
+
+        private Material MakeMaterial(string name, Color color)
+        {
+            return RuntimeMaterialFactory.Create(name, color);
+        }
+    }
+}
