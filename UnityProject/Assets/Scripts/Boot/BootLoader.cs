@@ -83,6 +83,26 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(x + 30f, y + 145f, width - 60f, 40f), status);
             GUI.Label(new Rect(x + 30f, y + 205f, width - 60f, 30f),
                 loadStarted ? "Activating gameplay scene..." : "Starting Unity...");
+
+#if UNITY_ANDROID
+            string previous = StartupCheckpoint.Previous;
+            if (!string.IsNullOrEmpty(previous) && previous != "none")
+            {
+                float dw = Mathf.Min(Screen.width - 48f, 760f);
+                float dh = 118f;
+                float dx = (Screen.width - dw) * 0.5f;
+                float dy = y + height + 18f;
+                GUI.color = new Color(0.04f, 0.07f, 0.11f, 0.96f);
+                GUI.DrawTexture(new Rect(dx, dy, dw, dh), Texture2D.whiteTexture);
+                GUI.color = new Color(0.92f, 0.66f, 0.18f, 1f);
+                GUI.DrawTexture(new Rect(dx, dy, dw, 4f), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+                GUI.Label(new Rect(dx + 14f, dy + 10f, dw - 28f, 22f), "PREVIOUS RUN DIAGNOSTIC");
+                GUI.Label(new Rect(dx + 14f, dy + 36f, dw - 28f, 22f), "Checkpoint: " + previous);
+                GUI.Label(new Rect(dx + 14f, dy + 60f, dw - 28f, 22f), "Exit: " + StartupCheckpoint.PreviousExitState);
+                GUI.Label(new Rect(dx + 14f, dy + 84f, dw - 28f, 22f), "Assessment: " + StartupCheckpoint.PreviousAssessment);
+            }
+#endif
         }
     }
 }
