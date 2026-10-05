@@ -670,10 +670,9 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator InitializeMatchServices()
         {
 #if UNITY_ANDROID
-            // Android smoke path: render the actual gameplay camera and stop the
-            // startup isolation sequence here. Touch, HUD and enemies stay disabled
-            // until the basic match is visibly running; there is no timed multi-stage
-            // gate that can make the game appear frozen.
+            // DIAGNOSTIC PASS: after MatchCoreReady, enable exactly one subsystem at a time.
+            // This build enables ONLY the Android camera, then waits for a long clean render
+            // window. If it crashes, the last checkpoint tells us the camera/render boundary.
             Camera activeCamera = androidRuntimeCamera != null
                 ? androidRuntimeCamera
                 : (mainCameraRoot != null ? mainCameraRoot.GetComponent<Camera>() : null);
@@ -681,75 +680,35 @@ namespace PersiaWar.Unity2D5D
                 ? null
                 : (activeCamera != null ? activeCamera.GetComponent<CameraFollow25D>() : null);
 
+            StartupCheckpoint.Set("AndroidPostCoreEntered");
             StartupCheckpoint.Set("AndroidCameraActivationStarted");
 
             if (follow != null)
             {
+                StartupCheckpoint.Set("AndroidCameraFollowAboutToEnable");
                 follow.SetTarget(player != null ? player.transform : null);
                 follow.enabled = true;
+                StartupCheckpoint.Set("AndroidCameraFollowEnabled");
             }
 
             yield return null;
+            StartupCheckpoint.Set("AndroidCameraEnableAboutToHappen");
 
             if (activeCamera != null)
                 activeCamera.enabled = true;
 
-            // Keep the player locked briefly after the camera becomes live so touch/UI
-            // initialization cannot translate the character during the hand-off frame.
+            StartupCheckpoint.Set("AndroidCameraEnabled");
+
             if (player != null)
                 player.LockMovementFor(0.20f);
 
-            // Give Unity enough clean frames to render the real 3D battlefield.
-            // Do not arm input/HUD/enemies in this pass: the purpose of this checkpoint
-            // is to prove that terrain + world meshes + player + Android camera are
-            // stable before another subsystem is allowed to enter the scene.
-            for (int i = 0; i < 20; i++)
+            // 120 frames gives the render thread plenty of time to hit a native
+            // graphics/mesh/material problem while all other gameplay systems remain off.
+            for (int i = 0; i < 120; i++)
                 yield return null;
 
-            startupStatus = "MATCH STABLE";
-            StartupCheckpoint.Set("Android3DWorldVisible");
-
-            // The 3D world is now stable, so restore the original gameplay stack:
-            // circular movement joystick, aim/fire, grenade, combat HUD and enemies.
-            // The minimap is enabled only after the safe rendering window.
-            matchInputArmed = true;
-
-            if (mobileInput != null)
-            {
-                mobileInput.SetGameplayCamera(activeCamera);
-                MobileInputHub.SetAndroidExecutionArmed(true);
-                mobileInput.EnableMinimap();
-                mobileInput.enabled = true;
-            }
-
-            if (enemySpawner == null)
-                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
-
-            if (enemySpawner != null && player != null)
-            {
-                enemySpawner.Configure(player.transform, 8, 44f, 0f);
-                enemySpawner.enabled = true;
-            }
-
-            if (combatHud == null)
-                combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
-
-            if (combatHud != null)
-            {
-                combatHud.ConfigurePlayer(player);
-                combatHud.enabled = true;
-            }
-
-            // These were temporary isolation helpers. Do not render a second joystick
-            // or second minimap on top of the production MobileInputHub.
-            if (mobileMovementJoystick != null)
-                mobileMovementJoystick.enabled = false;
-            if (androidMinimap != null)
-                androidMinimap.enabled = false;
-
-            StartupCheckpoint.Set("Android3DWorldValidationComplete");
-            StartupCheckpoint.Set("Android3DPresentationReady");
-            StartupCheckpoint.Set("AndroidGameplayStackReady");
+            StartupCheckpoint.Set("AndroidCameraStable120Frames");
+            startupStatus = "CAMERA STABLE — INPUT/HUD/ENEMIES DISABLED";
             yield break;
 #else
             yield return null;
