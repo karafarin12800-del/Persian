@@ -102,6 +102,7 @@ namespace PersiaWar.Unity2D5D
                 nextAttackTime = Time.time + meleeCooldown;
             }
 
+#if !UNITY_ANDROID
             if (distance <= rangedRange && Time.time >= nextRangedTime)
             {
                 if (HasLineOfSightToPlayer(player))
@@ -110,6 +111,7 @@ namespace PersiaWar.Unity2D5D
                     nextRangedTime = Time.time + rangedCooldown;
                 }
             }
+#endif
         }
 
         private bool CanMoveTo(Vector3 position)
