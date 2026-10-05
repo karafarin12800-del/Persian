@@ -23,6 +23,11 @@ namespace PersiaWar.Unity2D5D
         private Material roofMaterial;
         private Material accentMaterial;
         private bool prepareRequested;
+        // Reuse identical primitive meshes across the whole Android city. Creating a
+        // separate Mesh asset for every window, road dash and facade piece was causing
+        // unnecessary native/managed memory pressure during match startup.
+        private Mesh androidUnitCubeMesh;
+        private Mesh androidUnitQuadMesh;
 
         private void ReportStage(string message, string checkpoint)
         {
@@ -662,34 +667,15 @@ namespace PersiaWar.Unity2D5D
 
         private GameObject CreateAndroidBox(string objectName, Vector3 position, Vector3 size, Material material, bool collider)
         {
+            EnsureAndroidPrimitiveMeshes();
+
             GameObject obj = new GameObject(objectName);
             obj.transform.SetParent(worldRoot, true);
             obj.transform.position = position;
-
-            Mesh mesh = new Mesh { name = objectName + "Mesh" };
-            float x = size.x * 0.5f;
-            float y = size.y * 0.5f;
-            float z = size.z * 0.5f;
-
-            mesh.vertices = new[]
-            {
-                new Vector3(-x, -y, -z), new Vector3(x, -y, -z), new Vector3(x, -y, z), new Vector3(-x, -y, z),
-                new Vector3(-x, y, -z), new Vector3(x, y, -z), new Vector3(x, y, z), new Vector3(-x, y, z)
-            };
-
-            mesh.triangles = new[]
-            {
-                0,2,1, 0,3,2,
-                4,5,6, 4,6,7,
-                0,1,5, 0,5,4,
-                1,2,6, 1,6,5,
-                2,3,7, 2,7,6,
-                3,0,4, 3,4,7
-            };
-            mesh.RecalculateNormals();
+            obj.transform.localScale = size;
 
             MeshFilter filter = obj.AddComponent<MeshFilter>();
-            filter.sharedMesh = mesh;
+            filter.sharedMesh = androidUnitCubeMesh;
 
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
@@ -698,7 +684,7 @@ namespace PersiaWar.Unity2D5D
             {
                 BoxCollider box = obj.AddComponent<BoxCollider>();
                 box.center = Vector3.zero;
-                box.size = size;
+                box.size = Vector3.one;
             }
 
             return obj;
@@ -706,29 +692,65 @@ namespace PersiaWar.Unity2D5D
 
         private GameObject CreateFlatMesh(string objectName, Vector3 position, Vector2 size, Material material)
         {
+            EnsureAndroidPrimitiveMeshes();
+
             GameObject obj = new GameObject(objectName);
             obj.transform.SetParent(worldRoot, true);
             obj.transform.position = position;
-            Mesh mesh = new Mesh { name = objectName + "Mesh" };
-            float hx = size.x * 0.5f;
-            float hz = size.y * 0.5f;
-            mesh.vertices = new[]
-            {
-                new Vector3(-hx, 0f, -hz), new Vector3(hx, 0f, -hz),
-                new Vector3(hx, 0f, hz), new Vector3(-hx, 0f, hz)
-            };
-            mesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
-            mesh.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
-            mesh.uv = new[]
-            {
-                new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(1f, 1f), new Vector2(0f, 1f)
-            };
+            obj.transform.localScale = new Vector3(size.x, 1f, size.y);
+
             MeshFilter filter = obj.AddComponent<MeshFilter>();
-            filter.sharedMesh = mesh;
+            filter.sharedMesh = androidUnitQuadMesh;
+
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
             return obj;
+        }
+
+        private void EnsureAndroidPrimitiveMeshes()
+        {
+            if (androidUnitCubeMesh == null)
+            {
+                androidUnitCubeMesh = new Mesh { name = "AndroidSharedCube" };
+                androidUnitCubeMesh.vertices = new[]
+                {
+                    new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.5f, -0.5f, -0.5f),
+                    new Vector3(0.5f, -0.5f, 0.5f), new Vector3(-0.5f, -0.5f, 0.5f),
+                    new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(0.5f, 0.5f, -0.5f),
+                    new Vector3(0.5f, 0.5f, 0.5f), new Vector3(-0.5f, 0.5f, 0.5f)
+                };
+                androidUnitCubeMesh.triangles = new[]
+                {
+                    0, 2, 1, 0, 3, 2,
+                    4, 5, 6, 4, 6, 7,
+                    0, 1, 5, 0, 5, 4,
+                    1, 2, 6, 1, 6, 5,
+                    2, 3, 7, 2, 7, 6,
+                    3, 0, 4, 3, 4, 7
+                };
+                androidUnitCubeMesh.RecalculateNormals();
+                androidUnitCubeMesh.RecalculateBounds();
+                androidUnitCubeMesh.UploadMeshData(true);
+            }
+
+            if (androidUnitQuadMesh == null)
+            {
+                androidUnitQuadMesh = new Mesh { name = "AndroidSharedQuad" };
+                androidUnitQuadMesh.vertices = new[]
+                {
+                    new Vector3(-0.5f, 0f, -0.5f), new Vector3(0.5f, 0f, -0.5f),
+                    new Vector3(0.5f, 0f, 0.5f), new Vector3(-0.5f, 0f, 0.5f)
+                };
+                androidUnitQuadMesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+                androidUnitQuadMesh.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
+                androidUnitQuadMesh.uv = new[]
+                {
+                    new Vector2(0f, 0f), new Vector2(1f, 0f),
+                    new Vector2(1f, 1f), new Vector2(0f, 1f)
+                };
+                androidUnitQuadMesh.RecalculateBounds();
+                androidUnitQuadMesh.UploadMeshData(true);
+            }
         }
 
         private void BuildRoadMarkings(float roadWidth)
