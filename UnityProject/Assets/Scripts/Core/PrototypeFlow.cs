@@ -194,9 +194,36 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
             if (mode == ScreenMode.HeroSelect)
+            {
+                DrawPreviousRunDiagnostic();
                 DrawHeroSelect();
+            }
             else
                 DrawDropMap();
+        }
+
+        private void DrawPreviousRunDiagnostic()
+        {
+#if UNITY_ANDROID
+            string previous = StartupCheckpoint.Previous;
+            if (string.IsNullOrEmpty(previous) || previous == "none")
+                return;
+
+            float width = Mathf.Min(Screen.width - 32f, 760f);
+            float height = 118f;
+            Rect panel = new Rect((Screen.width - width) * 0.5f, 12f, width, height);
+            Fill(panel, new Color(0.03f, 0.045f, 0.07f, 0.94f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 4f), new Color(1f, 0.55f, 0.12f, 1f));
+
+            GUI.Label(new Rect(panel.x + 12f, panel.y + 8f, panel.width - 24f, 22f),
+                "PREVIOUS RUN DIAGNOSTIC", smallStyle);
+            GUI.Label(new Rect(panel.x + 12f, panel.y + 34f, panel.width - 24f, 24f),
+                "Checkpoint: " + previous, smallStyle);
+            GUI.Label(new Rect(panel.x + 12f, panel.y + 60f, panel.width - 24f, 24f),
+                "Exit: " + StartupCheckpoint.PreviousExitState, smallStyle);
+            GUI.Label(new Rect(panel.x + 12f, panel.y + 86f, panel.width - 24f, 24f),
+                "Assessment: " + StartupCheckpoint.PreviousAssessment, smallStyle);
+#endif
         }
 
         private void DrawBackdrop()
