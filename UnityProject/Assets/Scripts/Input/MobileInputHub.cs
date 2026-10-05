@@ -180,8 +180,8 @@ namespace PersiaWar.Unity2D5D
             if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch moveTouch))
             {
                 Vector2 delta = moveTouch.position - moveStartScreen;
-                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-                float touchRadius = joystickRadius * scale;
+                float touchScale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
+                float touchRadius = joystickRadius * touchScale;
                 moveValue = Vector2.ClampMagnitude(delta / touchRadius, 1f);
                 player.SetMoveInput(moveValue);
 
