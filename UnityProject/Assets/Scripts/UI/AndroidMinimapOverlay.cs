@@ -10,10 +10,12 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private Transform player;
         [SerializeField] private float worldSize = 192f;
         [SerializeField] private int textureSize = 192;
+        [SerializeField] private float refreshInterval = 0.20f;
 
         private Camera mapCamera;
         private RenderTexture mapTexture;
         private Texture2D marker;
+        private float nextRenderTime;
 
         public void Configure(Transform target)
         {
@@ -38,7 +40,9 @@ namespace PersiaWar.Unity2D5D
             mapTexture = new RenderTexture(textureSize, textureSize, 16, RenderTextureFormat.ARGB32);
             mapTexture.filterMode = FilterMode.Bilinear;
             mapCamera.targetTexture = mapTexture;
-            mapCamera.enabled = true;
+            // Render manually at a low refresh rate. The minimap should not pay for a
+            // second full-city camera pass every frame on a mobile device.
+            mapCamera.enabled = false;
 
             marker = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             marker.SetPixel(0, 0, Color.white);
@@ -50,8 +54,13 @@ namespace PersiaWar.Unity2D5D
             if (mapCamera == null || player == null)
                 return;
 
+            if (Time.unscaledTime < nextRenderTime)
+                return;
+
+            nextRenderTime = Time.unscaledTime + Mathf.Max(0.05f, refreshInterval);
             mapCamera.transform.position = player.position + Vector3.up * 120f;
             mapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            mapCamera.Render();
         }
 
         private void OnGUI()
