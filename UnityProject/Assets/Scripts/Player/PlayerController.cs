@@ -163,7 +163,10 @@ namespace PersiaWar.Unity2D5D
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
             next.y = 0f;
 
-            if (desired.sqrMagnitude > 0.00001f && !WouldCollide(next))
+            // Android input validation phase: movement must not be blocked by
+            // procedural city colliders. Collision-aware navigation will be restored
+            // after the input path is proven stable.
+            if (desired.sqrMagnitude > 0.00001f)
                 transform.position = next;
 
             if (visual != null)
