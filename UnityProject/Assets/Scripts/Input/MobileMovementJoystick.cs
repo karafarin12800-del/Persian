@@ -15,14 +15,38 @@ namespace PersiaWar.Unity2D5D
         private Vector2 start;
         private Vector2 value;
 
+        private bool matchActive;
+
         public void Configure(PlayerController target)
         {
             player = target;
         }
 
+        public void ActivateForMatch(PlayerController target)
+        {
+            player = target;
+            pointerId = -1;
+            start = Vector2.zero;
+            value = Vector2.zero;
+#if UNITY_ANDROID
+            Input.multiTouchEnabled = true;
+#endif
+            matchActive = true;
+            enabled = true;
+        }
+
+        public void DeactivateMatch()
+        {
+            matchActive = false;
+            pointerId = -1;
+            value = Vector2.zero;
+            if (player != null)
+                player.SetMoveInput(Vector2.zero);
+        }
+
         private void Update()
         {
-            if (player == null)
+            if (!matchActive || player == null)
                 return;
 
             if (!Application.isMobilePlatform)
@@ -83,7 +107,7 @@ namespace PersiaWar.Unity2D5D
 
         private void OnGUI()
         {
-            if (!Application.isMobilePlatform || player == null)
+            if (!matchActive || !Application.isMobilePlatform || player == null)
                 return;
 
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
