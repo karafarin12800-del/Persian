@@ -420,23 +420,21 @@ namespace PersiaWar.Unity2D5D
             const int alleyCountPerAxis = 15;
             float half = worldSize * 0.5f - alleySpacing;
 
-            // 15 lanes in each axis = 30 secondary alleys, kept much narrower
-            // than the main roads so the city reads as streets + side lanes.
+            // 15 lanes in each axis = 30 secondary alleys. Bake them into one
+            // shared road mesh instead of maintaining 30 separate renderers.
+            List<Vector3> alleyVertices = new List<Vector3>();
+            List<int> alleyTriangles = new List<int>();
             for (int i = 0; i < alleyCountPerAxis; i++)
             {
                 float offset = -half + i * alleySpacing;
-                CreateFlatMesh(
-                    "Alley_V_" + i,
+                AddAndroidQuad(alleyVertices, alleyTriangles,
                     new Vector3(offset, -0.01f, 0f),
-                    new Vector2(alleyWidth, worldSize),
-                    roadMaterial);
-
-                CreateFlatMesh(
-                    "Alley_H_" + i,
+                    new Vector2(alleyWidth, worldSize));
+                AddAndroidQuad(alleyVertices, alleyTriangles,
                     new Vector3(0f, -0.005f, offset),
-                    new Vector2(worldSize, alleyWidth),
-                    roadMaterial);
+                    new Vector2(worldSize, alleyWidth));
             }
+            CreateAndroidQuadBatch("AndroidSecondaryAlleys", alleyVertices, alleyTriangles, roadMaterial);
 
             Material[] vehicleMaterials =
             {
