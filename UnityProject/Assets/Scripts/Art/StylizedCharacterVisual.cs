@@ -28,6 +28,14 @@ namespace PersiaWar.Unity2D5D
         private Vector3 lastFacing = Vector3.forward;
         private Vector3 baseLocalPosition;
 
+        private Transform mobileModelRoot;
+        private Renderer mobileBody;
+        private Renderer mobileHead;
+        private Renderer mobileHair;
+        private Renderer mobileShirt;
+        private Renderer mobilePants;
+        private Renderer mobileShoes;
+
         public Transform Muzzle => muzzle;
 
         public static StylizedCharacterVisual Attach(Transform owner, bool isPlayer, int characterArchetype)
@@ -57,6 +65,8 @@ namespace PersiaWar.Unity2D5D
             EnsurePresentation();
             LoadCharacterSprite();
             ApplyScale();
+            if (Application.isMobilePlatform)
+                EnsureMobile3DCharacter();
         }
 
         public void ConfigurePlayerHero(int heroIndex)
@@ -79,6 +89,12 @@ namespace PersiaWar.Unity2D5D
 
             if (sprite != null)
                 sprite.color = variants[index];
+
+            if (Application.isMobilePlatform)
+            {
+                EnsureMobile3DCharacter();
+                ApplyMobilePlayerColors(index);
+            }
         }
 
         public void SetFacing(Vector3 worldDirection)
@@ -146,10 +162,130 @@ namespace PersiaWar.Unity2D5D
                 transform.localScale.y * (2f - squash),
                 1f);
 
+            if (mobileModelRoot != null)
+                mobileModelRoot.localPosition = new Vector3(0f, bob, 0f);
+
             if (muzzle != null && Time.time < fireUntil)
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.62f);
             else if (muzzle != null)
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.56f);
+        }
+
+
+        private void EnsureMobile3DCharacter()
+        {
+            if (mobileModelRoot != null)
+                return;
+
+            mobileModelRoot = new GameObject("Mobile3DModel").transform;
+            mobileModelRoot.SetParent(artRoot, false);
+            mobileModelRoot.localPosition = Vector3.zero;
+            mobileModelRoot.localRotation = Quaternion.identity;
+            mobileModelRoot.localScale = Vector3.one;
+
+            mobileHead = CreateMobilePrimitive(PrimitiveType.Sphere, "Head", mobileModelRoot,
+                new Vector3(0f, 1.35f, 0f), new Vector3(0.62f, 0.62f, 0.62f));
+            mobileBody = CreateMobilePrimitive(PrimitiveType.Capsule, "Body", mobileModelRoot,
+                new Vector3(0f, 0.72f, 0f), new Vector3(0.72f, 0.82f, 0.52f));
+            mobileShirt = CreateMobilePrimitive(PrimitiveType.Cube, "Shirt", mobileModelRoot,
+                new Vector3(0f, 0.78f, 0f), new Vector3(0.78f, 0.42f, 0.56f));
+            mobilePants = CreateMobilePrimitive(PrimitiveType.Cube, "Pants", mobileModelRoot,
+                new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.28f, 0.48f));
+            mobileShoes = CreateMobilePrimitive(PrimitiveType.Cube, "Shoes", mobileModelRoot,
+                new Vector3(0f, 0.05f, 0f), new Vector3(0.78f, 0.14f, 0.56f));
+            mobileHair = CreateMobilePrimitive(PrimitiveType.Cylinder, "Hair", mobileModelRoot,
+                new Vector3(0f, 1.67f, 0f), new Vector3(0.48f, 0.16f, 0.48f));
+
+            Renderer[] parts =
+            {
+                mobileHead, mobileBody, mobileShirt, mobilePants, mobileShoes, mobileHair
+            };
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i] == null) continue;
+                parts[i].shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                parts[i].receiveShadows = false;
+            }
+
+            if (sprite != null)
+                sprite.enabled = false;
+            if (shadowSprite != null)
+                shadowSprite.enabled = false;
+
+            if (playerCharacter)
+                ApplyMobilePlayerColors(0);
+            else
+                ApplyMobileEnemyColors(archetype);
+
+            transform.localScale = Vector3.one;
+            StartupCheckpoint.Set("Mobile3DCharacterReady");
+        }
+
+        private Renderer CreateMobilePrimitive(
+            PrimitiveType primitiveType,
+            string partName,
+            Transform parent,
+            Vector3 localPosition,
+            Vector3 localScale)
+        {
+            GameObject part = GameObject.CreatePrimitive(primitiveType);
+            part.name = partName;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+
+            Collider collider = part.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            Renderer renderer = part.GetComponent<Renderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = RuntimeMaterialFactory.Create(
+                    "Mobile_" + partName,
+                    Color.white);
+
+            return renderer;
+        }
+
+        private void ApplyMobilePlayerColors(int heroIndex)
+        {
+            Color shirtColor = heroIndex == 0 ? new Color(0.08f, 0.26f, 0.52f)
+                : heroIndex == 1 ? new Color(0.10f, 0.42f, 0.52f)
+                : heroIndex == 2 ? new Color(0.16f, 0.46f, 0.24f)
+                : heroIndex == 3 ? new Color(0.42f, 0.16f, 0.46f)
+                : new Color(0.48f, 0.32f, 0.08f);
+
+            Color hairColor = heroIndex == 0
+                ? new Color(0.56f, 0.20f, 0.08f)
+                : new Color(0.12f, 0.09f, 0.07f);
+
+            SetRendererColor(mobileHead, new Color(0.78f, 0.53f, 0.34f));
+            SetRendererColor(mobileBody, shirtColor * 0.85f);
+            SetRendererColor(mobileShirt, shirtColor);
+            SetRendererColor(mobilePants, new Color(0.08f, 0.12f, 0.20f));
+            SetRendererColor(mobileShoes, new Color(0.10f, 0.11f, 0.13f));
+            SetRendererColor(mobileHair, hairColor);
+        }
+
+        private void ApplyMobileEnemyColors(int archetypeIndex)
+        {
+            Color body = archetypeIndex == 1 ? new Color(0.48f, 0.15f, 0.12f)
+                : archetypeIndex == 2 ? new Color(0.18f, 0.34f, 0.18f)
+                : new Color(0.32f, 0.20f, 0.42f);
+
+            SetRendererColor(mobileHead, new Color(0.66f, 0.43f, 0.28f));
+            SetRendererColor(mobileBody, body * 0.85f);
+            SetRendererColor(mobileShirt, body);
+            SetRendererColor(mobilePants, new Color(0.09f, 0.09f, 0.12f));
+            SetRendererColor(mobileShoes, new Color(0.07f, 0.07f, 0.08f));
+            SetRendererColor(mobileHair, new Color(0.08f, 0.06f, 0.05f));
+        }
+
+        private static void SetRendererColor(Renderer renderer, Color color)
+        {
+            if (renderer == null) return;
+            renderer.sharedMaterial = RuntimeMaterialFactory.Create(
+                "MobileCharacterColor", color);
         }
 
         private void EnsurePresentation()
