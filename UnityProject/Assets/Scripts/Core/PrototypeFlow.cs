@@ -725,6 +725,18 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("AndroidInputActivationStarted");
 
+            // Keep the movement joystick on an independent, lightweight fallback path.
+            // It does not depend on the combat-input gate, so a UI/input regression cannot
+            // strand the player's basic movement.
+            if (mobileInput != null)
+            {
+                mobileMovementJoystick = mobileInput.GetComponent<MobileMovementJoystick>();
+                if (mobileMovementJoystick == null)
+                    mobileMovementJoystick = mobileInput.gameObject.AddComponent<MobileMovementJoystick>();
+
+                mobileMovementJoystick.ActivateForMatch(player);
+            }
+
             if (mobileInput != null)
             {
                 mobileInput.SetGameplayCamera(activeCamera);
