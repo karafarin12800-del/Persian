@@ -24,6 +24,10 @@ namespace PersiaWar.Unity2D5D
         private CameraFollow25D followCamera;
         private Camera activeCamera;
         private Camera androidRuntimeCamera;
+        private const float AndroidCameraPitch = 52f;
+        private const float AndroidCameraYaw = 32f;
+        private const float AndroidCameraDistance = 15.0f;
+        private const float AndroidCameraLookHeight = 0.80f;
         private MobileMovementJoystick mobileMovementJoystick;
         private AndroidMinimapOverlay androidMinimap;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
@@ -163,14 +167,8 @@ namespace PersiaWar.Unity2D5D
             if (mode == ScreenMode.Match)
             {
 #if UNITY_ANDROID
-                if (string.Equals(startupStatus, "MATCH STABLE", System.StringComparison.Ordinal))
-                {
-                    DrawAndroidMatchHud();
-                    if (GameSession.Instance != null && GameSession.Instance.IsFinished)
-                        DrawAndroidResultOverlay();
-                }
-                else
-                    DrawAndroidStabilityStatus();
+                if (GameSession.Instance != null && GameSession.Instance.IsFinished)
+                    DrawAndroidResultOverlay();
 #endif
                 return;
             }
