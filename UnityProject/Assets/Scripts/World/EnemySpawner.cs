@@ -14,6 +14,13 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int maxPerWave = 15;
         [SerializeField] private int victoryWave = 5;
 
+#if UNITY_ANDROID
+        // Crash-isolation switch: keep enemy construction completely disabled on Android
+        // for this diagnostic build. If the build survives past the old ~4s crash point,
+        // the enemy initialization path is the confirmed trigger.
+        private const bool AndroidEnemyDiagnosticDisabled = true;
+#endif
+
         private int wave = 1;
         private bool spawning;
         private float nextEnemyCheckTime;
@@ -29,9 +36,6 @@ namespace PersiaWar.Unity2D5D
             player = playerTransform;
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
 #if UNITY_ANDROID
-            // Keep the first Android combat wave deliberately light. The player and city
-            // are already the expensive startup path; enemies are added after the safe
-            // render window and must not create a large native allocation spike.
             startingCount = Mathf.Min(startingCount, 4);
 #endif
             spawnRadius = Mathf.Max(16f, radius);
@@ -39,14 +43,21 @@ namespace PersiaWar.Unity2D5D
 
         private void Start()
         {
+#if UNITY_ANDROID
+            if (AndroidEnemyDiagnosticDisabled)
+            {
+                Debug.Log("PERSIA_DIAGNOSTIC: Android enemy spawning DISABLED for crash isolation.");
+                enabled = false;
+                return;
+            }
+#endif
+
             if (player == null)
             {
                 PlayerController found = FindFirstObjectByType<PlayerController>();
                 if (found != null) player = found.transform;
             }
 
-            // Enemy construction is deliberately delayed until the gameplay scene has
-            // had time to render and finish its procedural world startup on Android.
             if (player != null)
                 StartCoroutine(SpawnInitialWaveAfterStartup());
         }
@@ -84,7 +95,6 @@ namespace PersiaWar.Unity2D5D
                 if (failedSpawnAttempts >= MaxFailedSpawnAttempts)
                     return;
 
-
                 spawning = true;
                 Invoke(nameof(SpawnNextWave), nextWaveDelay);
             }
@@ -110,8 +120,6 @@ namespace PersiaWar.Unity2D5D
 #endif
 
 #if UNITY_ANDROID
-            // Never construct the whole wave in one main-thread burst on Android.
-            // Keep the spawner occupied while one enemy is created per frame.
             spawning = true;
             StartCoroutine(SpawnAndroidWaveGradually(count, wave));
             return;
@@ -133,7 +141,7 @@ namespace PersiaWar.Unity2D5D
             if (spawned == 0)
             {
                 failedSpawnAttempts++;
-                Debug.LogWarning($"PERSIA_COMBAT: enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}); retries are bounded to avoid an infinite wave/pickup loop.");
+                Debug.LogWarning($"PERSIA_COMBAT: enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}).");
                 return;
             }
 
@@ -149,12 +157,9 @@ namespace PersiaWar.Unity2D5D
         private IEnumerator SpawnAndroidWaveGradually(int count, int currentWave)
         {
             int spawned = 0;
-            int attempts = 0;
 
             for (int i = 0; i < count * 3 && spawned < count; i++)
             {
-                attempts++;
-
                 float angle = Random.Range(0f, Mathf.PI * 2f);
                 float distance = Random.Range(spawnRadius * 0.72f, spawnRadius);
                 Vector3 position = player.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
@@ -166,15 +171,13 @@ namespace PersiaWar.Unity2D5D
                     spawned++;
                 }
 
-                // Give Unity a frame between enemy constructions. This is the key
-                // Android-safe change: no 8-enemy hierarchy/sprite burst in one frame.
                 yield return null;
             }
 
             if (spawned == 0)
             {
                 failedSpawnAttempts++;
-                Debug.LogWarning($"PERSIA_COMBAT: Android enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}); retries are bounded.");
+                Debug.LogWarning($"PERSIA_COMBAT: Android enemy spawn attempt failed ({failedSpawnAttempts}/{MaxFailedSpawnAttempts}).");
             }
             else
             {
@@ -193,8 +196,6 @@ namespace PersiaWar.Unity2D5D
         {
             int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
 #if UNITY_ANDROID
-            // Android combat keeps using explicit lightweight components after entry.
-            // Avoid GameObject.CreatePrimitive for enemies.
             GameObject enemy = new GameObject($"Enemy_W{currentWave}_{index}");
             enemy.transform.position = position;
             enemy.transform.localScale = new Vector3(0.9f, 0.9f, 0.9f);
@@ -255,11 +256,7 @@ namespace PersiaWar.Unity2D5D
                     : new Color(0.55f, 0.28f, 0.78f));
 
             GameObject pickup = AndroidSafeRuntimeFactory.CreateMarker(
-                $"Pickup_{type}",
-                position,
-                Vector3.one * 0.46f,
-                color,
-                true);
+                $"Pickup_{type}", position, Vector3.one * 0.46f, color, true);
 
             PickupItem item = pickup.AddComponent<PickupItem>();
             item.Configure(type, amount);
