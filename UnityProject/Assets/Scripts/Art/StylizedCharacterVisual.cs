@@ -35,6 +35,12 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobileShirt;
         private Renderer mobilePants;
         private Renderer mobileShoes;
+        private Renderer mobileArmor;
+        private Renderer mobileLeftArm;
+        private Renderer mobileRightArm;
+        private Renderer mobilePack;
+        private Renderer mobileHelmet;
+        private Renderer mobileVisor;
 
         public Transform Muzzle => muzzle;
 
@@ -195,10 +201,23 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(0f, 0.05f, 0f), new Vector3(0.78f, 0.14f, 0.56f));
             mobileHair = CreateMobilePrimitive(PrimitiveType.Cylinder, "Hair", mobileModelRoot,
                 new Vector3(0f, 1.67f, 0f), new Vector3(0.48f, 0.16f, 0.48f));
+            mobileArmor = CreateMobilePrimitive(PrimitiveType.Cube, "Armor", mobileModelRoot,
+                new Vector3(0f, 0.92f, 0.10f), new Vector3(0.66f, 0.48f, 0.20f));
+            mobileLeftArm = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftArm", mobileModelRoot,
+                new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
+            mobileRightArm = CreateMobilePrimitive(PrimitiveType.Capsule, "RightArm", mobileModelRoot,
+                new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
+            mobilePack = CreateMobilePrimitive(PrimitiveType.Cube, "Backpack", mobileModelRoot,
+                new Vector3(0f, 0.88f, -0.30f), new Vector3(0.46f, 0.55f, 0.20f));
+            mobileHelmet = CreateMobilePrimitive(PrimitiveType.Sphere, "Helmet", mobileModelRoot,
+                new Vector3(0f, 1.57f, 0.01f), new Vector3(0.70f, 0.38f, 0.66f));
+            mobileVisor = CreateMobilePrimitive(PrimitiveType.Cube, "Visor", mobileModelRoot,
+                new Vector3(0f, 1.49f, 0.31f), new Vector3(0.44f, 0.15f, 0.10f));
 
             Renderer[] parts =
             {
-                mobileHead, mobileBody, mobileShirt, mobilePants, mobileShoes, mobileHair
+                mobileHead, mobileBody, mobileShirt, mobilePants, mobileShoes, mobileHair,
+                mobileArmor, mobileLeftArm, mobileRightArm, mobilePack, mobileHelmet, mobileVisor
             };
             for (int i = 0; i < parts.Length; i++)
             {
@@ -265,6 +284,12 @@ namespace PersiaWar.Unity2D5D
             SetRendererColor(mobilePants, new Color(0.08f, 0.12f, 0.20f));
             SetRendererColor(mobileShoes, new Color(0.10f, 0.11f, 0.13f));
             SetRendererColor(mobileHair, hairColor);
+            SetRendererColor(mobileArmor, Color.Lerp(shirtColor, Color.white, 0.16f));
+            SetRendererColor(mobileLeftArm, shirtColor);
+            SetRendererColor(mobileRightArm, shirtColor);
+            SetRendererColor(mobilePack, new Color(0.07f, 0.09f, 0.12f));
+            SetRendererColor(mobileHelmet, new Color(0.13f, 0.16f, 0.19f));
+            SetRendererColor(mobileVisor, new Color(0.18f, 0.48f, 0.58f));
         }
 
         private void ApplyMobileEnemyColors(int archetypeIndex)
