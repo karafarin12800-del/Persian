@@ -483,13 +483,15 @@ namespace PersiaWar.Unity2D5D
 
             // Varied facade palette gives the city a stylized, readable look instead
             // of one continuous primitive-block color.
+            // Balanced Persian-city palette: sand, stone, slate, muted clay and olive.
+            // Keep the environment colorful without letting red/brown dominate the scene.
             Color[] palette =
             {
-                new Color(0.58f, 0.31f, 0.24f),
-                new Color(0.70f, 0.52f, 0.34f),
-                new Color(0.36f, 0.43f, 0.49f),
-                new Color(0.62f, 0.40f, 0.29f),
-                new Color(0.43f, 0.50f, 0.36f)
+                new Color(0.56f, 0.50f, 0.42f),
+                new Color(0.68f, 0.58f, 0.43f),
+                new Color(0.34f, 0.43f, 0.50f),
+                new Color(0.53f, 0.49f, 0.44f),
+                new Color(0.40f, 0.49f, 0.38f)
             };
             int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
             Material facade = MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
