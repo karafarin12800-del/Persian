@@ -739,7 +739,46 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
 
             StartupCheckpoint.Set("AndroidInputStable120Frames");
-            startupStatus = "INPUT STABLE — HUD/MINIMAP/ENEMIES DISABLED";
+            startupStatus = "INPUT STABLE — enabling gameplay services one at a time";
+
+            // PASS 3: enable only the lightweight HUD, then prove it is stable.
+            StartupCheckpoint.Set("AndroidHudActivationStarted");
+            if (combatHud == null)
+                combatHud = FindFirstObjectByType<RuntimeCombatHUD>(FindObjectsInactive.Include);
+            if (combatHud != null)
+            {
+                combatHud.ConfigurePlayer(player);
+                combatHud.enabled = true;
+            }
+
+            for (int i = 0; i < 120; i++)
+                yield return null;
+
+            StartupCheckpoint.Set("AndroidHudStable120Frames");
+
+            // PASS 4: enable the minimap only after the HUD has survived a clean window.
+            StartupCheckpoint.Set("AndroidMinimapActivationStarted");
+            if (mobileInput != null)
+                mobileInput.EnableMinimap();
+
+            for (int i = 0; i < 120; i++)
+                yield return null;
+
+            StartupCheckpoint.Set("AndroidMinimapStable120Frames");
+
+            // PASS 5: reopen enemy gameplay in the safest possible configuration.
+            // Start with exactly one enemy. EnemySpawner grows later by completed waves.
+            StartupCheckpoint.Set("AndroidEnemyActivationStarted");
+            if (enemySpawner == null)
+                enemySpawner = FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+
+            if (enemySpawner != null && player != null)
+            {
+                enemySpawner.Configure(player.transform, 1, 44f, 0f);
+                enemySpawner.enabled = true;
+            }
+
+            startupStatus = "GAMEPLAY SERVICES ACTIVE — enemy wave 1 is staged";
             yield break;
 #else
             yield return null;
