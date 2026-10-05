@@ -25,6 +25,7 @@ namespace PersiaWar.Unity2D5D
         private Texture2D lineTexture;
         private GrenadeController grenadeController;
         private bool minimapEnabled;
+        private float minimapReadyAt;
         private GUIStyle buttonTextStyle;
 
         public Vector2 MoveValue => moveValue;
@@ -48,6 +49,7 @@ namespace PersiaWar.Unity2D5D
             // Create the minimap only after the main gameplay camera is stable.
             // PrototypeFlow calls this after the Android safe-frame window.
             minimapEnabled = true;
+            minimapReadyAt = Time.unscaledTime + 1.5f;
             StartupCheckpoint.Set("MinimapEnabledAndroid");
 #else
             minimapEnabled = true;
@@ -95,7 +97,7 @@ namespace PersiaWar.Unity2D5D
 
             // The minimap is a secondary GPU allocation. Keep it out of the first gameplay
             // frame and let PrototypeFlow enable it only after the match is visibly entered.
-            if (minimapEnabled)
+            if (minimapEnabled && (minimapCamera != null || Time.unscaledTime >= minimapReadyAt))
                 EnsureMinimap();
 
 #if UNITY_EDITOR || UNITY_STANDALONE
@@ -293,7 +295,9 @@ namespace PersiaWar.Unity2D5D
             minimapCamera.orthographic = true;
             minimapCamera.orthographicSize = 96f;
             minimapCamera.nearClipPlane = 0.1f;
-            minimapCamera.farClipPlane = 350f;
+            minimapCamera.farClipPlane = 260f;
+            minimapCamera.allowHDR = false;
+            minimapCamera.allowMSAA = false;
             minimapCamera.clearFlags = CameraClearFlags.SolidColor;
             minimapCamera.backgroundColor = new Color(0.06f, 0.07f, 0.08f, 1f);
             minimapCamera.enabled = true;
