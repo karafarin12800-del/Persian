@@ -30,6 +30,21 @@ namespace PersiaWar.Unity2D5D
         private Mesh androidUnitCubeMesh;
         private Mesh androidUnitQuadMesh;
 
+        // Static city visuals are accumulated into a small number of baked meshes.
+        // This keeps the same detail while dramatically reducing GameObjects/Renderers.
+        private sealed class AndroidBoxBatch
+        {
+            public readonly Material Material;
+            public readonly List<Vector3> Vertices = new List<Vector3>();
+            public readonly List<Vector3> Normals = new List<Vector3>();
+            public readonly List<int> Triangles = new List<int>();
+
+            public AndroidBoxBatch(Material material) => Material = material;
+        }
+
+        private readonly Dictionary<Material, AndroidBoxBatch> androidBoxBatches =
+            new Dictionary<Material, AndroidBoxBatch>();
+
         private void ReportStage(string message, string checkpoint)
         {
             CurrentStage = message;
@@ -303,18 +318,44 @@ namespace PersiaWar.Unity2D5D
             const float roadWidth = 10f;
             const float sidewalkWidth = 1.35f;
             float half = worldSize * 0.5f;
+
+            List<Vector3> roadVertices = new List<Vector3>();
+            List<int> roadTriangles = new List<int>();
+            List<Vector3> sidewalkVertices = new List<Vector3>();
+            List<int> sidewalkTriangles = new List<int>();
+
             for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
             {
-                CreateFlatMesh("RoadX", new Vector3(x, 0.025f, 0f), new Vector2(roadWidth, worldSize), roadMaterial);
-                CreateFlatMesh("SidewalkX_L", new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
-                CreateFlatMesh("SidewalkX_R", new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f), new Vector2(sidewalkWidth, worldSize), androidSidewalkMaterial);
+                AddAndroidQuad(roadVertices, roadTriangles,
+                    new Vector3(x, 0.025f, 0f),
+                    new Vector2(roadWidth, worldSize));
+
+                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f),
+                    new Vector2(sidewalkWidth, worldSize));
+
+                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f),
+                    new Vector2(sidewalkWidth, worldSize));
             }
+
             for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
             {
-                CreateFlatMesh("RoadZ", new Vector3(0f, 0.025f, z), new Vector2(worldSize, roadWidth), roadMaterial);
-                CreateFlatMesh("SidewalkZ_B", new Vector3(0f, 0.035f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
-                CreateFlatMesh("SidewalkZ_T", new Vector3(0f, 0.035f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f), new Vector2(worldSize, sidewalkWidth), androidSidewalkMaterial);
+                AddAndroidQuad(roadVertices, roadTriangles,
+                    new Vector3(0f, 0.025f, z),
+                    new Vector2(worldSize, roadWidth));
+
+                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0.035f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth));
+
+                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0.035f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth));
             }
+
+            CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
+            CreateAndroidQuadBatch("AndroidSidewalkGrid", sidewalkVertices, sidewalkTriangles, androidSidewalkMaterial);
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
         }
 
@@ -322,6 +363,7 @@ namespace PersiaWar.Unity2D5D
         {
             // Dense, readable 2.5D city layout: buildings hug the streets so the
             // gameplay camera never opens onto a large empty floor.
+            androidBoxBatches.Clear();
             Vector3[] buildingPoints =
             {
                 new Vector3(-42f, 0f, -42f), new Vector3(-21f, 0f, -42f), new Vector3(21f, 0f, -42f), new Vector3(42f, 0f, -42f),
@@ -343,6 +385,10 @@ namespace PersiaWar.Unity2D5D
                 float depth = i % 3 == 0 ? 10.5f : 9.0f;
                 CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
             }
+
+            // One renderer per material group replaces hundreds of tiny facade/window
+            // renderers while preserving the exact box-based visual language.
+            FlushAndroidBoxBatches();
 
             Vector3[] treePoints =
             {
@@ -548,10 +594,6 @@ namespace PersiaWar.Unity2D5D
         {
             float bodyHeight = Mathf.Max(4.5f, height);
 
-            // Varied facade palette gives the city a stylized, readable look instead
-            // of one continuous primitive-block color.
-            // Balanced Persian-city palette: sand, stone, slate, muted clay and olive.
-            // Keep the environment colorful without letting red/brown dominate the scene.
             Color[] palette =
             {
                 new Color(0.56f, 0.50f, 0.42f),
@@ -566,34 +608,31 @@ namespace PersiaWar.Unity2D5D
             Material darkWindow = androidWindowMaterial != null
                 ? androidWindowMaterial
                 : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f));
+            Material door = MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
+            Material rooftop = MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
+            Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
+            Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
 
-            CreateAndroidBox(
-                "CityBuilding",
-                position + Vector3.up * (bodyHeight * 0.5f),
-                new Vector3(footprint, bodyHeight, depth),
-                facade,
-                true);
+            Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
+            QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
+            CreateAndroidCollider("CityBuildingCollider", position, bodySize);
 
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "CityRoof",
                 position + Vector3.up * (bodyHeight + 0.22f),
                 new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
-                trim,
-                false);
+                trim);
 
-            // Strong horizontal facade trim.
             for (int row = 0; row < 3; row++)
             {
                 float y = 1.25f + row * Mathf.Max(1.7f, (bodyHeight - 2.4f) / 3f);
-                CreateAndroidBox(
+                QueueAndroidBox(
                     "FacadeBand",
                     position + new Vector3(0f, y, -depth * 0.515f),
                     new Vector3(footprint * 0.92f, 0.16f, 0.10f),
-                    trim,
-                    false);
+                    trim);
             }
 
-            // Windows on the camera-facing side.
             int columns = Mathf.Clamp(Mathf.FloorToInt(footprint / 2.5f), 2, 4);
             float spacing = footprint / (columns + 1);
             for (int row = 0; row < 3; row++)
@@ -602,70 +641,57 @@ namespace PersiaWar.Unity2D5D
                 for (int col = 0; col < columns; col++)
                 {
                     float x = -footprint * 0.5f + spacing * (col + 1);
-                    CreateAndroidBox(
+                    QueueAndroidBox(
                         "Window",
                         position + new Vector3(x, y, -depth * 0.522f),
                         new Vector3(Mathf.Min(1.15f, spacing * 0.48f), 0.72f, 0.11f),
-                        darkWindow,
-                        false);
+                        darkWindow);
 
-                    // Small frame underneath each window.
-                    CreateAndroidBox(
+                    QueueAndroidBox(
                         "WindowSill",
                         position + new Vector3(x, y - 0.46f, -depth * 0.53f),
                         new Vector3(Mathf.Min(1.32f, spacing * 0.56f), 0.10f, 0.16f),
-                        trim,
-                        false);
+                        trim);
                 }
             }
 
-            // Door + canopy make the street-facing entrance readable.
-            Material door = MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "Door",
                 position + new Vector3(0f, 1.10f, -depth * 0.54f),
                 new Vector3(Mathf.Min(1.35f, footprint * 0.18f), 2.15f, 0.14f),
-                door,
-                false);
-            CreateAndroidBox(
+                door);
+
+            QueueAndroidBox(
                 "DoorCanopy",
                 position + new Vector3(0f, 2.30f, -depth * 0.56f),
                 new Vector3(Mathf.Min(2.4f, footprint * 0.30f), 0.18f, 0.72f),
-                trim,
-                false);
+                trim);
 
-            // Rooftop HVAC boxes add depth when the camera looks down.
-            Material rooftop = MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
             for (int i = 0; i < 2; i++)
             {
                 Vector3 offset = new Vector3(
                     (i == 0 ? -0.28f : 0.28f) * footprint,
                     bodyHeight + 0.70f,
                     (i == 0 ? -0.20f : 0.22f) * depth);
-                CreateAndroidBox(
+
+                QueueAndroidBox(
                     "RooftopUnit",
                     position + offset,
                     new Vector3(1.15f, 0.55f, 0.85f),
-                    rooftop,
-                    false);
+                    rooftop);
             }
 
-            // Short fence/planter pieces create the layered streetscape seen in the
-            // reference without introducing expensive physics.
-            Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
-            Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "Planter",
                 position + new Vector3(-footprint * 0.30f, 0.34f, -depth * 0.66f),
                 new Vector3(Mathf.Min(2.6f, footprint * 0.22f), 0.68f, 0.55f),
-                planter,
-                false);
-            CreateAndroidBox(
+                planter);
+
+            QueueAndroidBox(
                 "Hedge",
                 position + new Vector3(footprint * 0.30f, 0.55f, -depth * 0.66f),
                 new Vector3(Mathf.Min(3.0f, footprint * 0.26f), 1.10f, 0.65f),
-                hedge,
-                false);
+                hedge);
         }
 
         private Material androidTreeTrunkMaterial;
@@ -725,6 +751,124 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(0.65f, 0.18f, 0.38f),
                 androidLampGlowMaterial,
                 false);
+        }
+
+        private void QueueAndroidBox(string objectName, Vector3 position, Vector3 size, Material material)
+        {
+            if (material == null)
+                return;
+
+            if (!androidBoxBatches.TryGetValue(material, out AndroidBoxBatch batch))
+            {
+                batch = new AndroidBoxBatch(material);
+                androidBoxBatches.Add(material, batch);
+            }
+
+            AddAndroidBoxGeometry(batch.Vertices, batch.Normals, batch.Triangles, position, size);
+        }
+
+        private void AddAndroidBoxGeometry(
+            List<Vector3> vertices,
+            List<Vector3> normals,
+            List<int> triangles,
+            Vector3 center,
+            Vector3 size)
+        {
+            Vector3 h = size * 0.5f;
+
+            AddAndroidBoxFace(vertices, normals, triangles,
+                new Vector3(-h.x, -h.y, -h.z), new Vector3(h.x, -h.y, -h.z),
+                new Vector3(h.x, -h.y, h.z), new Vector3(-h.x, -h.y, h.z), Vector3.down, center);
+
+            AddAndroidBoxFace(vertices, normals, triangles,
+                new Vector3(-h.x, h.y, -h.z), new Vector3(-h.x, h.y, h.z),
+                new Vector3(h.x, h.y, h.z), new Vector3(h.x, h.y, -h.z), Vector3.up, center);
+
+            AddAndroidBoxFace(vertices, normals, triangles,
+                new Vector3(-h.x, -h.y, -h.z), new Vector3(-h.x, h.y, -h.z),
+                new Vector3(h.x, h.y, -h.z), new Vector3(h.x, -h.y, -h.z), Vector3.back, center);
+
+            AddAndroidBoxFace(vertices, normals, triangles,
+                new Vector3(h.x, -h.y, -h.z), new Vector3(h.x, h.y, -h.z),
+                new Vector3(h.x, h.y, h.z), new Vector3(h.x, -h.y, h.z), Vector3.right, center);
+
+            AddAndroidBoxFace(vertices, normals, triangles,
+                new Vector3(h.x, -h.y, h.z), new Vector3(h.x, h.y, h.z),
+                new Vector3(-h.x, h.y, h.z), new Vector3(-h.x, -h.y, h.z), Vector3.forward, center);
+
+            AddAndroidBoxFace(vertices, normals, triangles,
+                new Vector3(-h.x, -h.y, h.z), new Vector3(-h.x, h.y, h.z),
+                new Vector3(-h.x, h.y, -h.z), new Vector3(-h.x, -h.y, -h.z), Vector3.left, center);
+        }
+
+        private void AddAndroidBoxFace(
+            List<Vector3> vertices,
+            List<Vector3> normals,
+            List<int> triangles,
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            Vector3 d,
+            Vector3 normal,
+            Vector3 center)
+        {
+            int start = vertices.Count;
+            vertices.Add(center + a);
+            vertices.Add(center + b);
+            vertices.Add(center + c);
+            vertices.Add(center + d);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            triangles.Add(start + 0);
+            triangles.Add(start + 1);
+            triangles.Add(start + 2);
+            triangles.Add(start + 0);
+            triangles.Add(start + 2);
+            triangles.Add(start + 3);
+        }
+
+        private void CreateAndroidCollider(string objectName, Vector3 position, Vector3 size)
+        {
+            GameObject obj = new GameObject(objectName);
+            obj.transform.SetParent(worldRoot, true);
+            obj.transform.position = position + Vector3.up * (size.y * 0.5f);
+            BoxCollider box = obj.AddComponent<BoxCollider>();
+            box.center = Vector3.zero;
+            box.size = size;
+        }
+
+        private void FlushAndroidBoxBatches()
+        {
+            foreach (AndroidBoxBatch batch in androidBoxBatches.Values)
+            {
+                if (batch.Vertices.Count == 0)
+                    continue;
+
+                GameObject obj = new GameObject("AndroidCityBatch");
+                obj.transform.SetParent(worldRoot, true);
+
+                Mesh mesh = new Mesh { name = "AndroidCityBatchMesh" };
+                if (batch.Vertices.Count > 65000)
+                    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+
+                mesh.SetVertices(batch.Vertices);
+                mesh.SetNormals(batch.Normals);
+                mesh.SetTriangles(batch.Triangles, 0, true);
+                mesh.RecalculateBounds();
+                mesh.UploadMeshData(true);
+
+                MeshFilter filter = obj.AddComponent<MeshFilter>();
+                filter.sharedMesh = mesh;
+
+                MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = batch.Material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+
+            androidBoxBatches.Clear();
         }
 
         private GameObject CreateAndroidBox(string objectName, Vector3 position, Vector3 size, Material material, bool collider)
