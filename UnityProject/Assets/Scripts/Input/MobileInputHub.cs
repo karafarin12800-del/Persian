@@ -97,8 +97,11 @@ namespace PersiaWar.Unity2D5D
 
             // The minimap is a secondary GPU allocation. Keep it out of the first gameplay
             // frame and let PrototypeFlow enable it only after the match is visibly entered.
-            if (minimapEnabled && (minimapCamera != null || Time.unscaledTime >= minimapReadyAt))
-                EnsureMinimap();
+            if (minimapEnabled)
+            {
+                if (minimapCamera != null || Time.unscaledTime >= minimapReadyAt)
+                    EnsureMinimap();
+            }
 
 #if UNITY_EDITOR || UNITY_STANDALONE
             Vector2 keyboard = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
