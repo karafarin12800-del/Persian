@@ -9,16 +9,15 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int startingCount = 8;
         [SerializeField] private float spawnRadius = 44f;
         [SerializeField] private float nextWaveDelay = 3f;
-        [SerializeField] private float initialSpawnDelay = 4f;
+        [SerializeField] private float initialSpawnDelay = 6.5f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
         [SerializeField] private int maxPerWave = 15;
         [SerializeField] private int victoryWave = 5;
 
 #if UNITY_ANDROID
-        // Crash-isolation switch: keep enemy construction completely disabled on Android
-        // for this diagnostic build. If the build survives past the old ~4s crash point,
-        // the enemy initialization path is the confirmed trigger.
-        private const bool AndroidEnemyDiagnosticDisabled = true;
+        // Android enemy gameplay is reopened in a staged configuration:
+        // the first wave contains one enemy and later waves grow after kills.
+        private const bool AndroidEnemyDiagnosticDisabled = false;
 #endif
 
         private int wave = 1;
@@ -69,8 +68,10 @@ namespace PersiaWar.Unity2D5D
 
             if (player != null && player.GetComponent<PlayerController>()?.IsDefeated != true)
             {
+                StartupCheckpoint.Set("AndroidEnemyWaveStart");
                 SpawnWave();
                 initialWaveComplete = true;
+                StartupCheckpoint.Set("AndroidEnemyWaveReady");
             }
         }
 
@@ -167,8 +168,10 @@ namespace PersiaWar.Unity2D5D
 
                 if (!Physics.CheckSphere(position + Vector3.up * 0.7f, 0.85f, ~0, QueryTriggerInteraction.Ignore))
                 {
+                    StartupCheckpoint.Set("AndroidEnemySpawnAttempt");
                     SpawnEnemy(position, spawned, currentWave);
                     spawned++;
+                    StartupCheckpoint.Set("AndroidEnemySpawnComplete");
                 }
 
                 yield return null;
@@ -194,6 +197,7 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnEnemy(Vector3 position, int index, int currentWave)
         {
+            StartupCheckpoint.Set("AndroidEnemyObjectConstructionStarted");
             int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
 #if UNITY_ANDROID
             GameObject enemy = new GameObject($"Enemy_W{currentWave}_{index}");
@@ -229,6 +233,7 @@ namespace PersiaWar.Unity2D5D
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
             chase.Configure(player, archetype);
 #endif
+            StartupCheckpoint.Set("AndroidEnemyObjectConstructionComplete");
         }
 
         private void SpawnWaveReward()
