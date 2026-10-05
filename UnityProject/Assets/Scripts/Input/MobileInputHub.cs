@@ -250,10 +250,10 @@ namespace PersiaWar.Unity2D5D
             if (player == null || player.IsDefeated || player.Aim == null) return;
             if (Time.time < nextFireTime) return;
 
-            TargetHealth target = player.Aim.CurrentTarget;
+            TargetHealth target = player.Aim != null ? player.Aim.CurrentTarget : null;
             bool fired = target != null
-                ? player.Aim.FireAt(target.transform.position)
-                : player.Aim.FireForward(player.transform.forward);
+                ? player.Weapon.TryFire(target.transform.position)
+                : player.Weapon.TryFireDirection(player.transform.forward);
 
             if (fired)
             {
