@@ -9,6 +9,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float turnSpeed = 18f;
         [SerializeField] private float collisionRadius = 0.62f;
         [SerializeField] private int shield = 0;
+        [SerializeField] private float spawnMovementLockSeconds = 0.45f;
 
         private Vector3 input;
         private WeaponController weapon;
@@ -16,6 +17,10 @@ namespace PersiaWar.Unity2D5D
         private TargetHealth health;
         private PlayerInventory inventory;
         private GrenadeController grenadeController;
+        private StylizedCharacterVisual visual;
+        private float groundY;
+        private float movementLockUntil;
+        private bool movementEnabled = true;
 
         public NearestTargetAim Aim => aim;
         public WeaponController Weapon => weapon;
@@ -25,6 +30,7 @@ namespace PersiaWar.Unity2D5D
         public int Shield => shield;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
+        public bool IsMovementEnabled => movementEnabled && Time.time >= movementLockUntil && !IsDefeated;
         public bool IsGameplayReady => health != null && weapon != null && aim != null && inventory != null && grenadeController != null;
 
         private void OnEnable()
@@ -51,17 +57,44 @@ namespace PersiaWar.Unity2D5D
 
         public void PrepareForMatch(int heroIndex)
         {
+            IsDefeated = false;
+            input = Vector3.zero;
+            movementEnabled = true;
+            groundY = 0f;
+            movementLockUntil = Time.time + Mathf.Max(0f, spawnMovementLockSeconds);
+
             EnsurePlayerVisual();
             EnsureGameplayComponents();
-            StylizedCharacterVisual visual = GetComponentInChildren<StylizedCharacterVisual>(true);
+            visual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (visual != null)
                 visual.ConfigurePlayerHero(heroIndex);
             StartupCheckpoint.Set("PlayerPreparedForMatch");
         }
 
+        public void SetGroundedPosition(Vector3 worldPosition)
+        {
+            groundY = worldPosition.y;
+            Vector3 position = worldPosition;
+            position.y = groundY;
+            transform.position = position;
+        }
+
+        public void SetMovementEnabled(bool enabled)
+        {
+            movementEnabled = enabled;
+            if (!enabled)
+                SetMoveInput(Vector2.zero);
+        }
+
+        public void LockMovementFor(float seconds)
+        {
+            movementLockUntil = Mathf.Max(movementLockUntil, Time.time + Mathf.Max(0f, seconds));
+            input = Vector3.zero;
+        }
+
         public void SetMoveInput(Vector2 value)
         {
-            if (IsDefeated)
+            if (!movementEnabled || IsDefeated)
             {
                 input = Vector3.zero;
                 return;
@@ -100,6 +133,7 @@ namespace PersiaWar.Unity2D5D
         public void HandleDefeat()
         {
             IsDefeated = true;
+            movementEnabled = false;
             input = Vector3.zero;
             enabled = false;
             GameSession.Instance?.EndMission(false);
@@ -109,6 +143,19 @@ namespace PersiaWar.Unity2D5D
         {
             if (IsDefeated) return;
 
+            // The battlefield is intentionally planar. Keep Y pinned to the match ground
+            // so scene activation/camera hand-off cannot visually launch the player.
+            Vector3 anchored = transform.position;
+            anchored.y = groundY;
+            transform.position = anchored;
+
+            bool canMove = IsMovementEnabled;
+            if (!canMove)
+            {
+                if (visual != null) visual.SetMoving(false);
+                return;
+            }
+
             Vector3 desired = input * moveSpeed * Time.deltaTime;
             Vector3 next = transform.position + desired;
             next.x = Mathf.Clamp(next.x, -worldLimit, worldLimit);
@@ -117,6 +164,9 @@ namespace PersiaWar.Unity2D5D
 
             if (desired.sqrMagnitude > 0.00001f && !WouldCollide(next))
                 transform.position = next;
+
+            if (visual != null)
+                visual.SetMoving(input.sqrMagnitude > 0.0001f);
 
             if (input.sqrMagnitude > 0.0001f)
             {
@@ -168,7 +218,7 @@ namespace PersiaWar.Unity2D5D
 
         private void EnsurePlayerVisual()
         {
-            StylizedCharacterVisual visual = StylizedCharacterVisual.Attach(transform, true, 1);
+            visual = StylizedCharacterVisual.Attach(transform, true, 1);
             visual.ConfigurePlayerHero(0);
         }
     }
