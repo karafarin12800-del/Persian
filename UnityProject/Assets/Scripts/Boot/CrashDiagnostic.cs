@@ -1,15 +1,13 @@
 using System;
 using System.IO;
-using System.Reflection;
 using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
     /// Persistent Android crash/exit breadcrumb collector.
-    /// It does not catch native crashes; instead it records the last checkpoint,
-    /// managed exceptions, and Unity/Android exit-state information available on
-    /// the next launch. The report is written to persistentDataPath.
+    /// It records the previous startup checkpoint, managed errors, and Android's
+    /// historical process-exit reason when the device exposes that API.
     /// </summary>
     public static class CrashDiagnostic
     {
@@ -60,7 +58,7 @@ namespace PersiaWar.Unity2D5D
             string previousExitState,
             string currentExitState)
         {
-            string report =
+            return
                 "PERSIA WAR CRASH DIAGNOSTIC\n" +
                 "UTC: " + DateTime.UtcNow.ToString("O") + "\n" +
                 "Platform: " + Application.platform + "\n" +
@@ -69,34 +67,33 @@ namespace PersiaWar.Unity2D5D
                 "OS: " + SystemInfo.operatingSystem + "\n" +
                 "MemoryMB: " + SystemInfo.systemMemorySize + "\n" +
                 "Graphics: " + SystemInfo.graphicsDeviceName + "\n" +
+                "PersistentDataPath: " + Application.persistentDataPath + "\n" +
                 "PreviousCheckpoint: " + previousCheckpoint + "\n" +
                 "PreviousCheckpointTime: " + previousCheckpointTime + "\n" +
                 "PreviousRecordedExitState: " + previousExitState + "\n" +
                 "AndroidExitStateNow: " + currentExitState + "\n" +
-                "PreviousRunAssessment: " + Classify(previousCheckpoint, currentExitState) + "\n";
-
-            return report;
+                "Assessment: " + Classify(previousCheckpoint, currentExitState) + "\n";
         }
 
         private static string Classify(string checkpoint, string exitState)
         {
-            if (!string.IsNullOrEmpty(exitState) && !string.Equals(exitState, "unknown", StringComparison.OrdinalIgnoreCase))
-            {
-                string lower = exitState.ToLowerInvariant();
-                if (lower.Contains("lowmemory") || lower.Contains("memory"))
-                    return "LIKELY_LOW_MEMORY";
-                if (lower.Contains("anr"))
-                    return "LIKELY_ANR";
-                if (lower.Contains("crash"))
-                    return "LIKELY_CRASH";
-            }
+            string lower = (exitState ?? string.Empty).ToLowerInvariant();
+
+            if (lower.Contains("low_memory") || lower.Contains("lowmemory"))
+                return "LIKELY_LOW_MEMORY";
+            if (lower.Contains("anr"))
+                return "LIKELY_ANR";
+            if (lower.Contains("crash_native"))
+                return "LIKELY_NATIVE_CRASH";
+            if (lower.Contains("crash"))
+                return "LIKELY_CRASH";
+            if (lower.Contains("excessive_resource"))
+                return "LIKELY_EXCESSIVE_RESOURCE_USAGE";
 
             if (checkpoint == "AndroidGameplayStackReady" || checkpoint == "Android3DPresentationReady")
                 return "LAST_RUN_REACHED_FULL_GAMEPLAY_STACK";
-
             if (checkpoint == "Android3DWorldVisible" || checkpoint == "Android3DWorldValidationComplete")
                 return "LAST_RUN_REACHED_WORLD_AND_CAMERA";
-
             if (checkpoint == "WorldBuildReady" || checkpoint == "PlayerPreparedForMatch")
                 return "LAST_RUN_REACHED_WORLD_OR_PLAYER_STAGE";
 
@@ -106,30 +103,71 @@ namespace PersiaWar.Unity2D5D
         private static string ReadAndroidExitState()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
+            // Unity 2022.3 does not expose the newer AndroidApplication.exitState API,
+            // so use Android 11+ ActivityManager historical process-exit information
+            // directly. Older Android versions simply return unavailable.
             try
             {
-                Type androidApplicationType = Type.GetType(
-                    "UnityEngine.Android.AndroidApplication, UnityEngine.AndroidModule");
-                if (androidApplicationType == null)
+                AndroidJavaObject activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")
+                    .GetStatic<AndroidJavaObject>("currentActivity");
+
+                if (activity == null)
                     return "unavailable";
 
-                PropertyInfo exitStateProperty = androidApplicationType.GetProperty(
-                    "exitState",
-                    BindingFlags.Public | BindingFlags.Static);
+                string packageName = activity.Call<string>("getPackageName");
+                AndroidJavaObject activityManager =
+                    activity.Call<AndroidJavaObject>("getSystemService", "activity");
 
-                if (exitStateProperty == null)
+                if (activityManager == null)
                     return "unavailable";
 
-                object exitState = exitStateProperty.GetValue(null, null);
-                return exitState != null ? exitState.ToString() : "none";
+                AndroidJavaObject reasons = activityManager.Call<AndroidJavaObject>(
+                    "getHistoricalProcessExitReasons",
+                    packageName,
+                    0,
+                    5);
+
+                if (reasons == null)
+                    return "unavailable";
+
+                int count = reasons.Call<int>("size");
+                if (count <= 0)
+                    return "none";
+
+                AndroidJavaObject latest = reasons.Call<AndroidJavaObject>("get", 0);
+                if (latest == null)
+                    return "unknown";
+
+                int reason = latest.Call<int>("getReason");
+                string description = latest.Call<string>("getDescription");
+                string timestamp = latest.Call<long>("getTimestamp").ToString();
+
+                return "reason=" + reason +
+                       ";description=" + (description ?? "none") +
+                       ";timestampMs=" + timestamp +
+                       ";label=" + AndroidExitReasonLabel(reason);
             }
             catch (Exception ex)
             {
-                return "read_error:" + ex.GetType().Name;
+                return "unavailable:" + ex.GetType().Name;
             }
 #else
             return "editor_or_non_android";
 #endif
+        }
+
+        private static string AndroidExitReasonLabel(int reason)
+        {
+            switch (reason)
+            {
+                case 3: return "LOW_MEMORY";
+                case 4: return "CRASH";
+                case 5: return "CRASH_NATIVE";
+                case 6: return "ANR";
+                case 9: return "EXCESSIVE_RESOURCE_USAGE";
+                case 10: return "USER_REQUESTED";
+                default: return "reason_" + reason;
+            }
         }
 
         private static void OnLogMessage(string condition, string stackTrace, LogType type)
@@ -137,10 +175,7 @@ namespace PersiaWar.Unity2D5D
             if (type != LogType.Exception && type != LogType.Error && type != LogType.Assert)
                 return;
 
-            if (string.IsNullOrEmpty(condition))
-                condition = "unknown";
-
-            lastException = condition;
+            lastException = string.IsNullOrEmpty(condition) ? "unknown" : condition;
 
             try
             {
@@ -150,7 +185,7 @@ namespace PersiaWar.Unity2D5D
                     "\n--- RUNTIME ERROR ---\n" +
                     "UTC: " + DateTime.UtcNow.ToString("O") + "\n" +
                     "Type: " + type + "\n" +
-                    "Message: " + condition + "\n" +
+                    "Message: " + lastException + "\n" +
                     "Stack: " + stackTrace + "\n");
             }
             catch
