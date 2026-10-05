@@ -314,24 +314,27 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidCityPresentation()
         {
-            // Android main-game presentation: keep the real battlefield/combat path,
-            // but avoid a large allocation burst when the match starts. The previous
-            // 8x8 procedural pass created hundreds of Mesh objects in one frame.
+            // Dense, readable 2.5D city layout: buildings hug the streets so the
+            // gameplay camera never opens onto a large empty floor.
             Vector3[] buildingPoints =
             {
-                new Vector3(-48f, 0f, -48f), new Vector3(-24f, 0f, -48f),
-                new Vector3(24f, 0f, -48f),  new Vector3(48f, 0f, -48f),
-                new Vector3(-48f, 0f, 48f),  new Vector3(-24f, 0f, 48f),
-                new Vector3(24f, 0f, 48f),   new Vector3(48f, 0f, 48f),
-                new Vector3(-48f, 0f, 24f),  new Vector3(48f, 0f, 24f),
-                new Vector3(-48f, 0f, -24f), new Vector3(48f, 0f, -24f)
+                new Vector3(-42f, 0f, -42f), new Vector3(-21f, 0f, -42f), new Vector3(21f, 0f, -42f), new Vector3(42f, 0f, -42f),
+                new Vector3(-42f, 0f, -21f), new Vector3(42f, 0f, -21f),
+                new Vector3(-42f, 0f, 0f),   new Vector3(42f, 0f, 0f),
+                new Vector3(-42f, 0f, 21f),  new Vector3(42f, 0f, 21f),
+                new Vector3(-42f, 0f, 42f),  new Vector3(-21f, 0f, 42f), new Vector3(21f, 0f, 42f), new Vector3(42f, 0f, 42f),
+
+                new Vector3(-21f, 0f, -21f), new Vector3(21f, 0f, -21f),
+                new Vector3(-21f, 0f, 21f),  new Vector3(21f, 0f, 21f),
+                new Vector3(-10f, 0f, -34f),  new Vector3(10f, 0f, 34f),
+                new Vector3(-34f, 0f, 10f),   new Vector3(34f, 0f, -10f)
             };
 
             for (int i = 0; i < buildingPoints.Length; i++)
             {
-                float footprint = (i % 3 == 0) ? 11.5f : 9.5f;
-                float height = (i % 4 == 0) ? 12.5f : 9.0f;
-                float depth = (i % 2 == 0) ? 10f : 8.5f;
+                float footprint = i % 5 == 0 ? 13.5f : (i % 2 == 0 ? 11.5f : 10.0f);
+                float height = i % 4 == 0 ? 13.5f : (i % 3 == 0 ? 11.0f : 9.0f);
+                float depth = i % 3 == 0 ? 10.5f : 9.0f;
                 CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
             }
 
@@ -339,17 +342,17 @@ namespace PersiaWar.Unity2D5D
             {
                 new Vector3(-30f, 0f, -30f), new Vector3(30f, 0f, 30f),
                 new Vector3(-30f, 0f, 30f),  new Vector3(30f, 0f, -30f),
-                new Vector3(-68f, 0f, 0f), new Vector3(68f, 0f, 0f),
-                new Vector3(0f, 0f, 68f), new Vector3(0f, 0f, -68f)
+                new Vector3(-66f, 0f, 0f),   new Vector3(66f, 0f, 0f),
+                new Vector3(0f, 0f, 66f),    new Vector3(0f, 0f, -66f)
             };
 
             for (int i = 0; i < treePoints.Length; i++)
-                CreateAndroidTree(treePoints[i], 2.8f + (i % 2) * 0.35f);
+                CreateAndroidTree(treePoints[i], 2.9f + (i % 2) * 0.35f);
 
             Vector3[] plazaPillars =
             {
-                new Vector3(-8f, 0f, 8f), new Vector3(8f, 0f, 8f),
-                new Vector3(-8f, 0f, -8f), new Vector3(8f, 0f, -8f)
+                new Vector3(-7f, 0f, 7f), new Vector3(7f, 0f, 7f),
+                new Vector3(-7f, 0f, -7f), new Vector3(7f, 0f, -7f)
             };
 
             for (int i = 0; i < plazaPillars.Length; i++)
