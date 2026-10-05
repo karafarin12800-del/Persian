@@ -28,6 +28,12 @@ namespace PersiaWar.Unity2D5D
         {
             player = playerTransform;
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
+#if UNITY_ANDROID
+            // Keep the first Android combat wave deliberately light. The player and city
+            // are already the expensive startup path; enemies are added after the safe
+            // render window and must not create a large native allocation spike.
+            startingCount = Mathf.Min(startingCount, 4);
+#endif
             spawnRadius = Mathf.Max(16f, radius);
         }
 
@@ -99,6 +105,9 @@ namespace PersiaWar.Unity2D5D
         private void SpawnWave()
         {
             int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
+#if UNITY_ANDROID
+            count = Mathf.Min(count, 6);
+#endif
 
 #if UNITY_ANDROID
             // Never construct the whole wave in one main-thread burst on Android.
