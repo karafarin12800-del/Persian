@@ -46,6 +46,11 @@ namespace PersiaWar.Unity2D5D
         public static string Last => PlayerPrefs.GetString(Key, "none");
         public static string Previous => PlayerPrefs.GetString(PreviousKey, "none");
         public static string PreviousTime => PlayerPrefs.GetString(PreviousTimeKey, "unknown");
+        public static string PreviousExitState => PlayerPrefs.GetString(PreviousExitStateKey, "unknown");
+        public static string PreviousAssessment => PlayerPrefs.GetString("PersiaWar.PreviousAssessment", "unknown");
+
+        public static string DiagnosticSummary =>
+            "Previous: " + Previous + " | Exit: " + PreviousExitState + " | Assessment: " + PreviousAssessment;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
         private static void MarkBeforeSplashScreen()
@@ -104,6 +109,7 @@ namespace PersiaWar.Unity2D5D
             Application.quitting += OnQuitting;
 
             PlayerPrefs.SetString(PreviousExitStateKey, currentExitState);
+            PlayerPrefs.SetString("PersiaWar.PreviousAssessment", Classify(previousCheckpoint, currentExitState));
             PlayerPrefs.Save();
         }
 
@@ -253,7 +259,12 @@ namespace PersiaWar.Unity2D5D
             PlayerPrefs.SetString(Key, stage);
             PlayerPrefs.SetString(TimeKey, DateTime.UtcNow.ToString("O"));
 
+            // Building/city checkpoints must survive a native crash exactly at the
+            // failing object. The extra Save is limited to startup construction only.
+            bool cityConstructionCheckpoint = stage.StartsWith("CITY_", StringComparison.Ordinal);
+
             if (CriticalCheckpoints.Contains(stage)
+                || cityConstructionCheckpoint
                 || Time.realtimeSinceStartup - lastSaveTime >= 0.75f)
             {
                 SaveNow();
