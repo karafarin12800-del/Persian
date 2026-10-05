@@ -14,6 +14,8 @@ namespace PersiaWar.Unity2D5D
         private int movePointerId = -1;
         private int firePointerId = -1;
         private int grenadePointerId = -1;
+        private int meleePointerId = -1;
+        private int reloadPointerId = -1;
         private Vector2 moveStartScreen;
         private Vector2 moveValue;
         private float nextFireTime;
@@ -117,16 +119,29 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
             float radius = joystickRadius * scale;
-            Vector2 grenadeGuiPos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
-            float grenadeRadius = radius * 0.56f;
+
+            Vector2 joystickBaseGui = new Vector2(128f * scale, Screen.height - 142f * scale);
+            Vector2 fireGui = new Vector2(Screen.width - 118f * scale, Screen.height - 142f * scale);
+            Vector2 meleeGui = new Vector2(Screen.width - 235f * scale, Screen.height - 92f * scale);
+            Vector2 grenadeGui = new Vector2(Screen.width - 235f * scale, Screen.height - 222f * scale);
+            Vector2 reloadGui = new Vector2(Screen.width - 115f * scale, Screen.height - 260f * scale);
+
+            float joystickHit = radius * 1.45f;
+            float fireHit = radius * 0.78f;
+            float meleeHit = radius * 0.58f;
+            float grenadeHit = radius * 0.62f;
+            float reloadHit = radius * 0.58f;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch touch = Input.GetTouch(i);
                 if (touch.phase != TouchPhase.Began) continue;
 
-                bool leftSide = touch.position.x < Screen.width * 0.48f;
-                if (leftSide && movePointerId < 0)
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+
+                // Movement owns only the visible lower-left joystick zone.
+                if (movePointerId < 0 &&
+                    Vector2.Distance(gui, joystickBaseGui) <= joystickHit)
                 {
                     movePointerId = touch.fingerId;
                     moveStartScreen = touch.position;
@@ -134,25 +149,40 @@ namespace PersiaWar.Unity2D5D
                     continue;
                 }
 
-                Vector2 touchGuiPosition = new Vector2(touch.position.x, Screen.height - touch.position.y);
-                if (!leftSide && grenadePointerId < 0 && Vector2.Distance(touchGuiPosition, grenadeGuiPos) <= grenadeRadius)
+                if (firePointerId < 0 && Vector2.Distance(gui, fireGui) <= fireHit)
+                {
+                    firePointerId = touch.fingerId;
+                    FireAtNearestTarget();
+                    continue;
+                }
+
+                if (meleePointerId < 0 && Vector2.Distance(gui, meleeGui) <= meleeHit)
+                {
+                    meleePointerId = touch.fingerId;
+                    player.Weapon?.TryMelee();
+                    continue;
+                }
+
+                if (grenadePointerId < 0 && Vector2.Distance(gui, grenadeGui) <= grenadeHit)
                 {
                     grenadePointerId = touch.fingerId;
                     ThrowGrenadeAtTarget();
                     continue;
                 }
 
-                if (!leftSide && firePointerId < 0)
+                if (reloadPointerId < 0 && Vector2.Distance(gui, reloadGui) <= reloadHit)
                 {
-                    firePointerId = touch.fingerId;
-                    FireAtNearestTarget();
+                    reloadPointerId = touch.fingerId;
+                    player.Weapon?.Reload();
                 }
             }
 
             if (movePointerId >= 0 && TryGetTouch(movePointerId, out Touch moveTouch))
             {
                 Vector2 delta = moveTouch.position - moveStartScreen;
-                moveValue = Vector2.ClampMagnitude(delta / joystickRadius, 1f);
+                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
+                float touchRadius = joystickRadius * scale;
+                moveValue = Vector2.ClampMagnitude(delta / touchRadius, 1f);
                 player.SetMoveInput(moveValue);
 
                 if (moveTouch.phase == TouchPhase.Ended || moveTouch.phase == TouchPhase.Canceled)
@@ -195,6 +225,18 @@ namespace PersiaWar.Unity2D5D
             {
                 grenadePointerId = -1;
             }
+
+            ReleasePointer(ref meleePointerId);
+            ReleasePointer(ref reloadPointerId);
+        }
+
+        private static void ReleasePointer(ref int pointerId)
+        {
+            if (pointerId < 0) return;
+            if (!TryGetTouch(pointerId, out Touch touch) ||
+                touch.phase == TouchPhase.Ended ||
+                touch.phase == TouchPhase.Canceled)
+                pointerId = -1;
         }
 
         private void FireAtNearestTarget()
@@ -308,16 +350,20 @@ namespace PersiaWar.Unity2D5D
                 ? new Vector2(moveStartScreen.x, Screen.height - moveStartScreen.y)
                 : defaultBase;
             Vector2 knobPos = basePos + new Vector2(moveValue.x, -moveValue.y) * radius;
-            Vector2 firePos = new Vector2(Screen.width - 120f * scale, Screen.height - 140f * scale);
-            Vector2 grenadePos = new Vector2(Screen.width - 245f * scale, Screen.height - 245f * scale);
+            Vector2 firePos = new Vector2(Screen.width - 118f * scale, Screen.height - 142f * scale);
+            Vector2 meleePos = new Vector2(Screen.width - 235f * scale, Screen.height - 92f * scale);
+            Vector2 grenadePos = new Vector2(Screen.width - 235f * scale, Screen.height - 222f * scale);
+            Vector2 reloadPos = new Vector2(Screen.width - 115f * scale, Screen.height - 260f * scale);
 
-            DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.34f));
-            DrawCircle(knobPos, radius * 0.42f, new Color(1f, 1f, 1f, 0.72f));
+            DrawCircle(basePos, radius, new Color(0f, 0f, 0f, 0.42f));
+            DrawCircle(knobPos, radius * 0.42f, new Color(0.92f, 0.95f, 0.98f, 0.78f));
 
-            DrawCircle(firePos, radius * 0.72f, new Color(0.65f, 0.12f, 0.08f, firePointerId >= 0 ? 0.50f : 0.28f));
-            DrawCircle(firePos, radius * 0.38f, new Color(1f, 1f, 1f, 0.60f));
+            DrawCircle(firePos, radius * 0.72f, new Color(0.72f, 0.12f, 0.08f, firePointerId >= 0 ? 0.62f : 0.42f));
+            DrawCircle(firePos, radius * 0.38f, new Color(1f, 0.92f, 0.72f, 0.72f));
 
-            DrawCircle(grenadePos, radius * 0.56f, new Color(0.32f, 0.24f, 0.10f, grenadePointerId >= 0 ? 0.55f : 0.32f));
+            DrawCircle(meleePos, radius * 0.54f, new Color(0.16f, 0.18f, 0.22f, meleePointerId >= 0 ? 0.72f : 0.52f));
+            DrawCircle(grenadePos, radius * 0.56f, new Color(0.18f, 0.40f, 0.16f, grenadePointerId >= 0 ? 0.68f : 0.48f));
+            DrawCircle(reloadPos, radius * 0.50f, new Color(0.16f, 0.22f, 0.32f, reloadPointerId >= 0 ? 0.72f : 0.48f));
             if (buttonTextStyle == null)
             {
                 buttonTextStyle = new GUIStyle(GUI.skin.label)
@@ -329,7 +375,9 @@ namespace PersiaWar.Unity2D5D
             buttonTextStyle.fontSize = Mathf.RoundToInt(20f * scale);
 
             GUI.Label(new Rect(grenadePos.x - radius * 0.5f, grenadePos.y - radius * 0.5f, radius, radius), "G", buttonTextStyle);
-            GUI.Label(new Rect(firePos.x - radius, firePos.y + radius * 0.52f, radius * 2f, 26f * scale), "AIM / FIRE", buttonTextStyle);
+            GUI.Label(new Rect(meleePos.x - radius * 0.5f, meleePos.y - radius * 0.5f, radius, radius), "FIST", buttonTextStyle);
+            GUI.Label(new Rect(reloadPos.x - radius * 0.5f, reloadPos.y - radius * 0.5f, radius, radius), "R", buttonTextStyle);
+            GUI.Label(new Rect(firePos.x - radius, firePos.y + radius * 0.52f, radius * 2f, 26f * scale), "FIRE", buttonTextStyle);
             GUI.Label(new Rect(basePos.x - radius, basePos.y + radius * 0.52f, radius * 2f, 26f * scale), "MOVE", buttonTextStyle);
 
             DrawAimGuide(scale);
