@@ -43,11 +43,10 @@ namespace PersiaWar.Unity2D5D
         public void EnableMinimap()
         {
 #if UNITY_ANDROID
-            // The Android match path must not allocate a second camera/render target.
-            // Keep the minimap disabled on this device profile until a dedicated,
-            // device-tested minimap path exists.
-            minimapEnabled = false;
-            StartupCheckpoint.Set("MinimapDisabledAndroid");
+            // Create the minimap only after the main gameplay camera is stable.
+            // PrototypeFlow calls this after the Android safe-frame window.
+            minimapEnabled = true;
+            StartupCheckpoint.Set("MinimapEnabledAndroid");
 #else
             minimapEnabled = true;
 #endif
@@ -287,13 +286,9 @@ namespace PersiaWar.Unity2D5D
 
         private void UpdateMinimap()
         {
-#if UNITY_ANDROID
-            return;
-#else
             if (minimapCamera == null || player == null) return;
             minimapCamera.transform.position = player.transform.position + Vector3.up * 120f;
             minimapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-#endif
         }
 
         private void OnGUI()
@@ -301,17 +296,6 @@ namespace PersiaWar.Unity2D5D
             if (!Application.isMobilePlatform && !Application.isEditor) return;
 #if UNITY_ANDROID
             if (!androidExecutionArmed) return;
-#endif
-
-#if UNITY_ANDROID
-            // Android stability path: avoid Texture2D creation, GUI.skin access and
-            // custom texture drawing during the first activation of mobile input.
-            // Touch handling remains in Update(); this is presentation-only.
-            float androidScale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-            DrawAndroidControl(new Rect(22f, Screen.height - 106f * androidScale, 170f * androidScale, 68f * androidScale), "MOVE", new Color(0.12f, 0.18f, 0.22f, 0.78f));
-            DrawAndroidControl(new Rect(Screen.width - 192f * androidScale, Screen.height - 106f * androidScale, 170f * androidScale, 68f * androidScale), "AIM / FIRE", new Color(0.38f, 0.12f, 0.08f, 0.82f));
-            DrawAndroidControl(new Rect(Screen.width - 292f * androidScale, Screen.height - 194f * androidScale, 92f * androidScale, 62f * androidScale), "G", new Color(0.25f, 0.20f, 0.08f, 0.82f));
-            return;
 #endif
 
             if (circleTexture == null || lineTexture == null)
