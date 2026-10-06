@@ -40,15 +40,6 @@ namespace PersiaWar.Unity2D5D
         private bool matchActive;
         private bool matchPaused;
 
-#if UNITY_ANDROID
-        private static bool androidExecutionArmed;
-
-        public static void SetAndroidExecutionArmed(bool armed)
-        {
-            androidExecutionArmed = armed;
-        }
-#endif
-
         public Vector2 MoveValue => moveValue;
         public bool IsMovementTouchActive => movePointerId >= 0;
         public bool IsMatchActive => matchActive && !matchPaused;
@@ -110,16 +101,12 @@ namespace PersiaWar.Unity2D5D
             if (moveRadius > 0f)
                 joystickRadius = Mathf.Clamp(moveRadius * 0.87f, 92f, 152f);
 
-#if UNITY_ANDROID
-            androidExecutionArmed = false;
-#else
-            if (player == null)
+if (player == null)
                 player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null)
                 gameplayCamera = Camera.main;
             if (player != null)
                 grenadeController = player.Grenades;
-#endif
         }
 
         private void OnDestroy()
@@ -142,11 +129,7 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-#if UNITY_ANDROID
-            if (!androidExecutionArmed)
-                return;
-#endif
-            if (!matchActive || matchPaused)
+if (!matchActive || matchPaused)
                 return;
 
             if (player == null)
@@ -539,10 +522,8 @@ namespace PersiaWar.Unity2D5D
             if (!Application.isMobilePlatform && !Application.isEditor)
                 return;
 
-#if UNITY_ANDROID
-            if (!androidExecutionArmed || !matchActive || matchPaused)
+if (!matchActive || matchPaused)
                 return;
-#endif
 
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
