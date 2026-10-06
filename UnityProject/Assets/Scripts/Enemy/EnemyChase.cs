@@ -154,8 +154,38 @@ namespace PersiaWar.Unity2D5D
             if (distance <= 0.01f)
                 return true;
 
-            if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
+            // Ignore this enemy's own collider and projectile colliders. A ray that
+            // starts inside the enemy capsule must never make the enemy think the
+            // player is behind a wall.
+            RaycastHit[] hits = Physics.RaycastAll(
+                origin,
+                direction.normalized,
+                distance,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
+            if (hits == null || hits.Length == 0)
+                return true;
+
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider == null)
+                    continue;
+
+                Transform hitTransform = hit.collider.transform;
+
+                if (hitTransform == transform || hitTransform.IsChildOf(transform))
+                    continue;
+
+                if (hit.collider.GetComponentInParent<EnemyChase>() != null ||
+                    hit.collider.GetComponentInParent<EnemyProjectile>() != null ||
+                    hit.collider.GetComponentInParent<Projectile>() != null)
+                    continue;
+
                 return hit.collider.GetComponentInParent<PlayerController>() == player;
+            }
 
             return false;
         }
