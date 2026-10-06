@@ -73,7 +73,9 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            Input.simulateMouseWithTouches = true;
+            // Android touches are handled exclusively by HandleAndroidTouches().
+            // Do not synthesize a second mouse stream into OnGUI: that can consume
+            // the first finger and make the fire button require releasing movement.
 #endif
             enabled = true;
         }
@@ -563,7 +565,9 @@ if (!matchActive || matchPaused)
             if (!matchActive || matchPaused)
                 return;
 
+#if UNITY_EDITOR || UNITY_STANDALONE
             HandleGuiPointerFallback();
+#endif
 
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
