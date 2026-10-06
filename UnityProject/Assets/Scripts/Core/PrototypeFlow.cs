@@ -24,9 +24,9 @@ namespace PersiaWar.Unity2D5D
         private CameraFollow25D followCamera;
         private Camera activeCamera;
         private Camera androidRuntimeCamera;
-        private const float AndroidCameraPitch = 52f;
+        private const float AndroidCameraPitch = 37f; // 15 degrees lower
         private const float AndroidCameraYaw = 32f;
-        private const float AndroidCameraDistance = 15.84f; // 20% wider view, same pitch/yaw
+        private const float AndroidCameraDistance = 16.63f; // 5% farther than the previous 20% wider view
         private const float AndroidCameraLookHeight = 0.90f;
         private MobileMovementJoystick mobileMovementJoystick;
         private AndroidMinimapOverlay androidMinimap;
