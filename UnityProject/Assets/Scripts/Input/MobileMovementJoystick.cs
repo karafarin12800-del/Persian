@@ -16,11 +16,30 @@ namespace PersiaWar.Unity2D5D
         private Vector2 value;
 
         private bool matchActive;
+        private bool matchPaused;
         private Camera movementCamera;
 
         public void Configure(PlayerController target)
         {
             player = target;
+        }
+
+        public void SetMovementCamera(Camera camera)
+        {
+            movementCamera = camera;
+        }
+
+        public void SetPaused(bool paused)
+        {
+            if (paused)
+            {
+                pointerId = -1;
+                value = Vector2.zero;
+                if (player != null)
+                    player.SetMoveInput(Vector2.zero);
+            }
+
+            matchPaused = paused;
         }
 
         public void ActivateForMatch(PlayerController target)
@@ -50,7 +69,7 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            if (!matchActive || player == null)
+            if (!matchActive || matchPaused || player == null)
                 return;
 
             if (!Application.isMobilePlatform)
