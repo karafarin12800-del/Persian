@@ -73,10 +73,7 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Android uses the real Touch path below. Do not synthesize IMGUI mouse
-            // events here, because they can immediately clear the floating-stick
-            // pointer and make the stick appear invisible while movement still works.
-            Input.simulateMouseWithTouches = false;
+            Input.simulateMouseWithTouches = true;
 #endif
             enabled = true;
         }
@@ -566,9 +563,7 @@ if (!matchActive || matchPaused)
             if (!matchActive || matchPaused)
                 return;
 
-#if UNITY_EDITOR || UNITY_STANDALONE
             HandleGuiPointerFallback();
-#endif
 
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
@@ -594,32 +589,32 @@ if (!matchActive || matchPaused)
                 Vector2 knobPos = basePos +
                     new Vector2(moveValue.x, -moveValue.y) * radius;
 
-                // High-contrast floating control. The outer ring and knob are
-                // intentionally opaque enough to remain visible over the map.
+                // Stronger layered visuals make the floating control readable
+                // even over bright city terrain.
                 DrawCircle(
                     basePos,
-                    radius * 1.10f,
-                    new Color(0f, 0f, 0f, 0.78f));
+                    radius * 1.06f,
+                    new Color(0f, 0f, 0f, 0.62f));
 
                 DrawCircle(
                     basePos,
-                    radius * 0.98f,
-                    new Color(0.95f, 0.72f, 0.20f, 0.72f));
+                    radius,
+                    new Color(0.95f, 0.72f, 0.20f, 0.42f));
 
                 DrawCircle(
                     basePos,
-                    radius * 0.82f,
-                    new Color(0.04f, 0.05f, 0.07f, 0.62f));
+                    radius * 0.92f,
+                    new Color(0.05f, 0.07f, 0.10f, 0.38f));
 
                 DrawCircle(
                     knobPos,
-                    radius * 0.46f,
-                    new Color(1f, 1f, 1f, 1f));
+                    radius * 0.43f,
+                    new Color(0.98f, 0.98f, 1f, 0.96f));
 
                 DrawCircle(
                     knobPos,
-                    radius * 0.31f,
-                    new Color(0.95f, 0.72f, 0.20f, 1f));
+                    radius * 0.29f,
+                    new Color(0.95f, 0.72f, 0.20f, 0.78f));
 
                 if (buttonTextStyle == null)
                 {
