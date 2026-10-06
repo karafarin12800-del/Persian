@@ -73,6 +73,7 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
+            Input.simulateMouseWithTouches = true;
 #endif
             enabled = true;
         }
@@ -557,8 +558,10 @@ if (!matchActive || matchPaused)
             if (!Application.isMobilePlatform && !Application.isEditor)
                 return;
 
-if (!matchActive || matchPaused)
+            if (!matchActive || matchPaused)
                 return;
+
+            HandleGuiPointerFallback();
 
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
@@ -721,6 +724,114 @@ if (!matchActive || matchPaused)
                         24f),
                     "MAP",
                     buttonTextStyle);
+            }
+        }
+
+        private void HandleGuiPointerFallback()
+        {
+            Event e = Event.current;
+            if (e == null)
+                return;
+
+            if (e.type != EventType.MouseDown &&
+                e.type != EventType.MouseDrag &&
+                e.type != EventType.MouseUp)
+            {
+                return;
+            }
+
+            Vector2 gui = e.mousePosition;
+            float scale = GetUiScale();
+            float radius = joystickRadius * scale * controlScale;
+
+            GetActionCenters(
+                scale,
+                out Vector2 firePos,
+                out Vector2 meleePos,
+                out Vector2 grenadePos,
+                out Vector2 reloadPos);
+
+            if (e.type == EventType.MouseDown)
+            {
+                if (firePointerId < 0 && Vector2.Distance(gui, firePos) <= radius * 0.86f)
+                {
+                    firePointerId = -1001;
+                    FireAtNearestTarget();
+                    e.Use();
+                    return;
+                }
+
+                if (meleePointerId < 0 && Vector2.Distance(gui, meleePos) <= radius * 0.76f)
+                {
+                    meleePointerId = -1002;
+                    player.Weapon?.TryMelee();
+                    e.Use();
+                    return;
+                }
+
+                if (grenadePointerId < 0 && Vector2.Distance(gui, grenadePos) <= radius * 0.76f)
+                {
+                    grenadePointerId = -1003;
+                    ThrowGrenadeAtTarget();
+                    e.Use();
+                    return;
+                }
+
+                if (reloadPointerId < 0 && Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
+                {
+                    reloadPointerId = -1004;
+                    player.Weapon?.Reload();
+                    e.Use();
+                    return;
+                }
+
+                if (gui.x <= Screen.width * 0.58f &&
+                    gui.y >= Screen.height * 0.10f &&
+                    movePointerId < 0)
+                {
+                    movePointerId = -1000;
+                    moveStartScreen = ClampFloatingOrigin(
+                        new Vector2(gui.x, Screen.height - gui.y),
+                        radius);
+                    moveValue = Vector2.zero;
+                    e.Use();
+                    return;
+                }
+            }
+
+            if (e.type == EventType.MouseDrag && movePointerId == -1000)
+            {
+                Vector2 current = new Vector2(
+                    gui.x,
+                    Screen.height - gui.y);
+                Vector2 delta = current - moveStartScreen;
+                moveValue = Vector2.ClampMagnitude(delta / Mathf.Max(1f, radius), 1f);
+                player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                e.Use();
+                return;
+            }
+
+            if (e.type == EventType.MouseDrag && firePointerId == -1001)
+            {
+                if (Time.time >= nextFireTime)
+                    FireAtNearestTarget();
+                e.Use();
+                return;
+            }
+
+            if (e.type == EventType.MouseUp)
+            {
+                if (movePointerId == -1000)
+                    ResetMovementPointer();
+                if (firePointerId == -1001)
+                    firePointerId = -1;
+                if (meleePointerId == -1002)
+                    meleePointerId = -1;
+                if (grenadePointerId == -1003)
+                    grenadePointerId = -1;
+                if (reloadPointerId == -1004)
+                    reloadPointerId = -1;
+                e.Use();
             }
         }
 
