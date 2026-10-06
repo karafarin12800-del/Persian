@@ -374,7 +374,12 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(-21f, 0f, -21f), new Vector3(21f, 0f, -21f),
                 new Vector3(-21f, 0f, 21f),  new Vector3(21f, 0f, 21f),
                 new Vector3(-10f, 0f, -34f),  new Vector3(10f, 0f, 34f),
-                new Vector3(-34f, 0f, 10f),   new Vector3(34f, 0f, -10f)
+                new Vector3(-34f, 0f, 10f),   new Vector3(34f, 0f, -10f),
+
+                // Near-center landmarks keep the playable view from opening onto
+                // a large empty green floor around the spawn area.
+                new Vector3(-15f, 0f, -14f), new Vector3(15f, 0f, -14f),
+                new Vector3(-15f, 0f, 14f),  new Vector3(15f, 0f, 14f)
             };
 
             for (int i = 0; i < buildingPoints.Length; i++)
