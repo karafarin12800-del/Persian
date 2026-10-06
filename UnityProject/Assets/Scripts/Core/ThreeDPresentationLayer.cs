@@ -44,10 +44,10 @@ namespace PersiaWar.Unity2D5D
         private static void ConfigureWorldLighting()
         {
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.52f, 0.73f, 0.90f);
-            RenderSettings.ambientEquatorColor = new Color(0.48f, 0.67f, 0.38f);
-            RenderSettings.ambientGroundColor = new Color(0.22f, 0.29f, 0.17f);
-            RenderSettings.reflectionIntensity = 0.42f;
+            RenderSettings.ambientSkyColor = new Color(0.68f, 0.82f, 0.96f);
+            RenderSettings.ambientEquatorColor = new Color(0.64f, 0.78f, 0.48f);
+            RenderSettings.ambientGroundColor = new Color(0.34f, 0.42f, 0.25f);
+            RenderSettings.reflectionIntensity = 0.60f;
 
             RenderSettings.fog = false;
 
@@ -60,8 +60,8 @@ namespace PersiaWar.Unity2D5D
             }
 
             sun.type = LightType.Directional;
-            sun.intensity = 1.35f;
-            sun.color = new Color(1f, 0.96f, 0.84f);
+            sun.intensity = 1.65f;
+            sun.color = new Color(1f, 0.98f, 0.90f);
 
 #if UNITY_ANDROID
             sun.shadows = LightShadows.None;
@@ -93,7 +93,7 @@ namespace PersiaWar.Unity2D5D
 #endif
             camera.depthTextureMode = DepthTextureMode.None;
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.30f, 0.56f, 0.78f, 1f);
+            camera.backgroundColor = new Color(0.48f, 0.72f, 0.90f, 1f);
         }
 
         private static void UpgradeSceneRenderers()
