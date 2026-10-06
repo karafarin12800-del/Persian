@@ -27,6 +27,8 @@ namespace PersiaWar.Unity2D5D
         {
             player = target;
             movementCamera = Camera.main;
+            if (movementCamera == null)
+                movementCamera = FindFirstObjectByType<Camera>();
             pointerId = -1;
             start = Vector2.zero;
             value = Vector2.zero;
