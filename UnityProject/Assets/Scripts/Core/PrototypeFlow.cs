@@ -35,6 +35,7 @@ namespace PersiaWar.Unity2D5D
         private int selectedHero;
         private bool startingMatch;
         private bool matchInputArmed;
+        private bool matchPaused;
         private string startupStatus = string.Empty;
         private GameObject mainCameraRoot;
         private GameObject playerRoot;
@@ -168,6 +169,7 @@ namespace PersiaWar.Unity2D5D
             {
 #if UNITY_ANDROID
                 DrawAndroidPresentationHUD();
+                DrawAndroidPauseControl();
 
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                     DrawAndroidResultOverlay();
@@ -473,7 +475,59 @@ namespace PersiaWar.Unity2D5D
             if (!spawnChosen || startingMatch)
                 return;
 
+            matchPaused = false;
+            Time.timeScale = 1f;
             StartCoroutine(BeginMatchSafely());
+        }
+
+        private void DrawAndroidPauseControl()
+        {
+            EnsureUiInitialized();
+
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float size = 58f * scale;
+            Rect button = new Rect(
+                Screen.width * 0.5f - size * 0.5f,
+                14f * scale,
+                size,
+                size);
+
+            if (GUI.Button(button, matchPaused ? "▶" : "Ⅱ", buttonStyle))
+            {
+                matchPaused = !matchPaused;
+                Time.timeScale = matchPaused ? 0f : 1f;
+
+                if (mobileMovementJoystick != null)
+                    mobileMovementJoystick.SetPaused(matchPaused);
+            }
+
+            if (matchPaused)
+            {
+                Fill(new Rect(0f, 0f, Screen.width, Screen.height),
+                    new Color(0f, 0f, 0f, 0.28f));
+
+                float panelW = Mathf.Min(Screen.width - 64f, 420f);
+                float panelH = 170f;
+                Rect panel = new Rect(
+                    (Screen.width - panelW) * 0.5f,
+                    (Screen.height - panelH) * 0.5f,
+                    panelW,
+                    panelH);
+
+                Fill(panel, new Color(0.03f, 0.055f, 0.08f, 0.96f));
+                Fill(new Rect(panel.x, panel.y, panel.width, 5f),
+                    new Color(0.94f, 0.66f, 0.18f, 1f));
+
+                GUI.Label(
+                    new Rect(panel.x + 20f, panel.y + 24f, panel.width - 40f, 40f),
+                    "PAUSED",
+                    headerStyle);
+
+                GUI.Label(
+                    new Rect(panel.x + 20f, panel.y + 70f, panel.width - 40f, 28f),
+                    "Touch ▶ to resume",
+                    bodyStyle);
+            }
         }
 
         private IEnumerator BeginMatchSafely()
@@ -792,6 +846,8 @@ namespace PersiaWar.Unity2D5D
                     mobileMovementJoystick = mobileInput.gameObject.AddComponent<MobileMovementJoystick>();
 
                 mobileMovementJoystick.ActivateForMatch(player);
+                mobileMovementJoystick.SetMovementCamera(activeCamera);
+                mobileMovementJoystick.SetPaused(matchPaused);
             }
 
             if (mobileInput != null)
