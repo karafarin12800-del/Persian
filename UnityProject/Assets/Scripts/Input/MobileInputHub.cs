@@ -16,6 +16,8 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float fireRepeatInterval = 0.155f;
         [SerializeField] private Camera gameplayCamera;
         [SerializeField] private float moveRadius = 140f;
+        [SerializeField] private float controlScale = 1.12f;
+        [SerializeField] private float actionBottomMargin = 74f;
 
         private int movePointerId = -1;
         private int firePointerId = -1;
@@ -99,7 +101,7 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
             if (moveRadius > 0f)
-                joystickRadius = Mathf.Clamp(moveRadius * 0.87f, 92f, 152f);
+                joystickRadius = Mathf.Clamp(moveRadius * 0.98f, 108f, 164f);
 
 if (player == null)
                 player = FindFirstObjectByType<PlayerController>();
@@ -177,7 +179,7 @@ if (!matchActive || matchPaused)
         private void HandleAndroidTouches()
         {
             float scale = GetUiScale();
-            float radius = joystickRadius * scale;
+            float radius = joystickRadius * scale * controlScale;
 
             GetActionCenters(
                 scale,
@@ -186,10 +188,10 @@ if (!matchActive || matchPaused)
                 out Vector2 grenadeGui,
                 out Vector2 reloadGui);
 
-            float fireHit = radius * 0.88f;
-            float meleeHit = radius * 0.66f;
-            float grenadeHit = radius * 0.66f;
-            float reloadHit = radius * 0.64f;
+            float fireHit = radius * 0.86f;
+            float meleeHit = radius * 0.76f;
+            float grenadeHit = radius * 0.76f;
+            float reloadHit = radius * 0.72f;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -201,20 +203,8 @@ if (!matchActive || matchPaused)
                     touch.position.x,
                     Screen.height - touch.position.y);
 
-                // Left side is movement. The upper status/pause strip is excluded.
-                if (touch.position.x <= Screen.width * 0.58f &&
-                    gui.y >= Screen.height * 0.10f)
-                {
-                    if (movePointerId < 0)
-                    {
-                        movePointerId = touch.fingerId;
-                        moveStartScreen = touch.position;
-                        moveValue = Vector2.zero;
-                    }
-                    continue;
-                }
-
-                // Right-side actions use the same coordinates that are drawn below.
+                // Combat buttons get first priority so an oversized touch zone can
+                // never accidentally become a movement touch.
                 if (firePointerId < 0 &&
                     Vector2.Distance(gui, fireGui) <= fireHit)
                 {
@@ -244,6 +234,20 @@ if (!matchActive || matchPaused)
                 {
                     reloadPointerId = touch.fingerId;
                     player.Weapon?.Reload();
+                    continue;
+                }
+
+                // Everything else on the left side becomes the floating movement
+                // stick. The origin follows the player's first touch.
+                if (touch.position.x <= Screen.width * 0.58f &&
+                    gui.y >= Screen.height * 0.10f)
+                {
+                    if (movePointerId < 0)
+                    {
+                        movePointerId = touch.fingerId;
+                        moveStartScreen = ClampFloatingOrigin(touch.position, radius);
+                        moveValue = Vector2.zero;
+                    }
                 }
             }
 
@@ -406,21 +410,23 @@ if (!matchActive || matchPaused)
             out Vector2 grenade,
             out Vector2 reload)
         {
+            float bottom = actionBottomMargin * scale;
+
             fire = new Vector2(
-                Screen.width - 118f * scale,
-                Screen.height - 142f * scale);
+                Screen.width - 108f * scale,
+                Screen.height - bottom - 56f * scale);
 
             melee = new Vector2(
-                Screen.width - 235f * scale,
-                Screen.height - 92f * scale);
+                Screen.width - 244f * scale,
+                Screen.height - bottom - 20f * scale);
 
             grenade = new Vector2(
-                Screen.width - 235f * scale,
-                Screen.height - 222f * scale);
+                Screen.width - 244f * scale,
+                Screen.height - bottom - 164f * scale);
 
             reload = new Vector2(
-                Screen.width - 115f * scale,
-                Screen.height - 260f * scale);
+                Screen.width - 108f * scale,
+                Screen.height - bottom - 184f * scale);
         }
 
         private float GetUiScale()
@@ -429,6 +435,21 @@ if (!matchActive || matchPaused)
                 Mathf.Min(Screen.width, Screen.height) / 1080f,
                 0.75f,
                 1.35f);
+        }
+
+        private static Vector2 ClampFloatingOrigin(Vector2 touchPosition, float radius)
+        {
+            float margin = radius * 0.70f;
+
+            return new Vector2(
+                Mathf.Clamp(
+                    touchPosition.x,
+                    margin,
+                    Screen.width * 0.58f - margin),
+                Mathf.Clamp(
+                    touchPosition.y,
+                    margin,
+                    Screen.height - margin));
         }
 
         private void ResetMovementPointer()
@@ -529,7 +550,7 @@ if (!matchActive || matchPaused)
                 CreateGuiTextures();
 
             float scale = GetUiScale();
-            float radius = joystickRadius * scale;
+            float radius = joystickRadius * scale * controlScale;
 
             GetActionCenters(
                 scale,
@@ -538,59 +559,66 @@ if (!matchActive || matchPaused)
                 out Vector2 grenadePos,
                 out Vector2 reloadPos);
 
-            // The controller is visible at a resting location even before touch.
-            // When the user touches the movement side, this base immediately moves
-            // to the touch origin, preserving the floating-stick behavior.
-            Vector2 defaultBase = new Vector2(
-                118f * scale,
-                Screen.height - 142f * scale);
-
-            Vector2 basePos = movePointerId >= 0
-                ? new Vector2(
+            // True floating joystick: there is no fixed ring before the first
+            // movement touch. As soon as the player touches the left movement zone,
+            // the base is drawn around that touch origin.
+            if (movePointerId >= 0)
+            {
+                Vector2 basePos = new Vector2(
                     moveStartScreen.x,
-                    Screen.height - moveStartScreen.y)
-                : defaultBase;
+                    Screen.height - moveStartScreen.y);
 
-            Vector2 knobPos = basePos +
-                new Vector2(moveValue.x, -moveValue.y) * radius;
+                Vector2 knobPos = basePos +
+                    new Vector2(moveValue.x, -moveValue.y) * radius;
 
-            DrawCircle(
-                basePos,
-                radius,
-                new Color(0f, 0f, 0f, 0.38f));
+                DrawCircle(
+                    basePos,
+                    radius,
+                    new Color(0f, 0f, 0f, 0.38f));
 
-            DrawCircle(
-                basePos,
-                radius,
-                new Color(0.95f, 0.72f, 0.20f, 0.22f),
-                true);
+                DrawCircle(
+                    basePos,
+                    radius,
+                    new Color(0.95f, 0.72f, 0.20f, 0.28f),
+                    true);
 
-            DrawCircle(
-                knobPos,
-                radius * 0.40f,
-                new Color(0.95f, 0.98f, 1f, 0.84f));
+                DrawCircle(
+                    knobPos,
+                    radius * 0.40f,
+                    new Color(0.95f, 0.98f, 1f, 0.88f));
+
+                buttonTextStyle.fontSize = Mathf.RoundToInt(18f * scale);
+                GUI.Label(
+                    new Rect(
+                        basePos.x - radius,
+                        basePos.y + radius * 0.52f,
+                        radius * 2f,
+                        24f * scale),
+                    "MOVE",
+                    buttonTextStyle);
+            }
 
             DrawCircle(
                 firePos,
-                radius * 0.68f,
+                radius * 0.76f,
                 new Color(0.72f, 0.12f, 0.08f,
                     firePointerId >= 0 ? 0.70f : 0.48f));
 
             DrawCircle(
                 meleePos,
-                radius * 0.50f,
+                radius * 0.58f,
                 new Color(0.16f, 0.18f, 0.22f,
                     meleePointerId >= 0 ? 0.78f : 0.56f));
 
             DrawCircle(
                 grenadePos,
-                radius * 0.50f,
+                radius * 0.58f,
                 new Color(0.18f, 0.40f, 0.16f,
                     grenadePointerId >= 0 ? 0.72f : 0.52f));
 
             DrawCircle(
                 reloadPos,
-                radius * 0.48f,
+                radius * 0.56f,
                 new Color(0.16f, 0.22f, 0.32f,
                     reloadPointerId >= 0 ? 0.76f : 0.54f));
 
@@ -604,7 +632,7 @@ if (!matchActive || matchPaused)
             }
 
             buttonTextStyle.fontSize =
-                Mathf.RoundToInt(19f * scale);
+                Mathf.RoundToInt(21f * scale);
 
             GUI.Label(
                 new Rect(
@@ -640,15 +668,6 @@ if (!matchActive || matchPaused)
                     radius * 1.10f,
                     radius * 0.80f),
                 "R",
-                buttonTextStyle);
-
-            GUI.Label(
-                new Rect(
-                    basePos.x - radius,
-                    basePos.y + radius * 0.54f,
-                    radius * 2f,
-                    24f * scale),
-                "MOVE",
                 buttonTextStyle);
 
             DrawAimGuide(scale);
