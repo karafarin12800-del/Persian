@@ -24,10 +24,11 @@ namespace PersiaWar.Unity2D5D
         private CameraFollow25D followCamera;
         private Camera activeCamera;
         private Camera androidRuntimeCamera;
-        private const float AndroidCameraPitch = 37f; // 15 degrees lower
+        private const float AndroidCameraPitch = 37f;
         private const float AndroidCameraYaw = 32f;
-        private const float AndroidCameraDistance = 16.63f; // 5% farther than the previous 20% wider view
+        private const float AndroidCameraDistance = 16.63f;
         private const float AndroidCameraLookHeight = 0.90f;
+        private const float AndroidCameraLookAhead = 4.5f;
         private AndroidMinimapOverlay androidMinimap;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
@@ -740,7 +741,10 @@ namespace PersiaWar.Unity2D5D
                 desired,
                 1f - Mathf.Exp(-12f * Time.deltaTime));
 
-            Vector3 lookTarget = player.transform.position + Vector3.up * AndroidCameraLookHeight;
+            Vector3 cameraForward = Quaternion.Euler(0f, AndroidCameraYaw, 0f) * Vector3.forward;
+            Vector3 lookTarget = player.transform.position
+                + cameraForward * AndroidCameraLookAhead
+                + Vector3.up * AndroidCameraLookHeight;
             Vector3 direction = lookTarget - androidRuntimeCamera.transform.position;
             if (direction.sqrMagnitude > 0.001f)
                 androidRuntimeCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
@@ -869,11 +873,34 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("AndroidHudStable120Frames");
 
-            // DIAGNOSTIC STOP: the previous run crashed immediately after
-            // AndroidHudStable120Frames. Do not enable minimap or enemies yet.
-            // This isolates HUD-only stability from the next native-risk subsystem.
-            StartupCheckpoint.Set("AndroidHudOnlyStop");
-            startupStatus = "HUD ONLY STABLE — MINIMAP AND ENEMIES DISABLED";
+            StartupCheckpoint.Set("AndroidHudStable120Frames");
+
+            // Production Android path: the core, camera, touch input and HUD have
+            // each survived a clean 120-frame window. Keep the lightweight schematic
+            // minimap in PrototypeFlow (no extra RenderTexture camera), then release
+            // the existing enemy service in a delayed, bounded configuration.
+            StartupCheckpoint.Set("AndroidGameplayServicesActivationStarted");
+            startupStatus = "GAMEPLAY STABLE — preparing city activity";
+
+            if (enemySpawner == null)
+                enemySpawner = gameRoot != null
+                    ? gameRoot.GetComponentInChildren<EnemySpawner>(true)
+                    : FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
+
+            yield return new WaitForSecondsRealtime(0.75f);
+
+            if (enemySpawner != null && player != null)
+            {
+                enemySpawner.Configure(player.transform, 4, 44f, 0f);
+                enemySpawner.enabled = true;
+                StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
+            }
+
+            // Do not create the secondary minimap RenderTexture on Android. The
+            // presentation minimap above is intentionally GPU-light and stable.
+            StartupCheckpoint.Set("AndroidGameplayServicesReady");
+            startupStatus = "MATCH READY";
+            matchInputArmed = true;
             yield break;
 #else
             yield return null;
