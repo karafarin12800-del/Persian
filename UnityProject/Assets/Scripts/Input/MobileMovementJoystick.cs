@@ -119,19 +119,19 @@ namespace PersiaWar.Unity2D5D
             {
                 for (int i = 0; i < Input.touchCount; i++)
                 {
-                    Touch touch = Input.GetTouch(i);
-                    if (touch.phase != TouchPhase.Began)
+                    Touch beganTouch = Input.GetTouch(i);
+                    if (beganTouch.phase != TouchPhase.Began)
                         continue;
 
-                    if (touch.position.x > Screen.width * 0.58f)
+                    if (beganTouch.position.x > Screen.width * 0.58f)
                         continue;
 
                     // Keep the top HUD/pause area free from movement capture.
-                    if (touch.position.y > Screen.height * 0.90f)
+                    if (beganTouch.position.y > Screen.height * 0.90f)
                         continue;
 
-                    pointerId = touch.fingerId;
-                    start = ClampFloatingOrigin(touch.position);
+                    pointerId = beganTouch.fingerId;
+                    start = ClampFloatingOrigin(beganTouch.position);
                     value = Vector2.zero;
                     break;
                 }
