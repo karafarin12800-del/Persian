@@ -73,9 +73,7 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Android touches are handled exclusively by HandleAndroidTouches().
-            // Do not synthesize a second mouse stream into OnGUI: that can consume
-            // the first finger and make the fire button require releasing movement.
+            Input.simulateMouseWithTouches = true;
 #endif
             enabled = true;
         }
@@ -565,9 +563,7 @@ if (!matchActive || matchPaused)
             if (!matchActive || matchPaused)
                 return;
 
-#if UNITY_EDITOR || UNITY_STANDALONE
             HandleGuiPointerFallback();
-#endif
 
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
@@ -643,26 +639,16 @@ if (!matchActive || matchPaused)
             }
             else
             {
-                // Always show a clear movement control at rest. This is visual only;
-                // the actual touch ownership and finger-id logic remains unchanged.
+                // No fixed joystick is shown; only a subtle hint marks the
+                // left movement area until the player touches it.
                 Vector2 hint = new Vector2(
                     92f * scale,
-                    Screen.height - 92f * scale);
+                    Screen.height - 88f * scale);
 
                 DrawCircle(
                     hint,
-                    radius * 0.72f,
-                    new Color(0.05f, 0.08f, 0.10f, 0.34f));
-
-                DrawCircle(
-                    hint,
-                    radius * 0.58f,
-                    new Color(0.12f, 0.18f, 0.20f, 0.42f));
-
-                DrawCircle(
-                    hint,
-                    radius * 0.19f,
-                    new Color(0.82f, 0.72f, 0.36f, 0.72f));
+                    radius * 0.46f,
+                    new Color(0f, 0f, 0f, 0.16f));
 
                 buttonTextStyle ??= new GUIStyle(GUI.skin.label)
                 {
@@ -670,14 +656,14 @@ if (!matchActive || matchPaused)
                     alignment = TextAnchor.MiddleCenter
                 };
 
-                buttonTextStyle.fontSize = Mathf.RoundToInt(14f * scale);
-                buttonTextStyle.normal.textColor = new Color(1f, 1f, 1f, 0.86f);
+                buttonTextStyle.fontSize = Mathf.RoundToInt(13f * scale);
+                buttonTextStyle.normal.textColor = new Color(1f, 1f, 1f, 0.58f);
 
                 GUI.Label(
                     new Rect(
-                        hint.x - radius * 0.75f,
+                        hint.x - radius,
                         hint.y - 12f * scale,
-                        radius * 1.5f,
+                        radius * 2f,
                         24f * scale),
                     "MOVE",
                     buttonTextStyle);
