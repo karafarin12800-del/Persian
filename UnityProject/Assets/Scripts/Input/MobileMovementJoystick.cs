@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
         private Vector2 value;
 
         private bool matchActive;
+        private Camera movementCamera;
 
         public void Configure(PlayerController target)
         {
@@ -25,6 +26,7 @@ namespace PersiaWar.Unity2D5D
         public void ActivateForMatch(PlayerController target)
         {
             player = target;
+            movementCamera = Camera.main;
             pointerId = -1;
             start = Vector2.zero;
             value = Vector2.zero;
@@ -63,7 +65,7 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < Input.touchCount; i++)
                 {
                     Touch touch = Input.GetTouch(i);
-                    if (touch.phase != TouchPhase.Began || touch.position.x > Screen.width * 0.48f)
+                    if (touch.phase != TouchPhase.Began || touch.position.x > Screen.width * 0.52f)
                         continue;
 
                     pointerId = touch.fingerId;
@@ -85,7 +87,7 @@ namespace PersiaWar.Unity2D5D
                     found = true;
                     Vector2 delta = touch.position - start;
                     value = Vector2.ClampMagnitude(delta / Mathf.Max(1f, radius), 1f);
-                    player.SetMoveInput(value);
+                    player.SetMoveInput(ToWorldMove(value));
 
                     if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
                     {
@@ -103,6 +105,27 @@ namespace PersiaWar.Unity2D5D
                     player.SetMoveInput(Vector2.zero);
                 }
             }
+        }
+
+        private Vector2 ToWorldMove(Vector2 inputValue)
+        {
+            if (movementCamera == null)
+                movementCamera = Camera.main;
+
+            if (movementCamera == null)
+                return inputValue;
+
+            Vector3 forward = movementCamera.transform.forward;
+            Vector3 right = movementCamera.transform.right;
+            forward.y = 0f;
+            right.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f || right.sqrMagnitude < 0.0001f)
+                return inputValue;
+
+            forward.Normalize();
+            right.Normalize();
+            Vector3 world = right * inputValue.x + forward * inputValue.y;
+            return Vector2.ClampMagnitude(new Vector2(world.x, world.z), 1f);
         }
 
         private void OnGUI()
