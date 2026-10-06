@@ -41,6 +41,8 @@ namespace PersiaWar.Unity2D5D
         private float minimapReadyAt;
         private bool matchActive;
         private bool matchPaused;
+        private bool movementTouchCheckpointWritten;
+        private bool fireTouchCheckpointWritten;
 
         public Vector2 MoveValue => moveValue;
         public bool IsMovementTouchActive => movePointerId >= 0;
@@ -67,6 +69,8 @@ namespace PersiaWar.Unity2D5D
             matchActive = true;
             matchPaused = false;
             ResetAllPointers();
+            movementTouchCheckpointWritten = false;
+            fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
 #endif
@@ -209,6 +213,11 @@ if (!matchActive || matchPaused)
                     Vector2.Distance(gui, fireGui) <= fireHit)
                 {
                     firePointerId = touch.fingerId;
+                    if (!fireTouchCheckpointWritten)
+                    {
+                        fireTouchCheckpointWritten = true;
+                        StartupCheckpoint.Set("MobileFireTouchAccepted");
+                    }
                     FireAtNearestTarget();
                     continue;
                 }
@@ -247,6 +256,11 @@ if (!matchActive || matchPaused)
                         movePointerId = touch.fingerId;
                         moveStartScreen = ClampFloatingOrigin(touch.position, radius);
                         moveValue = Vector2.zero;
+                        if (!movementTouchCheckpointWritten)
+                        {
+                            movementTouchCheckpointWritten = true;
+                            StartupCheckpoint.Set("MobileMoveTouchAccepted");
+                        }
                     }
                 }
             }
@@ -417,11 +431,11 @@ if (!matchActive || matchPaused)
                 Screen.height - bottom - 56f * scale);
 
             melee = new Vector2(
-                Screen.width - 244f * scale,
+                Screen.width - 292f * scale,
                 Screen.height - bottom - 20f * scale);
 
             grenade = new Vector2(
-                Screen.width - 244f * scale,
+                Screen.width - 292f * scale,
                 Screen.height - bottom - 164f * scale);
 
             reload = new Vector2(
@@ -633,6 +647,7 @@ if (!matchActive || matchPaused)
 
             buttonTextStyle.fontSize =
                 Mathf.RoundToInt(21f * scale);
+            buttonTextStyle.normal.textColor = Color.white;
 
             GUI.Label(
                 new Rect(
