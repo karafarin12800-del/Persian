@@ -842,7 +842,6 @@ namespace PersiaWar.Unity2D5D
             if (mobileInput != null)
             {
                 mobileInput.ActivateForMatch(player, activeCamera);
-                MobileInputHub.SetAndroidExecutionArmed(true);
                 mobileInput.enabled = true;
             }
 
