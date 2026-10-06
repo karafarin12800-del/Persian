@@ -427,21 +427,23 @@ if (!matchActive || matchPaused)
         {
             float bottom = actionBottomMargin * scale;
 
+            // Keep combat buttons clearly separated so their touch zones
+            // and visuals cannot feel like one combined control cluster.
             fire = new Vector2(
-                Screen.width - 108f * scale,
-                Screen.height - bottom - 56f * scale);
+                Screen.width - 104f * scale,
+                Screen.height - bottom - 58f * scale);
 
             melee = new Vector2(
-                Screen.width - 292f * scale,
-                Screen.height - bottom - 20f * scale);
+                Screen.width - 342f * scale,
+                Screen.height - bottom - 18f * scale);
 
             grenade = new Vector2(
-                Screen.width - 292f * scale,
-                Screen.height - bottom - 164f * scale);
+                Screen.width - 342f * scale,
+                Screen.height - bottom - 182f * scale);
 
             reload = new Vector2(
-                Screen.width - 108f * scale,
-                Screen.height - bottom - 184f * scale);
+                Screen.width - 104f * scale,
+                Screen.height - bottom - 210f * scale);
         }
 
         private float GetUiScale()
@@ -576,9 +578,8 @@ if (!matchActive || matchPaused)
                 out Vector2 grenadePos,
                 out Vector2 reloadPos);
 
-            // True floating joystick: there is no fixed ring before the first
-            // movement touch. As soon as the player touches the left movement zone,
-            // the base is drawn around that touch origin.
+            // Floating joystick: nothing is fixed on the screen. The control
+            // appears at the exact touch origin and remains visible while held.
             if (movePointerId >= 0)
             {
                 Vector2 basePos = new Vector2(
@@ -588,27 +589,80 @@ if (!matchActive || matchPaused)
                 Vector2 knobPos = basePos +
                     new Vector2(moveValue.x, -moveValue.y) * radius;
 
+                // Stronger layered visuals make the floating control readable
+                // even over bright city terrain.
                 DrawCircle(
                     basePos,
-                    radius,
-                    new Color(0f, 0f, 0f, 0.38f));
+                    radius * 1.06f,
+                    new Color(0f, 0f, 0f, 0.62f));
 
                 DrawCircle(
                     basePos,
                     radius,
-                    new Color(0.95f, 0.72f, 0.20f, 0.28f),
-                    true);
+                    new Color(0.95f, 0.72f, 0.20f, 0.42f));
+
+                DrawCircle(
+                    basePos,
+                    radius * 0.92f,
+                    new Color(0.05f, 0.07f, 0.10f, 0.38f));
 
                 DrawCircle(
                     knobPos,
-                    radius * 0.40f,
-                    new Color(0.95f, 0.98f, 1f, 0.88f));
+                    radius * 0.43f,
+                    new Color(0.98f, 0.98f, 1f, 0.96f));
+
+                DrawCircle(
+                    knobPos,
+                    radius * 0.29f,
+                    new Color(0.95f, 0.72f, 0.20f, 0.78f));
+
+                if (buttonTextStyle == null)
+                {
+                    buttonTextStyle = new GUIStyle(GUI.skin.label)
+                    {
+                        fontStyle = FontStyle.Bold,
+                        alignment = TextAnchor.MiddleCenter
+                    };
+                }
 
                 buttonTextStyle.fontSize = Mathf.RoundToInt(18f * scale);
+                buttonTextStyle.normal.textColor = Color.white;
+
                 GUI.Label(
                     new Rect(
                         basePos.x - radius,
-                        basePos.y + radius * 0.52f,
+                        basePos.y + radius * 0.62f,
+                        radius * 2f,
+                        24f * scale),
+                    "MOVE",
+                    buttonTextStyle);
+            }
+            else
+            {
+                // No fixed joystick is shown; only a subtle hint marks the
+                // left movement area until the player touches it.
+                Vector2 hint = new Vector2(
+                    92f * scale,
+                    Screen.height - 88f * scale);
+
+                DrawCircle(
+                    hint,
+                    radius * 0.46f,
+                    new Color(0f, 0f, 0f, 0.16f));
+
+                buttonTextStyle ??= new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+
+                buttonTextStyle.fontSize = Mathf.RoundToInt(13f * scale);
+                buttonTextStyle.normal.textColor = new Color(1f, 1f, 1f, 0.58f);
+
+                GUI.Label(
+                    new Rect(
+                        hint.x - radius,
+                        hint.y - 12f * scale,
                         radius * 2f,
                         24f * scale),
                     "MOVE",
