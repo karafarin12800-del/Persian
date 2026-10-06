@@ -102,7 +102,9 @@ namespace PersiaWar.Unity2D5D
                 nextAttackTime = Time.time + meleeCooldown;
             }
 
-#if !UNITY_ANDROID
+            // Ranged combat is intentionally enabled on Android as well. The
+            // projectile uses the lightweight EnemyProjectile sweep path, so enemies
+            // can fight the player without introducing a second physics system.
             if (distance <= rangedRange && Time.time >= nextRangedTime)
             {
                 if (HasLineOfSightToPlayer(player))
@@ -111,7 +113,6 @@ namespace PersiaWar.Unity2D5D
                     nextRangedTime = Time.time + rangedCooldown;
                 }
             }
-#endif
         }
 
         private bool CanMoveTo(Vector3 position)
