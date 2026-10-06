@@ -417,10 +417,14 @@ namespace PersiaWar.Unity2D5D
             }
             StartupCheckpoint.Set("CITY_TREES_DONE");
 
+            // Keep a small number of landmarks so Android remains light, but give
+            // the camera more of the readable street-furniture language from the reference.
             Vector3[] plazaPillars =
             {
                 new Vector3(-7f, 0f, 7f), new Vector3(7f, 0f, 7f),
-                new Vector3(-7f, 0f, -7f), new Vector3(7f, 0f, -7f)
+                new Vector3(-7f, 0f, -7f), new Vector3(7f, 0f, -7f),
+                new Vector3(-36f, 0f, -10f), new Vector3(36f, 0f, 10f),
+                new Vector3(-60f, 0f, 48f), new Vector3(60f, 0f, -48f)
             };
 
             StartupCheckpoint.Set("CITY_LAMPS_START");
@@ -623,13 +627,15 @@ namespace PersiaWar.Unity2D5D
         {
             float bodyHeight = Mathf.Max(4.5f, height);
 
+            // Brighter, clean stylized-realism palette inspired by the free city
+            // reference, while staying fully procedural and Android-light.
             Color[] palette =
             {
-                new Color(0.56f, 0.50f, 0.42f),
-                new Color(0.68f, 0.58f, 0.43f),
-                new Color(0.34f, 0.43f, 0.50f),
-                new Color(0.53f, 0.49f, 0.44f),
-                new Color(0.40f, 0.49f, 0.38f)
+                new Color(0.76f, 0.67f, 0.54f),
+                new Color(0.67f, 0.73f, 0.75f),
+                new Color(0.80f, 0.71f, 0.57f),
+                new Color(0.58f, 0.66f, 0.68f),
+                new Color(0.63f, 0.70f, 0.58f)
             };
             int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
             Material facade = MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
