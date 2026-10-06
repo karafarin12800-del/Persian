@@ -167,6 +167,8 @@ namespace PersiaWar.Unity2D5D
             if (mode == ScreenMode.Match)
             {
 #if UNITY_ANDROID
+                DrawAndroidPresentationHUD();
+
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                     DrawAndroidResultOverlay();
 #endif
@@ -200,6 +202,61 @@ namespace PersiaWar.Unity2D5D
             }
             else
                 DrawDropMap();
+        }
+
+        private void DrawAndroidPresentationHUD()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float margin = 14f * scale;
+
+            // Bright, readable top status strip inspired by the requested mobile
+            // battle-royale presentation, without adding another runtime camera.
+            float leftW = 300f * scale;
+            Rect left = new Rect(margin, margin, leftW, 58f * scale);
+            Fill(left, new Color(0.03f, 0.06f, 0.08f, 0.82f));
+            Fill(new Rect(left.x, left.y, 58f * scale, left.height), new Color(0.94f, 0.62f, 0.18f, 1f));
+            GUI.Label(new Rect(left.x + 9f * scale, left.y + 7f * scale, 40f * scale, 40f * scale),
+                "P", headerStyle);
+            GUI.Label(new Rect(left.x + 68f * scale, left.y + 6f * scale, left.width - 78f * scale, 22f * scale),
+                "PERSIA WAR", headerStyle);
+            GUI.Label(new Rect(left.x + 68f * scale, left.y + 31f * scale, left.width - 78f * scale, 20f * scale),
+                "CITY • LEVEL 1", smallStyle);
+
+            float rightW = 250f * scale;
+            Rect right = new Rect(Screen.width - rightW - margin, margin, rightW, 58f * scale);
+            Fill(right, new Color(0.03f, 0.06f, 0.08f, 0.82f));
+            GUI.Label(new Rect(right.x + 12f * scale, right.y + 6f * scale, right.width - 24f * scale, 22f * scale),
+                "SURVIVORS", smallStyle);
+            GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
+                "32", headerStyle);
+
+            // Lightweight schematic minimap: no extra camera/render texture, so it
+            // does not reopen the native-risk path that was isolated earlier.
+            float mapSize = Mathf.Clamp(148f * scale, 112f, 190f);
+            Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
+            Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.92f));
+            Fill(new Rect(map.x + map.width * 0.42f, map.y, map.width * 0.16f, map.height), new Color(0.18f, 0.20f, 0.18f, 0.95f));
+            Fill(new Rect(map.x, map.y + map.height * 0.42f, map.width, map.height * 0.16f), new Color(0.18f, 0.20f, 0.18f, 0.95f));
+
+            for (int i = 0; i < 5; i++)
+            {
+                float x = map.x + (0.08f + i * 0.20f) * map.width;
+                float z = map.y + (0.12f + (i % 3) * 0.28f) * map.height;
+                Fill(new Rect(x, z, map.width * 0.12f, map.height * 0.10f),
+                    new Color(0.70f, 0.48f, 0.22f, 0.95f));
+            }
+
+            Vector2 playerPoint = new Vector2(map.center.x, map.center.y);
+            if (player != null)
+            {
+                float half = 110f;
+                Vector3 pos = player.transform.position;
+                playerPoint.x = map.x + Mathf.InverseLerp(-half, half, pos.x) * map.width;
+                playerPoint.y = map.y + Mathf.InverseLerp(half, -half, pos.z) * map.height;
+            }
+            DrawCircle(playerPoint, 7f * scale, new Color(0.95f, 0.86f, 0.20f, 1f));
+            GUI.Label(new Rect(map.x + 7f * scale, map.y + 5f * scale, 70f * scale, 22f * scale),
+                "MAP", smallStyle);
         }
 
         private void DrawPreviousRunDiagnostic()
