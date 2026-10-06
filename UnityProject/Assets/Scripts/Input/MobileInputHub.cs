@@ -122,6 +122,24 @@ namespace PersiaWar.Unity2D5D
 #endif
         }
 
+        private void OnDestroy()
+        {
+            if (minimapTexture != null)
+            {
+                minimapTexture.Release();
+                Destroy(minimapTexture);
+            }
+
+            if (minimapCamera != null)
+                Destroy(minimapCamera.gameObject);
+
+            if (circleTexture != null)
+                Destroy(circleTexture);
+
+            if (lineTexture != null)
+                Destroy(lineTexture);
+        }
+
         private void Update()
         {
 #if UNITY_ANDROID
@@ -360,7 +378,6 @@ namespace PersiaWar.Unity2D5D
             if (fired)
             {
                 nextFireTime = Time.time + fireRepeatInterval;
-                StartupCheckpoint.Set("MobileFireInputAccepted");
             }
             else if (player.Weapon.Magazine <= 0)
             {
