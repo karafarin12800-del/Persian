@@ -486,20 +486,6 @@ namespace PersiaWar.Unity2D5D
 
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
             float size = 58f * scale;
-            Rect button = new Rect(
-                Screen.width * 0.5f - size * 0.5f,
-                14f * scale,
-                size,
-                size);
-
-            if (GUI.Button(button, matchPaused ? "▶" : "Ⅱ", buttonStyle))
-            {
-                matchPaused = !matchPaused;
-                Time.timeScale = matchPaused ? 0f : 1f;
-
-                if (mobileMovementJoystick != null)
-                    mobileMovementJoystick.SetPaused(matchPaused);
-            }
 
             if (matchPaused)
             {
@@ -527,6 +513,22 @@ namespace PersiaWar.Unity2D5D
                     new Rect(panel.x + 20f, panel.y + 70f, panel.width - 40f, 28f),
                     "Touch ▶ to resume",
                     bodyStyle);
+            }
+
+            // Draw the control last so the pause overlay can never cover it.
+            Rect button = new Rect(
+                Screen.width * 0.5f - size * 0.5f,
+                14f * scale,
+                size,
+                size);
+
+            if (GUI.Button(button, matchPaused ? "▶" : "Ⅱ", buttonStyle))
+            {
+                matchPaused = !matchPaused;
+                Time.timeScale = matchPaused ? 0f : 1f;
+
+                if (mobileMovementJoystick != null)
+                    mobileMovementJoystick.SetPaused(matchPaused);
             }
         }
 
