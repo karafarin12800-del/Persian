@@ -219,13 +219,14 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
-            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.25f, 0.44f, 0.18f));
-            buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
+            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.28f, 0.31f, 0.26f));
+            buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.45f, 0.35f));
             roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
             accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
             androidWindowMaterial = MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
             androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
-            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.38f, 0.36f, 0.31f));
+            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.43f, 0.42f, 0.38f));
+            EnsureAndroidCityMaterials();
             BuildAndroidTerrain3D(groundMaterial);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
@@ -358,11 +359,31 @@ namespace PersiaWar.Unity2D5D
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
         }
 
+        private void BuildAndroidCentralPlaza()
+        {
+            Material plaza = MakeMaterial("CentralPlaza", new Color(0.46f, 0.44f, 0.39f));
+            Material tile = MakeMaterial("CentralPlazaTile", new Color(0.60f, 0.56f, 0.48f));
+
+            QueueAndroidBox("PlazaBase", new Vector3(0f, 0.06f, 0f), new Vector3(15.5f, 0.12f, 15.5f), plaza);
+            for (int i = -2; i <= 2; i++)
+            {
+                QueueAndroidBox("PlazaTileV", new Vector3(i * 2.9f, 0.125f, 0f), new Vector3(0.11f, 0.03f, 15.2f), tile);
+                QueueAndroidBox("PlazaTileH", new Vector3(0f, 0.126f, i * 2.9f), new Vector3(15.2f, 0.03f, 0.11f), tile);
+            }
+
+            QueueAndroidBox("PlazaPlanterN", new Vector3(0f, 0.40f, 5.8f), new Vector3(9.4f, 0.68f, 0.90f), androidPlanterMaterial);
+            QueueAndroidBox("PlazaHedgeN", new Vector3(0f, 0.92f, 5.5f), new Vector3(8.2f, 0.82f, 0.52f), androidHedgeMaterial);
+            QueueAndroidBox("PlazaPlanterS", new Vector3(0f, 0.40f, -5.8f), new Vector3(9.4f, 0.68f, 0.90f), androidPlanterMaterial);
+            QueueAndroidBox("PlazaHedgeS", new Vector3(0f, 0.92f, -5.5f), new Vector3(8.2f, 0.82f, 0.52f), androidHedgeMaterial);
+        }
+
         private void BuildAndroidCityPresentation()
         {
-            // Dense, readable 2.5D city layout: buildings hug the streets so the
-            // gameplay camera never opens onto a large empty floor.
             androidBoxBatches.Clear();
+            EnsureAndroidCityMaterials();
+
+            // Real visual pass: varied building silhouettes, storefronts, balconies,
+            // roof equipment, fences, trees, lamps, vehicles and a damaged quarter.
             Vector3[] buildingPoints =
             {
                 new Vector3(-42f, 0f, -42f), new Vector3(-21f, 0f, -42f), new Vector3(21f, 0f, -42f), new Vector3(42f, 0f, -42f),
@@ -376,70 +397,120 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(-10f, 0f, -34f),  new Vector3(10f, 0f, 34f),
                 new Vector3(-34f, 0f, 10f),   new Vector3(34f, 0f, -10f),
 
-                // Near-center landmarks keep the playable view from opening onto
-                // a large empty green floor around the spawn area.
                 new Vector3(-15f, 0f, -14f), new Vector3(15f, 0f, -14f),
-                new Vector3(-15f, 0f, 14f),  new Vector3(15f, 0f, 14f)
+                new Vector3(-15f, 0f, 14f),  new Vector3(15f, 0f, 14f),
+
+                new Vector3(-60f, 0f, -60f), new Vector3(60f, 0f, 60f)
             };
 
             for (int i = 0; i < buildingPoints.Length; i++)
             {
                 StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_START");
-                float footprint = i % 5 == 0 ? 13.5f : (i % 2 == 0 ? 11.5f : 10.0f);
-                float height = i % 4 == 0 ? 13.5f : (i % 3 == 0 ? 11.0f : 9.0f);
-                float depth = i % 3 == 0 ? 10.5f : 9.0f;
-                CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
+                bool warehouse = i == buildingPoints.Length - 2 || i == buildingPoints.Length - 1;
+                float footprint = warehouse ? 17.5f : (i % 5 == 0 ? 13.8f : (i % 2 == 0 ? 11.8f : 10.4f));
+                float height = warehouse ? 7.0f : (i % 4 == 0 ? 13.5f : (i % 3 == 0 ? 11.5f : 9.6f));
+                float depth = warehouse ? 12.8f : (i % 3 == 0 ? 10.8f : 9.2f);
+                CreateAndroidBuilding(buildingPoints[i], footprint, height, depth, i % 5, false, warehouse);
                 StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_DONE");
             }
 
             StartupCheckpoint.Set("CITY_BUILDINGS_ALL_DONE");
-            StartupCheckpoint.Set("CITY_FLUSH_START");
 
-            // One renderer per material group replaces hundreds of tiny facade/window
-            // renderers while preserving the exact box-based visual language.
-            FlushAndroidBoxBatches();
-            StartupCheckpoint.Set("CITY_FLUSH_DONE");
+            // A compact central plaza adds a recognizable landmark without introducing
+            // a large number of runtime objects.
+            BuildAndroidCentralPlaza();
+            StartupCheckpoint.Set("CITY_PLAZA_DONE");
 
             Vector3[] treePoints =
             {
-                new Vector3(-30f, 0f, -30f), new Vector3(30f, 0f, 30f),
-                new Vector3(-30f, 0f, 30f),  new Vector3(30f, 0f, -30f),
-                new Vector3(-66f, 0f, 0f),   new Vector3(66f, 0f, 0f),
-                new Vector3(0f, 0f, 66f),    new Vector3(0f, 0f, -66f)
+                new Vector3(-31f, 0f, -31f), new Vector3(31f, 0f, 31f),
+                new Vector3(-31f, 0f, 31f),  new Vector3(31f, 0f, -31f),
+                new Vector3(-64f, 0f, 0f),   new Vector3(64f, 0f, 0f),
+                new Vector3(0f, 0f, 64f),    new Vector3(0f, 0f, -64f),
+                new Vector3(-64f, 0f, 64f),  new Vector3(64f, 0f, -64f)
             };
 
             StartupCheckpoint.Set("CITY_TREES_START");
             for (int i = 0; i < treePoints.Length; i++)
             {
-                StartupCheckpoint.Set("CITY_TREE_" + (i + 1) + "_START");
-                CreateAndroidTree(treePoints[i], 2.9f + (i % 2) * 0.35f);
-                StartupCheckpoint.Set("CITY_TREE_" + (i + 1) + "_DONE");
+                CreateAndroidTree(treePoints[i], 2.8f + (i % 3) * 0.25f);
             }
             StartupCheckpoint.Set("CITY_TREES_DONE");
 
-            // Keep a small number of landmarks so Android remains light, but give
-            // the camera more of the readable street-furniture language from the reference.
-            Vector3[] plazaPillars =
+            // More frequent street furniture makes the space read as a lived-in city
+            // while staying inside a tiny renderer budget because all parts are batched.
+            Vector3[] lampPoints =
             {
-                new Vector3(-7f, 0f, 7f), new Vector3(7f, 0f, 7f),
-                new Vector3(-7f, 0f, -7f), new Vector3(7f, 0f, -7f),
-                new Vector3(-36f, 0f, -10f), new Vector3(36f, 0f, 10f),
-                new Vector3(-60f, 0f, 48f), new Vector3(60f, 0f, -48f)
+                new Vector3(-48f, 0f, -14f), new Vector3(-24f, 0f, -14f),
+                new Vector3(24f, 0f, -14f),  new Vector3(48f, 0f, -14f),
+                new Vector3(-48f, 0f, 14f),  new Vector3(-24f, 0f, 14f),
+                new Vector3(24f, 0f, 14f),   new Vector3(48f, 0f, 14f),
+                new Vector3(-14f, 0f, -48f), new Vector3(-14f, 0f, -24f),
+                new Vector3(-14f, 0f, 24f),  new Vector3(-14f, 0f, 48f),
+                new Vector3(14f, 0f, -48f),  new Vector3(14f, 0f, -24f),
+                new Vector3(14f, 0f, 24f),   new Vector3(14f, 0f, 48f)
             };
 
             StartupCheckpoint.Set("CITY_LAMPS_START");
-            for (int i = 0; i < plazaPillars.Length; i++)
-            {
-                StartupCheckpoint.Set("CITY_LAMP_" + (i + 1) + "_START");
-                CreateAndroidStreetLamp(plazaPillars[i]);
-                StartupCheckpoint.Set("CITY_LAMP_" + (i + 1) + "_DONE");
-            }
+            for (int i = 0; i < lampPoints.Length; i++)
+                CreateAndroidStreetLamp(lampPoints[i]);
             StartupCheckpoint.Set("CITY_LAMPS_DONE");
 
-            StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_START");
+            BuildAndroidFencesAndStreetDetails();
+            StartupCheckpoint.Set("CITY_STREET_DETAILS_DONE");
+
             BuildAndroidAlleysAndVehicles();
             StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_DONE");
+
+            BuildAndroidRuinedQuarter();
+            StartupCheckpoint.Set("CITY_RUINED_QUARTER_DONE");
+
+            // Flush once, after all static city parts are queued.
+            StartupCheckpoint.Set("CITY_FLUSH_START");
+            FlushAndroidBoxBatches();
+            StartupCheckpoint.Set("CITY_FLUSH_DONE");
             StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
+        }
+
+        private void BuildAndroidFencesAndStreetDetails()
+        {
+            // Low fences, corner planters and utility boxes add mid-range detail without
+            // creating a new renderer for every small prop.
+            Vector3[] centers =
+            {
+                new Vector3(-53f, 0f, -30f), new Vector3(53f, 0f, 30f),
+                new Vector3(-30f, 0f, 53f),  new Vector3(30f, 0f, -53f),
+                new Vector3(-67f, 0f, 35f),  new Vector3(67f, 0f, -35f)
+            };
+
+            for (int i = 0; i < centers.Length; i++)
+            {
+                Vector3 c0 = centers[i];
+                bool horizontal = i % 2 == 0;
+                float length = 8.0f;
+
+                QueueAndroidBox("FenceRail", c0 + Vector3.up * 0.66f,
+                    horizontal ? new Vector3(length, 0.12f, 0.12f) : new Vector3(0.12f, 0.12f, length),
+                    androidFenceRailMaterial);
+                QueueAndroidBox("FenceRailLow", c0 + Vector3.up * 0.34f,
+                    horizontal ? new Vector3(length, 0.10f, 0.10f) : new Vector3(0.10f, 0.10f, length),
+                    androidFenceRailMaterial);
+
+                for (int p = -1; p <= 1; p++)
+                {
+                    Vector3 post = c0 + (horizontal ? Vector3.right : Vector3.forward) * (p * length * 0.50f);
+                    QueueAndroidBox("FencePost", post + Vector3.up * 0.45f, new Vector3(0.16f, 0.90f, 0.16f), androidFenceMaterial);
+                }
+            }
+
+            for (int i = 0; i < 6; i++)
+            {
+                float x = -72f + i * 28f;
+                QueueAndroidBox("RoadsidePlanter", new Vector3(x, 0.38f, -9.0f),
+                    new Vector3(2.8f, 0.64f, 1.0f), androidPlanterMaterial);
+                QueueAndroidBox("RoadsideHedge", new Vector3(x, 0.86f, -8.86f),
+                    new Vector3(2.20f, 0.72f, 0.72f), androidHedgeMaterial);
+            }
         }
 
         private void BuildAndroidAlleysAndVehicles()
@@ -496,30 +567,24 @@ namespace PersiaWar.Unity2D5D
         {
             float length = longAxisZ ? 5.2f : 2.9f;
             float width = longAxisZ ? 2.8f : 5.2f;
-            CreateAndroidBox(
+
+            QueueAndroidBox(
                 "CityVehicleBody",
                 position + Vector3.up * 0.45f,
                 new Vector3(width, 0.9f, length),
-                body,
-                false);
+                body);
 
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "CityVehicleCabin",
-                position + Vector3.up * 0.92f,
-                new Vector3(width * 0.68f, 0.38f, length * 0.55f),
-                roofMaterial,
-                false);
+                position + Vector3.up * 0.94f,
+                new Vector3(width * 0.68f, 0.40f, length * 0.55f),
+                androidVehicleGlassRoofMaterial);
 
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "CityVehicleBumper",
                 position + Vector3.up * 0.28f,
-                new Vector3(width * 0.88f, 0.16f, length * 0.90f),
-                accentMaterial,
-                false);
-
-            Material wheel = MakeMaterial("VehicleWheel", new Color(0.035f, 0.045f, 0.055f));
-            Material glass = MakeMaterial("VehicleGlass", new Color(0.08f, 0.18f, 0.22f));
-            Material light = MakeMaterial("VehicleLight", new Color(0.95f, 0.82f, 0.45f));
+                new Vector3(width * 0.90f, 0.16f, length * 0.90f),
+                accentMaterial);
 
             float wheelY = 0.34f;
             Vector3[] wheels =
@@ -529,16 +594,25 @@ namespace PersiaWar.Unity2D5D
                 position + new Vector3(-width * 0.36f, wheelY, length * 0.34f),
                 position + new Vector3(width * 0.36f, wheelY, length * 0.34f)
             };
-            for (int i = 0; i < wheels.Length; i++)
-                CreateAndroidBox("VehicleWheel", wheels[i], new Vector3(0.42f, 0.30f, 0.58f), wheel, false);
 
-            CreateAndroidBox("VehicleGlass", position + Vector3.up * 1.10f,
-                new Vector3(width * 0.72f, 0.22f, length * 0.47f), glass, false);
-            CreateAndroidBox("VehicleLights",
-                position + Vector3.up * 0.52f + (longAxisZ ? Vector3.forward : Vector3.right) * (longAxisZ ? length : width) * 0.39f,
-                new Vector3(longAxisZ ? width * 0.38f : 0.34f, 0.16f, longAxisZ ? 0.16f : length * 0.38f),
-                light,
-                false);
+            for (int i = 0; i < wheels.Length; i++)
+                QueueAndroidBox("VehicleWheel", wheels[i], new Vector3(0.42f, 0.30f, 0.58f), androidVehicleWheelMaterial);
+
+            QueueAndroidBox(
+                "VehicleGlass",
+                position + Vector3.up * 1.11f,
+                new Vector3(width * 0.72f, 0.22f, length * 0.47f),
+                androidWindowMaterial);
+
+            QueueAndroidBox(
+                "VehicleLights",
+                position + Vector3.up * 0.52f +
+                    (longAxisZ ? Vector3.forward : Vector3.right) * (longAxisZ ? length : width) * 0.39f,
+                new Vector3(
+                    longAxisZ ? width * 0.38f : 0.34f,
+                    0.16f,
+                    longAxisZ ? 0.16f : length * 0.38f),
+                androidVehicleLightMaterial);
         }
 
         private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
@@ -623,112 +697,229 @@ namespace PersiaWar.Unity2D5D
             return obj;
         }
 
-        private void CreateAndroidBuilding(Vector3 position, float footprint, float height, float depth)
+        private void CreateAndroidBuilding(
+            Vector3 position,
+            float footprint,
+            float height,
+            float depth,
+            int styleIndex,
+            bool ruined,
+            bool warehouse)
         {
-            float bodyHeight = Mathf.Max(4.5f, height);
-
-            // Brighter, clean stylized-realism palette inspired by the free city
-            // reference, while staying fully procedural and Android-light.
-            Color[] palette =
-            {
-                new Color(0.76f, 0.67f, 0.54f),
-                new Color(0.67f, 0.73f, 0.75f),
-                new Color(0.80f, 0.71f, 0.57f),
-                new Color(0.58f, 0.66f, 0.68f),
-                new Color(0.63f, 0.70f, 0.58f)
-            };
-            int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
-            Material facade = MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
-            Material trim = MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
-            Material darkWindow = androidWindowMaterial != null
-                ? androidWindowMaterial
-                : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f));
-            Material door = MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
-            Material rooftop = MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
-            Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
-            Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
+            float bodyHeight = Mathf.Max(5.5f, height);
+            int style = Mathf.Abs(styleIndex) % androidFacadeMaterials.Length;
+            Material facade = androidFacadeMaterials[style];
+            Material trim = androidTrimMaterials[style];
+            Material accent = androidAccentMaterials[style];
+            Material window = androidWindowMaterial;
+            Material door = androidDoorMaterial;
 
             Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
             QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
             CreateAndroidCollider("CityBuildingCollider", position, bodySize);
 
+            // Stronger silhouette: raised plinth, parapet and roof cap.
             QueueAndroidBox(
-                "CityRoof",
+                "BuildingPlinth",
+                position + new Vector3(0f, 0.28f, 0f),
+                new Vector3(footprint + 0.50f, 0.56f, depth + 0.50f),
+                androidPlinthMaterial);
+
+            QueueAndroidBox(
+                "CityRoofCap",
                 position + Vector3.up * (bodyHeight + 0.22f),
-                new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
+                new Vector3(footprint + 0.60f, 0.44f, depth + 0.60f),
                 trim);
 
-            for (int row = 0; row < 3; row++)
+            // Front floor bands and corner columns make the facade read at camera distance.
+            int floorCount = warehouse ? 2 : Mathf.Clamp(Mathf.RoundToInt(bodyHeight / 3.25f), 2, 4);
+            for (int row = 0; row < floorCount; row++)
             {
-                float y = 1.25f + row * Mathf.Max(1.7f, (bodyHeight - 2.4f) / 3f);
+                float y = 1.15f + row * ((bodyHeight - 2.2f) / Mathf.Max(1, floorCount - 1));
                 QueueAndroidBox(
                     "FacadeBand",
                     position + new Vector3(0f, y, -depth * 0.515f),
-                    new Vector3(footprint * 0.92f, 0.16f, 0.10f),
+                    new Vector3(footprint * 0.94f, 0.12f, 0.10f),
                     trim);
             }
 
-            int columns = Mathf.Clamp(Mathf.FloorToInt(footprint / 2.5f), 2, 4);
-            float spacing = footprint / (columns + 1);
-            for (int row = 0; row < 3; row++)
+            float columnWidth = Mathf.Min(0.34f, footprint * 0.035f);
+            for (int side = -1; side <= 1; side += 2)
             {
-                float y = 1.75f + row * Mathf.Max(1.7f, (bodyHeight - 3.1f) / 3f);
-                for (int col = 0; col < columns; col++)
-                {
-                    float x = -footprint * 0.5f + spacing * (col + 1);
-                    QueueAndroidBox(
-                        "Window",
-                        position + new Vector3(x, y, -depth * 0.522f),
-                        new Vector3(Mathf.Min(1.15f, spacing * 0.48f), 0.72f, 0.11f),
-                        darkWindow);
+                QueueAndroidBox(
+                    "FacadeColumn",
+                    position + new Vector3(side * (footprint * 0.43f), bodyHeight * 0.52f, -depth * 0.525f),
+                    new Vector3(columnWidth, bodyHeight * 0.92f, 0.18f),
+                    trim);
+            }
 
+            if (warehouse)
+            {
+                // Warehouse: wide doors + roof skylights to break the repeated apartment silhouette.
+                QueueAndroidBox(
+                    "WarehouseDoor",
+                    position + new Vector3(0f, 1.90f, -depth * 0.54f),
+                    new Vector3(footprint * 0.42f, 3.15f, 0.16f),
+                    door);
+                QueueAndroidBox(
+                    "WarehouseDoorTrim",
+                    position + new Vector3(0f, 3.55f, -depth * 0.555f),
+                    new Vector3(footprint * 0.50f, 0.20f, 0.42f),
+                    accent);
+
+                for (int i = -1; i <= 1; i++)
+                {
                     QueueAndroidBox(
-                        "WindowSill",
-                        position + new Vector3(x, y - 0.46f, -depth * 0.53f),
-                        new Vector3(Mathf.Min(1.32f, spacing * 0.56f), 0.10f, 0.16f),
-                        trim);
+                        "WarehouseSkylight",
+                        position + new Vector3(i * footprint * 0.25f, bodyHeight + 0.46f, depth * 0.06f),
+                        new Vector3(2.20f, 0.18f, 3.00f),
+                        androidRoofDetailMaterial);
+                }
+            }
+            else
+            {
+                int columns = Mathf.Clamp(Mathf.FloorToInt(footprint / 2.45f), 2, 5);
+                float spacing = footprint / (columns + 1);
+
+                for (int row = 0; row < floorCount; row++)
+                {
+                    float y = 1.55f + row * ((bodyHeight - 2.8f) / Mathf.Max(1, floorCount - 1));
+                    for (int col = 0; col < columns; col++)
+                    {
+                        float x = -footprint * 0.5f + spacing * (col + 1);
+                        QueueAndroidBox(
+                            "WindowFront",
+                            position + new Vector3(x, y, -depth * 0.522f),
+                            new Vector3(Mathf.Min(1.20f, spacing * 0.50f), 0.84f, 0.10f),
+                            window);
+
+                        QueueAndroidBox(
+                            "WindowSill",
+                            position + new Vector3(x, y - 0.50f, -depth * 0.532f),
+                            new Vector3(Mathf.Min(1.35f, spacing * 0.58f), 0.10f, 0.15f),
+                            trim);
+                    }
+                }
+
+                int sideRows = Mathf.Clamp(Mathf.RoundToInt(depth / 3.3f), 2, 4);
+                for (int row = 0; row < floorCount; row++)
+                {
+                    float y = 1.65f + row * ((bodyHeight - 3.0f) / Mathf.Max(1, floorCount - 1));
+                    for (int col = 0; col < sideRows; col++)
+                    {
+                        float z = Mathf.Lerp(-depth * 0.34f, depth * 0.34f, sideRows == 1 ? 0.5f : col / (float)(sideRows - 1));
+                        QueueAndroidBox(
+                            "WindowSide",
+                            position + new Vector3(footprint * 0.522f, y, z),
+                            new Vector3(0.10f, 0.82f, Mathf.Min(1.15f, (depth * 0.58f) / sideRows)),
+                            window);
+                    }
+                }
+
+                // Storefront strip + entrance canopy.
+                QueueAndroidBox(
+                    "Storefront",
+                    position + new Vector3(0f, 1.18f, -depth * 0.54f),
+                    new Vector3(footprint * 0.78f, 1.55f, 0.12f),
+                    accent);
+
+                QueueAndroidBox(
+                    "Door",
+                    position + new Vector3(0f, 1.20f, -depth * 0.565f),
+                    new Vector3(Mathf.Min(1.35f, footprint * 0.18f), 2.30f, 0.15f),
+                    door);
+
+                QueueAndroidBox(
+                    "DoorCanopy",
+                    position + new Vector3(0f, 2.48f, -depth * 0.58f),
+                    new Vector3(Mathf.Min(2.8f, footprint * 0.34f), 0.18f, 0.72f),
+                    trim);
+
+                // Select buildings get balconies; others get side AC units.
+                if (style == 1 || style == 3)
+                {
+                    int balconies = bodyHeight > 11f ? 2 : 1;
+                    for (int i = 0; i < balconies; i++)
+                    {
+                        float y = 3.10f + i * 3.35f;
+                        QueueAndroidBox(
+                            "BalconySlab",
+                            position + new Vector3(-footprint * 0.20f, y, -depth * 0.60f),
+                            new Vector3(footprint * 0.34f, 0.16f, depth * 0.22f),
+                            accent);
+                        QueueAndroidBox(
+                            "BalconyRail",
+                            position + new Vector3(-footprint * 0.20f, y + 0.44f, -depth * 0.71f),
+                            new Vector3(footprint * 0.34f, 0.66f, 0.08f),
+                            trim);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < 2; i++)
+                    {
+                        QueueAndroidBox(
+                            "ACUnit",
+                            position + new Vector3(
+                                footprint * 0.48f,
+                                2.8f + i * 2.25f,
+                                -depth * 0.05f + i * 0.70f),
+                            new Vector3(0.55f, 0.35f, 0.52f),
+                            androidRoofDetailMaterial);
+                    }
                 }
             }
 
+            // Rooftop equipment gives the camera a deliberate skyline.
             QueueAndroidBox(
-                "Door",
-                position + new Vector3(0f, 1.10f, -depth * 0.54f),
-                new Vector3(Mathf.Min(1.35f, footprint * 0.18f), 2.15f, 0.14f),
-                door);
-
+                "RoofEquipmentA",
+                position + new Vector3(-footprint * 0.28f, bodyHeight + 0.78f, depth * 0.18f),
+                new Vector3(1.45f, 0.72f, 1.05f),
+                androidRoofDetailMaterial);
             QueueAndroidBox(
-                "DoorCanopy",
-                position + new Vector3(0f, 2.30f, -depth * 0.56f),
-                new Vector3(Mathf.Min(2.4f, footprint * 0.30f), 0.18f, 0.72f),
-                trim);
+                "RoofEquipmentB",
+                position + new Vector3(footprint * 0.24f, bodyHeight + 0.56f, -depth * 0.18f),
+                new Vector3(0.90f, 0.50f, 0.90f),
+                androidRoofDetailMaterial);
 
-            for (int i = 0; i < 2; i++)
-            {
-                Vector3 offset = new Vector3(
-                    (i == 0 ? -0.28f : 0.28f) * footprint,
-                    bodyHeight + 0.70f,
-                    (i == 0 ? -0.20f : 0.22f) * depth);
+            // Raised edge parapets.
+            float parapetY = bodyHeight + 0.56f;
+            QueueAndroidBox("ParapetFront",
+                position + new Vector3(0f, parapetY, -depth * 0.48f),
+                new Vector3(footprint + 0.25f, 0.28f, 0.16f), trim);
+            QueueAndroidBox("ParapetBack",
+                position + new Vector3(0f, parapetY, depth * 0.48f),
+                new Vector3(footprint + 0.25f, 0.28f, 0.16f), trim);
 
-                QueueAndroidBox(
-                    "RooftopUnit",
-                    position + offset,
-                    new Vector3(1.15f, 0.55f, 0.85f),
-                    rooftop);
-            }
-
+            // Ground-level planting breaks up long facade runs.
             QueueAndroidBox(
                 "Planter",
-                position + new Vector3(-footprint * 0.30f, 0.34f, -depth * 0.66f),
-                new Vector3(Mathf.Min(2.6f, footprint * 0.22f), 0.68f, 0.55f),
-                planter);
+                position + new Vector3(-footprint * 0.28f, 0.34f, -depth * 0.66f),
+                new Vector3(Mathf.Min(2.5f, footprint * 0.22f), 0.68f, 0.56f),
+                androidPlanterMaterial);
 
             QueueAndroidBox(
                 "Hedge",
-                position + new Vector3(footprint * 0.30f, 0.55f, -depth * 0.66f),
-                new Vector3(Mathf.Min(3.0f, footprint * 0.26f), 1.10f, 0.65f),
-                hedge);
+                position + new Vector3(footprint * 0.28f, 0.58f, -depth * 0.66f),
+                new Vector3(Mathf.Min(3.0f, footprint * 0.26f), 1.12f, 0.64f),
+                androidHedgeMaterial);
         }
 
+        private Material[] androidFacadeMaterials;
+        private Material[] androidTrimMaterials;
+        private Material[] androidAccentMaterials;
+        private Material androidDoorMaterial;
+        private Material androidPlinthMaterial;
+        private Material androidRoofDetailMaterial;
+        private Material androidPlanterMaterial;
+        private Material androidHedgeMaterial;
+        private Material androidVehicleWheelMaterial;
+        private Material androidVehicleGlassRoofMaterial;
+        private Material androidVehicleLightMaterial;
+        private Material androidFenceMaterial;
+        private Material androidFenceRailMaterial;
+        private Material androidDebrisMaterial;
+        private Material androidCrackMaterial;
         private Material androidTreeTrunkMaterial;
         private Material androidTreeCrownMaterial;
         private Material androidLampMaterial;
@@ -737,54 +928,161 @@ namespace PersiaWar.Unity2D5D
         private Material androidShadowMaterial;
         private Material androidSidewalkMaterial;
 
+        private void EnsureAndroidCityMaterials()
+        {
+            if (androidFacadeMaterials != null && androidFacadeMaterials.Length == 5)
+                return;
+
+            androidFacadeMaterials = new[]
+            {
+                MakeMaterial("FacadeSand", new Color(0.67f, 0.58f, 0.46f)),
+                MakeMaterial("FacadeSlate", new Color(0.47f, 0.55f, 0.58f)),
+                MakeMaterial("FacadeIvory", new Color(0.76f, 0.69f, 0.56f)),
+                MakeMaterial("FacadeBlue", new Color(0.40f, 0.51f, 0.54f)),
+                MakeMaterial("FacadeOlive", new Color(0.52f, 0.58f, 0.48f))
+            };
+
+            androidTrimMaterials = new[]
+            {
+                MakeMaterial("TrimSand", new Color(0.84f, 0.77f, 0.64f)),
+                MakeMaterial("TrimSlate", new Color(0.69f, 0.74f, 0.75f)),
+                MakeMaterial("TrimIvory", new Color(0.90f, 0.85f, 0.72f)),
+                MakeMaterial("TrimBlue", new Color(0.62f, 0.71f, 0.72f)),
+                MakeMaterial("TrimOlive", new Color(0.70f, 0.76f, 0.62f))
+            };
+
+            androidAccentMaterials = new[]
+            {
+                MakeMaterial("AwningTerracotta", new Color(0.61f, 0.28f, 0.17f)),
+                MakeMaterial("AwningBlue", new Color(0.17f, 0.35f, 0.42f)),
+                MakeMaterial("AwningOchre", new Color(0.72f, 0.50f, 0.18f)),
+                MakeMaterial("AwningTeal", new Color(0.18f, 0.42f, 0.42f)),
+                MakeMaterial("AwningGreen", new Color(0.31f, 0.45f, 0.27f))
+            };
+
+            androidDoorMaterial = MakeMaterial("CityDoor", new Color(0.17f, 0.13f, 0.11f));
+            androidPlinthMaterial = MakeMaterial("CityPlinth", new Color(0.36f, 0.35f, 0.32f));
+            androidRoofDetailMaterial = MakeMaterial("RoofDetail", new Color(0.26f, 0.28f, 0.29f));
+            androidPlanterMaterial = MakeMaterial("Planter", new Color(0.27f, 0.21f, 0.14f));
+            androidHedgeMaterial = MakeMaterial("Hedge", new Color(0.20f, 0.38f, 0.17f));
+            androidVehicleWheelMaterial = MakeMaterial("VehicleWheel", new Color(0.035f, 0.045f, 0.055f));
+            androidVehicleGlassRoofMaterial = MakeMaterial("VehicleRoofGlass", new Color(0.10f, 0.16f, 0.19f));
+            androidVehicleLightMaterial = MakeMaterial("VehicleLight", new Color(0.93f, 0.75f, 0.34f));
+            androidFenceMaterial = MakeMaterial("FencePost", new Color(0.21f, 0.22f, 0.20f));
+            androidFenceRailMaterial = MakeMaterial("FenceRail", new Color(0.34f, 0.34f, 0.31f));
+            androidDebrisMaterial = MakeMaterial("Rubble", new Color(0.29f, 0.28f, 0.25f));
+            androidCrackMaterial = MakeMaterial("RuinDark", new Color(0.13f, 0.13f, 0.12f));
+            androidTreeTrunkMaterial = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+            androidTreeCrownMaterial = MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.38f, 0.13f));
+            androidLampMaterial = MakeMaterial("AndroidLamp", new Color(0.10f, 0.12f, 0.14f));
+            androidLampGlowMaterial = MakeMaterial("AndroidLampGlow", new Color(0.92f, 0.70f, 0.28f));
+        }
+
         private void CreateAndroidTree(Vector3 position, float scale)
         {
-            if (androidTreeTrunkMaterial == null)
-                androidTreeTrunkMaterial = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
-            if (androidTreeCrownMaterial == null)
-                androidTreeCrownMaterial = MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
-
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "TreeTrunk",
-                position + Vector3.up * (scale * 0.8f),
-                new Vector3(scale * 0.22f, scale * 1.6f, scale * 0.22f),
-                androidTreeTrunkMaterial,
-                false);
+                position + Vector3.up * (scale * 0.75f),
+                new Vector3(scale * 0.24f, scale * 1.50f, scale * 0.24f),
+                androidTreeTrunkMaterial);
 
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "TreeCrownLower",
-                position + Vector3.up * (scale * 1.75f),
-                new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
-                androidTreeCrownMaterial,
-                false);
+                position + Vector3.up * (scale * 1.72f),
+                new Vector3(scale * 1.55f, scale * 0.88f, scale * 1.55f),
+                androidTreeCrownMaterial);
 
-            CreateAndroidBox(
+            QueueAndroidBox(
+                "TreeCrownMid",
+                position + Vector3.up * (scale * 2.18f),
+                new Vector3(scale * 1.22f, scale * 0.74f, scale * 1.22f),
+                androidTreeCrownMaterial);
+
+            QueueAndroidBox(
                 "TreeCrownUpper",
-                position + Vector3.up * (scale * 2.30f),
-                new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
-                androidTreeCrownMaterial,
-                false);
+                position + Vector3.up * (scale * 2.56f),
+                new Vector3(scale * 0.86f, scale * 0.58f, scale * 0.86f),
+                androidTreeCrownMaterial);
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
         {
-            if (androidLampMaterial == null)
-                androidLampMaterial = MakeMaterial("AndroidLamp", new Color(0.10f, 0.12f, 0.14f));
-            if (androidLampGlowMaterial == null)
-                androidLampGlowMaterial = MakeMaterial("AndroidLampGlow", new Color(0.95f, 0.78f, 0.30f));
-
-            CreateAndroidBox(
+            QueueAndroidBox(
                 "LampPost",
                 position + Vector3.up * 2.0f,
                 new Vector3(0.16f, 4.0f, 0.16f),
-                androidLampMaterial,
-                false);
+                androidLampMaterial);
 
-            CreateAndroidBox(
+            QueueAndroidBox(
+                "LampArm",
+                position + new Vector3(0.28f, 3.84f, 0f),
+                new Vector3(0.72f, 0.12f, 0.12f),
+                androidLampMaterial);
+
+            QueueAndroidBox(
                 "LampHead",
-                position + Vector3.up * 4.0f,
-                new Vector3(0.65f, 0.18f, 0.38f),
-                androidLampGlowMaterial,                false);
+                position + new Vector3(0.62f, 3.70f, 0f),
+                new Vector3(0.58f, 0.18f, 0.34f),
+                androidLampGlowMaterial);
+        }
+
+        private void BuildAndroidRuinedQuarter()
+        {
+            Material[] ruinFacades =
+            {
+                MakeMaterial("RuinFacadeA", new Color(0.35f, 0.33f, 0.30f)),
+                MakeMaterial("RuinFacadeB", new Color(0.40f, 0.37f, 0.32f))
+            };
+
+            Vector3[] ruinPoints =
+            {
+                new Vector3(54f, 0f, 54f),
+                new Vector3(72f, 0f, 54f),
+                new Vector3(54f, 0f, 72f),
+                new Vector3(72f, 0f, 72f)
+            };
+
+            for (int i = 0; i < ruinPoints.Length; i++)
+            {
+                Vector3 p = ruinPoints[i];
+                float width = 11f + (i % 2) * 2.0f;
+                float depth = 9.0f + ((i + 1) % 2) * 1.5f;
+                float h = 6.2f + (i % 3) * 0.9f;
+
+                QueueAndroidBox("RuinBlock",
+                    p + Vector3.up * (h * 0.5f),
+                    new Vector3(width, h, depth),
+                    ruinFacades[i % ruinFacades.Length]);
+
+                QueueAndroidBox("RuinUpper",
+                    p + new Vector3((i % 2 == 0 ? -2.4f : 2.4f), h + 1.15f, 0f),
+                    new Vector3(width * 0.42f, 2.3f, depth * 0.70f),
+                    androidCrackMaterial);
+
+                // Large broken openings read better from the elevated camera than tiny debris.
+                QueueAndroidBox("RuinOpening",
+                    p + new Vector3(0f, 1.65f, -depth * 0.53f),
+                    new Vector3(width * 0.48f, 2.7f, 0.12f),
+                    androidCrackMaterial);
+
+                for (int d = -1; d <= 1; d++)
+                {
+                    QueueAndroidBox("Rubble",
+                        p + new Vector3(d * 2.1f, 0.30f + (d == 0 ? 0.24f : 0f), depth * 0.70f),
+                        new Vector3(1.45f + Mathf.Abs(d) * 0.30f, 0.60f + (d == 0 ? 0.30f : 0f), 1.10f),
+                        androidDebrisMaterial);
+                }
+            }
+
+            // Subtle "crack" bars rather than expensive particle effects.
+            for (int i = 0; i < 6; i++)
+            {
+                float x = 50f + i * 4.2f;
+                QueueAndroidBox("GroundCrack",
+                    new Vector3(x, 0.072f, 62f + Mathf.Sin(i * 1.7f) * 3f),
+                    new Vector3(2.8f, 0.025f, 0.08f),
+                    androidCrackMaterial);
+            }
         }
 
         private void QueueAndroidBox(string objectName, Vector3 position, Vector3 size, Material material)
