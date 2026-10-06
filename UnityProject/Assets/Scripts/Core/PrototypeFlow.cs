@@ -28,7 +28,6 @@ namespace PersiaWar.Unity2D5D
         private const float AndroidCameraYaw = 32f;
         private const float AndroidCameraDistance = 16.63f; // 5% farther than the previous 20% wider view
         private const float AndroidCameraLookHeight = 0.90f;
-        private MobileMovementJoystick mobileMovementJoystick;
         private AndroidMinimapOverlay androidMinimap;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
@@ -527,8 +526,8 @@ namespace PersiaWar.Unity2D5D
                 matchPaused = !matchPaused;
                 Time.timeScale = matchPaused ? 0f : 1f;
 
-                if (mobileMovementJoystick != null)
-                    mobileMovementJoystick.SetPaused(matchPaused);
+                if (mobileInput != null)
+                    mobileInput.SetPaused(matchPaused);
             }
         }
 
@@ -838,23 +837,11 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("AndroidInputActivationStarted");
 
-            // Keep the movement joystick on an independent, lightweight fallback path.
-            // It does not depend on the combat-input gate, so a UI/input regression cannot
-            // strand the player's basic movement.
+            // MobileInputHub is now the single Android touch owner. Movement and all
+            // combat buttons share one dispatcher so multi-touch cannot overwrite movement.
             if (mobileInput != null)
             {
-                mobileMovementJoystick = mobileInput.GetComponent<MobileMovementJoystick>();
-                if (mobileMovementJoystick == null)
-                    mobileMovementJoystick = mobileInput.gameObject.AddComponent<MobileMovementJoystick>();
-
-                mobileMovementJoystick.ActivateForMatch(player);
-                mobileMovementJoystick.SetMovementCamera(activeCamera);
-                mobileMovementJoystick.SetPaused(matchPaused);
-            }
-
-            if (mobileInput != null)
-            {
-                mobileInput.SetGameplayCamera(activeCamera);
+                mobileInput.ActivateForMatch(player, activeCamera);
                 MobileInputHub.SetAndroidExecutionArmed(true);
                 mobileInput.enabled = true;
             }
