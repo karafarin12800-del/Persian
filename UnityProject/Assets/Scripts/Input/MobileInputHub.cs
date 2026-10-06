@@ -73,9 +73,7 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Use the real Touch path on Android. Synthesized IMGUI mouse events
-            // can release the floating-stick pointer and prevent true multitouch.
-            Input.simulateMouseWithTouches = false;
+            Input.simulateMouseWithTouches = true;
 #endif
             enabled = true;
         }
@@ -565,9 +563,7 @@ if (!matchActive || matchPaused)
             if (!matchActive || matchPaused)
                 return;
 
-#if UNITY_EDITOR || UNITY_STANDALONE
             HandleGuiPointerFallback();
-#endif
 
             if (circleTexture == null || lineTexture == null)
                 CreateGuiTextures();
