@@ -315,8 +315,12 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidRoadGrid()
         {
-            const float roadWidth = 10f;
-            const float sidewalkWidth = 1.35f;
+            // Redesigned macro layout: a broad boulevard/crossroads, secondary streets,
+            // sidewalks and a central civic district. The goal is to make the city shape
+            // visibly different from the previous uniform 24m grid.
+            const float boulevardWidth = 14f;
+            const float streetWidth = 8f;
+            const float sidewalkWidth = 1.55f;
             float half = worldSize * 0.5f;
 
             List<Vector3> roadVertices = new List<Vector3>();
@@ -324,39 +328,50 @@ namespace PersiaWar.Unity2D5D
             List<Vector3> sidewalkVertices = new List<Vector3>();
             List<int> sidewalkTriangles = new List<int>();
 
-            for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+            AddAndroidQuad(roadVertices, roadTriangles, new Vector3(0f, 0.025f, 0f),
+                new Vector2(boulevardWidth, worldSize));
+            AddAndroidQuad(roadVertices, roadTriangles, new Vector3(0f, 0.026f, 0f),
+                new Vector2(worldSize, boulevardWidth));
+
+            AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                new Vector3(-boulevardWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f),
+                new Vector2(sidewalkWidth, worldSize));
+            AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                new Vector3(boulevardWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f),
+                new Vector2(sidewalkWidth, worldSize));
+            AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                new Vector3(0f, 0.035f, -boulevardWidth * 0.5f - sidewalkWidth * 0.5f),
+                new Vector2(worldSize, sidewalkWidth));
+            AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                new Vector3(0f, 0.035f, boulevardWidth * 0.5f + sidewalkWidth * 0.5f),
+                new Vector2(worldSize, sidewalkWidth));
+
+            float[] secondary = { -54f, -27f, 27f, 54f };
+            for (int i = 0; i < secondary.Length; i++)
             {
-                AddAndroidQuad(roadVertices, roadTriangles,
-                    new Vector3(x, 0.025f, 0f),
-                    new Vector2(roadWidth, worldSize));
+                float p = secondary[i];
+                AddAndroidQuad(roadVertices, roadTriangles, new Vector3(p, 0.02f, 0f),
+                    new Vector2(streetWidth, worldSize));
+                AddAndroidQuad(roadVertices, roadTriangles, new Vector3(0f, 0.021f, p),
+                    new Vector2(worldSize, streetWidth));
 
                 AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f),
+                    new Vector3(p - streetWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f),
                     new Vector2(sidewalkWidth, worldSize));
-
                 AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f),
+                    new Vector3(p + streetWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f),
                     new Vector2(sidewalkWidth, worldSize));
+                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0.035f, p - streetWidth * 0.5f - sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth));
+                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0.035f, p + streetWidth * 0.5f + sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth));
             }
 
-            for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
-            {
-                AddAndroidQuad(roadVertices, roadTriangles,
-                    new Vector3(0f, 0.025f, z),
-                    new Vector2(worldSize, roadWidth));
-
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0.035f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth));
-
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0.035f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth));
-            }
-
-            CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
-            CreateAndroidQuadBatch("AndroidSidewalkGrid", sidewalkVertices, sidewalkTriangles, androidSidewalkMaterial);
-            BuildAndroidIntersectionsAndLaneMarks(roadWidth);
+            CreateAndroidQuadBatch("AndroidRedesignedBoulevards", roadVertices, roadTriangles, roadMaterial);
+            CreateAndroidQuadBatch("AndroidRedesignedSidewalks", sidewalkVertices, sidewalkTriangles, androidSidewalkMaterial);
+            BuildAndroidIntersectionsAndLaneMarks(boulevardWidth);
         }
 
         private void BuildAndroidCentralPlaza()
@@ -382,94 +397,113 @@ namespace PersiaWar.Unity2D5D
             androidBoxBatches.Clear();
             EnsureAndroidCityMaterials();
 
-            // Real visual pass: varied building silhouettes, storefronts, balconies,
-            // roof equipment, fences, trees, lamps, vehicles and a damaged quarter.
-            Vector3[] buildingPoints =
+            // Major visual redesign: five readable districts instead of a repeated grid.
+            // Buildings are deliberately larger and more varied so the change is visible
+            // from the existing elevated gameplay camera.
+            StartupCheckpoint.Set("CITY_DISTRICTS_START");
+
+            // WEST RESIDENTIAL: low-rise houses with wider footprints.
+            Vector3[] west =
             {
-                new Vector3(-42f, 0f, -42f), new Vector3(-21f, 0f, -42f), new Vector3(21f, 0f, -42f), new Vector3(42f, 0f, -42f),
-                new Vector3(-42f, 0f, -21f), new Vector3(42f, 0f, -21f),
-                new Vector3(-42f, 0f, 0f),   new Vector3(42f, 0f, 0f),
-                new Vector3(-42f, 0f, 21f),  new Vector3(42f, 0f, 21f),
-                new Vector3(-42f, 0f, 42f),  new Vector3(-21f, 0f, 42f), new Vector3(21f, 0f, 42f), new Vector3(42f, 0f, 42f),
-
-                new Vector3(-21f, 0f, -21f), new Vector3(21f, 0f, -21f),
-                new Vector3(-21f, 0f, 21f),  new Vector3(21f, 0f, 21f),
-                new Vector3(-10f, 0f, -34f),  new Vector3(10f, 0f, 34f),
-                new Vector3(-34f, 0f, 10f),   new Vector3(34f, 0f, -10f),
-
-                new Vector3(-15f, 0f, -14f), new Vector3(15f, 0f, -14f),
-                new Vector3(-15f, 0f, 14f),  new Vector3(15f, 0f, 14f),
-
-                new Vector3(-60f, 0f, -60f), new Vector3(60f, 0f, 60f)
+                new Vector3(-62f, 0f, -62f), new Vector3(-35f, 0f, -62f),
+                new Vector3(-62f, 0f, -35f), new Vector3(-35f, 0f, -35f),
+                new Vector3(-62f, 0f, 35f),  new Vector3(-35f, 0f, 35f),
+                new Vector3(-62f, 0f, 62f),  new Vector3(-35f, 0f, 62f)
             };
+            for (int i = 0; i < west.Length; i++)
+                CreateAndroidBuilding(west[i], 14.5f, i % 3 == 0 ? 7.4f : 8.6f, 11.5f, i % 5, false, false);
 
-            for (int i = 0; i < buildingPoints.Length; i++)
+            // EAST COMMERCIAL: taller, narrow blocks create a distinct skyline.
+            Vector3[] east =
             {
-                StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_START");
-                bool warehouse = i == buildingPoints.Length - 2 || i == buildingPoints.Length - 1;
-                float footprint = warehouse ? 17.5f : (i % 5 == 0 ? 13.8f : (i % 2 == 0 ? 11.8f : 10.4f));
-                float height = warehouse ? 7.0f : (i % 4 == 0 ? 13.5f : (i % 3 == 0 ? 11.5f : 9.6f));
-                float depth = warehouse ? 12.8f : (i % 3 == 0 ? 10.8f : 9.2f);
-                CreateAndroidBuilding(buildingPoints[i], footprint, height, depth, i % 5, false, warehouse);
-                StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_DONE");
-            }
+                new Vector3(35f, 0f, -62f), new Vector3(62f, 0f, -62f),
+                new Vector3(35f, 0f, -35f), new Vector3(62f, 0f, -35f),
+                new Vector3(35f, 0f, 35f),  new Vector3(62f, 0f, 35f),
+                new Vector3(35f, 0f, 62f),  new Vector3(62f, 0f, 62f)
+            };
+            for (int i = 0; i < east.Length; i++)
+                CreateAndroidBuilding(east[i], i % 2 == 0 ? 10.5f : 13.0f,
+                    i % 3 == 0 ? 16.5f : 13.5f, 9.0f, (i + 1) % 5, false, false);
 
-            StartupCheckpoint.Set("CITY_BUILDINGS_ALL_DONE");
+            // NORTH MARKET / WAREHOUSE DISTRICT.
+            CreateAndroidBuilding(new Vector3(-27f, 0f, 66f), 20f, 7.0f, 14f, 2, false, true);
+            CreateAndroidBuilding(new Vector3(0f, 0f, 66f), 20f, 8.0f, 14f, 0, false, true);
+            CreateAndroidBuilding(new Vector3(27f, 0f, 66f), 20f, 7.0f, 14f, 3, false, true);
 
-            // A compact central plaza adds a recognizable landmark without introducing
-            // a large number of runtime objects.
+            // SOUTH GATE / LANDMARKS: large stepped buildings frame the main approach.
+            CreateAndroidBuilding(new Vector3(-27f, 0f, -66f), 16f, 11.0f, 12f, 4, false, false);
+            CreateAndroidBuilding(new Vector3(27f, 0f, -66f), 16f, 14.0f, 12f, 1, false, false);
+            BuildAndroidCityLandmarks();
+
+            // Central civic plaza and a wider green median visually break the old grid.
             BuildAndroidCentralPlaza();
-            StartupCheckpoint.Set("CITY_PLAZA_DONE");
+            BuildAndroidCivicGreen();
+            StartupCheckpoint.Set("CITY_DISTRICTS_DONE");
 
             Vector3[] treePoints =
             {
-                new Vector3(-31f, 0f, -31f), new Vector3(31f, 0f, 31f),
-                new Vector3(-31f, 0f, 31f),  new Vector3(31f, 0f, -31f),
-                new Vector3(-64f, 0f, 0f),   new Vector3(64f, 0f, 0f),
-                new Vector3(0f, 0f, 64f),    new Vector3(0f, 0f, -64f),
-                new Vector3(-64f, 0f, 64f),  new Vector3(64f, 0f, -64f)
+                new Vector3(-20f, 0f, -51f), new Vector3(20f, 0f, -51f),
+                new Vector3(-20f, 0f, 51f),  new Vector3(20f, 0f, 51f),
+                new Vector3(-51f, 0f, -20f), new Vector3(-51f, 0f, 20f),
+                new Vector3(51f, 0f, -20f),  new Vector3(51f, 0f, 20f),
+                new Vector3(-72f, 0f, 0f),   new Vector3(72f, 0f, 0f),
+                new Vector3(0f, 0f, -72f),   new Vector3(0f, 0f, 72f)
             };
-
-            StartupCheckpoint.Set("CITY_TREES_START");
             for (int i = 0; i < treePoints.Length; i++)
-            {
-                CreateAndroidTree(treePoints[i], 2.8f + (i % 3) * 0.25f);
-            }
-            StartupCheckpoint.Set("CITY_TREES_DONE");
+                CreateAndroidTree(treePoints[i], 3.0f + (i % 3) * 0.35f);
 
-            // More frequent street furniture makes the space read as a lived-in city
-            // while staying inside a tiny renderer budget because all parts are batched.
             Vector3[] lampPoints =
             {
-                new Vector3(-48f, 0f, -14f), new Vector3(-24f, 0f, -14f),
-                new Vector3(24f, 0f, -14f),  new Vector3(48f, 0f, -14f),
-                new Vector3(-48f, 0f, 14f),  new Vector3(-24f, 0f, 14f),
-                new Vector3(24f, 0f, 14f),   new Vector3(48f, 0f, 14f),
-                new Vector3(-14f, 0f, -48f), new Vector3(-14f, 0f, -24f),
-                new Vector3(-14f, 0f, 24f),  new Vector3(-14f, 0f, 48f),
-                new Vector3(14f, 0f, -48f),  new Vector3(14f, 0f, -24f),
-                new Vector3(14f, 0f, 24f),   new Vector3(14f, 0f, 48f)
+                new Vector3(-20f, 0f, -48f), new Vector3(20f, 0f, -48f),
+                new Vector3(-20f, 0f, 48f),  new Vector3(20f, 0f, 48f),
+                new Vector3(-48f, 0f, -20f), new Vector3(-48f, 0f, 20f),
+                new Vector3(48f, 0f, -20f),  new Vector3(48f, 0f, 20f)
             };
-
-            StartupCheckpoint.Set("CITY_LAMPS_START");
             for (int i = 0; i < lampPoints.Length; i++)
                 CreateAndroidStreetLamp(lampPoints[i]);
-            StartupCheckpoint.Set("CITY_LAMPS_DONE");
 
             BuildAndroidFencesAndStreetDetails();
-            StartupCheckpoint.Set("CITY_STREET_DETAILS_DONE");
-
             BuildAndroidAlleysAndVehicles();
-            StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_DONE");
-
             BuildAndroidRuinedQuarter();
-            StartupCheckpoint.Set("CITY_RUINED_QUARTER_DONE");
 
-            // Flush once, after all static city parts are queued.
             StartupCheckpoint.Set("CITY_FLUSH_START");
             FlushAndroidBoxBatches();
             StartupCheckpoint.Set("CITY_FLUSH_DONE");
             StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
+        }
+
+        private void BuildAndroidCityLandmarks()
+        {
+            Material landmark = MakeMaterial("LandmarkStone", new Color(0.52f, 0.47f, 0.39f));
+            Material landmarkDark = MakeMaterial("LandmarkDark", new Color(0.20f, 0.23f, 0.25f));
+            Material landmarkAccent = MakeMaterial("LandmarkAccent", new Color(0.72f, 0.38f, 0.16f));
+
+            // Large civic arch at the south entrance.
+            QueueAndroidBox("GateLeft", new Vector3(-6.8f, 3.4f, -73f), new Vector3(2.2f, 6.8f, 2.0f), landmark);
+            QueueAndroidBox("GateRight", new Vector3(6.8f, 3.4f, -73f), new Vector3(2.2f, 6.8f, 2.0f), landmark);
+            QueueAndroidBox("GateTop", new Vector3(0f, 6.1f, -73f), new Vector3(15.8f, 1.8f, 2.0f), landmarkAccent);
+
+            // A stepped civic tower is much more legible from the camera than tiny props.
+            QueueAndroidBox("TowerBase", new Vector3(0f, 3.0f, 20f), new Vector3(8.0f, 6.0f, 8.0f), landmark);
+            QueueAndroidBox("TowerMid", new Vector3(0f, 7.8f, 20f), new Vector3(5.8f, 3.6f, 5.8f), landmarkDark);
+            QueueAndroidBox("TowerTop", new Vector3(0f, 10.5f, 20f), new Vector3(3.4f, 1.8f, 3.4f), landmarkAccent);
+            QueueAndroidBox("TowerCap", new Vector3(0f, 12.0f, 20f), new Vector3(5.0f, 0.35f, 5.0f), landmark);
+        }
+
+        private void BuildAndroidCivicGreen()
+        {
+            Material green = MakeMaterial("CivicGreen", new Color(0.31f, 0.43f, 0.20f));
+            Material path = MakeMaterial("CivicPath", new Color(0.65f, 0.59f, 0.47f));
+
+            QueueAndroidBox("GreenWest", new Vector3(-20f, 0.08f, 0f), new Vector3(2.8f, 0.16f, 30f), green);
+            QueueAndroidBox("GreenEast", new Vector3(20f, 0.08f, 0f), new Vector3(2.8f, 0.16f, 30f), green);
+            QueueAndroidBox("GreenNorth", new Vector3(0f, 0.08f, 20f), new Vector3(30f, 0.16f, 2.8f), green);
+            QueueAndroidBox("GreenSouth", new Vector3(0f, 0.08f, -20f), new Vector3(30f, 0.16f, 2.8f), green);
+
+            QueueAndroidBox("PathWest", new Vector3(-20f, 0.17f, 0f), new Vector3(0.55f, 0.03f, 29f), path);
+            QueueAndroidBox("PathEast", new Vector3(20f, 0.17f, 0f), new Vector3(0.55f, 0.03f, 29f), path);
+            QueueAndroidBox("PathNorth", new Vector3(0f, 0.17f, 20f), new Vector3(29f, 0.03f, 0.55f), path);
+            QueueAndroidBox("PathSouth", new Vector3(0f, 0.17f, -20f), new Vector3(29f, 0.03f, 0.55f), path);
         }
 
         private void BuildAndroidFencesAndStreetDetails()
