@@ -104,7 +104,7 @@ jobs:
           android_path = world_method[android_start:android_end]
           assert 'AddComponent<Terrain3DBuilder>' not in android_path and 'terrain.Build()' not in android_path, 'Android first-match path still invokes Terrain3DBuilder.'
           assert 'GameObject.CreatePrimitive' not in android_path, 'Android first-match path still uses CreatePrimitive.'
-          assert 'CreateFlatMesh' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
+          assert 'BuildAndroidTerrain3D' in android_path and 'BuildAndroidCityPresentation' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           awake = weapon[weapon.index('private void Awake()'):weapon.index('private void EnsureProjectileTemplate()')]
@@ -473,3 +473,8 @@ jobs:
 # Build trigger: 2026-10-02 isolate BootScene first-frame startup
 
 # Android input isolation 3A/3B/3C build trigger: 2026-10-03
+
+# Build trigger: 2026-10-07 real Android city macro-layout redesign validation
+
+
+# Build trigger: 2026-10-07 custom stylized city mesh asset-pass validation
