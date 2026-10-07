@@ -473,3 +473,5 @@ jobs:
 # Build trigger: 2026-10-02 isolate BootScene first-frame startup
 
 # Android input isolation 3A/3B/3C build trigger: 2026-10-03
+
+# Build trigger: 2026-10-07 real Android city macro-layout redesign validation
