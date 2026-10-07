@@ -749,21 +749,40 @@ namespace PersiaWar.Unity2D5D
             Material door = androidDoorMaterial;
 
             Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
-            QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
+            CreateAndroidChamferedShell(
+                position,
+                footprint,
+                bodyHeight,
+                depth,
+                Mathf.Clamp(Mathf.Min(footprint, depth) * 0.10f, 0.55f, 1.35f),
+                facade);
             CreateAndroidCollider("CityBuildingCollider", position, bodySize);
 
-            // Stronger silhouette: raised plinth, parapet and roof cap.
+            // Real silhouette pass: chamfered corners + a roof profile that varies by district.
             QueueAndroidBox(
                 "BuildingPlinth",
                 position + new Vector3(0f, 0.28f, 0f),
                 new Vector3(footprint + 0.50f, 0.56f, depth + 0.50f),
                 androidPlinthMaterial);
 
-            QueueAndroidBox(
-                "CityRoofCap",
-                position + Vector3.up * (bodyHeight + 0.22f),
-                new Vector3(footprint + 0.60f, 0.44f, depth + 0.60f),
-                trim);
+            bool usePitchedRoof = !warehouse && bodyHeight <= 13.5f && (style == 0 || style == 2 || style == 4);
+            if (usePitchedRoof)
+            {
+                CreateAndroidPitchedRoof(
+                    position + new Vector3(0f, bodyHeight, 0f),
+                    footprint + 0.80f,
+                    depth + 0.80f,
+                    1.65f,
+                    androidRoofTileMaterial);
+            }
+            else
+            {
+                QueueAndroidBox(
+                    "CityRoofCap",
+                    position + Vector3.up * (bodyHeight + 0.22f),
+                    new Vector3(footprint + 0.60f, 0.44f, depth + 0.60f),
+                    trim);
+            }
 
             // Front floor bands and corner columns make the facade read at camera distance.
             int floorCount = warehouse ? 2 : Mathf.Clamp(Mathf.RoundToInt(bodyHeight / 3.25f), 2, 4);
@@ -945,6 +964,7 @@ namespace PersiaWar.Unity2D5D
         private Material androidDoorMaterial;
         private Material androidPlinthMaterial;
         private Material androidRoofDetailMaterial;
+        private Material androidRoofTileMaterial;
         private Material androidPlanterMaterial;
         private Material androidHedgeMaterial;
         private Material androidVehicleWheelMaterial;
@@ -997,6 +1017,7 @@ namespace PersiaWar.Unity2D5D
             androidDoorMaterial = MakeMaterial("CityDoor", new Color(0.17f, 0.13f, 0.11f));
             androidPlinthMaterial = MakeMaterial("CityPlinth", new Color(0.36f, 0.35f, 0.32f));
             androidRoofDetailMaterial = MakeMaterial("RoofDetail", new Color(0.26f, 0.28f, 0.29f));
+            androidRoofTileMaterial = MakeMaterial("RoofTile", new Color(0.50f, 0.20f, 0.12f));
             androidPlanterMaterial = MakeMaterial("Planter", new Color(0.27f, 0.21f, 0.14f));
             androidHedgeMaterial = MakeMaterial("Hedge", new Color(0.20f, 0.38f, 0.17f));
             androidVehicleWheelMaterial = MakeMaterial("VehicleWheel", new Color(0.035f, 0.045f, 0.055f));
@@ -1117,6 +1138,206 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(2.8f, 0.025f, 0.08f),
                     androidCrackMaterial);
             }
+        }
+
+
+        private void CreateAndroidChamferedShell(
+            Vector3 position,
+            float width,
+            float height,
+            float depth,
+            float chamfer,
+            Material material)
+        {
+            if (material == null)
+                return;
+
+            if (!androidBoxBatches.TryGetValue(material, out AndroidBoxBatch batch))
+            {
+                batch = new AndroidBoxBatch(material);
+                androidBoxBatches.Add(material, batch);
+            }
+
+            AddAndroidChamferedPrismGeometry(
+                batch.Vertices,
+                batch.Normals,
+                batch.Triangles,
+                position,
+                width,
+                height,
+                depth,
+                chamfer);
+        }
+
+        private void AddAndroidChamferedPrismGeometry(
+            List<Vector3> vertices,
+            List<Vector3> normals,
+            List<int> triangles,
+            Vector3 center,
+            float width,
+            float height,
+            float depth,
+            float chamfer)
+        {
+            float x = width * 0.5f;
+            float z = depth * 0.5f;
+            float c = Mathf.Clamp(chamfer, 0.05f, Mathf.Min(x, z) * 0.45f);
+
+            Vector2[] polygon =
+            {
+                new Vector2(-x + c, -z),
+                new Vector2(x - c, -z),
+                new Vector2(x, -z + c),
+                new Vector2(x, z - c),
+                new Vector2(x - c, z),
+                new Vector2(-x + c, z),
+                new Vector2(-x, z - c),
+                new Vector2(-x, -z + c)
+            };
+
+            Vector3[] bottom = new Vector3[polygon.Length];
+            Vector3[] top = new Vector3[polygon.Length];
+            for (int i = 0; i < polygon.Length; i++)
+            {
+                bottom[i] = center + new Vector3(polygon[i].x, 0f, polygon[i].y);
+                top[i] = center + new Vector3(polygon[i].x, height, polygon[i].y);
+            }
+
+            // Bottom face.
+            int bottomStart = vertices.Count;
+            for (int i = 0; i < bottom.Length; i++)
+            {
+                vertices.Add(bottom[i]);
+                normals.Add(Vector3.down);
+            }
+            for (int i = 1; i < bottom.Length - 1; i++)
+            {
+                triangles.Add(bottomStart);
+                triangles.Add(bottomStart + i + 1);
+                triangles.Add(bottomStart + i);
+            }
+
+            // Side faces.
+            for (int i = 0; i < polygon.Length; i++)
+            {
+                int next = (i + 1) % polygon.Length;
+                Vector3 edge = top[next] - top[i];
+                Vector3 normal = Vector3.Cross(Vector3.up, edge).normalized;
+
+                int start = vertices.Count;
+                vertices.Add(bottom[i]);
+                vertices.Add(top[i]);
+                vertices.Add(top[next]);
+                vertices.Add(bottom[next]);
+                normals.Add(normal);
+                normals.Add(normal);
+                normals.Add(normal);
+                normals.Add(normal);
+
+                triangles.Add(start + 0);
+                triangles.Add(start + 1);
+                triangles.Add(start + 2);
+                triangles.Add(start + 0);
+                triangles.Add(start + 2);
+                triangles.Add(start + 3);
+            }
+
+            // Top face.
+            int topStart = vertices.Count;
+            for (int i = 0; i < top.Length; i++)
+            {
+                vertices.Add(top[i]);
+                normals.Add(Vector3.up);
+            }
+            for (int i = 1; i < top.Length - 1; i++)
+            {
+                triangles.Add(topStart);
+                triangles.Add(topStart + i);
+                triangles.Add(topStart + i + 1);
+            }
+        }
+
+        private void CreateAndroidPitchedRoof(
+            Vector3 position,
+            float width,
+            float depth,
+            float rise,
+            Material material)
+        {
+            if (material == null)
+                return;
+
+            if (!androidBoxBatches.TryGetValue(material, out AndroidBoxBatch batch))
+            {
+                batch = new AndroidBoxBatch(material);
+                androidBoxBatches.Add(material, batch);
+            }
+
+            float x = width * 0.5f;
+            float z = depth * 0.5f;
+            float overhang = 0.10f;
+            x += overhang;
+            z += overhang;
+
+            Vector3 fl = position + new Vector3(-x, 0f, -z);
+            Vector3 fr = position + new Vector3(x, 0f, -z);
+            Vector3 br = position + new Vector3(x, 0f, z);
+            Vector3 bl = position + new Vector3(-x, 0f, z);
+            Vector3 rl = position + new Vector3(-x, rise, 0f);
+            Vector3 rr = position + new Vector3(x, rise, 0f);
+
+            AddAndroidQuadFace(batch.Vertices, batch.Normals, batch.Triangles, fl, fr, rr, rl);
+            AddAndroidQuadFace(batch.Vertices, batch.Normals, batch.Triangles, br, bl, rl, rr);
+            AddAndroidTriangleFace(batch.Vertices, batch.Normals, batch.Triangles, fl, rl, bl);
+            AddAndroidTriangleFace(batch.Vertices, batch.Normals, batch.Triangles, fr, br, rr);
+        }
+
+        private void AddAndroidQuadFace(
+            List<Vector3> vertices,
+            List<Vector3> normals,
+            List<int> triangles,
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            Vector3 d)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
+            int start = vertices.Count;
+            vertices.Add(a);
+            vertices.Add(b);
+            vertices.Add(c);
+            vertices.Add(d);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            triangles.Add(start + 0);
+            triangles.Add(start + 1);
+            triangles.Add(start + 2);
+            triangles.Add(start + 0);
+            triangles.Add(start + 2);
+            triangles.Add(start + 3);
+        }
+
+        private void AddAndroidTriangleFace(
+            List<Vector3> vertices,
+            List<Vector3> normals,
+            List<int> triangles,
+            Vector3 a,
+            Vector3 b,
+            Vector3 c)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
+            int start = vertices.Count;
+            vertices.Add(a);
+            vertices.Add(b);
+            vertices.Add(c);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            triangles.Add(start + 0);
+            triangles.Add(start + 1);
+            triangles.Add(start + 2);
         }
 
         private void QueueAndroidBox(string objectName, Vector3 position, Vector3 size, Material material)
