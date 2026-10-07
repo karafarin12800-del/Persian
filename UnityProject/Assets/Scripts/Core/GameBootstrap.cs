@@ -1213,8 +1213,8 @@ namespace PersiaWar.Unity2D5D
             for (int i = 1; i < bottom.Length - 1; i++)
             {
                 triangles.Add(bottomStart);
-                triangles.Add(bottomStart + i + 1);
                 triangles.Add(bottomStart + i);
+                triangles.Add(bottomStart + i + 1);
             }
 
             // Side faces.
@@ -1252,8 +1252,8 @@ namespace PersiaWar.Unity2D5D
             for (int i = 1; i < top.Length - 1; i++)
             {
                 triangles.Add(topStart);
-                triangles.Add(topStart + i);
                 triangles.Add(topStart + i + 1);
+                triangles.Add(topStart + i);
             }
         }
 
@@ -1286,10 +1286,10 @@ namespace PersiaWar.Unity2D5D
             Vector3 rl = position + new Vector3(-x, rise, 0f);
             Vector3 rr = position + new Vector3(x, rise, 0f);
 
-            AddAndroidQuadFace(batch.Vertices, batch.Normals, batch.Triangles, fl, fr, rr, rl);
-            AddAndroidQuadFace(batch.Vertices, batch.Normals, batch.Triangles, br, bl, rl, rr);
-            AddAndroidTriangleFace(batch.Vertices, batch.Normals, batch.Triangles, fl, rl, bl);
-            AddAndroidTriangleFace(batch.Vertices, batch.Normals, batch.Triangles, fr, br, rr);
+            AddAndroidQuadFace(batch.Vertices, batch.Normals, batch.Triangles, fl, rl, rr, fr);
+            AddAndroidQuadFace(batch.Vertices, batch.Normals, batch.Triangles, br, rr, rl, bl);
+            AddAndroidTriangleFace(batch.Vertices, batch.Normals, batch.Triangles, bl, rl, fl);
+            AddAndroidTriangleFace(batch.Vertices, batch.Normals, batch.Triangles, fr, rr, br);
         }
 
         private void AddAndroidQuadFace(
