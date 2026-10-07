@@ -397,48 +397,51 @@ namespace PersiaWar.Unity2D5D
             androidBoxBatches.Clear();
             EnsureAndroidCityMaterials();
 
-            // Major visual redesign: five readable districts instead of a repeated grid.
-            // Buildings are deliberately larger and more varied so the change is visible
-            // from the existing elevated gameplay camera.
-            StartupCheckpoint.Set("CITY_DISTRICTS_START");
+            // Low-rise gameplay-first city: every normal building is strictly one or two
+            // floors, with wider footprints, clearer lanes, courtyards and short sightline
+            // breaks so the environment supports movement and combat instead of becoming
+            // a tall visual wall.
+            StartupCheckpoint.Set("CITY_LOW_RISE_START");
 
-            // WEST RESIDENTIAL: low-rise houses with wider footprints.
-            Vector3[] west =
+            Vector3[] residential =
             {
                 new Vector3(-62f, 0f, -62f), new Vector3(-35f, 0f, -62f),
                 new Vector3(-62f, 0f, -35f), new Vector3(-35f, 0f, -35f),
                 new Vector3(-62f, 0f, 35f),  new Vector3(-35f, 0f, 35f),
-                new Vector3(-62f, 0f, 62f),  new Vector3(-35f, 0f, 62f)
+                new Vector3(-62f, 0f, 62f),  new Vector3(-35f, 0f, 62f),
+                new Vector3(35f, 0f, -62f),  new Vector3(62f, 0f, -62f),
+                new Vector3(35f, 0f, -35f),  new Vector3(62f, 0f, -35f),
+                new Vector3(35f, 0f, 35f),   new Vector3(62f, 0f, 35f),
+                new Vector3(35f, 0f, 62f),   new Vector3(62f, 0f, 62f)
             };
-            for (int i = 0; i < west.Length; i++)
-                CreateAndroidBuilding(west[i], 14.5f, i % 3 == 0 ? 7.4f : 8.6f, 11.5f, i % 5, false, false);
 
-            // EAST COMMERCIAL: taller, narrow blocks create a distinct skyline.
-            Vector3[] east =
+            for (int i = 0; i < residential.Length; i++)
             {
-                new Vector3(35f, 0f, -62f), new Vector3(62f, 0f, -62f),
-                new Vector3(35f, 0f, -35f), new Vector3(62f, 0f, -35f),
-                new Vector3(35f, 0f, 35f),  new Vector3(62f, 0f, 35f),
-                new Vector3(35f, 0f, 62f),  new Vector3(62f, 0f, 62f)
-            };
-            for (int i = 0; i < east.Length; i++)
-                CreateAndroidBuilding(east[i], i % 2 == 0 ? 10.5f : 13.0f,
-                    i % 3 == 0 ? 16.5f : 13.5f, 9.0f, (i + 1) % 5, false, false);
+                float footprint = 12.5f + (i % 3) * 1.6f;
+                float height = (i % 4 == 0 || i % 5 == 0) ? 7.8f : 5.3f;
+                float depth = 10.8f + (i % 2) * 1.1f;
+                CreateAndroidBuilding(
+                    residential[i],
+                    footprint,
+                    height,
+                    depth,
+                    i % 5,
+                    false,
+                    false);
+            }
 
-            // NORTH MARKET / WAREHOUSE DISTRICT.
-            CreateAndroidBuilding(new Vector3(-27f, 0f, 66f), 20f, 7.0f, 14f, 2, false, true);
-            CreateAndroidBuilding(new Vector3(0f, 0f, 66f), 20f, 8.0f, 14f, 0, false, true);
-            CreateAndroidBuilding(new Vector3(27f, 0f, 66f), 20f, 7.0f, 14f, 3, false, true);
+            // NORTH MARKET: one-story warehouses and two-story shops create a readable
+            // skyline without introducing tall combat-obscuring blocks.
+            CreateAndroidBuilding(new Vector3(-27f, 0f, 66f), 18.5f, 6.2f, 13f, 2, false, true);
+            CreateAndroidBuilding(new Vector3(0f, 0f, 66f), 18.5f, 6.2f, 13f, 0, false, true);
+            CreateAndroidBuilding(new Vector3(27f, 0f, 66f), 18.5f, 6.2f, 13f, 3, false, true);
+            CreateAndroidBuilding(new Vector3(-27f, 0f, -66f), 15.0f, 7.8f, 11.5f, 4, false, false);
+            CreateAndroidBuilding(new Vector3(27f, 0f, -66f), 15.0f, 7.8f, 11.5f, 1, false, false);
 
-            // SOUTH GATE / LANDMARKS: large stepped buildings frame the main approach.
-            CreateAndroidBuilding(new Vector3(-27f, 0f, -66f), 16f, 11.0f, 12f, 4, false, false);
-            CreateAndroidBuilding(new Vector3(27f, 0f, -66f), 16f, 14.0f, 12f, 1, false, false);
             BuildAndroidCityLandmarks();
-
-            // Central civic plaza and a wider green median visually break the old grid.
             BuildAndroidCentralPlaza();
             BuildAndroidCivicGreen();
-            StartupCheckpoint.Set("CITY_DISTRICTS_DONE");
+            StartupCheckpoint.Set("CITY_LOW_RISE_BLOCKS_DONE");
 
             Vector3[] treePoints =
             {
@@ -466,7 +469,7 @@ namespace PersiaWar.Unity2D5D
             BuildAndroidAlleysAndVehicles();
             BuildAndroidRuinedQuarter();
 
-            StartupCheckpoint.Set("CITY_FLUSH_START");
+            StartupCheckpoint.Set("CITY_LOW_RISE_FLUSH_START");
             FlushAndroidBoxBatches();
             StartupCheckpoint.Set("CITY_FLUSH_DONE");
             StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
@@ -478,16 +481,18 @@ namespace PersiaWar.Unity2D5D
             Material landmarkDark = MakeMaterial("LandmarkDark", new Color(0.20f, 0.23f, 0.25f));
             Material landmarkAccent = MakeMaterial("LandmarkAccent", new Color(0.72f, 0.38f, 0.16f));
 
-            // Large civic arch at the south entrance.
+            // Entrance arch is a navigation marker, not a combat-height structure.
             QueueAndroidBox("GateLeft", new Vector3(-6.8f, 3.4f, -73f), new Vector3(2.2f, 6.8f, 2.0f), landmark);
             QueueAndroidBox("GateRight", new Vector3(6.8f, 3.4f, -73f), new Vector3(2.2f, 6.8f, 2.0f), landmark);
             QueueAndroidBox("GateTop", new Vector3(0f, 6.1f, -73f), new Vector3(15.8f, 1.8f, 2.0f), landmarkAccent);
 
-            // A stepped civic tower is much more legible from the camera than tiny props.
-            QueueAndroidBox("TowerBase", new Vector3(0f, 3.0f, 20f), new Vector3(8.0f, 6.0f, 8.0f), landmark);
-            QueueAndroidBox("TowerMid", new Vector3(0f, 7.8f, 20f), new Vector3(5.8f, 3.6f, 5.8f), landmarkDark);
-            QueueAndroidBox("TowerTop", new Vector3(0f, 10.5f, 20f), new Vector3(3.4f, 1.8f, 3.4f), landmarkAccent);
-            QueueAndroidBox("TowerCap", new Vector3(0f, 12.0f, 20f), new Vector3(5.0f, 0.35f, 5.0f), landmark);
+            // Two-floor civic hall: visually distinctive but never a tall skyline obstacle.
+            QueueAndroidBox("CivicHallBase", new Vector3(0f, 2.55f, 20f), new Vector3(10.0f, 5.1f, 8.5f), landmark);
+            QueueAndroidBox("CivicHallUpper", new Vector3(0f, 6.25f, 20f), new Vector3(7.2f, 2.3f, 6.6f), landmarkDark);
+            QueueAndroidBox("CivicHallCap", new Vector3(0f, 7.65f, 20f), new Vector3(8.0f, 0.35f, 7.4f), landmarkAccent);
+
+            // A small front stair/forecourt improves readability without blocking the lane.
+            QueueAndroidBox("CivicHallStep", new Vector3(0f, 0.32f, 15.2f), new Vector3(5.4f, 0.48f, 2.2f), landmark);
         }
 
         private void BuildAndroidCivicGreen()
@@ -550,26 +555,25 @@ namespace PersiaWar.Unity2D5D
         private void BuildAndroidAlleysAndVehicles()
         {
             StartupCheckpoint.Set("CITY_ALLEYS_START");
-            const float alleyWidth = 4.5f;
-            const float alleySpacing = 12f;
-            const int alleyCountPerAxis = 15;
-            float half = worldSize * 0.5f - alleySpacing;
+            const float alleyWidth = 4.2f;
 
-            // 15 lanes in each axis = 30 secondary alleys. Bake them into one
-            // shared road mesh instead of maintaining 30 separate renderers.
+            // Four clear east/west and north/south alleys sit between building rows.
+            // They are sparse on purpose: the player gets readable cover lanes instead
+            // of a dense carpet of intersecting road meshes.
+            float[] alleyOffsets = { -48f, -13f, 13f, 48f };
             List<Vector3> alleyVertices = new List<Vector3>();
             List<int> alleyTriangles = new List<int>();
-            for (int i = 0; i < alleyCountPerAxis; i++)
+            for (int i = 0; i < alleyOffsets.Length; i++)
             {
-                float offset = -half + i * alleySpacing;
+                float offset = alleyOffsets[i];
                 AddAndroidQuad(alleyVertices, alleyTriangles,
-                    new Vector3(offset, -0.01f, 0f),
+                    new Vector3(offset, -0.012f, 0f),
                     new Vector2(alleyWidth, worldSize));
                 AddAndroidQuad(alleyVertices, alleyTriangles,
-                    new Vector3(0f, -0.005f, offset),
+                    new Vector3(0f, -0.011f, offset),
                     new Vector2(worldSize, alleyWidth));
             }
-            CreateAndroidQuadBatch("AndroidSecondaryAlleys", alleyVertices, alleyTriangles, roadMaterial);
+            CreateAndroidQuadBatch("AndroidGameplayAlleys", alleyVertices, alleyTriangles, roadMaterial);
             StartupCheckpoint.Set("CITY_ALLEYS_DONE");
 
             Material[] vehicleMaterials =
@@ -580,12 +584,13 @@ namespace PersiaWar.Unity2D5D
                 MakeMaterial("VehicleRed", new Color(0.48f, 0.16f, 0.12f))
             };
 
+            // Vehicles are placed on the actual clear lanes, not inside building footprints.
             Vector3[] vehiclePoints =
             {
-                new Vector3(-36f, 0f, -12f), new Vector3(36f, 0f, 12f),
-                new Vector3(-60f, 0f, 60f),  new Vector3(60f, 0f, -60f),
-                new Vector3(-12f, 0f, 60f),  new Vector3(12f, 0f, -60f),
-                new Vector3(-72f, 0f, 24f),  new Vector3(72f, 0f, -24f)
+                new Vector3(-48f, 0f, -13f), new Vector3(48f, 0f, 13f),
+                new Vector3(-13f, 0f, 48f),  new Vector3(13f, 0f, -48f),
+                new Vector3(-48f, 0f, 20f),  new Vector3(48f, 0f, -20f),
+                new Vector3(-20f, 0f, -48f), new Vector3(20f, 0f, 48f)
             };
 
             for (int i = 0; i < vehiclePoints.Length; i++)
@@ -655,41 +660,45 @@ namespace PersiaWar.Unity2D5D
             Material curb = MakeMaterial("AndroidCurb", new Color(0.56f, 0.54f, 0.49f));
             float half = worldSize * 0.5f;
 
-            // Build all repeated road markings into a few shared meshes instead of
-            // hundreds of separate GameObjects. This preserves the same visual grid
-            // while dramatically reducing Android hierarchy/renderer overhead.
-            List<Vector3> verticalVertices = new List<Vector3>(1024);
-            List<int> verticalTriangles = new List<int>(1536);
-            List<Vector3> horizontalVertices = new List<Vector3>(1024);
-            List<int> horizontalTriangles = new List<int>(1536);
+            List<Vector3> verticalVertices = new List<Vector3>(512);
+            List<int> verticalTriangles = new List<int>(768);
+            List<Vector3> horizontalVertices = new List<Vector3>(512);
+            List<int> horizontalTriangles = new List<int>(768);
             List<Vector3> curbVertices = new List<Vector3>(256);
             List<int> curbTriangles = new List<int>(384);
 
-            for (float x = -half + 5f; x < half; x += 10f)
+            float[] roadCenters = { -54f, -27f, 0f, 27f, 54f };
+            for (int i = 0; i < roadCenters.Length; i++)
             {
-                for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
-                    AddAndroidQuad(verticalVertices, verticalTriangles, new Vector3(x, -0.006f, z), new Vector2(0.28f, 4.2f));
-            }
+                float center = roadCenters[i];
+                float localWidth = Mathf.Approximately(center, 0f) ? roadWidth : 8f;
 
-            for (float z = -half + 5f; z < half; z += 10f)
-            {
-                for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
-                    AddAndroidQuad(horizontalVertices, horizontalTriangles, new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f));
-            }
+                for (float z = -half + 8f; z < half; z += 12f)
+                {
+                    AddAndroidQuad(verticalVertices, verticalTriangles,
+                        new Vector3(center, 0.012f, z), new Vector2(0.22f, 4.6f));
+                }
 
-            for (float x = -half + 0.68f; x <= half; x += 24f)
-            {
+                for (float x = -half + 8f; x < half; x += 12f)
+                {
+                    AddAndroidQuad(horizontalVertices, horizontalTriangles,
+                        new Vector3(x, 0.013f, center), new Vector2(4.6f, 0.22f));
+                }
+
+                float edge = localWidth * 0.5f;
                 AddAndroidQuad(curbVertices, curbTriangles,
-                    new Vector3(x - roadWidth * 0.5f, 0.01f, 0f),
-                    new Vector2(0.08f, worldSize));
+                    new Vector3(center - edge, 0.014f, 0f), new Vector2(0.10f, worldSize));
                 AddAndroidQuad(curbVertices, curbTriangles,
-                    new Vector3(x + roadWidth * 0.5f, 0.01f, 0f),
-                    new Vector2(0.08f, worldSize));
+                    new Vector3(center + edge, 0.014f, 0f), new Vector2(0.10f, worldSize));
+                AddAndroidQuad(curbVertices, curbTriangles,
+                    new Vector3(0f, 0.014f, center - edge), new Vector2(worldSize, 0.10f));
+                AddAndroidQuad(curbVertices, curbTriangles,
+                    new Vector3(0f, 0.014f, center + edge), new Vector2(worldSize, 0.10f));
             }
 
-            CreateAndroidQuadBatch("AndroidLaneDashV", verticalVertices, verticalTriangles, lane);
-            CreateAndroidQuadBatch("AndroidLaneDashH", horizontalVertices, horizontalTriangles, lane);
-            CreateAndroidQuadBatch("AndroidCurbs", curbVertices, curbTriangles, curb);
+            CreateAndroidQuadBatch("AndroidGameplayLaneDashesV", verticalVertices, verticalTriangles, lane);
+            CreateAndroidQuadBatch("AndroidGameplayLaneDashesH", horizontalVertices, horizontalTriangles, lane);
+            CreateAndroidQuadBatch("AndroidGameplayCurbs", curbVertices, curbTriangles, curb);
         }
 
         private static void AddAndroidQuad(List<Vector3> vertices, List<int> triangles, Vector3 center, Vector2 size)
@@ -740,7 +749,12 @@ namespace PersiaWar.Unity2D5D
             bool ruined,
             bool warehouse)
         {
-            float bodyHeight = Mathf.Max(5.5f, height);
+            // Gameplay constraint: no ordinary city building exceeds two floors.
+            // One-story houses/shops use compact silhouettes; two-story blocks stay low enough
+            // to preserve sightlines for the player and enemies.
+            float bodyHeight = warehouse
+                ? Mathf.Clamp(height, 4.8f, 6.0f)
+                : Mathf.Clamp(height, 4.4f, 8.2f);
             int style = Mathf.Abs(styleIndex) % androidFacadeMaterials.Length;
             Material facade = androidFacadeMaterials[style];
             Material trim = androidTrimMaterials[style];
@@ -772,7 +786,7 @@ namespace PersiaWar.Unity2D5D
                     position + new Vector3(0f, bodyHeight, 0f),
                     footprint + 0.80f,
                     depth + 0.80f,
-                    1.65f,
+                    bodyHeight < 6.1f ? 1.35f : 1.60f,
                     androidRoofTileMaterial);
             }
             else
@@ -785,7 +799,7 @@ namespace PersiaWar.Unity2D5D
             }
 
             // Front floor bands and corner columns make the facade read at camera distance.
-            int floorCount = warehouse ? 2 : Mathf.Clamp(Mathf.RoundToInt(bodyHeight / 3.25f), 2, 4);
+            int floorCount = warehouse ? 1 : Mathf.Clamp(Mathf.RoundToInt(bodyHeight / 3.6f), 1, 2);
             for (int row = 0; row < floorCount; row++)
             {
                 float y = 1.15f + row * ((bodyHeight - 2.2f) / Mathf.Max(1, floorCount - 1));
@@ -869,29 +883,52 @@ namespace PersiaWar.Unity2D5D
                     }
                 }
 
-                // Storefront strip + entrance canopy.
-                QueueAndroidBox(
-                    "Storefront",
-                    position + new Vector3(0f, 1.18f, -depth * 0.54f),
-                    new Vector3(footprint * 0.78f, 1.55f, 0.12f),
-                    accent);
+                bool lowRiseHouse = bodyHeight < 6.1f && (style == 0 || style == 2 || style == 4);
+                if (lowRiseHouse)
+                {
+                    QueueAndroidBox(
+                        "HousePorch",
+                        position + new Vector3(0f, 0.16f, -depth * 0.59f),
+                        new Vector3(Mathf.Min(3.6f, footprint * 0.36f), 0.32f, 1.10f),
+                        trim);
+                    QueueAndroidBox(
+                        "HouseDoor",
+                        position + new Vector3(0f, 1.14f, -depth * 0.57f),
+                        new Vector3(Mathf.Min(1.25f, footprint * 0.16f), 2.20f, 0.16f),
+                        door);
+                    QueueAndroidBox(
+                        "HouseAwning",
+                        position + new Vector3(0f, 2.42f, -depth * 0.60f),
+                        new Vector3(Mathf.Min(2.8f, footprint * 0.30f), 0.16f, 0.74f),
+                        accent);
+                }
+                else
+                {
+                    // Shop/apartment entrance: a stronger front band gives the low-rise block
+                    // a clearly readable facade without making it taller.
+                    QueueAndroidBox(
+                        "Storefront",
+                        position + new Vector3(0f, 1.18f, -depth * 0.54f),
+                        new Vector3(footprint * 0.78f, 1.55f, 0.12f),
+                        accent);
 
-                QueueAndroidBox(
-                    "Door",
-                    position + new Vector3(0f, 1.20f, -depth * 0.565f),
-                    new Vector3(Mathf.Min(1.35f, footprint * 0.18f), 2.30f, 0.15f),
-                    door);
+                    QueueAndroidBox(
+                        "Door",
+                        position + new Vector3(0f, 1.20f, -depth * 0.565f),
+                        new Vector3(Mathf.Min(1.35f, footprint * 0.18f), 2.30f, 0.15f),
+                        door);
 
-                QueueAndroidBox(
-                    "DoorCanopy",
-                    position + new Vector3(0f, 2.48f, -depth * 0.58f),
-                    new Vector3(Mathf.Min(2.8f, footprint * 0.34f), 0.18f, 0.72f),
-                    trim);
+                    QueueAndroidBox(
+                        "DoorCanopy",
+                        position + new Vector3(0f, 2.48f, -depth * 0.58f),
+                        new Vector3(Mathf.Min(2.8f, footprint * 0.34f), 0.18f, 0.72f),
+                        trim);
+                }
 
                 // Select buildings get balconies; others get side AC units.
                 if (style == 1 || style == 3)
                 {
-                    int balconies = bodyHeight > 11f ? 2 : 1;
+                    int balconies = bodyHeight > 7.0f ? 1 : 1;
                     for (int i = 0; i < balconies; i++)
                     {
                         float y = 3.10f + i * 3.35f;
