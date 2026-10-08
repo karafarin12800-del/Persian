@@ -3,7 +3,7 @@ using UnityEngine;
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// Lightweight, deterministic city dressing for the 2.5D prototype.
+    /// Lightweight, deterministic city dressing for the 2.5D prototype with Persian-inspired facade accents and street dressing.
     /// Gameplay-scale buildings keep their solid body colliders; decorative details
     /// share materials and do not create extra colliders on Android.
     /// </summary>
@@ -42,6 +42,9 @@ namespace PersiaWar.Unity2D5D
         private static Material doorMaterial;
         private static Material trunkMaterial;
         private static Material foliageMaterial;
+        private static Material tileAccentMaterial;
+        private static Material stoneMaterial;
+        private static Material metalMaterial;
 
         private void Start()
         {
@@ -49,6 +52,8 @@ namespace PersiaWar.Unity2D5D
             Random.InitState(20260930);
             SpawnBuildings();
             SpawnTrees();
+            SpawnStreetProps();
+            SpawnPlazas();
         }
 
         private static void EnsureMaterials()
@@ -68,6 +73,9 @@ namespace PersiaWar.Unity2D5D
             doorMaterial = CreateSharedMaterial("CityDoor", new Color(0.25f, 0.15f, 0.09f));
             trunkMaterial = CreateSharedMaterial("CityTreeTrunk", new Color(0.30f, 0.20f, 0.12f));
             foliageMaterial = CreateSharedMaterial("CityTreeFoliage", new Color(0.22f, 0.37f, 0.18f));
+            tileAccentMaterial = CreateSharedMaterial("CityTileAccent", new Color(0.10f, 0.33f, 0.38f));
+            stoneMaterial = CreateSharedMaterial("CityStone", new Color(0.43f, 0.39f, 0.33f));
+            metalMaterial = CreateSharedMaterial("CityLampMetal", new Color(0.15f, 0.17f, 0.16f));
         }
 
         private static Material CreateSharedMaterial(string materialName, Color color)
@@ -195,6 +203,27 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(width * 0.20f, height + 0.82f, depth * 0.15f),
                 new Vector3(Mathf.Min(2.2f, width * 0.16f), 0.8f, Mathf.Min(1.6f, depth * 0.14f)),
                 accentMaterial);
+
+            // Persian-inspired trim and pilasters add a stronger silhouette without adding colliders.
+            if (index % 2 == 0)
+            {
+                CreateDetail(root.transform, "LeftPilaster",
+                    new Vector3(-width * 0.38f, height * 0.5f, -depth * 0.53f),
+                    new Vector3(0.42f, height * 0.88f, 0.16f), stoneMaterial);
+                CreateDetail(root.transform, "RightPilaster",
+                    new Vector3(width * 0.38f, height * 0.5f, -depth * 0.53f),
+                    new Vector3(0.42f, height * 0.88f, 0.16f), stoneMaterial);
+                CreateDetail(root.transform, "TileBand",
+                    new Vector3(0f, Mathf.Min(height - 1.2f, 3.8f), -depth * 0.525f),
+                    new Vector3(width * 0.78f, 0.34f, 0.14f), tileAccentMaterial);
+            }
+
+            if (index % 4 == 0)
+            {
+                CreateDetail(root.transform, "ParapetFront",
+                    new Vector3(0f, height + 0.72f, -depth * 0.36f),
+                    new Vector3(width * 0.76f, 0.65f, 0.18f), stoneMaterial);
+            }
         }
 
         private static void CreateWindowFrame(Transform parent, float x, float y, float depth, float width, float height)
@@ -254,6 +283,89 @@ namespace PersiaWar.Unity2D5D
 
                 spawned++;
             }
+        }
+
+        private void SpawnStreetProps()
+        {
+            for (int spawned = 0, attempts = 0; spawned < 34 && attempts < 34 * 40; attempts++)
+            {
+                Vector3 p = RandomPointInsideCity();
+                if (!IsOnRoadOrAlley(p, 1.5f)) continue;
+
+                float roadOffset = (spawned % 2 == 0 ? -1f : 1f) * Random.Range(3.0f, 4.8f);
+                bool placeOnXRoad = Mathf.Abs(p.x) > Mathf.Abs(p.z);
+                Vector3 propPos = placeOnXRoad
+                    ? new Vector3(p.x, 0f, p.z + roadOffset)
+                    : new Vector3(p.x + roadOffset, 0f, p.z);
+
+                CreateStreetLamp(propPos, spawned);
+                spawned++;
+            }
+        }
+
+        private void CreateStreetLamp(Vector3 position, int index)
+        {
+            var root = new GameObject("StreetLamp_" + index);
+            root.transform.position = position;
+
+            var pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pole.name = "Pole";
+            pole.transform.SetParent(root.transform, false);
+            pole.transform.localPosition = new Vector3(0f, 2.4f, 0f);
+            pole.transform.localScale = new Vector3(0.16f, 2.4f, 0.16f);
+            SetMaterial(pole, metalMaterial);
+            RemoveCollider(pole);
+
+            var arm = CreateDetail(root.transform, "Arm", new Vector3(0.34f, 4.55f, 0f),
+                new Vector3(0.68f, 0.14f, 0.14f), metalMaterial);
+            var lamp = CreateDetail(root.transform, "Lamp",
+                new Vector3(0.66f, 4.35f, 0f), new Vector3(0.38f, 0.24f, 0.38f),
+                tileAccentMaterial);
+
+            if (index % 3 == 0)
+                CreateDetail(root.transform, "Base", new Vector3(0f, 0.12f, 0f),
+                    new Vector3(0.6f, 0.24f, 0.6f), stoneMaterial);
+        }
+
+        private void SpawnPlazas()
+        {
+            Vector3[] positions =
+            {
+                new Vector3(-42f, 0.02f, 46f),
+                new Vector3(48f, 0.02f, -40f)
+            };
+
+            for (int i = 0; i < positions.Length; i++)
+            {
+                var plaza = new GameObject("Plaza_" + i);
+                plaza.transform.position = positions[i];
+
+                CreateDetail(plaza.transform, "Paving",
+                    Vector3.zero, new Vector3(24f, 0.18f, 24f), stoneMaterial);
+
+                CreateDetail(plaza.transform, "Inset",
+                    new Vector3(0f, 0.11f, 0f), new Vector3(15f, 0.10f, 15f),
+                    tileAccentMaterial);
+
+                CreatePlazaMarker(plaza.transform, -8f, -8f);
+                CreatePlazaMarker(plaza.transform, 8f, -8f);
+                CreatePlazaMarker(plaza.transform, -8f, 8f);
+                CreatePlazaMarker(plaza.transform, 8f, 8f);
+            }
+        }
+
+        private static void CreatePlazaMarker(Transform parent, float x, float z)
+        {
+            CreateDetail(parent, "Marker", new Vector3(x, 0.22f, z),
+                new Vector3(1.0f, 0.25f, 1.0f), stoneMaterial);
+            CreateDetail(parent, "Accent", new Vector3(x, 0.36f, z),
+                new Vector3(0.52f, 0.10f, 0.52f), tileAccentMaterial);
+        }
+
+        private static void RemoveCollider(GameObject obj)
+        {
+            Collider collider = obj.GetComponent<Collider>();
+            if (collider != null) Object.Destroy(collider);
         }
 
         private Vector3 RandomPointInsideCity()
