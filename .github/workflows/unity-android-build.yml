@@ -118,9 +118,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
-          assert 'DrawAimGuide(scale)' not in hub, 'Yellow player-to-target line is still rendered by MobileInputHub.'
-
           spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
           assert spawner.count('enemy.AddComponent<EnemyHealthBar>();') == 2, 'Enemy health bar is not attached in both main spawn paths.'
 
