@@ -157,7 +157,8 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            Vector3 desired = input * moveSpeed * Time.deltaTime;
+            float weaponMoveMultiplier = weapon != null ? weapon.MoveSpeedMultiplier : 1f;
+            Vector3 desired = input * moveSpeed * weaponMoveMultiplier * Time.deltaTime;
             Vector3 next = transform.position + desired;
             next.x = Mathf.Clamp(next.x, -worldLimit, worldLimit);
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
