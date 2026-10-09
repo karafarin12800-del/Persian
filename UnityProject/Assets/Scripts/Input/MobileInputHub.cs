@@ -83,9 +83,9 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            Input.simulateMouseWithTouches = false;
-            // Real finger IDs are the primary path; IMGUI mouse events are only a
-            // guarded fallback when Unity fails to expose a live touch pointer.
+            Input.simulateMouseWithTouches = true;
+            // Keep synthesized mouse events available for IMGUI menu/pause controls.
+            // During gameplay the fallback dispatcher defers to real touch IDs.
 #endif
             enabled = true;
         }
@@ -123,10 +123,9 @@ namespace PersiaWar.Unity2D5D
         {
 #if UNITY_ANDROID
             // Keep IMGUI menu/pause controls clickable from the very first frame.
-            // Gameplay prefers real finger IDs and uses the guarded GUI fallback
-            // only if Unity does not expose a corresponding Input.touchCount.
+            // Gameplay prefers real finger IDs and guards its fallback dispatcher.
             Input.multiTouchEnabled = true;
-            Input.simulateMouseWithTouches = false;
+            Input.simulateMouseWithTouches = true;
 #endif
             if (moveRadius > 0f)
                 joystickRadius = Mathf.Clamp(moveRadius * 0.98f, 108f, 164f);
@@ -159,14 +158,6 @@ namespace PersiaWar.Unity2D5D
         {
 if (!matchActive || matchPaused)
                 return;
-
-#if UNITY_ANDROID
-            // Gameplay input is handled from real Touch.fingerId values. Disable
-            // synthetic mouse events while the match is active so IMGUI cannot
-            // compete with the second finger during move + fire multitouch.
-            if (Input.simulateMouseWithTouches)
-                Input.simulateMouseWithTouches = false;
-#endif
 
             if (player == null)
             {
