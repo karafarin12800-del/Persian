@@ -157,9 +157,12 @@ jobs:
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
 
           assert 'enemySpawner.Configure(player.transform, 11, 84f, 0f);' in flow, 'Android match must start with the reduced 11-opponent lobby.'
-          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.15f, 112f, 218f);' in active_hud, 'Android minimap is not enlarged by 15%.'
+          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f, 134f, 262f);' in active_hud, 'Active Android minimap is not 20% larger than its previous size.'
           assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
-          assert 'AndroidMinimapBuildingPoints' in active_hud and 'for (int road = -72; road <= 72; road += 24)' in active_hud, 'Minimap city roads/buildings are incomplete.'
+          assert 'AndroidMinimapBuildingPoints' in active_hud and 'AndroidMinimapRoadCoordinates' in active_hud, 'Minimap city roads/buildings are incomplete.'
+          assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
+          assert 'Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.96f))' not in active_hud and 'new Color(0.92f, 0.95f, 0.98f, 0.32f)' in active_hud, 'Active Android minimap must be transparent with only a subtle frame.'
+          assert 'new Color(0.68f, 0.70f, 0.73f)' in bootstrap, 'Android battlefield ground is still green instead of light gray.'
 
           enemy_ai = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'EnemyRifleVisual' in enemy_ai and 'RifleBarrel' in enemy_ai, 'Enemy characters do not have visible rifle geometry.'
