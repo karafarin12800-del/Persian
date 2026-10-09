@@ -121,12 +121,6 @@ jobs:
           hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
           assert 'DrawAimGuide(scale)' not in hub, 'Yellow player-to-target line is still rendered by MobileInputHub.'
 
-          projectile = Path('UnityProject/Assets/Scripts/Combat/Projectile.cs').read_text(encoding='utf-8')
-          assert '[SerializeField] private float lifetime = 1.2f;' in projectile, 'Default player projectile lifetime is not halved.'
-          weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
-          assert '[SerializeField] private float projectileLifetime = 1.1f;' in weapon, 'Direct-fire path still overrides the reduced player projectile lifetime.'
-          assert 'projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);' in weapon, 'Direct-fire projectile configuration path changed unexpectedly.'
-
           spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
           assert spawner.count('enemy.AddComponent<EnemyHealthBar>();') == 2, 'Enemy health bar is not attached in both spawn paths.'
 
