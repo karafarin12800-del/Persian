@@ -161,8 +161,10 @@ jobs:
           assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
           assert 'AndroidMinimapBuildingPoints' in active_hud and 'AndroidMinimapRoadCoordinates' in active_hud, 'Minimap city roads/buildings are incomplete.'
           assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
-          assert 'Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.96f))' not in active_hud and 'new Color(0.92f, 0.95f, 0.98f, 0.32f)' in active_hud, 'Active Android minimap must be transparent with only a subtle frame.'
-          assert 'new Color(0.68f, 0.70f, 0.73f)' in bootstrap, 'Android battlefield ground is still green instead of light gray.'
+          assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.78f))' in active_hud, 'Active Android minimap must use a translucent green base so the schematic stays readable over the 3D camera.'
+          assert 'new Color(0.96f, 0.68f, 0.30f, 1f)' in active_hud and 'new Color(0.12f, 0.075f, 0.035f, 0.98f)' in active_hud, 'Minimap houses need high-contrast fill and outline.'
+          assert 'new Color(0.24f, 0.48f, 0.22f)' in bootstrap, 'Android grass must remain green.'
+          assert 'new Color(0.90f, 0.91f, 0.92f)' in bootstrap, 'Android asphalt must remain light gray.'
 
           enemy_ai = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'EnemyRifleVisual' in enemy_ai and 'RifleBarrel' in enemy_ai, 'Enemy characters do not have visible rifle geometry.'
