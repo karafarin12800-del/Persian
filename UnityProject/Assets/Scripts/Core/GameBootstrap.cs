@@ -393,7 +393,7 @@ namespace PersiaWar.Unity2D5D
                 float heightRoll = Mathf.Abs(Mathf.Sin((i + 1) * 78.233f));
                 float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
 
-                bool isWarehouse = i == 4 || i == 9 || i == 16 || i == 20;
+                bool isWarehouse = i == 4 || i == 9 || i == 11 || i == 16;
                 bool isPitchedRoof = !isWarehouse &&
                     (i == 1 || i == 3 || i == 6 || i == 10 ||
                      i == 12 || i == 14 || i == 18 || i == 24);
