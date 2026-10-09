@@ -174,9 +174,15 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            // The spawn map is part of the front-end and must remain interactive
-            // even while the gameplay roots are still dormant.
+            // Use direct Touch.fingerId input for front-end controls on Android.
+            // GUI.Button still draws the visual surface, but must not be the only
+            // path that can advance the menu if touch-to-mouse synthesis is missing.
             if (mode == ScreenMode.Match) return;
+            if (mode == ScreenMode.HeroSelect)
+            {
+                HandleHeroSelectTouches();
+                return;
+            }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
         }
@@ -483,6 +489,46 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(30f, 62f, Screen.width * 0.60f, 30f), "CLASSIC BATTLE ROYALE  •  PROTOTYPE", smallStyle);
         }
 
+        private void HandleHeroSelectTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                float gap = 14f;
+                float totalWidth = Mathf.Min(Screen.width - 44f, 980f);
+                float cardWidth = (totalWidth - gap * 4f) / 5f;
+                float startX = (Screen.width - totalWidth) * 0.5f;
+                float top = 230f;
+                float cardHeight = Mathf.Min(310f, Screen.height - 360f);
+
+                for (int hero = 0; hero < HeroNames.Length; hero++)
+                {
+                    Rect card = new Rect(startX + hero * (cardWidth + gap), top, cardWidth, cardHeight);
+                    if (!card.Contains(gui))
+                        continue;
+
+                    selectedHero = hero;
+                    StartupCheckpoint.Set("HeroSelectedByTouch");
+                    return;
+                }
+
+                Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
+                if (continueRect.Contains(gui))
+                {
+                    mode = ScreenMode.DropMap;
+                    StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                    return;
+                }
+            }
+        }
+
         private void DrawHeroSelect()
         {
             GUI.Label(new Rect(0f, 125f, Screen.width, 52f), "CHOOSE YOUR HERO", headerStyle);
@@ -641,6 +687,16 @@ namespace PersiaWar.Unity2D5D
             }
 
             screen.y = Screen.height - screen.y;
+
+            // Handle START MATCH through real touch coordinates as well as IMGUI.
+            // Some Android configurations do not synthesize MouseUp for GUI.Button.
+            Rect startRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+            if (spawnChosen && startRect.Contains(screen))
+            {
+                StartMatch();
+                return;
+            }
+
             float size = Mathf.Min(Screen.width - 70f, Screen.height - 330f);
             Rect mapRect = new Rect((Screen.width - size) * 0.5f, 220f, size, size);
             if (!mapRect.Contains(screen)) return;

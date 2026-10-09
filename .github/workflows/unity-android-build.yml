@@ -244,6 +244,12 @@ jobs:
           assert 'float fireHit = radius * 1.02f;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile firing touch-zone must tolerate screen differences without stealing other action buttons.'
           assert 'Screen.width - 352f * scale' in input_hub and 'Screen.height - bottom - 236f * scale' in input_hub and 'Screen.height - bottom - 300f * scale' in input_hub, 'Mobile action-button hit-zones must be separated so fire cannot register as reload/grenade/melee.'
           assert 'private int guiMoveMouseButton = -1;' in input_hub and 'private int guiFireMouseButton = -1;' in input_hub, 'Fallback touchscreen contacts need independent movement and fire button ownership.'
+          fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
+          fallback_end = input_hub.index('private void CreateGuiTextures()', fallback_start)
+          fallback = input_hub[fallback_start:fallback_end]
+          assert 'if (Application.isMobilePlatform)\n                return;' not in fallback, 'Android IMGUI fallback must not be unconditionally disabled.'
+          assert 'private void HandleHeroSelectTouches()' in flow and 'HeroSelectionContinuedByTouch' in flow, 'Android hero selection must support direct touches.'
+          assert 'startRect.Contains(screen)' in flow, 'Android Start Match must support direct touches.'
           assert 'guiMoveMouseButton == e.button' in gui_fallback and 'guiFireMouseButton == e.button' in gui_fallback, 'Drag events must only control the finger/button that originally claimed the input.'
           assert 'movePointerId == -1 &&' in gui_fallback and 'guiMoveMouseButton == -1' in gui_fallback, 'A second touch must not overwrite an already-held fallback movement pointer.'
           assert 'if (handled)' in gui_fallback and 'e.Use();' in gui_fallback, 'Only owned MouseUp events may be consumed; unrelated UI releases must pass through.'

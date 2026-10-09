@@ -896,13 +896,10 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleGuiPointerFallback()
         {
-            // Android gameplay uses independent Touch.fingerId pointers in
-            // HandleAndroidTouches. Synthesized IMGUI mouse events can collapse
-            // two simultaneous fingers into the same mouse button and steal fire.
-            // Keep this legacy fallback for desktop/editor only.
-            if (Application.isMobilePlatform)
-                return;
-
+            // Prefer independent Touch.fingerId pointers whenever Unity exposes
+            // live contacts. If the legacy touch list is empty on a device, allow
+            // synthesized IMGUI mouse events to recover the control instead of
+            // returning early for every mobile platform.
             Event e = Event.current;
             if (e == null)
                 return;
