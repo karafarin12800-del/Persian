@@ -136,6 +136,10 @@ jobs:
           assert 'Resources.Load<Shader>("PersiaWarAndroidFade")' in fader and 'r.sharedMaterials = fades;' in fader, 'Occlusion fader must swap to the transparent shader.'
           assert 'Physics.SphereCastNonAlloc' in fader and 'GetComponentsInChildren<Renderer>' in fader, 'Occlusion fader must resolve building collider to house renderers.'
           assert 'androidCurrentBuildingRoot' in bootstrap and 'FlushAndroidBoxBatches();' in bootstrap, 'Android houses must be independently batchable for selective fading.'
+          box_factory_start = bootstrap.index('private GameObject CreateAndroidBox(')
+          box_factory_end = bootstrap.index('private GameObject CreateFlatMesh(', box_factory_start)
+          box_factory = bootstrap[box_factory_start:box_factory_end]
+          assert 'androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot' in box_factory, 'Pitched roofs and individual house details must remain children of their house for fading.'
           assert 'cameraObject.AddComponent<CameraOcclusionFader>()' in flow, 'Gameplay camera does not enable occlusion fade.'
           assert '148f * scale * 1.38f * 1.15f' in flow, 'Gameplay minimap is not enlarged by another 15 percent.'
           assert '0.42f));' in flow and '0.66f);' in flow, 'Gameplay minimap transparency has regressed.'
