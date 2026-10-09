@@ -273,6 +273,7 @@ jobs:
           pickup = (root / 'Combat/PickupItem.cs').read_text(encoding='utf-8')
           world = (root / 'Core/GameBootstrap.cs').read_text(encoding='utf-8')
           health_bar = (root / 'UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
+          flow = (root / 'Core/PrototypeFlow.cs').read_text(encoding='utf-8')
 
           assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range must match player range by weapon kind.'
           assert 'PlanLocalRoute(' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy pursuit must route around blocking colliders.'
