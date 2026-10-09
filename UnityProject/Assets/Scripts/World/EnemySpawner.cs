@@ -211,6 +211,7 @@ namespace PersiaWar.Unity2D5D
 
             TargetHealth health = enemy.AddComponent<TargetHealth>();
             health.SetMaxHealth(archetype == 3 ? 160 : (archetype == 2 ? 120 : 100));
+            enemy.AddComponent<EnemyHealthBar>();
 
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
             chase.Configure(player, archetype);
@@ -229,6 +230,7 @@ namespace PersiaWar.Unity2D5D
 
             TargetHealth health = enemy.AddComponent<TargetHealth>();
             health.SetMaxHealth(archetype == 3 ? 160 : (archetype == 2 ? 120 : 100));
+            enemy.AddComponent<EnemyHealthBar>();
 
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
             chase.Configure(player, archetype);

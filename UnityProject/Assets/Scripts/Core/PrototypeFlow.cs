@@ -211,29 +211,66 @@ namespace PersiaWar.Unity2D5D
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
             float margin = 14f * scale;
 
-            // Bright, readable top status strip inspired by the requested mobile
-            // battle-royale presentation, without adding another runtime camera.
+            // This is the Android HUD actually rendered during a match.
+            // Keep live player state here instead of relying on the dormant desktop HUD.
+            TargetHealth playerHealth = player != null ? player.Health : null;
+            int currentHealth = playerHealth != null ? playerHealth.CurrentHealth : 0;
+            int maxHealth = playerHealth != null ? playerHealth.MaxHealth : 0;
+            float healthRatio = maxHealth > 0 ? Mathf.Clamp01(currentHealth / (float)maxHealth) : 0f;
+            int shieldAmount = player != null ? player.Shield : 0;
+            float shieldRatio = Mathf.Clamp01(shieldAmount / 100f);
+
+            WeaponController weapon = player != null ? player.Weapon : null;
+            PlayerInventory inventory = player != null ? player.Inventory : null;
+            int magazine = weapon != null ? weapon.Magazine : 0;
+            int reserveAmmo = weapon != null ? weapon.Reserve : 0;
+            int grenades = inventory != null ? inventory.Grenades : 0;
+            int wave = enemySpawner != null ? enemySpawner.CurrentWave : 0;
+            GameSession session = GameSession.Instance;
+            int score = session != null ? session.Score : 0;
+
             float leftW = 300f * scale;
-            Rect left = new Rect(margin, margin, leftW, 58f * scale);
-            Fill(left, new Color(0.03f, 0.06f, 0.08f, 0.82f));
-            Fill(new Rect(left.x, left.y, 58f * scale, left.height), new Color(0.94f, 0.62f, 0.18f, 1f));
+            float leftH = 88f * scale;
+            Rect left = new Rect(margin, margin, leftW, leftH);
+            Fill(left, new Color(0.03f, 0.06f, 0.08f, 0.90f));
+            Fill(new Rect(left.x, left.y, 58f * scale, 58f * scale), new Color(0.94f, 0.62f, 0.18f, 1f));
             GUI.Label(new Rect(left.x + 9f * scale, left.y + 7f * scale, 40f * scale, 40f * scale),
                 "P", headerStyle);
-            GUI.Label(new Rect(left.x + 68f * scale, left.y + 6f * scale, left.width - 78f * scale, 22f * scale),
+            GUI.Label(new Rect(left.x + 68f * scale, left.y + 3f * scale, left.width - 78f * scale, 23f * scale),
                 "PERSIA WAR", headerStyle);
-            GUI.Label(new Rect(left.x + 68f * scale, left.y + 31f * scale, left.width - 78f * scale, 20f * scale),
-                "CITY • LEVEL 1", smallStyle);
+
+            float statusX = left.x + 68f * scale;
+            float statusWidth = left.width - 78f * scale;
+            GUI.Label(new Rect(statusX, left.y + 27f * scale, statusWidth, 17f * scale),
+                "HP  " + currentHealth + " / " + maxHealth, smallStyle);
+            DrawStatusBar(
+                new Rect(statusX, left.y + 44f * scale, statusWidth, 8f * scale),
+                healthRatio,
+                new Color(0.25f, 0.90f, 0.36f, 1f));
+
+            GUI.Label(new Rect(statusX, left.y + 54f * scale, statusWidth, 17f * scale),
+                "SHIELD  " + shieldAmount + " / 100", smallStyle);
+            DrawStatusBar(
+                new Rect(statusX, left.y + 72f * scale, statusWidth, 8f * scale),
+                shieldRatio,
+                new Color(0.30f, 0.66f, 1f, 1f));
+
+            // Preserve the useful ammo/grenade counters without stacking a second
+            // player-health panel over this one.
+            Rect loadout = new Rect(margin, left.yMax + 6f * scale, leftW, 28f * scale);
+            Fill(loadout, new Color(0.03f, 0.06f, 0.08f, 0.86f));
+            GUI.Label(new Rect(loadout.x + 8f * scale, loadout.y, loadout.width - 16f * scale, loadout.height),
+                "AMMO  " + magazine + "/" + reserveAmmo + "     GRENADES  " + grenades, smallStyle);
 
             float rightW = 250f * scale;
             Rect right = new Rect(Screen.width - rightW - margin, margin, rightW, 58f * scale);
-            Fill(right, new Color(0.03f, 0.06f, 0.08f, 0.82f));
+            Fill(right, new Color(0.03f, 0.06f, 0.08f, 0.88f));
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 6f * scale, right.width - 24f * scale, 22f * scale),
                 "SURVIVORS", smallStyle);
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
                 "32", headerStyle);
 
-            // Lightweight schematic minimap: no extra camera/render texture, so it
-            // does not reopen the native-risk path that was isolated earlier.
+            // Lightweight schematic minimap: no extra camera or RenderTexture.
             float mapSize = Mathf.Clamp(148f * scale, 112f, 190f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
             Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.92f));
@@ -251,7 +288,7 @@ namespace PersiaWar.Unity2D5D
             Vector2 playerPoint = new Vector2(map.center.x, map.center.y);
             if (player != null)
             {
-                float half = 110f;
+                const float half = 110f;
                 Vector3 pos = player.transform.position;
                 playerPoint.x = map.x + Mathf.InverseLerp(-half, half, pos.x) * map.width;
                 playerPoint.y = map.y + Mathf.InverseLerp(half, -half, pos.z) * map.height;
@@ -259,6 +296,28 @@ namespace PersiaWar.Unity2D5D
             DrawCircle(playerPoint, 7f * scale, new Color(0.95f, 0.86f, 0.20f, 1f));
             GUI.Label(new Rect(map.x + 7f * scale, map.y + 5f * scale, 70f * scale, 22f * scale),
                 "MAP", smallStyle);
+
+            Rect counters = new Rect(
+                Screen.width - rightW - margin,
+                map.yMax + 7f * scale,
+                rightW,
+                30f * scale);
+            Fill(counters, new Color(0.03f, 0.06f, 0.08f, 0.86f));
+            GUI.Label(new Rect(counters.x + 8f * scale, counters.y, counters.width - 16f * scale, counters.height),
+                "WAVE  " + wave + "     KILLS  " + score, smallStyle);
+        }
+
+        private void DrawStatusBar(Rect rect, float ratio, Color fillColor)
+        {
+            Fill(rect, new Color(0f, 0f, 0f, 0.82f));
+            float inset = Mathf.Min(1.5f, rect.height * 0.2f);
+            Rect inner = new Rect(
+                rect.x + inset,
+                rect.y + inset,
+                Mathf.Max(0f, rect.width - inset * 2f),
+                Mathf.Max(0f, rect.height - inset * 2f));
+            inner.width *= Mathf.Clamp01(ratio);
+            Fill(inner, fillColor);
         }
 
         private void DrawPreviousRunDiagnostic()
@@ -865,7 +924,9 @@ namespace PersiaWar.Unity2D5D
             if (combatHud != null)
             {
                 combatHud.ConfigurePlayer(player);
-                combatHud.enabled = true;
+                // PrototypeFlow.DrawAndroidPresentationHUD now owns the Android HUD.
+                // Keep this overlapping secondary panel off on Android.
+                combatHud.enabled = false;
             }
 
             for (int i = 0; i < 120; i++)

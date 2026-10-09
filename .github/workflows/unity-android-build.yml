@@ -115,6 +115,33 @@ jobs:
           assert 'CreateMuzzleFlash()' not in presentation, 'Muzzle flash is still allocated during player presentation setup.'
           print('Android startup isolation checks: PASS')
           PY
+          python3 - <<'PY'
+          from pathlib import Path
+
+          spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
+          assert spawner.count('enemy.AddComponent<EnemyHealthBar>();') == 2, 'Enemy health bar is not attached in both main spawn paths.'
+
+          offscreen_spawner = Path('UnityProject/Assets/Scripts/World/OffscreenEnemySpawner.cs').read_text(encoding='utf-8')
+          assert 'enemy.GetComponent<EnemyHealthBar>()' in offscreen_spawner and 'enemy.AddComponent<EnemyHealthBar>()' in offscreen_spawner, 'Offscreen enemy spawn path does not ensure a health bar.'
+
+          enemy_bar = Path('UnityProject/Assets/Scripts/UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
+          assert 'WorldToScreenPoint' in enemy_bar and 'health.CurrentHealth' in enemy_bar and 'health.MaxHealth' in enemy_bar, 'Enemy health bar does not project numeric live health.'
+
+          flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+          active_hud_start = flow.index('private void DrawAndroidPresentationHUD()')
+          active_hud_end = flow.index('private void DrawPreviousRunDiagnostic()', active_hud_start)
+          active_hud = flow[active_hud_start:active_hud_end]
+          assert 'playerHealth.CurrentHealth' in active_hud and 'currentHealth + " / " + maxHealth' in active_hud, 'Active Android HUD does not show numeric player health.'
+          assert 'player.Shield' in active_hud and 'SHIELD  ' in active_hud, 'Active Android HUD does not show player shield.'
+          assert 'DrawStatusBar(' in active_hud, 'Active Android HUD has no health/shield bars.'
+
+          android_pass_start = flow.index('// PASS 3: enable only the lightweight HUD')
+          android_pass_end = flow.index('#else', android_pass_start)
+          android_hud_activation = flow[android_pass_start:android_pass_end]
+          assert 'combatHud.enabled = false;' in android_hud_activation, 'Overlapping secondary HUD must remain disabled on Android.'
+          print('Combat HUD regression checks: PASS (aim guide hidden, two enemy spawn paths, live player HP/shield).')
+          PY
+
           echo 'Unity project structure/settings validation passed.'
 
       - name: Report Unity version

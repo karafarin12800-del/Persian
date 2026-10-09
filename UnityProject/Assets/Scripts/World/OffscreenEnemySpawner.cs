@@ -31,6 +31,10 @@ namespace PersiaWar.Unity2D5D
                     continue;
 
                 GameObject enemy = Instantiate(enemyPrefab, candidate, Quaternion.identity);
+                EnemyHealthBar healthBar = enemy.GetComponent<EnemyHealthBar>();
+                if (healthBar == null)
+                    enemy.AddComponent<EnemyHealthBar>();
+
                 EnemyChase chase = enemy.GetComponent<EnemyChase>();
                 if (chase != null)
                     chase.SetTarget(player);
