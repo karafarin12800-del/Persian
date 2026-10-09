@@ -10,6 +10,7 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public sealed class MobileInputHub : MonoBehaviour
     {
+        private const float BaseActionHitRadius = 122f;
         [SerializeField] private PlayerController player;
         [SerializeField] private float joystickRadius = 122f;
         [SerializeField] private float minimapSize = 190f;
@@ -171,13 +172,31 @@ namespace PersiaWar.Unity2D5D
         private void OnApplicationPause(bool paused)
         {
             if (paused)
+            {
                 ResetAllPointers();
+                return;
+            }
+
+            RestoreAndroidTouchSettings();
         }
 
         private void OnApplicationFocus(bool hasFocus)
         {
             if (!hasFocus)
+            {
                 ResetAllPointers();
+                return;
+            }
+
+            RestoreAndroidTouchSettings();
+        }
+
+        private static void RestoreAndroidTouchSettings()
+        {
+#if UNITY_ANDROID
+            Input.multiTouchEnabled = true;
+            Input.simulateMouseWithTouches = true;
+#endif
         }
 
         private void Update()
@@ -241,10 +260,11 @@ namespace PersiaWar.Unity2D5D
                 out Vector2 grenadeGui,
                 out Vector2 reloadGui);
 
-            float fireHit = radius * 1.02f;
-            float meleeHit = radius * 0.76f;
-            float grenadeHit = radius * 0.76f;
-            float reloadHit = radius * 0.72f;
+            float actionHitRadius = BaseActionHitRadius * scale * controlScale;
+            float fireHit = actionHitRadius * 1.02f;
+            float meleeHit = actionHitRadius * 0.76f;
+            float grenadeHit = actionHitRadius * 0.76f;
+            float reloadHit = actionHitRadius * 0.72f;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -944,6 +964,7 @@ namespace PersiaWar.Unity2D5D
             Vector2 gui = e.mousePosition;
             float scale = GetUiScale();
             float radius = joystickRadius * scale * controlScale;
+            float actionHitRadius = BaseActionHitRadius * scale * controlScale;
 
             GetActionCenters(
                 scale,
@@ -962,7 +983,7 @@ namespace PersiaWar.Unity2D5D
                 // mouse-button owner are free. Negative pointer sentinels are active.
                 if (firePointerId == -1 &&
                     guiFireMouseButton == -1 &&
-                    Vector2.Distance(gui, firePos) <= radius * 0.86f)
+                    Vector2.Distance(gui, firePos) <= actionHitRadius * 1.02f)
                 {
                     firePointerId = -1001;
                     guiFireMouseButton = mouseButton;
@@ -973,7 +994,7 @@ namespace PersiaWar.Unity2D5D
 
                 if (meleePointerId == -1 &&
                     guiMeleeMouseButton == -1 &&
-                    Vector2.Distance(gui, meleePos) <= radius * 0.76f)
+                    Vector2.Distance(gui, meleePos) <= actionHitRadius * 0.76f)
                 {
                     meleePointerId = -1002;
                     guiMeleeMouseButton = mouseButton;
@@ -984,7 +1005,7 @@ namespace PersiaWar.Unity2D5D
 
                 if (grenadePointerId == -1 &&
                     guiGrenadeMouseButton == -1 &&
-                    Vector2.Distance(gui, grenadePos) <= radius * 0.76f)
+                    Vector2.Distance(gui, grenadePos) <= actionHitRadius * 0.76f)
                 {
                     grenadePointerId = -1003;
                     guiGrenadeMouseButton = mouseButton;
@@ -995,7 +1016,7 @@ namespace PersiaWar.Unity2D5D
 
                 if (reloadPointerId == -1 &&
                     guiReloadMouseButton == -1 &&
-                    Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
+                    Vector2.Distance(gui, reloadPos) <= actionHitRadius * 0.72f)
                 {
                     reloadPointerId = -1004;
                     guiReloadMouseButton = mouseButton;
