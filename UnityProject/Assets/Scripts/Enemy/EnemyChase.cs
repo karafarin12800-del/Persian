@@ -36,6 +36,9 @@ namespace PersiaWar.Unity2D5D
         {
             target = targetTransform;
             archetype = Mathf.Clamp(enemyArchetype, 1, 3);
+            // With a full 32-combatant lobby, lower mobile AI polling frequency to
+            // reduce per-frame physics-query pressure without changing attack rules.
+            retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;
 
             moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
