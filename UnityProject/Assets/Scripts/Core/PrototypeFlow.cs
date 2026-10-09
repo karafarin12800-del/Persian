@@ -302,7 +302,7 @@ namespace PersiaWar.Unity2D5D
 
             // Keep the map see-through, but tint the live scene with a light
             // translucent grass-green layer so roads and house symbols remain readable.
-            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.34f));
+            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.78f));
 
             Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.62f);
             float frame = Mathf.Max(1f, 1.5f * scale);
