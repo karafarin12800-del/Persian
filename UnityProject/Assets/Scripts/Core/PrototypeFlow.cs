@@ -276,8 +276,11 @@ namespace PersiaWar.Unity2D5D
             // player-health panel over this one.
             Rect loadout = new Rect(margin, left.yMax + 6f * scale, leftW, 28f * scale);
             Fill(loadout, new Color(0.03f, 0.06f, 0.08f, 0.86f));
+            string weaponSummary = weapon != null
+                ? weapon.CurrentWeaponName + " " + Mathf.RoundToInt(weapon.EffectiveRange) + "m"
+                : "NO WEAPON";
             GUI.Label(new Rect(loadout.x + 8f * scale, loadout.y, loadout.width - 16f * scale, loadout.height),
-                "AMMO  " + magazine + "/" + reserveAmmo + "     GRENADES  " + grenades, smallStyle);
+                weaponSummary + "  AMMO " + magazine + "/" + reserveAmmo + "  G " + grenades, smallStyle);
 
             float rightW = 250f * scale;
             Rect right = new Rect(Screen.width - rightW - margin, margin, rightW, 58f * scale);
