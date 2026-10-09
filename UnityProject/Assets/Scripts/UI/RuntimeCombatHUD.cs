@@ -30,14 +30,14 @@ namespace PersiaWar.Unity2D5D
 
             small = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 15,
+                fontSize = 18,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleLeft
             };
-            medium = new GUIStyle(small) { fontSize = 20 };
+            medium = new GUIStyle(small) { fontSize = 24 };
             bold = new GUIStyle(small)
             {
-                fontSize = 24,
+                fontSize = 28,
                 alignment = TextAnchor.MiddleCenter
             };
         }
@@ -77,8 +77,8 @@ namespace PersiaWar.Unity2D5D
 
             if (player.IsDefeated)
             {
-                float w = 360f * scale;
-                Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - 48f * scale, w, 96f * scale);
+                float w = 400f * scale;
+                Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - 48f * scale, w, 110f * scale);
                 Fill(panel, new Color(0.05f, 0.06f, 0.08f, 0.86f));
                 GUI.Label(panel, "GAME OVER", bold);
             }
@@ -86,27 +86,27 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawTopStatus(float margin, float scale, float hp, int currentHealth, int maxHealth, float shield, int shieldAmount, int ammo, int reserve, int grenades)
         {
-            float panelW = 360f * scale;
-            float panelH = 96f * scale;
+            float panelW = 400f * scale;
+            float panelH = 110f * scale;
             Rect panel = new Rect(margin, margin, panelW, panelH);
             Fill(panel, new Color(0.05f, 0.08f, 0.12f, 0.74f));
 
-            Rect portrait = new Rect(panel.x + 10f * scale, panel.y + 10f * scale, 58f * scale, 58f * scale);
+            Rect portrait = new Rect(panel.x + 10f * scale, panel.y + 10f * scale, 62f * scale, 62f * scale);
             Fill(portrait, new Color(0.90f, 0.40f, 0.16f, 0.96f));
             GUI.Label(portrait, "P", bold);
 
             float barX = portrait.xMax + 10f * scale;
             float barWidth = panelW - (barX - panel.x) - 12f * scale;
-            GUI.Label(new Rect(barX, panel.y + 5f * scale, barWidth, 25f * scale), "PERSIA WARRIOR", medium);
+            GUI.Label(new Rect(barX, panel.y + 5f * scale, barWidth, 29f * scale), "PERSIA WARRIOR", medium);
 
-            GUI.Label(new Rect(barX, panel.y + 31f * scale, barWidth, 17f * scale),
+            GUI.Label(new Rect(barX, panel.y + 35f * scale, barWidth, 20f * scale),
                 "HP  " + currentHealth + " / " + maxHealth, small);
-            DrawBar(new Rect(barX, panel.y + 48f * scale, barWidth, 9f * scale),
+            DrawBar(new Rect(barX, panel.y + 55f * scale, barWidth, 9f * scale),
                 hp, new Color(0.25f, 0.90f, 0.36f));
 
-            GUI.Label(new Rect(barX, panel.y + 58f * scale, barWidth, 17f * scale),
+            GUI.Label(new Rect(barX, panel.y + 66f * scale, barWidth, 20f * scale),
                 "SHIELD  " + shieldAmount + " / 100", small);
-            DrawBar(new Rect(barX, panel.y + 75f * scale, barWidth, 9f * scale),
+            DrawBar(new Rect(barX, panel.y + 87f * scale, barWidth, 9f * scale),
                 shield, new Color(0.30f, 0.66f, 1f));
 
             float itemY = panel.yMax + 8f * scale;
@@ -116,7 +116,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawCounters(float margin, float scale, int wave, int score)
         {
-            float w = 180f * scale;
+            float w = 200f * scale;
             Rect waveRect = new Rect(Screen.width - w - margin, margin, w, 38f * scale);
             DrawChip(waveRect, "WAVE  " + wave, new Color(0.10f, 0.12f, 0.18f));
 
