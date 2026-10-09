@@ -29,6 +29,7 @@ namespace PersiaWar.Unity2D5D
                 color = color,
                 enableInstancing = true
             };
+            ApplyWhiteBaseTextureWhenRequired(material);
             sharedMaterials[key] = material;
             return material;
         }
@@ -58,12 +59,23 @@ namespace PersiaWar.Unity2D5D
                 return null;
             }
 
-            return new Material(shader)
+            Material material = new Material(shader)
             {
                 name = materialName,
                 color = color,
                 enableInstancing = true
             };
+            ApplyWhiteBaseTextureWhenRequired(material);
+            return material;
+        }
+
+        // Unlit/Texture is selected on Android for compatibility. Without a white
+        // base texture, flat-color materials can render black or appear untinted.
+        // Textured materials replace this with their real texture in CreateTextured.
+        private static void ApplyWhiteBaseTextureWhenRequired(Material material)
+        {
+            if (material != null && material.HasProperty("_MainTex") && material.mainTexture == null)
+                material.mainTexture = Texture2D.whiteTexture;
         }
 
         private static int ComputeKey(Shader shader, Color color)
