@@ -49,7 +49,19 @@ namespace PersiaWar.Unity2D5D
         private void ApplyWeaponPickupScale()
         {
             if (weaponPickupScaleApplied) return;
-            transform.localScale *= 2f;
+
+            // Dropped weapon parts are child meshes under a root pickup collider.
+            // Enlarge the visible model only so the pickup radius does not double.
+            if (transform.childCount > 0)
+            {
+                for (int i = 0; i < transform.childCount; i++)
+                    transform.GetChild(i).localScale *= 2f;
+            }
+            else
+            {
+                transform.localScale *= 2f;
+            }
+
             weaponPickupScaleApplied = true;
         }
 
