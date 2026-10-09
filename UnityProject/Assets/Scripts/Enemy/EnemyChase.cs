@@ -31,6 +31,12 @@ namespace PersiaWar.Unity2D5D
         }
 
         public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
+        public int Archetype => archetype;
+        public WeaponController.WeaponKind DroppedWeaponKind => archetype == 1
+            ? WeaponController.WeaponKind.LightPistol
+            : (archetype == 2
+                ? WeaponController.WeaponKind.HeavyMachineGun
+                : WeaponController.WeaponKind.AssaultRifle);
 
         public void Configure(Transform targetTransform, int enemyArchetype)
         {
@@ -43,8 +49,10 @@ namespace PersiaWar.Unity2D5D
             moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
-            stopDistance = archetype == 3 ? 10.5f : (archetype == 2 ? 9f : 7.5f);
-            rangedRange = archetype == 3 ? 46f : (archetype == 2 ? 40f : 34f);
+            // Effective enemy weapon ranges are authored in world metres:
+            // pistol 3m, machine gun 5m, AK-style rifle 8m.
+            rangedRange = archetype == 3 ? 8f : (archetype == 2 ? 5f : 3f);
+            stopDistance = Mathf.Max(1.1f, rangedRange * 0.78f);
             meleeCooldown = archetype == 3 ? 1.05f : (archetype == 2 ? 1.25f : 1.5f);
             rangedCooldown = archetype == 3 ? 0.90f : (archetype == 2 ? 1.10f : 1.35f);
             if (visual == null)
@@ -93,12 +101,40 @@ namespace PersiaWar.Unity2D5D
                 enemyRifleMetalMaterial = RuntimeMaterialFactory.Create(
                     "EnemyRifleMetal", new Color(0.42f, 0.43f, 0.39f));
 
-            CreateEnemyWeaponPart("RifleStock", new Vector3(0f, 0f, -0.16f),
-                new Vector3(0.12f, 0.10f, 0.22f), enemyRifleReceiverMaterial);
-            CreateEnemyWeaponPart("RifleReceiver", new Vector3(0f, 0f, 0.12f),
-                new Vector3(0.16f, 0.13f, 0.38f), enemyRifleReceiverMaterial);
-            CreateEnemyWeaponPart("RifleBarrel", new Vector3(0f, 0.015f, 0.43f),
-                new Vector3(0.065f, 0.065f, 0.28f), enemyRifleMetalMaterial);
+            if (archetype == 1)
+            {
+                // Compact pistol silhouette.
+                CreateEnemyWeaponPart("PistolGrip", new Vector3(0f, -0.055f, -0.015f),
+                    new Vector3(0.085f, 0.17f, 0.10f), enemyRifleReceiverMaterial);
+                CreateEnemyWeaponPart("PistolSlide", new Vector3(0f, 0.025f, 0.105f),
+                    new Vector3(0.10f, 0.085f, 0.27f), enemyRifleReceiverMaterial);
+                CreateEnemyWeaponPart("PistolBarrel", new Vector3(0f, 0.025f, 0.265f),
+                    new Vector3(0.045f, 0.045f, 0.10f), enemyRifleMetalMaterial);
+            }
+            else if (archetype == 2)
+            {
+                // Heavier machine gun with a broad receiver and magazine.
+                CreateEnemyWeaponPart("MachineGunStock", new Vector3(0f, 0f, -0.19f),
+                    new Vector3(0.13f, 0.11f, 0.25f), enemyRifleReceiverMaterial);
+                CreateEnemyWeaponPart("MachineGunReceiver", new Vector3(0f, 0f, 0.10f),
+                    new Vector3(0.18f, 0.15f, 0.40f), enemyRifleReceiverMaterial);
+                CreateEnemyWeaponPart("MachineGunMagazine", new Vector3(0f, -0.13f, 0.12f),
+                    new Vector3(0.11f, 0.23f, 0.16f), enemyRifleMetalMaterial);
+                CreateEnemyWeaponPart("MachineGunBarrel", new Vector3(0f, 0.015f, 0.43f),
+                    new Vector3(0.075f, 0.075f, 0.30f), enemyRifleMetalMaterial);
+            }
+            else
+            {
+                // AK-style rifle silhouette with a distinct curved-looking magazine.
+                CreateEnemyWeaponPart("AKStock", new Vector3(0f, 0f, -0.18f),
+                    new Vector3(0.12f, 0.10f, 0.25f), enemyRifleReceiverMaterial);
+                CreateEnemyWeaponPart("AKReceiver", new Vector3(0f, 0f, 0.12f),
+                    new Vector3(0.16f, 0.13f, 0.38f), enemyRifleReceiverMaterial);
+                CreateEnemyWeaponPart("AKMagazine", new Vector3(0f, -0.13f, 0.13f),
+                    new Vector3(0.10f, 0.24f, 0.15f), enemyRifleMetalMaterial);
+                CreateEnemyWeaponPart("AKBarrel", new Vector3(0f, 0.015f, 0.43f),
+                    new Vector3(0.065f, 0.065f, 0.30f), enemyRifleMetalMaterial);
+            }
         }
 
         private void CreateEnemyWeaponPart(
@@ -323,7 +359,7 @@ namespace PersiaWar.Unity2D5D
 #endif
 
             EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
-            shot.Configure(shotDirection, rangedDamage, transform);
+            shot.Configure(shotDirection, rangedDamage, transform, rangedRange);
 
             if (visual != null)
                 visual.PlayFire();
