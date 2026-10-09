@@ -885,15 +885,24 @@ namespace PersiaWar.Unity2D5D
                     Vector3.up);
             }
 
+            CameraOcclusionFader occlusionFader = cameraObject.AddComponent<CameraOcclusionFader>();
+            occlusionFader.SetTarget(target);
             camera.enabled = false;
             return camera;
         }
+
+        private CameraOcclusionFader cameraOcclusionFader;
 
         private void LateUpdate()
         {
 #if UNITY_ANDROID
             if (androidRuntimeCamera == null || player == null)
                 return;
+
+            if (cameraOcclusionFader == null)
+                cameraOcclusionFader = androidRuntimeCamera.GetComponent<CameraOcclusionFader>();
+            if (cameraOcclusionFader != null)
+                cameraOcclusionFader.SetTarget(player.transform);
 
             Quaternion orbit = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
             Vector3 desired = player.transform.position + orbit * Vector3.back * AndroidCameraDistance;
