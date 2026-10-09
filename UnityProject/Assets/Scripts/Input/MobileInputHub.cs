@@ -590,6 +590,7 @@ namespace PersiaWar.Unity2D5D
             reloadPressedAt = 0f;
             reloadHeldToSwap = false;
             moveStartScreen = Vector2.zero;
+            moveTouchOriginScreen = Vector2.zero;
             moveValue = Vector2.zero;
 
             if (player != null)
