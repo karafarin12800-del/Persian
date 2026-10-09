@@ -89,6 +89,7 @@ namespace PersiaWar.Unity2D5D
                 QualitySettings.vSyncCount = 0;
                 Random.InitState(seed);
                 EnsureGameSession();
+                RuntimeGameAudio.EnsureInstance();
                 GameSession.Instance?.ResetMatch();
                 ReportStage("Stage 2: creating game session...", "GameSessionReady");
                 ConfigureCameraSafe();
