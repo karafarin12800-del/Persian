@@ -254,29 +254,29 @@ namespace PersiaWar.Unity2D5D
             GameSession session = GameSession.Instance;
             int score = session != null ? session.Score : 0;
 
-            float leftW = 300f * scale;
-            float leftH = 88f * scale;
+            float leftW = 340f * scale;
+            float leftH = 100f * scale;
             Rect left = new Rect(margin, margin, leftW, leftH);
             Fill(left, new Color(0.03f, 0.06f, 0.08f, 0.90f));
-            Fill(new Rect(left.x, left.y, 58f * scale, 58f * scale), new Color(0.94f, 0.62f, 0.18f, 1f));
-            GUI.Label(new Rect(left.x + 9f * scale, left.y + 7f * scale, 40f * scale, 40f * scale),
+            Fill(new Rect(left.x, left.y, 62f * scale, 62f * scale), new Color(0.94f, 0.62f, 0.18f, 1f));
+            GUI.Label(new Rect(left.x + 10f * scale, left.y + 8f * scale, 42f * scale, 42f * scale),
                 "P", headerStyle);
-            GUI.Label(new Rect(left.x + 68f * scale, left.y + 3f * scale, left.width - 78f * scale, 23f * scale),
+            GUI.Label(new Rect(left.x + 72f * scale, left.y + 3f * scale, left.width - 82f * scale, 27f * scale),
                 "PERSIA WAR", headerStyle);
 
-            float statusX = left.x + 68f * scale;
-            float statusWidth = left.width - 78f * scale;
-            GUI.Label(new Rect(statusX, left.y + 27f * scale, statusWidth, 17f * scale),
+            float statusX = left.x + 72f * scale;
+            float statusWidth = left.width - 82f * scale;
+            GUI.Label(new Rect(statusX, left.y + 31f * scale, statusWidth, 20f * scale),
                 "HP  " + currentHealth + " / " + maxHealth, smallStyle);
             DrawStatusBar(
-                new Rect(statusX, left.y + 44f * scale, statusWidth, 8f * scale),
+                new Rect(statusX, left.y + 51f * scale, statusWidth, 9f * scale),
                 healthRatio,
                 new Color(0.25f, 0.90f, 0.36f, 1f));
 
-            GUI.Label(new Rect(statusX, left.y + 54f * scale, statusWidth, 17f * scale),
+            GUI.Label(new Rect(statusX, left.y + 63f * scale, statusWidth, 20f * scale),
                 "SHIELD  " + shieldAmount + " / 100", smallStyle);
             DrawStatusBar(
-                new Rect(statusX, left.y + 72f * scale, statusWidth, 8f * scale),
+                new Rect(statusX, left.y + 84f * scale, statusWidth, 9f * scale),
                 shieldRatio,
                 new Color(0.30f, 0.66f, 1f, 1f));
 
@@ -1407,9 +1407,9 @@ namespace PersiaWar.Unity2D5D
         private void BuildStyles()
         {
             titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 32, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
-            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         }
 
