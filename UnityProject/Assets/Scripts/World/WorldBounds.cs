@@ -11,7 +11,7 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
             if (size.x > 400f || size.y > 400f)
-                size = new Vector2(220f, 220f);
+                size = new Vector2(220.8f, 220.8f);
 
             if (target == null)
             {
