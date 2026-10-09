@@ -300,14 +300,18 @@ namespace PersiaWar.Unity2D5D
             float mapSize = Mathf.Clamp(148f * scale * 1.38f, 134f, 262f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
 
-            Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.32f);
+            // Keep the map see-through, but tint the live scene with a light
+            // translucent grass-green layer so roads and house symbols remain readable.
+            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.34f));
+
+            Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.62f);
             float frame = Mathf.Max(1f, 1.5f * scale);
             Fill(new Rect(map.x, map.y, map.width, frame), frameColor);
             Fill(new Rect(map.x, map.yMax - frame, map.width, frame), frameColor);
             Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
             Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
 
-            Color roadColor = new Color(0.86f, 0.88f, 0.91f, 0.62f);
+            Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.88f);
             float roadThickness = map.width * (10f / 192f);
             for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
             {
@@ -350,8 +354,19 @@ namespace PersiaWar.Unity2D5D
                 Vector2 building = WorldToMap(AndroidMinimapBuildingPoints[i], map);
                 float buildingWidth = map.width * (footprint / 192f);
                 float buildingHeight = map.height * (depth / 192f);
-                Fill(new Rect(building.x - buildingWidth * 0.5f, building.y - buildingHeight * 0.5f,
-                    buildingWidth, buildingHeight), new Color(0.70f, 0.48f, 0.22f, 0.96f));
+                // A dark outline separates every footprint from the green ground and
+                // gray streets; the inner sand color makes house locations legible
+                // on a transparent map without changing their real world coordinates.
+                float outline = Mathf.Max(1.5f, 2.0f * scale);
+                Rect houseRect = new Rect(
+                    building.x - buildingWidth * 0.5f,
+                    building.y - buildingHeight * 0.5f,
+                    buildingWidth,
+                    buildingHeight);
+                Fill(new Rect(houseRect.x - outline * 0.5f, houseRect.y - outline * 0.5f,
+                    houseRect.width + outline, houseRect.height + outline),
+                    new Color(0.12f, 0.075f, 0.035f, 0.98f));
+                Fill(houseRect, new Color(0.96f, 0.68f, 0.30f, 1f));
             }
 
             if (Time.unscaledTime >= nextMinimapRefresh)
