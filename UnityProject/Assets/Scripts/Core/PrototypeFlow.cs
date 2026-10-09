@@ -1000,7 +1000,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                enemySpawner.Configure(player.transform, 31, 84f, 0f);
+                enemySpawner.Configure(player.transform, 11, 84f, 0f);
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
