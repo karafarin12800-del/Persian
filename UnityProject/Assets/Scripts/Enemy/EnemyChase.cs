@@ -37,6 +37,7 @@ namespace PersiaWar.Unity2D5D
         // Allocated once per enemy. Clear-path pursuit stays cheap; the local
         // occupancy grid is generated only when a wall/prop blocks direct movement.
         private readonly Collider[] movementHits = new Collider[64];
+        private readonly RaycastHit[] navigationRayHits = new RaycastHit[64];
         private readonly bool[] navigationBlocked = new bool[NavigationCellCapacity];
         private readonly int[] navigationPrevious = new int[NavigationCellCapacity];
         private readonly int[] navigationQueue = new int[NavigationCellCapacity];
@@ -579,14 +580,15 @@ namespace PersiaWar.Unity2D5D
                 from + Vector3.up * 0.75f,
                 collisionRadius * 0.72f,
                 delta / distance,
-                movementHits,
+                navigationRayHits,
                 Mathf.Max(0f, distance - 0.08f),
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < count; i++)
             {
-                if (movementHits[i] != null && !IsIgnoredMovementCollider(movementHits[i]))
+                Collider hit = navigationRayHits[i].collider;
+                if (hit != null && !IsIgnoredMovementCollider(hit))
                     return false;
             }
             return true;
