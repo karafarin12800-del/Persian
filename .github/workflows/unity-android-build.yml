@@ -221,7 +221,7 @@ jobs:
           assert 'ApplyWeaponProfile(true);' in weapon_controller and 'projectileLifetime = weaponRange / Mathf.Max(1f, projectileSpeed);' in weapon_controller, 'Equipping a weapon does not refresh its projectile range/lifetime profile.'
           assert 'distance > EffectiveRange' in weapon_controller, 'Player firing can exceed the active weapon profile range.'
           assert 'weaponRange = 15f;' in weapon_controller and 'weaponRange = 27f;' in weapon_controller and 'weaponRange = 42f;' in weapon_controller, 'Picked pistol/rifle/heavy weapons do not have distinct effective ranges.'
-          assert 'new Color(0.25f, 0.26f, 0.27f)' in world, 'Road asphalt has not been lightened to gray.'
+          assert 'new Color(0.76f, 0.77f, 0.78f)' in world, 'Road asphalt has not been lightened to gray.'
           assert 'AndroidContinuousGroundFoundation' in world, 'Continuous ground foundation is missing.'
           assert 'AddClearAndroidAlleySegments' in world and 'androidBuildingHalfExtents' in world, 'Alley strips are not clipped around building footprints.'
           assert 'new Vector3(-79f, 0f, 89f)' in world, 'Outer houses overlap the outermost street.'
