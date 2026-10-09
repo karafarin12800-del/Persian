@@ -44,7 +44,7 @@ namespace PersiaWar.Unity2D5D
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
             stopDistance = archetype == 3 ? 10.5f : (archetype == 2 ? 9f : 7.5f);
-            rangedRange = archetype == 3 ? 46f : (archetype == 2 ? 40f : 34f);
+            rangedRange = archetype == 3 ? 32f : (archetype == 2 ? 27f : 22f);
             meleeCooldown = archetype == 3 ? 1.05f : (archetype == 2 ? 1.25f : 1.5f);
             rangedCooldown = archetype == 3 ? 0.90f : (archetype == 2 ? 1.10f : 1.35f);
             if (visual == null)
@@ -323,7 +323,7 @@ namespace PersiaWar.Unity2D5D
 #endif
 
             EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
-            shot.Configure(shotDirection, rangedDamage, transform);
+            shot.Configure(shotDirection, rangedDamage, transform, rangedRange);
 
             if (visual != null)
                 visual.PlayFire();
