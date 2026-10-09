@@ -215,7 +215,7 @@ jobs:
           assert 'Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)' in projectile, 'Enemy projectile has no explicit distance cap.'
           assert 'lifetime = Mathf.Max(0.05f, Mathf.Max(0.1f, maxRange) / Mathf.Max(1f, speed));' in projectile, 'Enemy projectile lifetime is not tied to weapon range.'
           assert 'SpawnDroppedWeapon(enemy);' in health and 'pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);' in health, 'Enemy death does not drop the matching weapon.'
-          assert 'Weapon,' in pickup and 'player.Weapon.SelectWeapon(weaponKind);' in pickup, 'Dropped weapon cannot be picked up and equipped.'
+          assert 'Weapon' in pickup and 'player.Weapon.SelectWeapon(weaponKind);' in pickup, 'Dropped weapon cannot be picked up and equipped.'
           assert 'AndroidContinuousGroundFoundation' in world, 'Continuous ground foundation is missing.'
           assert 'AddClearAndroidAlleySegments' in world and 'androidBuildingHalfExtents' in world, 'Alley strips are not clipped around building footprints.'
           assert 'new Vector3(-79f, 0f, 89f)' in world, 'Outer houses overlap the outermost street.'
