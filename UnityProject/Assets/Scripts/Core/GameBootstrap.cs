@@ -213,7 +213,7 @@ namespace PersiaWar.Unity2D5D
 
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
-            roadMaterial = MakeMaterial("Road", new Color(0.43f, 0.44f, 0.45f));
+            roadMaterial = MakeMaterial("Road", new Color(0.62f, 0.63f, 0.64f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
