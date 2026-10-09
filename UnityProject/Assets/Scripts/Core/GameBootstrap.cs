@@ -385,9 +385,47 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < buildingPoints.Length; i++)
             {
                 StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_START");
-                float footprint = i % 5 == 0 ? 13.5f : (i % 2 == 0 ? 11.5f : 10.0f);
-                float height = i % 4 == 0 ? 13.5f : (i % 3 == 0 ? 11.0f : 9.0f);
-                float depth = i % 3 == 0 ? 10.5f : 9.0f;
+
+                // The Android match is built here, not by EnvironmentSpawner. Use
+                // stable per-building variation so silhouettes do not repeat in a
+                // small set of modulo-based sizes between builds.
+                float widthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 12.9898f));
+                float heightRoll = Mathf.Abs(Mathf.Sin((i + 1) * 78.233f));
+                float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
+
+                float footprint = Mathf.Lerp(7.4f, 13.6f, widthRoll);
+                float height = Mathf.Lerp(5.4f, 15.2f, heightRoll);
+                float depth = Mathf.Lerp(6.8f, 12.0f, depthRoll);
+
+                // Four close-to-center buildings occupy tighter plots. Keep their
+                // footprint compact to prevent adjacent walls/colliders overlapping.
+                if (i >= 22)
+                {
+                    footprint = Mathf.Lerp(6.6f, 8.6f, widthRoll);
+                    height = Mathf.Lerp(5.0f, 9.0f, heightRoll);
+                    depth = Mathf.Lerp(6.0f, 8.2f, depthRoll);
+                }
+                // Buildings at the inner alley corners also need smaller plots.
+                else if (i >= 18 && i <= 21)
+                {
+                    footprint = Mathf.Lerp(7.5f, 10.0f, widthRoll);
+                    depth = Mathf.Lerp(7.0f, 9.5f, depthRoll);
+                }
+
+                // A few distinct landmarks and low warehouse-like blocks break up
+                // the residential skyline without adding extra GameObjects.
+                if (i == 0 || i == 7 || i == 13)
+                {
+                    footprint = Mathf.Max(footprint, 12.8f);
+                    height = Mathf.Max(height, 14.2f);
+                    depth = Mathf.Max(depth, 10.8f);
+                }
+                else if (i == 4 || i == 11 || i == 16)
+                {
+                    height = Mathf.Min(height, 6.4f);
+                    depth = Mathf.Max(depth, 9.6f);
+                }
+
                 CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
                 StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_DONE");
             }
@@ -670,9 +708,11 @@ namespace PersiaWar.Unity2D5D
 
             int columns = Mathf.Clamp(Mathf.FloorToInt(footprint / 2.5f), 2, 4);
             float spacing = footprint / (columns + 1);
-            for (int row = 0; row < 3; row++)
+            int windowRows = bodyHeight < 7f ? 2 : (bodyHeight < 11f ? 3 : 4);
+            float windowRowSpacing = (bodyHeight - 3.4f) / Mathf.Max(1, windowRows - 1);
+            for (int row = 0; row < windowRows; row++)
             {
-                float y = 1.75f + row * Mathf.Max(1.7f, (bodyHeight - 3.1f) / 3f);
+                float y = 1.75f + row * windowRowSpacing;
                 for (int col = 0; col < columns; col++)
                 {
                     float x = -footprint * 0.5f + spacing * (col + 1);
