@@ -600,7 +600,13 @@ if (!matchActive || matchPaused)
             if (!matchActive || matchPaused)
                 return;
 
+            // Android must use the real Touch API only. Unity can synthesize
+            // MouseDown/MouseDrag events from the first finger; mixing those events
+            // with Input.touchCount gives the same finger two pointer IDs and can
+            // steal/release movement or action controls during multi-touch.
+#if UNITY_EDITOR || UNITY_STANDALONE
             HandleGuiPointerFallback();
+#endif
 
             if (circleTexture == null)
                 CreateGuiTextures();
