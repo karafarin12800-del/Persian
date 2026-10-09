@@ -25,8 +25,6 @@ namespace PersiaWar.Unity2D5D
         private int meleePointerId = -1;
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
-        private int missingMovementTouchFrames;
-        private const int MovementTouchGraceFrames = 3;
         private float reloadPressedAt;
         private bool reloadHeldToSwap;
 
@@ -373,17 +371,16 @@ namespace PersiaWar.Unity2D5D
                     }
                     else
                     {
-                        missingMovementTouchFrames = 0;
-                    }
+                                }
                 }
-                else if (firePointerId >= 0 && Input.touchCount > 0 &&
-                         missingMovementTouchFrames < MovementTouchGraceFrames)
+                else if (Input.touchCount > 0)
                 {
-                    // Some Android touch drivers briefly omit an already captured
-                    // finger when a second finger begins. Preserve the last movement
-                    // vector for a few frames rather than immediately zeroing it.
-                    // A normal Ended/Canceled event still releases movement at once.
-                    missingMovementTouchFrames++;
+                    // A few Android devices temporarily expose only one active contact
+                    // when a second finger is placed. If our captured movement finger
+                    // disappears from the touch list, keep the last joystick vector
+                    // while any contact is still down. A visible Ended/Canceled phase
+                    // above releases movement immediately; when all contacts lift,
+                    // ResetMovementPointer runs below.
                     player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                 }
                 else
