@@ -189,11 +189,11 @@ jobs:
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
 
           assert 'enemySpawner.Configure(player.transform, 11, 84f, 0f);' in flow, 'Android match must start with the reduced 11-opponent lobby.'
-          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f, 134f, 262f);' in active_hud, 'Active Android minimap is not 20% larger than its previous size.'
+          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f, 150f, 262f);' in active_hud, 'Active Android minimap is not enlarged by another 15 percent.'
           assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
           assert 'AndroidMinimapBuildingPoints' in active_hud and 'AndroidMinimapRoadCoordinates' in active_hud, 'Minimap city roads/buildings are incomplete.'
           assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
-          assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.78f))' in active_hud, 'Active Android minimap must use a translucent green base so the schematic stays readable over the 3D camera.'
+          assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f))' in active_hud, 'Active Android minimap must remain more transparent while retaining its green tint.'
           assert 'new Color(0.96f, 0.68f, 0.30f, 1f)' in active_hud and 'new Color(0.12f, 0.075f, 0.035f, 0.98f)' in active_hud, 'Minimap houses need high-contrast fill and outline.'
           assert 'new Color(0.12f, 0.46f, 0.08f)' in bootstrap, 'Android grass must remain green.'
           assert 'new Color(0.52f, 0.54f, 0.57f)' in bootstrap, 'Android asphalt must remain light gray.'
@@ -209,7 +209,7 @@ jobs:
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           assert 'enum WeaponKind' in weapon and 'public void CycleWeapon()' in weapon, 'Weapon profiles cannot be cycled at runtime.'
           assert 'public float EffectiveRange => Mathf.Max(1f, weaponRange);' in weapon, 'Weapon range is not exposed to aiming and HUD.'
-          assert 'weaponRange = 15f;' in weapon and 'weaponRange = 27f;' in weapon and 'weaponRange = 42f;' in weapon, 'Weapon profiles do not have distinct light/rifle/heavy ranges.'
+          assert 'weaponRange = 7.5f;' in weapon and 'weaponRange = 13.5f;' in weapon and 'weaponRange = 21f;' in weapon, 'Weapon profiles must have distinct halved light/rifle/heavy ranges.'
           assert 'PistolSlide' in weapon and 'PistolGrip' in weapon, 'The light pistol still uses only a scaled rifle silhouette.'
           assert 'SetWeaponPart("PistolSlide", pistol' in weapon and 'SetWeaponPart("Stock", !pistol' in weapon, 'Weapon profiles do not swap actual visible parts.'
           assert 'heavy ? new Vector3(0.26f, 0.20f, 0.64f)' in weapon and 'heavy ? new Vector3(0.16f, 0.34f, 0.21f)' in weapon, 'Heavy weapon receiver/magazine are not visually distinct.'
@@ -246,7 +246,7 @@ jobs:
           world = (root / 'Core/GameBootstrap.cs').read_text(encoding='utf-8')
           health_bar = (root / 'UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
 
-          assert 'rangedRange = archetype == 3 ? 8f : (archetype == 2 ? 5f : 3f);' in enemy, 'Enemy ranges must be 3m pistol / 5m machine gun / 8m rifle.'
+          assert 'rangedRange = archetype == 3 ? 4f : (archetype == 2 ? 2.5f : 1.5f);' in enemy, 'Enemy weapon ranges must be halved.'
           assert 'PistolSlide' in enemy and 'MachineGunReceiver' in enemy and 'AKMagazine' in enemy, 'Enemy weapon silhouettes must be distinct.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy, 'Enemy firing does not pass its effective range to the projectile.'
           assert 'Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)' in projectile, 'Enemy projectile has no explicit distance cap.'
@@ -257,7 +257,7 @@ jobs:
           assert 'public void EquipWeaponFromPickup(WeaponKind selectedWeapon, int reserveAmmo)' in weapon_controller, 'Weapon pickup does not use the explicit equip path.'
           assert 'ApplyWeaponProfile(true);' in weapon_controller and 'projectileLifetime = weaponRange / Mathf.Max(1f, projectileSpeed);' in weapon_controller, 'Equipping a weapon does not refresh its projectile range/lifetime profile.'
           assert 'distance > EffectiveRange' in weapon_controller, 'Player firing can exceed the active weapon profile range.'
-          assert 'weaponRange = 15f;' in weapon_controller and 'weaponRange = 27f;' in weapon_controller and 'weaponRange = 42f;' in weapon_controller, 'Picked pistol/rifle/heavy weapons do not have distinct effective ranges.'
+          assert 'weaponRange = 7.5f;' in weapon_controller and 'weaponRange = 13.5f;' in weapon_controller and 'weaponRange = 21f;' in weapon_controller, 'Picked pistol/rifle/heavy weapons do not have distinct halved effective ranges.'
           assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to gray.'
           assert 'AndroidContinuousGroundFoundation' in world, 'Continuous ground foundation is missing.'
           assert 'AddClearAndroidAlleySegments' in world and 'androidBuildingHalfExtents' in world, 'Alley strips are not clipped around building footprints.'
