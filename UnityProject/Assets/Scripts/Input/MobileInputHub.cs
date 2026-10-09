@@ -24,6 +24,8 @@ namespace PersiaWar.Unity2D5D
         private int meleePointerId = -1;
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
+        private float reloadPressedAt;
+        private bool reloadHeldToSwap;
 
         private Vector2 moveStartScreen;
         private Vector2 moveValue;
@@ -34,8 +36,8 @@ namespace PersiaWar.Unity2D5D
         private Camera minimapCamera;
         private RenderTexture minimapTexture;
         private Texture2D circleTexture;
-        private Texture2D lineTexture;
         private GUIStyle buttonTextStyle;
+        private GUIStyle smallButtonHintStyle;
 
         private bool minimapEnabled;
         private float minimapReadyAt;
@@ -132,8 +134,6 @@ if (player == null)
             if (circleTexture != null)
                 Destroy(circleTexture);
 
-            if (lineTexture != null)
-                Destroy(lineTexture);
         }
 
         private void Update()
@@ -161,6 +161,8 @@ if (!matchActive || matchPaused)
 
             if (Input.GetKeyDown(KeyCode.R))
                 player.Weapon?.Reload();
+            if (Input.GetKeyDown(KeyCode.Q))
+                player.Weapon?.CycleWeapon();
 
             if (Input.GetKeyDown(KeyCode.Space))
                 player.Weapon?.TryMelee();
@@ -244,8 +246,10 @@ if (!matchActive || matchPaused)
                 if (reloadPointerId < 0 &&
                     Vector2.Distance(gui, reloadGui) <= reloadHit)
                 {
+                    // Tap to reload; hold for 0.55 seconds to cycle weapon profile.
                     reloadPointerId = touch.fingerId;
-                    player.Weapon?.Reload();
+                    reloadPressedAt = Time.time;
+                    reloadHeldToSwap = false;
                     continue;
                 }
 
@@ -318,9 +322,38 @@ if (!matchActive || matchPaused)
                 }
             }
 
+            if (reloadPointerId >= 0)
+            {
+                if (TryGetTouch(reloadPointerId, out Touch reloadTouch))
+                {
+                    if (!reloadHeldToSwap && Time.time - reloadPressedAt >= 0.55f)
+                    {
+                        player.Weapon?.CycleWeapon();
+                        reloadHeldToSwap = true;
+                    }
+
+                    if (reloadTouch.phase == TouchPhase.Ended ||
+                        reloadTouch.phase == TouchPhase.Canceled)
+                    {
+                        if (!reloadHeldToSwap)
+                            player.Weapon?.Reload();
+                        reloadPointerId = -1;
+                        reloadHeldToSwap = false;
+                        reloadPressedAt = 0f;
+                    }
+                }
+                else
+                {
+                    if (!reloadHeldToSwap)
+                        player.Weapon?.Reload();
+                    reloadPointerId = -1;
+                    reloadHeldToSwap = false;
+                    reloadPressedAt = 0f;
+                }
+            }
+
             ReleasePointer(ref meleePointerId);
             ReleasePointer(ref grenadePointerId);
-            ReleasePointer(ref reloadPointerId);
         }
 
         private Vector2 ApplyDeadZone(Vector2 inputValue)
@@ -488,6 +521,8 @@ if (!matchActive || matchPaused)
             meleePointerId = -1;
             grenadePointerId = -1;
             reloadPointerId = -1;
+            reloadPressedAt = 0f;
+            reloadHeldToSwap = false;
             moveStartScreen = Vector2.zero;
             moveValue = Vector2.zero;
 
@@ -567,7 +602,7 @@ if (!matchActive || matchPaused)
 
             HandleGuiPointerFallback();
 
-            if (circleTexture == null || lineTexture == null)
+            if (circleTexture == null)
                 CreateGuiTextures();
 
             float scale = GetUiScale();
@@ -708,6 +743,14 @@ if (!matchActive || matchPaused)
                 Mathf.RoundToInt(21f * scale);
             buttonTextStyle.normal.textColor = Color.white;
 
+            smallButtonHintStyle ??= new GUIStyle(GUI.skin.label)
+            {
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter
+            };
+            smallButtonHintStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(10f * scale), 8, 11);
+            smallButtonHintStyle.normal.textColor = new Color(1f, 0.93f, 0.62f, 0.95f);
+
             GUI.Label(
                 new Rect(
                     firePos.x - radius,
@@ -743,8 +786,14 @@ if (!matchActive || matchPaused)
                     radius * 0.80f),
                 "R",
                 buttonTextStyle);
-
-            DrawAimGuide(scale);
+            GUI.Label(
+                new Rect(
+                    reloadPos.x - radius * 0.72f,
+                    reloadPos.y + radius * 0.43f,
+                    radius * 1.44f,
+                    16f * scale),
+                "HOLD SWAP",
+                smallButtonHintStyle);
 
             if (minimapTexture != null)
             {
@@ -836,7 +885,8 @@ if (!matchActive || matchPaused)
                 if (reloadPointerId < 0 && Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
                 {
                     reloadPointerId = -1004;
-                    player.Weapon?.Reload();
+                    reloadPressedAt = Time.time;
+                    reloadHeldToSwap = false;
                     e.Use();
                     return;
                 }
@@ -875,6 +925,17 @@ if (!matchActive || matchPaused)
                 return;
             }
 
+            if (e.type == EventType.MouseDrag && reloadPointerId == -1004)
+            {
+                if (!reloadHeldToSwap && Time.time - reloadPressedAt >= 0.55f)
+                {
+                    player.Weapon?.CycleWeapon();
+                    reloadHeldToSwap = true;
+                }
+                e.Use();
+                return;
+            }
+
             if (e.type == EventType.MouseUp)
             {
                 if (movePointerId == -1000)
@@ -886,79 +947,18 @@ if (!matchActive || matchPaused)
                 if (grenadePointerId == -1003)
                     grenadePointerId = -1;
                 if (reloadPointerId == -1004)
+                {
+                    if (!reloadHeldToSwap && Time.time - reloadPressedAt >= 0.55f)
+                        player.Weapon?.CycleWeapon();
+                    else if (!reloadHeldToSwap)
+                        player.Weapon?.Reload();
+
                     reloadPointerId = -1;
+                    reloadHeldToSwap = false;
+                    reloadPressedAt = 0f;
+                }
                 e.Use();
             }
-        }
-
-        private void DrawAimGuide(float scale)
-        {
-            if (player == null ||
-                player.Aim == null ||
-                player.Aim.CurrentTarget == null ||
-                lineTexture == null)
-            {
-                return;
-            }
-
-            Camera camera =
-                gameplayCamera != null
-                    ? gameplayCamera
-                    : Camera.main;
-
-            if (camera == null)
-                return;
-
-            Vector3 from = camera.WorldToScreenPoint(
-                player.transform.position + Vector3.up * 0.8f);
-
-            Vector3 to = camera.WorldToScreenPoint(
-                player.Aim.CurrentTarget.transform.position +
-                Vector3.up * 0.75f);
-
-            if (from.z <= 0f || to.z <= 0f)
-                return;
-
-            from.y = Screen.height - from.y;
-            to.y = Screen.height - to.y;
-
-            DrawLine(
-                from,
-                to,
-                Mathf.Max(2f, 3f * scale),
-                new Color(1f, 0.85f, 0.2f, 0.55f));
-        }
-
-        private void DrawLine(
-            Vector2 start,
-            Vector2 end,
-            float width,
-            Color color)
-        {
-            Vector2 delta = end - start;
-            float length = delta.magnitude;
-
-            if (length <= 0.01f)
-                return;
-
-            Matrix4x4 oldMatrix = GUI.matrix;
-            Color oldColor = GUI.color;
-
-            GUI.color = color;
-            GUIUtility.RotateAroundPivot(
-                Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg,
-                start);
-
-            GUI.DrawTexture(
-                new Rect(
-                    start.x,
-                    start.y - width * 0.5f,
-                    length,
-                    width),
-                lineTexture);
-
-            GUI.matrix = oldMatrix;
-            GUI.color = oldColor;
         }
 
         private void CreateGuiTextures()
@@ -968,15 +968,6 @@ if (!matchActive || matchPaused)
                 64,
                 TextureFormat.RGBA32,
                 false);
-
-            lineTexture = new Texture2D(
-                1,
-                1,
-                TextureFormat.RGBA32,
-                false);
-
-            lineTexture.SetPixel(0, 0, Color.white);
-            lineTexture.Apply();
 
             Vector2 center = new Vector2(31.5f, 31.5f);
             float radius = 31f;
