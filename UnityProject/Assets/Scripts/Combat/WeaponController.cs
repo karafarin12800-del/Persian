@@ -82,11 +82,25 @@ namespace PersiaWar.Unity2D5D
 
         public void SelectWeapon(WeaponKind selectedWeapon)
         {
-            if (weaponKind == selectedWeapon) return;
+            bool changed = weaponKind != selectedWeapon;
             weaponKind = selectedWeapon;
+
+            // Always re-apply the chosen profile. In particular, a pickup must
+            // restore the weapon's configured range, projectile lifetime, damage,
+            // fire cadence, and magazine size even if its kind is already selected.
             ApplyWeaponProfile(true);
             RefreshWeaponVisual();
             UpdateRangeIndicator();
+
+            if (changed)
+                StartupCheckpoint.Set("WeaponSwitched_" + CurrentWeaponName);
+        }
+
+        public void EquipWeaponFromPickup(WeaponKind selectedWeapon, int reserveAmmo)
+        {
+            SelectWeapon(selectedWeapon);
+            AddReserveAmmo(reserveAmmo);
+            StartupCheckpoint.Set("WeaponPickupEquipped_" + CurrentWeaponName);
         }
 
         private void ApplyWeaponProfile(bool preserveAmmo)
