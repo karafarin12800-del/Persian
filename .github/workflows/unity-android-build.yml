@@ -194,6 +194,36 @@ jobs:
 
           echo 'Unity project structure/settings validation passed.'
 
+      - name: Validate requested enemy weapons, pickups, and city clearances
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('UnityProject/Assets/Scripts')
+          enemy = (root / 'Enemy/EnemyChase.cs').read_text(encoding='utf-8')
+          projectile = (root / 'Combat/EnemyProjectile.cs').read_text(encoding='utf-8')
+          health = (root / 'Combat/TargetHealth.cs').read_text(encoding='utf-8')
+          pickup = (root / 'Combat/PickupItem.cs').read_text(encoding='utf-8')
+          world = (root / 'Core/GameBootstrap.cs').read_text(encoding='utf-8')
+          health_bar = (root / 'UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
+
+          assert 'rangedRange = archetype == 3 ? 8f : (archetype == 2 ? 5f : 3f);' in enemy, 'Enemy ranges must be 3m pistol / 5m machine gun / 8m rifle.'
+          assert 'PistolSlide' in enemy and 'MachineGunReceiver' in enemy and 'AKMagazine' in enemy, 'Enemy weapon silhouettes must be distinct.'
+          assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy, 'Enemy firing does not pass its effective range to the projectile.'
+          assert 'Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)' in projectile, 'Enemy projectile has no explicit distance cap.'
+          assert 'lifetime = Mathf.Max(0.05f, Mathf.Max(0.1f, maxRange) / Mathf.Max(1f, speed));' in projectile, 'Enemy projectile lifetime is not tied to weapon range.'
+          assert 'SpawnDroppedWeapon(enemy);' in health and 'pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);' in health, 'Enemy death does not drop the matching weapon.'
+          assert 'Weapon,' in pickup and 'player.Weapon.SelectWeapon(weaponKind);' in pickup, 'Dropped weapon cannot be picked up and equipped.'
+          assert 'AndroidContinuousGroundFoundation' in world, 'Continuous ground foundation is missing.'
+          assert 'AddClearAndroidAlleySegments' in world and 'androidBuildingHalfExtents' in world, 'Alley strips are not clipped around building footprints.'
+          assert 'new Vector3(-79f, 0f, 89f)' in world, 'Outer houses overlap the outermost street.'
+          assert 'bool isPitchedRoof = !isWarehouse && (i % 3 != 0 || i == 0);' in world, 'Most houses should have pitched roofs.'
+          assert 'cameraDistance > Mathf.Max(1f, maxVisibleDistance)' in health_bar and 'Physics.Raycast(' in health_bar, 'Enemy health bars must obey distance and occlusion.'
+          print('Requested gameplay/terrain regression checks: PASS')
+          PY
+
       - name: Report Unity version
         shell: bash
         run: |
