@@ -46,6 +46,7 @@ namespace PersiaWar.Unity2D5D
                 }
 
                 SpawnDroppedWeapon(enemy);
+                ExtractionBeacon.NotifyEnemyDefeated(enemy);
             }
 
             Destroy(gameObject);
