@@ -8,7 +8,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private Transform muzzle;
         [SerializeField] private float fireCooldown = 0.155f;
         [SerializeField] private float projectileSpeed = 45f;
-        [SerializeField] private float projectileLifetime = 2.2f;
+        [SerializeField] private float projectileLifetime = 1.1f;
         [SerializeField] private int projectileDamage = 30;
         [SerializeField] private int magazineSize = 12;
         [SerializeField] private int startingMagazine = 12;
