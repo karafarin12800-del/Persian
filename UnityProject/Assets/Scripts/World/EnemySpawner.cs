@@ -11,7 +11,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float nextWaveDelay = 3f;
         [SerializeField] private float initialSpawnDelay = 6.5f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
-        [SerializeField] private int maxPerWave = 31;
+        [SerializeField] private int maxPerWave = 15;
         [SerializeField] private int victoryWave = 5;
 
 #if UNITY_ANDROID
