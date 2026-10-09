@@ -43,6 +43,7 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobileVisor;
 
         public Transform Muzzle => muzzle;
+        public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;
 
         public static StylizedCharacterVisual Attach(Transform owner, bool isPlayer, int characterArchetype)
         {
