@@ -302,11 +302,11 @@ jobs:
           assert 'new Vector3(-79f, 0f, 89f)' in world, 'Outer houses overlap the outermost street.'
           assert 'bool isPitchedRoof = !isWarehouse && (i % 3 != 0 || i == 0);' in world, 'Most houses should have pitched roofs.'
           assert 'cameraDistance > Mathf.Max(1f, maxVisibleDistance)' in health_bar and 'Physics.Raycast(' in health_bar, 'Enemy health bars must obey distance and occlusion.'
-          minimap = (root / 'UI/AndroidMinimapOverlay.cs').read_text(encoding='utf-8')
-          assert 'new Color(0f, 0f, 0f, 0f)' in minimap, 'Minimap background is not transparent.'
-          assert 'float size = 214f * scale;' in minimap, 'Minimap is not enlarged by approximately 20 percent.'
-          assert 'mapCamera.cullingMask = ~0;' in minimap, 'Minimap camera may omit house/world layers.'
-          assert 'GUI.Box(rect, GUIContent.none)' not in minimap, 'Default GUI.Box may draw an opaque minimap background.'
+          flow = (root / 'Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+          assert not (root / 'UI/AndroidMinimapOverlay.cs').exists(), 'The duplicate minimap camera must stay removed; PrototypeFlow owns the active Android minimap.'
+          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in flow, 'Active Android minimap size has regressed.'
+          assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));' in flow, 'Active Android minimap transparency has regressed.'
+          assert 'AndroidMinimapRoadCoordinates' in flow and 'AndroidMinimapBuildingPoints' in flow, 'Active Android minimap must follow the built city layout.'
           assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to very light gray.'
           print('Minimap transparency/size/world-layer and bright-road regression checks: PASS')
           print('Requested gameplay/terrain regression checks: PASS')
