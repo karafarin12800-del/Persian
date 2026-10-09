@@ -48,6 +48,8 @@ jobs:
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity.meta
           test -f UnityProject/Assets/Resources/PersiaWarLit.shader
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader.meta
           test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
           test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
           test -f UnityProject/Assets/Scripts/Core/AndroidSafeRuntimeFactory.cs
@@ -113,6 +115,18 @@ jobs:
           visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
           presentation = visual[visual.index('private void EnsurePresentation()'):visual.index('private void LoadCharacterSprite()')]
           assert 'CreateMuzzleFlash()' not in presentation, 'Muzzle flash is still allocated during player presentation setup.'
+          flat_shader = Path('UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader').read_text(encoding='utf-8')
+          factory = Path('UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs').read_text(encoding='utf-8')
+          assert 'Shader "PersiaWar/AndroidFlat"' in flat_shader, 'Project-owned Android flat shader is missing.'
+          assert 'return tex2D(_MainTex, i.uv) * _Color;' in flat_shader, 'Android flat shader must tint textures without lighting.'
+          assert 'Resources.Load<Shader>("PersiaWarAndroidFlat")' in factory, 'Android does not prefer the bundled flat shader.'
+          assert factory.index('Resources.Load<Shader>("PersiaWarAndroidFlat")') < factory.index('Shader.Find("Unlit/Texture")'), 'Built-in lookup runs before the bundled Android shader.'
+          assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
+          assert 'DisableLegacyWorldBuilderPath();' in bootstrap, 'Android does not disable the retired gray-ground/dark-road generator.'
+          legacy_world = Path('UnityProject/Assets/Scripts/World/WorldBuilder.cs').read_text(encoding='utf-8')
+          assert 'new Color(0.12f, 0.46f, 0.08f)' in legacy_world and 'new Color(0.52f, 0.54f, 0.57f)' in legacy_world, 'Legacy fallback colors regress.'
+          assert 'RuntimeMaterialFactory.Create(' in legacy_world, 'Legacy fallback materials bypass the runtime shader path.'
+          print('Android shader/legacy-ground regression checks: PASS')
           print('Android startup isolation checks: PASS')
           PY
           python3 - <<'PY'
@@ -163,8 +177,8 @@ jobs:
           assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
           assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.78f))' in active_hud, 'Active Android minimap must use a translucent green base so the schematic stays readable over the 3D camera.'
           assert 'new Color(0.96f, 0.68f, 0.30f, 1f)' in active_hud and 'new Color(0.12f, 0.075f, 0.035f, 0.98f)' in active_hud, 'Minimap houses need high-contrast fill and outline.'
-          assert 'new Color(0.24f, 0.48f, 0.22f)' in bootstrap, 'Android grass must remain green.'
-          assert 'new Color(0.90f, 0.91f, 0.92f)' in bootstrap, 'Android asphalt must remain light gray.'
+          assert 'new Color(0.12f, 0.46f, 0.08f)' in bootstrap, 'Android grass must remain green.'
+          assert 'new Color(0.52f, 0.54f, 0.57f)' in bootstrap, 'Android asphalt must remain light gray.'
 
           enemy_ai = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'EnemyRifleVisual' in enemy_ai and 'RifleBarrel' in enemy_ai, 'Enemy characters do not have visible rifle geometry.'
@@ -226,7 +240,7 @@ jobs:
           assert 'ApplyWeaponProfile(true);' in weapon_controller and 'projectileLifetime = weaponRange / Mathf.Max(1f, projectileSpeed);' in weapon_controller, 'Equipping a weapon does not refresh its projectile range/lifetime profile.'
           assert 'distance > EffectiveRange' in weapon_controller, 'Player firing can exceed the active weapon profile range.'
           assert 'weaponRange = 15f;' in weapon_controller and 'weaponRange = 27f;' in weapon_controller and 'weaponRange = 42f;' in weapon_controller, 'Picked pistol/rifle/heavy weapons do not have distinct effective ranges.'
-          assert 'new Color(0.90f, 0.91f, 0.92f)' in world, 'Road asphalt has not been lightened to gray.'
+          assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to gray.'
           assert 'AndroidContinuousGroundFoundation' in world, 'Continuous ground foundation is missing.'
           assert 'AddClearAndroidAlleySegments' in world and 'androidBuildingHalfExtents' in world, 'Alley strips are not clipped around building footprints.'
           assert 'new Vector3(-79f, 0f, 89f)' in world, 'Outer houses overlap the outermost street.'
@@ -237,7 +251,7 @@ jobs:
           assert 'float size = 214f * scale;' in minimap, 'Minimap is not enlarged by approximately 20 percent.'
           assert 'mapCamera.cullingMask = ~0;' in minimap, 'Minimap camera may omit house/world layers.'
           assert 'GUI.Box(rect, GUIContent.none)' not in minimap, 'Default GUI.Box may draw an opaque minimap background.'
-          assert 'new Color(0.90f, 0.91f, 0.92f)' in world, 'Road asphalt has not been lightened to very light gray.'
+          assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to very light gray.'
           print('Minimap transparency/size/world-layer and bright-road regression checks: PASS')
           print('Requested gameplay/terrain regression checks: PASS')
           PY

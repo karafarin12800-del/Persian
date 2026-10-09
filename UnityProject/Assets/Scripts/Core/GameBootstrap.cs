@@ -205,6 +205,9 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildWorldBase()
         {
+#if UNITY_ANDROID
+            DisableLegacyWorldBuilderPath();
+#endif
             GameObject legacyGround = GameObject.Find("Ground");
             if (legacyGround != null) legacyGround.SetActive(false);
 
@@ -213,7 +216,7 @@ namespace PersiaWar.Unity2D5D
 
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
-            roadMaterial = MakeMaterial("Road", new Color(0.90f, 0.91f, 0.92f));
+            roadMaterial = MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
@@ -221,7 +224,7 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
-            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.24f, 0.48f, 0.22f));
+            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.12f, 0.46f, 0.08f));
             buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
             roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
             accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
@@ -258,6 +261,46 @@ namespace PersiaWar.Unity2D5D
                 CreateBox("RoadZ", new Vector3(0f, -0.04f, z), new Vector3(worldSize, 0.18f, roadWidth), roadMaterial, false);
 #endif
         }
+
+#if UNITY_ANDROID
+        private void DisableLegacyWorldBuilderPath()
+        {
+            // The retired WorldBuilder path used gray-olive ground and nearly black roads.
+            // Disable its generator and clean up its objects if it ran before this bootstrap.
+            WorldBuilder[] legacyBuilders = FindObjectsByType<WorldBuilder>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < legacyBuilders.Length; i++)
+            {
+                if (legacyBuilders[i] != null)
+                    legacyBuilders[i].enabled = false;
+            }
+
+            GameObject[] existingObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            int removed = 0;
+            for (int i = 0; i < existingObjects.Length; i++)
+            {
+                GameObject candidate = existingObjects[i];
+                if (candidate == null)
+                    continue;
+
+                string objectName = candidate.name;
+                bool legacySurface =
+                    objectName == "World_Ground" ||
+                    objectName.StartsWith("MainRoad_") ||
+                    objectName.StartsWith("Alley_");
+
+                if (legacySurface)
+                {
+                    candidate.SetActive(false);
+                    removed++;
+                }
+            }
+
+            Debug.Log("PERSIA_WORLD_CLEANUP: legacy builders=" + legacyBuilders.Length +
+                      ", removed legacy ground/road objects=" + removed);
+        }
+#endif
+
         private void BuildAndroidTerrain3D(Material material)
         {
             const int grid = 17;
