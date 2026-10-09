@@ -25,6 +25,8 @@ namespace PersiaWar.Unity2D5D
         private int meleePointerId = -1;
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
+        private int missingMovementTouchFrames;
+        private const int MovementTouchGraceFrames = 3;
         private float reloadPressedAt;
         private bool reloadHeldToSwap;
 
@@ -250,6 +252,12 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleAndroidTouches()
         {
+#if UNITY_ANDROID
+            // Keep Android's native multi-pointer input enabled throughout gameplay,
+            // not only during Awake/scene activation or app focus restoration.
+            if (!Input.multiTouchEnabled)
+                Input.multiTouchEnabled = true;
+#endif
             float scale = GetUiScale();
             float radius = joystickRadius * scale * controlScale;
 
@@ -363,6 +371,20 @@ namespace PersiaWar.Unity2D5D
                     {
                         ResetMovementPointer();
                     }
+                    else
+                    {
+                        missingMovementTouchFrames = 0;
+                    }
+                }
+                else if (firePointerId >= 0 && Input.touchCount > 0 &&
+                         missingMovementTouchFrames < MovementTouchGraceFrames)
+                {
+                    // Some Android touch drivers briefly omit an already captured
+                    // finger when a second finger begins. Preserve the last movement
+                    // vector for a few frames rather than immediately zeroing it.
+                    // A normal Ended/Canceled event still releases movement at once.
+                    missingMovementTouchFrames++;
+                    player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                 }
                 else
                 {
@@ -594,6 +616,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetMovementPointer()
         {
             movePointerId = -1;
+            missingMovementTouchFrames = 0;
             guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
             moveTouchOriginScreen = Vector2.zero;
@@ -606,6 +629,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetAllPointers()
         {
             movePointerId = -1;
+            missingMovementTouchFrames = 0;
             firePointerId = -1;
             meleePointerId = -1;
             grenadePointerId = -1;
