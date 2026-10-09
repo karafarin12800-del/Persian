@@ -771,6 +771,11 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(longAxisZ ? width * 0.38f : 0.34f, 0.16f, longAxisZ ? 0.16f : length * 0.38f),
                 light,
                 false);
+
+            // Visual car pieces have no individual colliders; one solid body collider
+            // makes the entire parked vehicle an obstacle for player movement.
+            CreateAndroidCollider("CityVehicleCollider", position,
+                new Vector3(width, 1.35f, length));
         }
 
         private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
@@ -890,10 +895,16 @@ namespace PersiaWar.Unity2D5D
 
             Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
             QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
-            // Extend the camera-blocking collider through the roofline so the camera
-            // can detect houses even when its sightline crosses the upper facade/roof.
-            CreateAndroidCollider("CityBuildingCollider", position,
-                new Vector3(footprint, bodyHeight + (isPitchedRoof ? 1.6f : 0.65f), depth));
+            // Split solid collision around the front door. Windows remain blocked;
+            // the player can enter only through the doorway-sized opening.
+            float doorWidthForCollision = isWarehouse
+                ? Mathf.Min(3.4f, footprint * 0.32f)
+                : Mathf.Min(1.35f, footprint * 0.18f);
+            float doorHeightForCollision = isWarehouse ? 2.35f : 2.15f;
+            float collisionHeight = bodyHeight + (isPitchedRoof ? 1.6f : 0.65f);
+            CreateAndroidBuildingColliders(
+                position, footprint, depth, collisionHeight,
+                doorWidthForCollision, doorHeightForCollision);
 
             if (isPitchedRoof)
             {
@@ -1173,6 +1184,45 @@ namespace PersiaWar.Unity2D5D
             triangles.Add(start + 0);
             triangles.Add(start + 2);
             triangles.Add(start + 3);
+        }
+
+        private void CreateAndroidBuildingColliders(
+            Vector3 position,
+            float footprint,
+            float depth,
+            float totalHeight,
+            float doorWidth,
+            float doorHeight)
+        {
+            float thickness = Mathf.Clamp(Mathf.Min(footprint, depth) * 0.08f, 0.35f, 0.60f);
+            float frontZ = -depth * 0.5f + thickness * 0.5f;
+            float backZ = depth * 0.5f - thickness * 0.5f;
+            float sideWidth = Mathf.Max(0.35f, (footprint - doorWidth) * 0.5f);
+
+            // Side and rear walls stay fully solid.
+            CreateAndroidCollider("CityBuildingSideCollider",
+                position + Vector3.left * (footprint * 0.5f - thickness * 0.5f),
+                new Vector3(thickness, totalHeight, depth));
+            CreateAndroidCollider("CityBuildingSideCollider",
+                position + Vector3.right * (footprint * 0.5f - thickness * 0.5f),
+                new Vector3(thickness, totalHeight, depth));
+            CreateAndroidCollider("CityBuildingRearCollider",
+                position + Vector3.forward * backZ,
+                new Vector3(footprint, totalHeight, thickness));
+
+            // The two front sections leave a gap only as wide as the door.
+            CreateAndroidCollider("CityBuildingFrontCollider",
+                position + new Vector3(-(doorWidth * 0.5f + sideWidth * 0.5f), 0f, frontZ),
+                new Vector3(sideWidth, totalHeight, thickness));
+            CreateAndroidCollider("CityBuildingFrontCollider",
+                position + new Vector3(doorWidth * 0.5f + sideWidth * 0.5f, 0f, frontZ),
+                new Vector3(sideWidth, totalHeight, thickness));
+
+            // The wall above the door is still solid.
+            float headerHeight = Mathf.Max(0.1f, totalHeight - doorHeight);
+            CreateAndroidCollider("CityBuildingDoorHeaderCollider",
+                position + new Vector3(0f, doorHeight, frontZ),
+                new Vector3(doorWidth, headerHeight, thickness));
         }
 
         private void CreateAndroidCollider(string objectName, Vector3 position, Vector3 size)
