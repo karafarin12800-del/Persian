@@ -5,7 +5,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class EnemyProjectile : MonoBehaviour
     {
         [SerializeField] private float speed = 24f;
-        [SerializeField] private float lifetime = 2f;
+        [SerializeField] private float lifetime = 1f;
         [SerializeField] private int damage = 8;
 
         private Vector3 direction;
