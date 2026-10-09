@@ -161,7 +161,8 @@ jobs:
           enemy_ai = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'EnemyRifleVisual' in enemy_ai and 'RifleBarrel' in enemy_ai, 'Enemy characters do not have visible rifle geometry.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system.'
-          print('Combat HUD and 32-player lobby regression checks: PASS (live health/shield, 31 distributed opponents, enlarged enemy-aware minimap, visible enemy rifles).')
+          assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
+          print('Combat HUD and 32-player lobby regression checks: PASS (live health/shield, 31 distributed opponents, enlarged enemy-aware minimap, visible enemy rifles, mobile AI cadence).')
           PY
 
           echo 'Unity project structure/settings validation passed.'
