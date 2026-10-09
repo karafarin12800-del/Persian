@@ -58,8 +58,11 @@ namespace PersiaWar.Unity2D5D
             EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
             GameSession session = GameSession.Instance;
 
-            float hp = health != null && health.MaxHealth > 0f ? health.CurrentHealth / health.MaxHealth : 0f;
-            float shield = Mathf.Clamp01(player.Shield / 100f);
+            int currentHealth = health != null ? health.CurrentHealth : 0;
+            int maxHealth = health != null ? health.MaxHealth : 0;
+            float hp = maxHealth > 0 ? currentHealth / (float)maxHealth : 0f;
+            int shieldAmount = player.Shield;
+            float shield = Mathf.Clamp01(shieldAmount / 100f);
             int ammo = weapon != null ? weapon.Magazine : 0;
             int reserve = weapon != null ? weapon.Reserve : 0;
             int grenades = inventory != null ? inventory.Grenades : 0;
@@ -69,7 +72,7 @@ namespace PersiaWar.Unity2D5D
             float scale = Mathf.Clamp(Screen.height / 720f, 0.75f, 1.35f);
             float margin = 22f * scale;
 
-            DrawTopStatus(margin, scale, hp, shield, ammo, reserve, grenades);
+            DrawTopStatus(margin, scale, hp, currentHealth, maxHealth, shield, shieldAmount, ammo, reserve, grenades);
             DrawCounters(margin, scale, wave, score);
 
             if (player.IsDefeated)
@@ -81,7 +84,7 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
-        private void DrawTopStatus(float margin, float scale, float hp, float shield, int ammo, int reserve, int grenades)
+        private void DrawTopStatus(float margin, float scale, float hp, int currentHealth, int maxHealth, float shield, int shieldAmount, int ammo, int reserve, int grenades)
         {
             float panelW = 360f * scale;
             float panelH = 96f * scale;
@@ -92,12 +95,19 @@ namespace PersiaWar.Unity2D5D
             Fill(portrait, new Color(0.90f, 0.40f, 0.16f, 0.96f));
             GUI.Label(portrait, "P", bold);
 
-            GUI.Label(new Rect(portrait.xMax + 10f * scale, panel.y + 8f * scale, 180f * scale, 26f * scale), "PERSIA WARRIOR", medium);
-
             float barX = portrait.xMax + 10f * scale;
-            DrawBar(new Rect(barX, panel.y + 40f * scale, panelW - (barX - panel.x) - 12f * scale, 16f * scale), hp, new Color(0.25f, 0.90f, 0.36f));
-            GUI.Label(new Rect(barX, panel.y + 58f * scale, 150f * scale, 22f * scale), "SHIELD", small);
-            DrawBar(new Rect(barX + 70f * scale, panel.y + 61f * scale, 120f * scale, 10f * scale), shield, new Color(0.30f, 0.66f, 1f));
+            float barWidth = panelW - (barX - panel.x) - 12f * scale;
+            GUI.Label(new Rect(barX, panel.y + 5f * scale, barWidth, 25f * scale), "PERSIA WARRIOR", medium);
+
+            GUI.Label(new Rect(barX, panel.y + 31f * scale, barWidth, 17f * scale),
+                "HP  " + currentHealth + " / " + maxHealth, small);
+            DrawBar(new Rect(barX, panel.y + 48f * scale, barWidth, 9f * scale),
+                hp, new Color(0.25f, 0.90f, 0.36f));
+
+            GUI.Label(new Rect(barX, panel.y + 58f * scale, barWidth, 17f * scale),
+                "SHIELD  " + shieldAmount + " / 100", small);
+            DrawBar(new Rect(barX, panel.y + 75f * scale, barWidth, 9f * scale),
+                shield, new Color(0.30f, 0.66f, 1f));
 
             float itemY = panel.yMax + 8f * scale;
             DrawChip(new Rect(panel.x, itemY, 120f * scale, 36f * scale), "⚡  " + grenades, new Color(0.13f, 0.30f, 0.15f));
