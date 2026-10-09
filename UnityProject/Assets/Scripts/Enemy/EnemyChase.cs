@@ -693,7 +693,7 @@ namespace PersiaWar.Unity2D5D
                 origin + shotDirection * 0.16f,
                 Quaternion.LookRotation(shotDirection, Vector3.up),
                 new Vector3(0.07f, 0.07f, 0.07f),
-                new Color(0.92f, 0.18f, 0.10f));
+                new Color(0.10f, 0.55f, 1f));
 #else
             GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             projectile.name = "EnemyProjectile";
