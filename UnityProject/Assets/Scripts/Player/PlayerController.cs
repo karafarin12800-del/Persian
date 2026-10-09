@@ -164,11 +164,25 @@ namespace PersiaWar.Unity2D5D
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
             next.y = 0f;
 
-            // Android input validation phase: movement must not be blocked by
-            // procedural city colliders. Collision-aware navigation will be restored
-            // after the input path is proven stable.
             if (desired.sqrMagnitude > 0.00001f)
-                transform.position = next;
+            {
+                if (!WouldCollide(next))
+                {
+                    transform.position = next;
+                }
+                else
+                {
+                    // Slide along walls and parked vehicles instead of stopping at
+                    // every diagonal collision. Both candidate positions still pass
+                    // through the same solid-obstacle query.
+                    Vector3 slideX = new Vector3(next.x, next.y, transform.position.z);
+                    Vector3 slideZ = new Vector3(transform.position.x, next.y, next.z);
+                    if (!WouldCollide(slideX))
+                        transform.position = slideX;
+                    else if (!WouldCollide(slideZ))
+                        transform.position = slideZ;
+                }
+            }
 
             if (visual != null)
                 visual.SetMoving(input.sqrMagnitude > 0.0001f);
