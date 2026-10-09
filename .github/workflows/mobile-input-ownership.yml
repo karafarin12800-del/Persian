@@ -82,6 +82,8 @@ jobs:
           ):
               assert callback in hub, f"Missing input reset lifecycle path: {callback}"
           assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
+          assert "private const float BaseActionHitRadius = 122f;" in hub, "Action touch zones must not inherit the enlarged movement-joystick radius"
+          assert hub.count("float actionHitRadius = BaseActionHitRadius * scale * controlScale;") == 2, "Real touch and IMGUI fallback must share the same action hit radius"
           fallback_start = hub.index("private void HandleGuiPointerFallback()")
           fallback_end = hub.index("private void CreateGuiTextures()", fallback_start)
           fallback = hub[fallback_start:fallback_end]
