@@ -82,6 +82,9 @@ jobs:
           ):
               assert callback in hub, f"Missing input reset lifecycle path: {callback}"
           assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
+          assert "private const int MovementTouchGraceFrames = 3;" in hub, "Brief Android movement-touch gaps must not instantly cancel movement while firing"
+          assert "missingMovementTouchFrames < MovementTouchGraceFrames" in hub and "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement continuity fallback must preserve the last vector briefly"
+          assert "if (!Input.multiTouchEnabled)" in hub and "Input.multiTouchEnabled = true;" in hub, "Android multi-touch must be enforced during active touch dispatch"
           assert "private const float BaseActionHitRadius = 122f;" in hub, "Action touch zones must not inherit the enlarged movement-joystick radius"
           assert hub.count("float actionHitRadius = BaseActionHitRadius * scale * controlScale;") == 2, "Real touch and IMGUI fallback must share the same action hit radius"
           fallback_start = hub.index("private void HandleGuiPointerFallback()")
