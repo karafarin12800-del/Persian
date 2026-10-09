@@ -219,7 +219,7 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
-            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.25f, 0.44f, 0.18f));
+            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.29f, 0.48f, 0.22f));
             buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
             roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
             accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
@@ -227,6 +227,13 @@ namespace PersiaWar.Unity2D5D
             androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
             androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.38f, 0.36f, 0.31f));
             BuildAndroidTerrain3D(groundMaterial);
+            // Continuous underlay prevents hairline gaps at terrain/building seams.
+            CreateAndroidBox(
+                "AndroidContinuousGroundFoundation",
+                new Vector3(0f, -0.235f, 0f),
+                new Vector3(worldSize + 8f, 0.40f, worldSize + 8f),
+                groundMaterial,
+                false);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
             return;
@@ -314,8 +321,8 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidRoadGrid()
         {
-            const float roadWidth = 10f;
-            const float sidewalkWidth = 1.35f;
+            const float roadWidth = 8f;
+            const float sidewalkWidth = 1.10f;
             float half = worldSize * 0.5f;
 
             List<Vector3> roadVertices = new List<Vector3>();
@@ -323,7 +330,7 @@ namespace PersiaWar.Unity2D5D
             List<Vector3> sidewalkVertices = new List<Vector3>();
             List<int> sidewalkTriangles = new List<int>();
 
-            for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+            for (float x = -half + 12f; x <= half; x += 24f)
             {
                 AddAndroidQuad(roadVertices, roadTriangles,
                     new Vector3(x, 0.025f, 0f),
@@ -338,7 +345,7 @@ namespace PersiaWar.Unity2D5D
                     new Vector2(sidewalkWidth, worldSize));
             }
 
-            for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
+            for (float z = -half + 12f; z <= half; z += 24f)
             {
                 AddAndroidQuad(roadVertices, roadTriangles,
                     new Vector3(0f, 0.025f, z),
@@ -394,9 +401,9 @@ namespace PersiaWar.Unity2D5D
                 float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
 
                 bool isWarehouse = i == 4 || i == 9 || i == 11 || i == 16;
-                bool isPitchedRoof = !isWarehouse &&
-                    (i == 1 || i == 3 || i == 6 || i == 10 ||
-                     i == 12 || i == 14 || i == 18 || i == 24);
+                // Most residential blocks now use visible gable roofs; warehouses
+                // and a smaller modern subset keep flat roofs.
+                bool isPitchedRoof = !isWarehouse && (i % 3 != 0 || i == 0);
 
                 float footprint = Mathf.Lerp(7.6f, 11.4f, widthRoll);
                 float depth = Mathf.Lerp(7.0f, 10.0f, depthRoll);
@@ -489,18 +496,22 @@ namespace PersiaWar.Unity2D5D
         private void BuildAndroidAlleysAndVehicles()
         {
             StartupCheckpoint.Set("CITY_ALLEYS_START");
-            const float alleyWidth = 4.5f;
+            const float alleyWidth = 4.0f;
             const float alleySpacing = 12f;
             const int alleyCountPerAxis = 15;
             float half = worldSize * 0.5f - alleySpacing;
 
-            // 15 lanes in each axis = 30 secondary alleys. Bake them into one
-            // shared road mesh instead of maintaining 30 separate renderers.
+            // Secondary alleys stay on outer blocks. The former every-12m grid
+            // crossed through multiple house footprints; the aligned primary grid
+            // serves the inner blocks without roads cutting across buildings.
             List<Vector3> alleyVertices = new List<Vector3>();
             List<int> alleyTriangles = new List<int>();
             for (int i = 0; i < alleyCountPerAxis; i++)
             {
                 float offset = -half + i * alleySpacing;
+                if (Mathf.Abs(offset) < 60f)
+                    continue;
+
                 AddAndroidQuad(alleyVertices, alleyTriangles,
                     new Vector3(offset, -0.01f, 0f),
                     new Vector2(alleyWidth, worldSize));
