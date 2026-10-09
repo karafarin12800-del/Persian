@@ -232,7 +232,8 @@ jobs:
           assert 'Mathf.Min(range, weapon.EffectiveRange)' in aim, 'Auto-targeting can select opponents beyond the current weapon range.'
 
           input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
-          assert 'Input.multiTouchEnabled = true;' in input_hub and 'Input.simulateMouseWithTouches = false;' in input_hub, 'Android must use real multi-touch without synthesized mouse pointers.'
+          assert 'Input.multiTouchEnabled = true;' in input_hub, 'Android must use multi-touch.'
+          assert 'Input.simulateMouseWithTouches = false;' not in input_hub, 'Keep touch-to-mouse simulation enabled for IMGUI controls; suppress it only inside the custom mobile pointer dispatcher.'
           gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
           gui_fallback_end = input_hub.index('private void CreateGuiTextures()', gui_fallback_start)
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]

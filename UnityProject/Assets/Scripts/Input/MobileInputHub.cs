@@ -75,10 +75,10 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            Input.simulateMouseWithTouches = false;
-            // Keep real Android multi-touch as the sole touch source. The legacy
-            // mouse simulation only represents one pointer and can cancel/steal
-            // the movement finger when a second finger presses FIRE.
+            // HandleAndroidTouches owns the real finger IDs. Keep Unity's built-in
+            // touch-to-mouse simulation enabled for IMGUI controls such as PAUSE;
+            // HandleGuiPointerFallback ignores those events on mobile so they cannot
+            // overwrite the joystick/FIRE finger IDs.
 #endif
             enabled = true;
         }
