@@ -21,6 +21,9 @@ namespace PersiaWar.Unity2D5D
         private int archetype = 1;
         private float collisionRadius = 0.55f;
         private StylizedCharacterVisual visual;
+        private Transform weaponVisualRoot;
+        private static Material enemyRifleReceiverMaterial;
+        private static Material enemyRifleMetalMaterial;
 
         public void SetTarget(Transform targetTransform)
         {
@@ -33,6 +36,9 @@ namespace PersiaWar.Unity2D5D
         {
             target = targetTransform;
             archetype = Mathf.Clamp(enemyArchetype, 1, 3);
+            // With a full 32-combatant lobby, lower mobile AI polling frequency to
+            // reduce per-frame physics-query pressure without changing attack rules.
+            retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;
 
             moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
@@ -49,6 +55,69 @@ namespace PersiaWar.Unity2D5D
 
             if (visual != null)
                 visual.Configure(false, archetype);
+
+            EnsureEnemyWeaponVisual();
+        }
+
+        private void EnsureEnemyWeaponVisual()
+        {
+            if (visual == null)
+                return;
+
+            if (weaponVisualRoot != null)
+                return;
+
+            Transform existing = visual.transform.Find("EnemyRifleVisual");
+            if (existing != null)
+            {
+                weaponVisualRoot = existing;
+                return;
+            }
+
+            weaponVisualRoot = new GameObject("EnemyRifleVisual").transform;
+            weaponVisualRoot.SetParent(visual.transform, false);
+            weaponVisualRoot.localPosition = new Vector3(0.34f, 0.86f, 0.10f);
+            weaponVisualRoot.localRotation = Quaternion.identity;
+            weaponVisualRoot.localScale = Vector3.one;
+
+            if (enemyRifleReceiverMaterial == null)
+                enemyRifleReceiverMaterial = RuntimeMaterialFactory.Create(
+                    "EnemyRifleReceiver", new Color(0.07f, 0.09f, 0.11f));
+            if (enemyRifleMetalMaterial == null)
+                enemyRifleMetalMaterial = RuntimeMaterialFactory.Create(
+                    "EnemyRifleMetal", new Color(0.42f, 0.43f, 0.39f));
+
+            CreateEnemyWeaponPart("RifleStock", new Vector3(0f, 0f, -0.16f),
+                new Vector3(0.12f, 0.10f, 0.22f), enemyRifleReceiverMaterial);
+            CreateEnemyWeaponPart("RifleReceiver", new Vector3(0f, 0f, 0.12f),
+                new Vector3(0.16f, 0.13f, 0.38f), enemyRifleReceiverMaterial);
+            CreateEnemyWeaponPart("RifleBarrel", new Vector3(0f, 0.015f, 0.43f),
+                new Vector3(0.065f, 0.065f, 0.28f), enemyRifleMetalMaterial);
+        }
+
+        private void CreateEnemyWeaponPart(
+            string partName,
+            Vector3 localPosition,
+            Vector3 localScale,
+            Material material)
+        {
+            GameObject part = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            part.name = partName;
+            part.transform.SetParent(weaponVisualRoot, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+
+            Collider collider = part.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            Renderer renderer = part.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
         }
 
         private void Awake()

@@ -30,6 +30,8 @@ namespace PersiaWar.Unity2D5D
         private const float AndroidCameraLookHeight = 0.90f;
         private const float AndroidCameraLookAhead = 4.5f;
         private AndroidMinimapOverlay androidMinimap;
+        private EnemyChase[] minimapEnemies = new EnemyChase[0];
+        private float nextMinimapRefresh;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
@@ -50,6 +52,21 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle bodyStyle;
         private GUIStyle buttonStyle;
         private GUIStyle smallStyle;
+
+        private static readonly Vector2[] AndroidMinimapBuildingPoints =
+        {
+            new Vector2(-42f, -42f), new Vector2(-21f, -42f), new Vector2(21f, -42f), new Vector2(42f, -42f),
+            new Vector2(-42f, -21f), new Vector2(42f, -21f),
+            new Vector2(-42f, 0f), new Vector2(42f, 0f),
+            new Vector2(-42f, 21f), new Vector2(42f, 21f),
+            new Vector2(-42f, 42f), new Vector2(-21f, 42f), new Vector2(21f, 42f), new Vector2(42f, 42f),
+            new Vector2(-21f, -21f), new Vector2(21f, -21f),
+            new Vector2(-21f, 21f), new Vector2(21f, 21f),
+            new Vector2(-10f, -34f), new Vector2(10f, 34f),
+            new Vector2(-34f, 10f), new Vector2(34f, -10f),
+            new Vector2(-15f, -14f), new Vector2(15f, -14f),
+            new Vector2(-15f, 14f), new Vector2(15f, 14f)
+        };
 
         private static readonly string[] HeroNames =
         {
@@ -270,32 +287,60 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
                 "32", headerStyle);
 
-            // Lightweight schematic minimap: no extra camera or RenderTexture.
-            float mapSize = Mathf.Clamp(148f * scale, 112f, 190f);
+            // Lightweight city schematic: 15% larger, with the actual street grid,
+            // building blocks, player marker and live enemy positions. No extra camera
+            // or RenderTexture is allocated on Android.
+            float mapSize = Mathf.Clamp(148f * scale * 1.15f, 112f, 218f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
-            Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.92f));
-            Fill(new Rect(map.x + map.width * 0.42f, map.y, map.width * 0.16f, map.height), new Color(0.18f, 0.20f, 0.18f, 0.95f));
-            Fill(new Rect(map.x, map.y + map.height * 0.42f, map.width, map.height * 0.16f), new Color(0.18f, 0.20f, 0.18f, 0.95f));
+            Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.96f));
 
-            for (int i = 0; i < 5; i++)
+            Color roadColor = new Color(0.18f, 0.20f, 0.18f, 0.98f);
+            for (int road = -72; road <= 72; road += 24)
             {
-                float x = map.x + (0.08f + i * 0.20f) * map.width;
-                float z = map.y + (0.12f + (i % 3) * 0.28f) * map.height;
-                Fill(new Rect(x, z, map.width * 0.12f, map.height * 0.10f),
-                    new Color(0.70f, 0.48f, 0.22f, 0.95f));
+                float x = map.x + Mathf.InverseLerp(-96f, 96f, road) * map.width;
+                float y = map.y + Mathf.InverseLerp(96f, -96f, road) * map.height;
+                Fill(new Rect(x - map.width * 0.018f, map.y, map.width * 0.036f, map.height), roadColor);
+                Fill(new Rect(map.x, y - map.height * 0.018f, map.width, map.height * 0.036f), roadColor);
+            }
+
+            for (int i = 0; i < AndroidMinimapBuildingPoints.Length; i++)
+            {
+                Vector2 building = WorldToMap(AndroidMinimapBuildingPoints[i], map);
+                float buildingWidth = map.width * (i >= 22 ? 0.055f : 0.065f);
+                float buildingHeight = map.height * (i >= 22 ? 0.045f : 0.055f);
+                Fill(new Rect(building.x - buildingWidth * 0.5f, building.y - buildingHeight * 0.5f,
+                    buildingWidth, buildingHeight), new Color(0.70f, 0.48f, 0.22f, 0.98f));
+            }
+
+            if (Time.unscaledTime >= nextMinimapRefresh)
+            {
+                nextMinimapRefresh = Time.unscaledTime + 0.25f;
+                minimapEnemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+            }
+
+            for (int i = 0; i < minimapEnemies.Length; i++)
+            {
+                EnemyChase enemy = minimapEnemies[i];
+                if (enemy == null || !enemy.gameObject.activeInHierarchy)
+                    continue;
+
+                Vector3 enemyPosition = enemy.transform.position;
+                if (Mathf.Abs(enemyPosition.x) > 96f || Mathf.Abs(enemyPosition.z) > 96f)
+                    continue;
+
+                Vector2 enemyPoint = WorldToMap(new Vector2(enemyPosition.x, enemyPosition.z), map);
+                DrawCircle(enemyPoint, 3.5f * scale, new Color(1f, 0.22f, 0.16f, 1f));
             }
 
             Vector2 playerPoint = new Vector2(map.center.x, map.center.y);
             if (player != null)
             {
-                const float half = 110f;
                 Vector3 pos = player.transform.position;
-                playerPoint.x = map.x + Mathf.InverseLerp(-half, half, pos.x) * map.width;
-                playerPoint.y = map.y + Mathf.InverseLerp(half, -half, pos.z) * map.height;
+                playerPoint = WorldToMap(new Vector2(pos.x, pos.z), map);
             }
-            DrawCircle(playerPoint, 7f * scale, new Color(0.95f, 0.86f, 0.20f, 1f));
-            GUI.Label(new Rect(map.x + 7f * scale, map.y + 5f * scale, 70f * scale, 22f * scale),
-                "MAP", smallStyle);
+            DrawCircle(playerPoint, 6.5f * scale, new Color(0.95f, 0.86f, 0.20f, 1f));
+            GUI.Label(new Rect(map.x + 7f * scale, map.y + 5f * scale, map.width - 12f * scale, 22f * scale),
+                "MAP   P: YOU   E: ENEMY", smallStyle);
 
             Rect counters = new Rect(
                 Screen.width - rightW - margin,
@@ -952,7 +997,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                enemySpawner.Configure(player.transform, 4, 44f, 0f);
+                enemySpawner.Configure(player.transform, 31, 84f, 0f);
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
