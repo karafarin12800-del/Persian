@@ -75,9 +75,12 @@ namespace PersiaWar.Unity2D5D
 
         private TargetHealth FindNearestTarget()
         {
+            float activeRange = weapon != null
+                ? Mathf.Min(range, weapon.EffectiveRange)
+                : range;
             Collider[] hits = Physics.OverlapSphere(
                 transform.position,
-                range,
+                activeRange,
                 targetMask,
                 QueryTriggerInteraction.Ignore);
 

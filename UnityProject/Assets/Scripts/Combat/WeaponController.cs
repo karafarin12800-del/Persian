@@ -4,15 +4,24 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class WeaponController : MonoBehaviour
     {
+        public enum WeaponKind
+        {
+            LightPistol = 0,
+            AssaultRifle = 1,
+            HeavyMachineGun = 2
+        }
+
         [SerializeField] private Projectile projectilePrefab;
         [SerializeField] private Transform muzzle;
         [SerializeField] private float fireCooldown = 0.155f;
         [SerializeField] private float projectileSpeed = 45f;
-        [SerializeField] private float projectileLifetime = 2.2f;
-        [SerializeField] private int projectileDamage = 30;
-        [SerializeField] private int magazineSize = 12;
-        [SerializeField] private int startingMagazine = 12;
+        [SerializeField] private float projectileLifetime = 0.72f;
+        [SerializeField] private float weaponRange = 27f;
+        [SerializeField] private int projectileDamage = 22;
+        [SerializeField] private int magazineSize = 24;
+        [SerializeField] private int startingMagazine = 24;
         [SerializeField] private int startingReserve = 90;
+        [SerializeField] private WeaponKind weaponKind = WeaponKind.AssaultRifle;
         [SerializeField] private int meleeDamage = 45;
         [SerializeField] private float meleeRange = 3.1f;
         [SerializeField] private float meleeCooldown = 0.32f;
@@ -25,8 +34,18 @@ namespace PersiaWar.Unity2D5D
         private Transform gunRoot;
         private Vector3 gunRestLocalPosition;
         private float recoilAmount;
+        private LineRenderer rangeRing;
+        private const int RangeRingSegments = 64;
 
         public Transform Muzzle => muzzle != null ? muzzle : transform;
+        public WeaponKind CurrentWeapon => weaponKind;
+        public string CurrentWeaponName => weaponKind == WeaponKind.LightPistol
+            ? "PISTOL"
+            : (weaponKind == WeaponKind.HeavyMachineGun ? "HEAVY" : "RIFLE");
+        public float EffectiveRange => Mathf.Max(1f, weaponRange);
+        public float MoveSpeedMultiplier => weaponKind == WeaponKind.LightPistol
+            ? 1.20f
+            : (weaponKind == WeaponKind.HeavyMachineGun ? 0.78f : 1f);
         public int Magazine => magazine;
         public int Reserve => reserve;
         public int MagazineSize => magazineSize;
@@ -35,8 +54,7 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
             player = GetComponent<PlayerController>();
-            magazine = Mathf.Clamp(startingMagazine, 0, magazineSize);
-            reserve = Mathf.Max(0, startingReserve);
+            ApplyWeaponProfile(false);
             // The projectile template creates a collider and Rigidbody. Defer that
             // physics allocation until the player actually fires.
 
@@ -49,6 +67,151 @@ namespace PersiaWar.Unity2D5D
             }
 
             EnsureWeaponVisual();
+            EnsureRangeIndicator();
+            RefreshWeaponVisual();
+        }
+
+        public void CycleWeapon()
+        {
+            weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
+            ApplyWeaponProfile(true);
+            RefreshWeaponVisual();
+            UpdateRangeIndicator();
+            StartupCheckpoint.Set("WeaponSwitched_" + CurrentWeaponName);
+        }
+
+        public void SelectWeapon(WeaponKind selectedWeapon)
+        {
+            if (weaponKind == selectedWeapon) return;
+            weaponKind = selectedWeapon;
+            ApplyWeaponProfile(true);
+            RefreshWeaponVisual();
+            UpdateRangeIndicator();
+        }
+
+        private void ApplyWeaponProfile(bool preserveAmmo)
+        {
+            int oldMagazineSize = Mathf.Max(1, magazineSize);
+            float oldAmmoRatio = preserveAmmo ? magazine / (float)oldMagazineSize : 1f;
+
+            switch (weaponKind)
+            {
+                case WeaponKind.LightPistol:
+                    projectileSpeed = 34f;
+                    weaponRange = 15f;
+                    projectileDamage = 14;
+                    fireCooldown = 0.24f;
+                    magazineSize = 15;
+                    break;
+
+                case WeaponKind.HeavyMachineGun:
+                    projectileSpeed = 40f;
+                    weaponRange = 42f;
+                    projectileDamage = 34;
+                    fireCooldown = 0.31f;
+                    magazineSize = 36;
+                    break;
+
+                default:
+                    projectileSpeed = 38f;
+                    weaponRange = 27f;
+                    projectileDamage = 22;
+                    fireCooldown = 0.19f;
+                    magazineSize = 24;
+                    break;
+            }
+
+            projectileLifetime = weaponRange / Mathf.Max(1f, projectileSpeed);
+            magazine = preserveAmmo
+                ? Mathf.Clamp(Mathf.RoundToInt(oldAmmoRatio * magazineSize), 0, magazineSize)
+                : magazineSize;
+            if (!preserveAmmo)
+                reserve = Mathf.Max(0, startingReserve);
+
+            if (gunRoot != null)
+                RefreshWeaponVisual();
+            if (rangeRing != null)
+                UpdateRangeIndicator();
+        }
+
+        private void EnsureRangeIndicator()
+        {
+            if (rangeRing != null) return;
+
+            GameObject indicator = new GameObject("WeaponRangeIndicator");
+            indicator.transform.SetParent(transform, false);
+            rangeRing = indicator.AddComponent<LineRenderer>();
+            rangeRing.useWorldSpace = true;
+            rangeRing.loop = true;
+            rangeRing.positionCount = RangeRingSegments;
+            rangeRing.widthMultiplier = 0.065f;
+            rangeRing.numCornerVertices = 2;
+            rangeRing.numCapVertices = 0;
+            rangeRing.alignment = LineAlignment.View;
+            rangeRing.textureMode = LineTextureMode.Stretch;
+            rangeRing.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            rangeRing.receiveShadows = false;
+            rangeRing.sharedMaterial = RuntimeMaterialFactory.Create(
+                "WeaponRangeRingYellow",
+                new Color(1f, 0.82f, 0.08f, 1f));
+            rangeRing.startColor = new Color(1f, 0.82f, 0.08f, 1f);
+            rangeRing.endColor = new Color(1f, 0.82f, 0.08f, 1f);
+            rangeRing.enabled = true;
+            UpdateRangeIndicator();
+        }
+
+        private void RefreshWeaponVisual()
+        {
+            if (gunRoot == null) return;
+
+            float visualScale = weaponKind == WeaponKind.LightPistol
+                ? 0.62f
+                : (weaponKind == WeaponKind.HeavyMachineGun ? 1.28f : 1f);
+
+            gunRestLocalPosition = weaponKind == WeaponKind.LightPistol
+                ? new Vector3(0.24f, 0.93f, 0.33f)
+                : (weaponKind == WeaponKind.HeavyMachineGun
+                    ? new Vector3(0.40f, 1.04f, 0.48f)
+                    : new Vector3(0.34f, 1.02f, 0.42f));
+
+            gunRoot.localScale = Vector3.one * visualScale;
+            gunRoot.localPosition = gunRestLocalPosition;
+
+            if (muzzle != null)
+            {
+                muzzle.localPosition = weaponKind == WeaponKind.LightPistol
+                    ? new Vector3(0.24f, 0.93f, 0.66f)
+                    : (weaponKind == WeaponKind.HeavyMachineGun
+                        ? new Vector3(0.40f, 1.04f, 1.22f)
+                        : new Vector3(0.36f, 1.02f, 1.12f));
+            }
+        }
+
+        private void LateUpdate()
+        {
+            UpdateRangeIndicator();
+        }
+
+        private void UpdateRangeIndicator()
+        {
+            if (rangeRing == null || player == null)
+                return;
+
+            bool visible = isActiveAndEnabled && player.isActiveAndEnabled && !player.IsDefeated;
+            rangeRing.enabled = visible;
+            if (!visible) return;
+
+            Vector3 center = player.transform.position;
+            float y = center.y + 0.12f;
+            float radius = EffectiveRange;
+            for (int i = 0; i < RangeRingSegments; i++)
+            {
+                float angle = (i / (float)RangeRingSegments) * Mathf.PI * 2f;
+                rangeRing.SetPosition(i, new Vector3(
+                    center.x + Mathf.Cos(angle) * radius,
+                    y,
+                    center.z + Mathf.Sin(angle) * radius));
+            }
         }
 
         private void EnsureProjectileTemplate()
@@ -99,15 +262,23 @@ namespace PersiaWar.Unity2D5D
             Vector3 origin = muzzle != null ? muzzle.position : transform.position + Vector3.up;
             Vector3 direction = targetWorldPosition - origin;
             direction.y = 0f;
-            if (direction.sqrMagnitude < 0.001f) return false;
+            float distance = direction.magnitude;
+            if (distance < 0.001f || distance > EffectiveRange)
+                return false;
 
             nextFireTime = Time.time + fireCooldown;
             magazine--;
             transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
 
             Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
+            projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
+            projectile.SetOwner(transform);
             projectile.gameObject.SetActive(true);
             projectile.Launch(direction.normalized);
+            recoilAmount = 0.12f;
+            StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
+            if (characterVisual != null)
+                characterVisual.PlayFire();
             return true;
         }
 
@@ -136,9 +307,9 @@ namespace PersiaWar.Unity2D5D
             transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
 
             Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
-            projectile.gameObject.SetActive(true);
             projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
             projectile.SetOwner(transform);
+            projectile.gameObject.SetActive(true);
             projectile.Launch(direction);
             recoilAmount = 0.12f;
             StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);

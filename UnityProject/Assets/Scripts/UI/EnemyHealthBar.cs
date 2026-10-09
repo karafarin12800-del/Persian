@@ -3,19 +3,62 @@ using UnityEngine;
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// Displays a lightweight world-projected health bar above runtime-spawned enemies.
-    /// Uses Unity's built-in white texture and OnGUI to avoid canvas/prefab dependencies.
+    /// Screen-space enemy health number/bar. IMGUI is deliberately used so building
+    /// geometry cannot depth-occlude the enemy's current health indicator.
     /// </summary>
     public sealed class EnemyHealthBar : MonoBehaviour
     {
         private TargetHealth health;
-        private Camera worldCamera;
         private GUIStyle labelStyle;
+        private static Camera sharedWorldCamera;
+        private static float nextCameraSearchTime;
 
         private void Awake()
         {
             health = GetComponent<TargetHealth>();
-            worldCamera = Camera.main;
+            ResolveWorldCamera();
+        }
+
+        private static Camera ResolveWorldCamera()
+        {
+            Camera mainCamera = Camera.main;
+            if (mainCamera != null && mainCamera.isActiveAndEnabled)
+            {
+                sharedWorldCamera = mainCamera;
+                return sharedWorldCamera;
+            }
+
+            if (sharedWorldCamera != null &&
+                sharedWorldCamera.isActiveAndEnabled &&
+                sharedWorldCamera.gameObject.activeInHierarchy)
+                return sharedWorldCamera;
+
+            if (Time.unscaledTime < nextCameraSearchTime)
+                return sharedWorldCamera;
+
+            nextCameraSearchTime = Time.unscaledTime + 0.25f;
+            Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
+            Camera best = null;
+            for (int i = 0; i < cameras.Length; i++)
+            {
+                Camera candidate = cameras[i];
+                if (candidate == null ||
+                    !candidate.isActiveAndEnabled ||
+                    !candidate.gameObject.activeInHierarchy)
+                    continue;
+
+                if (candidate.CompareTag("MainCamera"))
+                {
+                    best = candidate;
+                    break;
+                }
+
+                if (best == null || candidate.depth > best.depth)
+                    best = candidate;
+            }
+
+            sharedWorldCamera = best;
+            return sharedWorldCamera;
         }
 
         private void OnGUI()
@@ -26,13 +69,13 @@ namespace PersiaWar.Unity2D5D
             if (health == null || health.CurrentHealth <= 0 || health.MaxHealth <= 0)
                 return;
 
-            if (worldCamera == null)
-                worldCamera = Camera.main;
-
+            Camera worldCamera = ResolveWorldCamera();
             if (worldCamera == null)
                 return;
 
-            Vector3 worldPoint = transform.position + Vector3.up * 2.45f;
+            // The enemy root is grounded at y=1. This offset places the label near
+            // the top of the character rather than floating a long way above it.
+            Vector3 worldPoint = transform.position + Vector3.up * 2.0f;
             Vector3 screenPoint = worldCamera.WorldToScreenPoint(worldPoint);
             if (screenPoint.z <= 0f ||
                 screenPoint.x < 0f || screenPoint.x > Screen.width ||
@@ -40,9 +83,9 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             float scale = Mathf.Clamp(Screen.height / 720f, 0.70f, 1.25f);
-            float width = 72f * scale;
+            float width = 78f * scale;
             float barHeight = 8f * scale;
-            float labelHeight = 15f * scale;
+            float labelHeight = 17f * scale;
             float x = Mathf.Clamp(screenPoint.x - width * 0.5f, 2f, Screen.width - width - 2f);
             float guiY = Screen.height - screenPoint.y;
             float labelY = guiY - labelHeight - barHeight - 4f * scale;
@@ -50,7 +93,11 @@ namespace PersiaWar.Unity2D5D
             Rect labelRect = new Rect(x, labelY, width, labelHeight);
             Rect barRect = new Rect(x, labelRect.yMax + 1f * scale, width, barHeight);
 
-            DrawRect(labelRect, new Color(0.02f, 0.025f, 0.035f, 0.86f));
+            // Screen-space GUI is rendered independently from scene depth. A negative
+            // depth also prioritizes this label over normal-depth gameplay HUD elements.
+            int previousDepth = GUI.depth;
+            GUI.depth = -50;
+            DrawRect(labelRect, new Color(0.02f, 0.025f, 0.035f, 0.94f));
             if (labelStyle == null)
             {
                 labelStyle = new GUIStyle(GUI.skin.label)
@@ -64,7 +111,7 @@ namespace PersiaWar.Unity2D5D
             labelStyle.normal.textColor = Color.white;
             GUI.Label(labelRect, health.CurrentHealth + " / " + health.MaxHealth, labelStyle);
 
-            DrawRect(barRect, new Color(0f, 0f, 0f, 0.88f));
+            DrawRect(barRect, new Color(0f, 0f, 0f, 0.94f));
             Rect innerRect = new Rect(
                 barRect.x + 1f * scale,
                 barRect.y + 1f * scale,
@@ -79,6 +126,7 @@ namespace PersiaWar.Unity2D5D
                     ? new Color(1f, 0.69f, 0.18f, 1f)
                     : new Color(0.94f, 0.22f, 0.16f, 1f));
             DrawRect(innerRect, fill);
+            GUI.depth = previousDepth;
         }
 
         private static void DrawRect(Rect rect, Color color)

@@ -67,7 +67,11 @@ namespace PersiaWar.Unity2D5D
             if (weaponVisualRoot != null)
                 return;
 
-            Transform existing = visual.transform.Find("EnemyRifleVisual");
+            // Mount the rifle to the character's 3D hand/body layer on mobile,
+            // not to the outer aiming transform. This keeps it visibly in the hands
+            // while the enemy separately faces its target for projectile aiming.
+            Transform mount = visual.WeaponMount != null ? visual.WeaponMount : visual.transform;
+            Transform existing = mount.Find("EnemyRifleVisual");
             if (existing != null)
             {
                 weaponVisualRoot = existing;
@@ -75,8 +79,10 @@ namespace PersiaWar.Unity2D5D
             }
 
             weaponVisualRoot = new GameObject("EnemyRifleVisual").transform;
-            weaponVisualRoot.SetParent(visual.transform, false);
-            weaponVisualRoot.localPosition = new Vector3(0.34f, 0.86f, 0.10f);
+            weaponVisualRoot.SetParent(mount, false);
+            weaponVisualRoot.localPosition = mount == visual.transform
+                ? new Vector3(0.34f, 0.86f, 0.10f)
+                : new Vector3(0.24f, 0.78f, 0.34f);
             weaponVisualRoot.localRotation = Quaternion.identity;
             weaponVisualRoot.localScale = Vector3.one;
 

@@ -393,40 +393,46 @@ namespace PersiaWar.Unity2D5D
                 float heightRoll = Mathf.Abs(Mathf.Sin((i + 1) * 78.233f));
                 float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
 
-                float footprint = Mathf.Lerp(7.4f, 13.6f, widthRoll);
-                float height = Mathf.Lerp(5.4f, 15.2f, heightRoll);
-                float depth = Mathf.Lerp(6.8f, 12.0f, depthRoll);
+                bool isWarehouse = i == 4 || i == 9 || i == 11 || i == 16;
+                bool isPitchedRoof = !isWarehouse &&
+                    (i == 1 || i == 3 || i == 6 || i == 10 ||
+                     i == 12 || i == 14 || i == 18 || i == 24);
 
-                // Four close-to-center buildings occupy tighter plots. Keep their
-                // footprint compact to prevent adjacent walls/colliders overlapping.
+                float footprint = Mathf.Lerp(7.6f, 11.4f, widthRoll);
+                float depth = Mathf.Lerp(7.0f, 10.0f, depthRoll);
+                bool twoStorey = heightRoll > 0.52f;
+                float height = twoStorey
+                    ? Mathf.Lerp(5.4f, 6.4f, Mathf.InverseLerp(0.52f, 1f, heightRoll))
+                    : Mathf.Lerp(3.25f, 3.95f, Mathf.InverseLerp(0f, 0.52f, heightRoll));
+
+                // Inner homes keep smaller footprints so the spawn lanes and alleys
+                // remain open. All ordinary houses are only one or two storeys.
                 if (i >= 22)
                 {
-                    footprint = Mathf.Lerp(6.6f, 8.6f, widthRoll);
-                    height = Mathf.Lerp(5.0f, 9.0f, heightRoll);
-                    depth = Mathf.Lerp(6.0f, 8.2f, depthRoll);
+                    footprint = Mathf.Lerp(6.5f, 8.2f, widthRoll);
+                    height = twoStorey ? 5.4f : 3.55f;
+                    depth = Mathf.Lerp(6.0f, 7.8f, depthRoll);
                 }
-                // Buildings at the inner alley corners also need smaller plots.
                 else if (i >= 18 && i <= 21)
                 {
-                    footprint = Mathf.Lerp(7.5f, 10.0f, widthRoll);
-                    depth = Mathf.Lerp(7.0f, 9.5f, depthRoll);
+                    footprint = Mathf.Lerp(7.5f, 9.8f, widthRoll);
+                    depth = Mathf.Lerp(6.8f, 9.2f, depthRoll);
                 }
 
-                // A few distinct landmarks and low warehouse-like blocks break up
-                // the residential skyline without adding extra GameObjects.
+                // A few wider corner homes become landmarks without becoming towers.
+                // Four dedicated low, deep industrial buildings are warehouses.
                 if (i == 0 || i == 7 || i == 13)
+                    footprint = Mathf.Max(footprint, 11.8f);
+
+                if (isWarehouse)
                 {
-                    footprint = Mathf.Max(footprint, 12.8f);
-                    height = Mathf.Max(height, 14.2f);
-                    depth = Mathf.Max(depth, 10.8f);
-                }
-                else if (i == 4 || i == 11 || i == 16)
-                {
-                    height = Mathf.Min(height, 6.4f);
-                    depth = Mathf.Max(depth, 9.6f);
+                    footprint = Mathf.Lerp(11.8f, 14.0f, widthRoll);
+                    depth = Mathf.Lerp(9.5f, 12.2f, depthRoll);
+                    height = Mathf.Lerp(3.55f, 4.45f, heightRoll);
                 }
 
-                CreateAndroidBuilding(buildingPoints[i], footprint, height, depth);
+                CreateAndroidBuilding(
+                    buildingPoints[i], footprint, height, depth, i, isWarehouse, isPitchedRoof);
                 StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_DONE");
             }
 
@@ -661,9 +667,18 @@ namespace PersiaWar.Unity2D5D
             return obj;
         }
 
-        private void CreateAndroidBuilding(Vector3 position, float footprint, float height, float depth)
+        private void CreateAndroidBuilding(
+            Vector3 position,
+            float footprint,
+            float height,
+            float depth,
+            int buildingIndex,
+            bool isWarehouse,
+            bool isPitchedRoof)
         {
-            float bodyHeight = Mathf.Max(4.5f, height);
+            // Residential bodies are limited to one or two storeys. A pitched roof
+            // adds roof height, not a third occupied floor.
+            float bodyHeight = Mathf.Clamp(height, 3.2f, 6.5f);
 
             // Brighter, clean stylized-realism palette inspired by the free city
             // reference, while staying fully procedural and Android-light.
@@ -690,29 +705,41 @@ namespace PersiaWar.Unity2D5D
             QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
             CreateAndroidCollider("CityBuildingCollider", position, bodySize);
 
-            QueueAndroidBox(
-                "CityRoof",
-                position + Vector3.up * (bodyHeight + 0.22f),
-                new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
-                trim);
-
-            for (int row = 0; row < 3; row++)
+            if (isPitchedRoof)
             {
-                float y = 1.25f + row * Mathf.Max(1.7f, (bodyHeight - 2.4f) / 3f);
+                CreateAndroidPitchedRoof(position, footprint, bodyHeight, depth, buildingIndex);
+            }
+            else
+            {
                 QueueAndroidBox(
-                    "FacadeBand",
-                    position + new Vector3(0f, y, -depth * 0.515f),
-                    new Vector3(footprint * 0.92f, 0.16f, 0.10f),
+                    "CityRoof",
+                    position + Vector3.up * (bodyHeight + 0.22f),
+                    new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
                     trim);
             }
 
-            int columns = Mathf.Clamp(Mathf.FloorToInt(footprint / 2.5f), 2, 4);
+            int facadeBandCount = bodyHeight >= 5.0f && !isWarehouse ? 2 : 1;
+            for (int row = 0; row < facadeBandCount; row++)
+            {
+                float y = row == 0 ? 0.30f : 3.15f;
+                if (y >= bodyHeight - 0.15f) continue;
+                QueueAndroidBox(
+                    "FacadeBand",
+                    position + new Vector3(0f, y, -depth * 0.515f),
+                    new Vector3(footprint * 0.92f, 0.13f, 0.10f),
+                    trim);
+            }
+
+            int columns = isWarehouse
+                ? Mathf.Clamp(Mathf.FloorToInt(footprint / 2.6f), 3, 4)
+                : Mathf.Clamp(Mathf.FloorToInt(footprint / 2.5f), 2, 4);
             float spacing = footprint / (columns + 1);
-            int windowRows = bodyHeight < 7f ? 2 : (bodyHeight < 11f ? 3 : 4);
-            float windowRowSpacing = (bodyHeight - 3.4f) / Mathf.Max(1, windowRows - 1);
+            int windowRows = isWarehouse ? 1 : (bodyHeight >= 5.0f ? 2 : 1);
             for (int row = 0; row < windowRows; row++)
             {
-                float y = 1.75f + row * windowRowSpacing;
+                float y = isWarehouse
+                    ? bodyHeight * 0.54f
+                    : (windowRows == 1 ? 1.65f : 1.65f + row * 2.65f);
                 for (int col = 0; col < columns; col++)
                 {
                     float x = -footprint * 0.5f + spacing * (col + 1);
@@ -730,30 +757,50 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
+            float doorWidth = isWarehouse
+                ? Mathf.Min(3.4f, footprint * 0.32f)
+                : Mathf.Min(1.35f, footprint * 0.18f);
             QueueAndroidBox(
-                "Door",
-                position + new Vector3(0f, 1.10f, -depth * 0.54f),
-                new Vector3(Mathf.Min(1.35f, footprint * 0.18f), 2.15f, 0.14f),
+                isWarehouse ? "WarehouseLoadingDoor" : "Door",
+                position + new Vector3(0f, 1.12f, -depth * 0.54f),
+                new Vector3(doorWidth, isWarehouse ? 2.35f : 2.15f, 0.14f),
                 door);
 
-            QueueAndroidBox(
-                "DoorCanopy",
-                position + new Vector3(0f, 2.30f, -depth * 0.56f),
-                new Vector3(Mathf.Min(2.4f, footprint * 0.30f), 0.18f, 0.72f),
-                trim);
-
-            for (int i = 0; i < 2; i++)
+            if (isWarehouse)
             {
-                Vector3 offset = new Vector3(
-                    (i == 0 ? -0.28f : 0.28f) * footprint,
-                    bodyHeight + 0.70f,
-                    (i == 0 ? -0.20f : 0.22f) * depth);
-
                 QueueAndroidBox(
-                    "RooftopUnit",
-                    position + offset,
-                    new Vector3(1.15f, 0.55f, 0.85f),
-                    rooftop);
+                    "WarehouseFacadeSign",
+                    position + new Vector3(0f, bodyHeight - 0.48f, -depth * 0.535f),
+                    new Vector3(Mathf.Min(3.4f, footprint * 0.40f), 0.30f, 0.10f),
+                    accentMaterial);
+            }
+            else
+            {
+                QueueAndroidBox(
+                    "DoorCanopy",
+                    position + new Vector3(0f, 2.30f, -depth * 0.56f),
+                    new Vector3(Mathf.Min(2.4f, footprint * 0.30f), 0.18f, 0.72f),
+                    trim);
+            }
+
+            // Flat roofs get small utility vents; the pitched roofs stay clean.
+            if (!isPitchedRoof)
+            {
+                int rooftopUnits = isWarehouse ? 2 : 1;
+                for (int i = 0; i < rooftopUnits; i++)
+                {
+                    float side = rooftopUnits == 1 ? 0f : (i == 0 ? -0.28f : 0.28f);
+                    Vector3 offset = new Vector3(
+                        side * footprint,
+                        bodyHeight + 0.48f,
+                        (i == 0 ? -0.20f : 0.22f) * depth);
+
+                    QueueAndroidBox(
+                        "RooftopUnit",
+                        position + offset,
+                        new Vector3(isWarehouse ? 1.25f : 0.90f, 0.38f, 0.75f),
+                        rooftop);
+                }
             }
 
             QueueAndroidBox(
@@ -767,6 +814,39 @@ namespace PersiaWar.Unity2D5D
                 position + new Vector3(footprint * 0.30f, 0.55f, -depth * 0.66f),
                 new Vector3(Mathf.Min(3.0f, footprint * 0.26f), 1.10f, 0.65f),
                 hedge);
+        }
+
+        private void CreateAndroidPitchedRoof(
+            Vector3 position,
+            float footprint,
+            float bodyHeight,
+            float depth,
+            int buildingIndex)
+        {
+            // Two shallow, sloped box panels form a small gable. They use the cached
+            // Android cube mesh and have no colliders, so the detail stays inexpensive.
+            float span = footprint + 0.55f;
+            float halfSpan = span * 0.5f;
+            float rise = Mathf.Clamp(footprint * 0.095f, 0.82f, 1.18f);
+            float slopedLength = Mathf.Sqrt(halfSpan * halfSpan + rise * rise);
+            float angle = Mathf.Atan2(rise, halfSpan) * Mathf.Rad2Deg;
+            float roofDepth = depth + 0.55f;
+
+            GameObject leftPanel = CreateAndroidBox(
+                "PitchedRoof_Left_" + buildingIndex,
+                position + new Vector3(-span * 0.25f, bodyHeight + rise * 0.5f, 0f),
+                new Vector3(slopedLength, 0.20f, roofDepth),
+                roofMaterial,
+                false);
+            leftPanel.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+
+            GameObject rightPanel = CreateAndroidBox(
+                "PitchedRoof_Right_" + buildingIndex,
+                position + new Vector3(span * 0.25f, bodyHeight + rise * 0.5f, 0f),
+                new Vector3(slopedLength, 0.20f, roofDepth),
+                roofMaterial,
+                false);
+            rightPanel.transform.rotation = Quaternion.Euler(0f, 0f, -angle);
         }
 
         private Material androidTreeTrunkMaterial;

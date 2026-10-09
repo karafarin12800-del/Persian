@@ -126,14 +126,17 @@ jobs:
 
           enemy_bar = Path('UnityProject/Assets/Scripts/UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
           assert 'WorldToScreenPoint' in enemy_bar and 'health.CurrentHealth' in enemy_bar and 'health.MaxHealth' in enemy_bar, 'Enemy health bar does not project numeric live health.'
+          assert 'ResolveWorldCamera()' in enemy_bar and 'GUI.depth = -50;' in enemy_bar, 'Enemy health labels are not prioritized as screen-space overlays.'
 
           bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')
           city_start = bootstrap.index('private void BuildAndroidCityPresentation()')
           city_end = bootstrap.index('private void BuildAndroidAlleysAndVehicles()', city_start)
           city = bootstrap[city_start:city_end]
-          assert 'Mathf.Sin((i + 1) * 12.9898f)' in city and 'Mathf.Sin((i + 1) * 78.233f)' in city, 'Android buildings still use a small repeating modulo size pattern.'
-          assert 'Mathf.Lerp(7.4f, 13.6f, widthRoll)' in city and 'Mathf.Lerp(5.4f, 15.2f, heightRoll)' in city, 'Android building footprint/height variation is missing.'
-          assert 'int windowRows = bodyHeight < 7f ? 2 : (bodyHeight < 11f ? 3 : 4);' in bootstrap, 'Building window rows do not reflect building height.'
+          assert 'Mathf.Lerp(3.25f, 3.95f' in city and 'Mathf.Lerp(5.4f, 6.4f' in city, 'Android houses are not constrained to one/two storeys.'
+          assert 'bool isWarehouse = i == 4 || i == 9 || i == 11 || i == 16;' in city, 'Dedicated warehouse buildings are missing from the Android map.'
+          assert 'CreateAndroidPitchedRoof' in bootstrap and 'bool isPitchedRoof' in city, 'Sloped-roof house variants are missing.'
+          assert 'float bodyHeight = Mathf.Clamp(height, 3.2f, 6.5f);' in bootstrap, 'Android building body height is not capped at two storeys.'
+          assert 'int windowRows = isWarehouse ? 1 : (bodyHeight >= 5.0f ? 2 : 1);' in bootstrap, 'Window rows can imply extra storeys.'
           assert 'i >= 22' in city and 'i >= 18 && i <= 21' in city, 'Close central building plots are not protected from oversized footprints.'
 
           flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
@@ -160,9 +163,30 @@ jobs:
 
           enemy_ai = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'EnemyRifleVisual' in enemy_ai and 'RifleBarrel' in enemy_ai, 'Enemy characters do not have visible rifle geometry.'
+          assert 'visual.WeaponMount' in enemy_ai and 'weaponVisualRoot.SetParent(mount, false);' in enemy_ai, 'Enemy rifle is not attached to the visible character hand/body mount.'
+          visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
+          assert 'public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;' in visual, 'Mobile weapon mount is missing.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system.'
           assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
-          print('Combat HUD and 32-player lobby regression checks: PASS (live health/shield, 31 distributed opponents, enlarged enemy-aware minimap, visible enemy rifles, mobile AI cadence).')
+
+          weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
+          assert 'enum WeaponKind' in weapon and 'public void CycleWeapon()' in weapon, 'Weapon profiles cannot be cycled at runtime.'
+          assert 'public float EffectiveRange => Mathf.Max(1f, weaponRange);' in weapon, 'Weapon range is not exposed to aiming and HUD.'
+          assert 'weaponRange = 15f;' in weapon and 'weaponRange = 27f;' in weapon and 'weaponRange = 42f;' in weapon, 'Weapon profiles do not have distinct light/rifle/heavy ranges.'
+          assert 'public float MoveSpeedMultiplier =>' in weapon and 'WeaponKind.LightPistol' in weapon and '1.20f' in weapon and 'weaponKind == WeaponKind.HeavyMachineGun ? 0.78f' in weapon, 'Weapon weight does not affect player movement speed.'
+          assert 'EnsureRangeIndicator()' in weapon and 'rangeRing.SetPosition' in weapon, 'Dynamic yellow weapon-range ring is missing.'
+          assert 'new Color(1f, 0.82f, 0.08f, 1f)' in weapon, 'Range indicator is not yellow.'
+
+          player_controller = Path('UnityProject/Assets/Scripts/Player/PlayerController.cs').read_text(encoding='utf-8')
+          assert 'weapon.MoveSpeedMultiplier' in player_controller, 'Player movement is not linked to the active weapon weight.'
+          aim = Path('UnityProject/Assets/Scripts/Combat/NearestTargetAim.cs').read_text(encoding='utf-8')
+          assert 'Mathf.Min(range, weapon.EffectiveRange)' in aim, 'Auto-targeting can select opponents beyond the current weapon range.'
+
+          input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
+          assert 'DrawAimGuide(' not in input_hub and 'lineTexture' not in input_hub, 'Yellow target line is still drawn by mobile input HUD.'
+          assert 'reloadHeldToSwap' in input_hub and 'player.Weapon?.CycleWeapon()' in input_hub, 'Mobile users have no weapon-change gesture.'
+          assert 'HOLD SWAP' in input_hub, 'Reload-button hold-to-swap gesture is not labelled.'
+          print('Combat/city regression checks: PASS (one/two storeys, warehouses, pitched roofs, screen-space enemy HP, no yellow aim line, weapon-specific range/speed, dynamic yellow range ring and weapon switching).')
           PY
 
           echo 'Unity project structure/settings validation passed.'
