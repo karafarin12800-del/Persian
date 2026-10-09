@@ -72,10 +72,7 @@ namespace PersiaWar.Unity2D5D
                     break;
                 case PickupType.Weapon:
                     if (player.Weapon != null)
-                    {
-                        player.Weapon.SelectWeapon(weaponKind);
-                        player.Weapon.AddReserveAmmo(amount);
-                    }
+                        player.Weapon.EquipWeaponFromPickup(weaponKind, amount);
                     break;
             }
 
