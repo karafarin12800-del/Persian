@@ -731,6 +731,7 @@ namespace PersiaWar.Unity2D5D
 
             if (visual != null)
                 visual.PlayFire();
+            RuntimeGameAudio.PlayEnemyShot();
         }
     }
 }
