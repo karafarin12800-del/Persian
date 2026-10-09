@@ -213,7 +213,7 @@ namespace PersiaWar.Unity2D5D
 
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
-            roadMaterial = MakeMaterial("Road", new Color(0.25f, 0.26f, 0.27f));
+            roadMaterial = MakeMaterial("Road", new Color(0.43f, 0.44f, 0.45f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
@@ -221,13 +221,13 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
-            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.40f, 0.62f, 0.30f));
+            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.48f, 0.70f, 0.36f));
             buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
             roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
             accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
             androidWindowMaterial = MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
             androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
-            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.38f, 0.36f, 0.31f));
+            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
             // stays below the lowest terrain vertices, preventing black pinholes
@@ -724,7 +724,7 @@ namespace PersiaWar.Unity2D5D
         private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
         {
             Material lane = MakeMaterial("AndroidLane", new Color(0.78f, 0.68f, 0.34f));
-            Material curb = MakeMaterial("AndroidCurb", new Color(0.56f, 0.54f, 0.49f));
+            Material curb = MakeMaterial("AndroidCurb", new Color(0.78f, 0.74f, 0.65f));
             float half = worldSize * 0.5f;
 
             List<Vector3> verticalVertices = new List<Vector3>(1024);
