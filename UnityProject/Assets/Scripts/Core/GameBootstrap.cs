@@ -726,13 +726,13 @@ namespace PersiaWar.Unity2D5D
                         new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f), 0.075f);
             }
 
-            for (float x = -half + 0.68f; x <= half; x += 24f)
+            for (float roadCenter = -half + roadWidth * 0.5f; roadCenter <= half; roadCenter += 24f)
             {
                 AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
-                    new Vector3(x - roadWidth * 0.5f, 0f, 0f),
+                    new Vector3(roadCenter - roadWidth * 0.5f, 0f, 0f),
                     new Vector2(0.08f, worldSize), 0.055f);
                 AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
-                    new Vector3(x + roadWidth * 0.5f, 0f, 0f),
+                    new Vector3(roadCenter + roadWidth * 0.5f, 0f, 0f),
                     new Vector2(0.08f, worldSize), 0.055f);
             }
 
