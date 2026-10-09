@@ -215,7 +215,7 @@ if (!matchActive || matchPaused)
                 out Vector2 grenadeGui,
                 out Vector2 reloadGui);
 
-            float fireHit = radius * 0.86f;
+            float fireHit = radius * 1.02f;
             float meleeHit = radius * 0.76f;
             float grenadeHit = radius * 0.76f;
             float reloadHit = radius * 0.72f;
@@ -229,21 +229,6 @@ if (!matchActive || matchPaused)
                 Vector2 gui = new Vector2(
                     touch.position.x,
                     Screen.height - touch.position.y);
-
-                // Combat buttons get first priority so an oversized touch zone can
-                // never accidentally become a movement touch.
-                if (firePointerId == -1 &&
-                    Vector2.Distance(gui, fireGui) <= fireHit)
-                {
-                    firePointerId = touch.fingerId;
-                    if (!fireTouchCheckpointWritten)
-                    {
-                        fireTouchCheckpointWritten = true;
-                        StartupCheckpoint.Set("MobileFireTouchAccepted");
-                    }
-                    FireAtNearestTarget();
-                    continue;
-                }
 
                 if (meleePointerId == -1 &&
                     Vector2.Distance(gui, meleeGui) <= meleeHit)
@@ -268,6 +253,31 @@ if (!matchActive || matchPaused)
                     reloadPointerId = touch.fingerId;
                     reloadPressedAt = Time.time;
                     reloadHeldToSwap = false;
+                    continue;
+                }
+
+                // Capture firing after melee/grenade/reload so the widened area
+                // cannot steal those controls. The lower-right backup region tolerates
+                // screen-density and safe-area differences on Android.
+                bool insideOtherActionZone =
+                    Vector2.Distance(gui, meleeGui) <= meleeHit ||
+                    Vector2.Distance(gui, grenadeGui) <= grenadeHit ||
+                    Vector2.Distance(gui, reloadGui) <= reloadHit;
+                bool broadFireZone =
+                    gui.x >= Screen.width * 0.70f &&
+                    gui.y >= Screen.height * 0.48f;
+
+                if (firePointerId == -1 &&
+                    !insideOtherActionZone &&
+                    (Vector2.Distance(gui, fireGui) <= fireHit || broadFireZone))
+                {
+                    firePointerId = touch.fingerId;
+                    if (!fireTouchCheckpointWritten)
+                    {
+                        fireTouchCheckpointWritten = true;
+                        StartupCheckpoint.Set("MobileFireTouchAccepted");
+                    }
+                    FireAtNearestTarget();
                     continue;
                 }
 
@@ -859,6 +869,13 @@ if (!matchActive || matchPaused)
 
         private void HandleGuiPointerFallback()
         {
+            // Android gameplay uses independent Touch.fingerId pointers in
+            // HandleAndroidTouches. Synthesized IMGUI mouse events can collapse
+            // two simultaneous fingers into the same mouse button and steal fire.
+            // Keep this legacy fallback for desktop/editor only.
+            if (Application.isMobilePlatform)
+                return;
+
             Event e = Event.current;
             if (e == null)
                 return;

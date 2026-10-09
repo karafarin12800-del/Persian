@@ -389,6 +389,16 @@ namespace PersiaWar.Unity2D5D
                 DrawCircle(enemyPoint, 3.5f * scale, new Color(1f, 0.22f, 0.16f, 1f));
             }
 
+            if (ExtractionBeacon.IsActive)
+            {
+                Vector3 extractionWorld = ExtractionBeacon.WorldPosition;
+                Vector2 extractionPoint = WorldToMap(
+                    new Vector2(extractionWorld.x, extractionWorld.z),
+                    map);
+                DrawCircle(extractionPoint, 12f * scale, new Color(0.08f, 0.48f, 1f, 0.62f));
+                DrawCircle(extractionPoint, 5.5f * scale, new Color(0.58f, 0.90f, 1f, 1f));
+            }
+
             Vector2 playerPoint = new Vector2(map.center.x, map.center.y);
             if (player != null)
             {
@@ -407,6 +417,21 @@ namespace PersiaWar.Unity2D5D
             Fill(counters, new Color(0.03f, 0.06f, 0.08f, 0.86f));
             GUI.Label(new Rect(counters.x + 8f * scale, counters.y, counters.width - 16f * scale, counters.height),
                 "WAVE  " + wave + "     KILLS  " + score, smallStyle);
+
+            if (ExtractionBeacon.IsActive)
+            {
+                float objectiveWidth = 360f * scale;
+                Rect objective = new Rect(
+                    (Screen.width - objectiveWidth) * 0.5f,
+                    Screen.height - 43f * scale,
+                    objectiveWidth,
+                    30f * scale);
+                Fill(objective, new Color(0.02f, 0.20f, 0.48f, 0.92f));
+                GUI.Label(
+                    new Rect(objective.x + 8f * scale, objective.y, objective.width - 16f * scale, objective.height),
+                    "EXTRACTION ACTIVE  -  REACH THE BLUE BEAM",
+                    smallStyle);
+            }
         }
 
         private void DrawStatusBar(Rect rect, float ratio, Color fillColor)

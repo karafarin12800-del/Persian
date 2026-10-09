@@ -94,7 +94,14 @@ namespace PersiaWar.Unity2D5D
             {
                 if (wave >= Mathf.Max(1, victoryWave))
                 {
-                    GameSession.Instance?.EndMission(true);
+                    PlayerController activePlayer = player.GetComponent<PlayerController>();
+                    if (activePlayer != null && !activePlayer.IsDefeated)
+                        ExtractionBeacon.ActivateForVictory(activePlayer);
+                    else
+                        GameSession.Instance?.EndMission(false);
+
+                    // Do not declare victory here. ExtractionBeacon completes the
+                    // mission only after the player reaches the visible blue beam.
                     enabled = false;
                     return;
                 }
