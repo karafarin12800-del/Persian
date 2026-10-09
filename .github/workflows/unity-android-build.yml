@@ -237,7 +237,9 @@ jobs:
           gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
           gui_fallback_end = input_hub.index('private void CreateGuiTextures()', gui_fallback_start)
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
-          assert 'if (Application.isMobilePlatform)' in gui_fallback and 'return;' in gui_fallback, 'GUI mouse fallback must not take ownership of real Android touch IDs.'
+          assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
+          assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
+          assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android IMGUI menu and pause controls must receive synthesized touch events.'
           touch_start = input_hub.index('private void HandleAndroidTouches()')
           touch_end = input_hub.index('private Vector2 ApplyDeadZone(', touch_start)
           touch_handler = input_hub[touch_start:touch_end]
