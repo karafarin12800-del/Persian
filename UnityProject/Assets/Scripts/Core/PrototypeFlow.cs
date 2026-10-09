@@ -297,7 +297,7 @@ namespace PersiaWar.Unity2D5D
             // No opaque backing is painted: the live 3D scene remains visible through it.
             // A subtle frame and translucent road strokes keep the schematic readable.
             // 1.38 = the former 1.15 size multiplied by another 20 percent.
-            float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f, 150f, 262f);
+            float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
 
             // Keep the map see-through, but tint the live scene with a light
