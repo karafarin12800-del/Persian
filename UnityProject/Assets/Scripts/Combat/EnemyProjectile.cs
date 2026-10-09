@@ -18,9 +18,16 @@ namespace PersiaWar.Unity2D5D
 
         public void Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform)
         {
+            Configure(launchDirection, damageAmount, ownerTransform, speed * lifetime);
+        }
+
+        public void Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)
+        {
             direction = launchDirection.normalized;
             damage = Mathf.Max(1, damageAmount);
             owner = ownerTransform;
+            // Bound each projectile by the weapon's actual world-space travel range.
+            lifetime = Mathf.Max(0.05f, Mathf.Max(0.1f, maxRange) / Mathf.Max(1f, speed));
         }
 
         private void Update()
