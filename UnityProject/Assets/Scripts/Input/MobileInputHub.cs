@@ -613,7 +613,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetMovementPointer()
         {
             movePointerId = -1;
-            missingMovementTouchFrames = 0;
+
             guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
             moveTouchOriginScreen = Vector2.zero;
@@ -626,7 +626,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetAllPointers()
         {
             movePointerId = -1;
-            missingMovementTouchFrames = 0;
+
             firePointerId = -1;
             meleePointerId = -1;
             grenadePointerId = -1;
