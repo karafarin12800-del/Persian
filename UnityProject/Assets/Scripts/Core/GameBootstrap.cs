@@ -211,7 +211,9 @@ namespace PersiaWar.Unity2D5D
             if (worldRoot != null) Destroy(worldRoot.gameObject);
             worldRoot = new GameObject("BattleRoyaleCity").transform;
 
-            roadMaterial = MakeMaterial("Road", new Color(0.105f, 0.12f, 0.135f));
+            // Mid-light neutral asphalt: the previous near-black tint made streets
+            // too dark on Android and reduced contrast against buildings and sidewalks.
+            roadMaterial = MakeMaterial("Road", new Color(0.25f, 0.26f, 0.27f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
