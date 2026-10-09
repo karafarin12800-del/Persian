@@ -276,16 +276,7 @@ namespace PersiaWar.Unity2D5D
                 for (int x = 0; x < grid; x++)
                 {
                     float worldX = -half + x * step;
-                    float radial = Vector2.Distance(new Vector2(worldX, worldZ), Vector2.zero) / half;
-                    float edge = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((radial - 0.52f) / 0.48f));
-                    float undulation =
-                        Mathf.Sin(worldX * 0.075f) * 0.045f +
-                        Mathf.Cos(worldZ * 0.065f) * 0.04f +
-                        Mathf.Sin((worldX + worldZ) * 0.035f) * 0.025f;
-
-                    // Keep the playable city on a broad, stable plateau while the
-                    // outer terrain gently rises/falls so the 3D camera reads depth.
-                    float y = edge * 0.18f + undulation * 0.35f;
+                    float y = CalculateAndroidTerrainHeight(worldX, worldZ);
                     vertices[z * grid + x] = new Vector3(worldX, y, worldZ);
                     uv[z * grid + x] = new Vector2((float)x / (grid - 1), (float)z / (grid - 1));
                 }
@@ -321,6 +312,47 @@ namespace PersiaWar.Unity2D5D
             collider.sharedMesh = mesh;
         }
 
+        private float CalculateAndroidTerrainHeight(float worldX, float worldZ)
+        {
+            float half = worldSize * 0.5f;
+            float radial = Vector2.Distance(new Vector2(worldX, worldZ), Vector2.zero) / half;
+            float edge = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((radial - 0.52f) / 0.48f));
+            float undulation =
+                Mathf.Sin(worldX * 0.075f) * 0.045f +
+                Mathf.Cos(worldZ * 0.065f) * 0.04f +
+                Mathf.Sin((worldX + worldZ) * 0.035f) * 0.025f;
+            return edge * 0.18f + undulation * 0.35f;
+        }
+
+        private void AddAndroidTerrainFollowingQuad(
+            List<Vector3> vertices,
+            List<int> triangles,
+            Vector3 center,
+            Vector2 size,
+            float heightOffset)
+        {
+            int start = vertices.Count;
+            float halfX = size.x * 0.5f;
+            float halfZ = size.y * 0.5f;
+
+            Vector3 a = new Vector3(center.x - halfX, 0f, center.z - halfZ);
+            Vector3 b = new Vector3(center.x + halfX, 0f, center.z - halfZ);
+            Vector3 c = new Vector3(center.x + halfX, 0f, center.z + halfZ);
+            Vector3 d = new Vector3(center.x - halfX, 0f, center.z + halfZ);
+
+            vertices.Add(new Vector3(a.x, CalculateAndroidTerrainHeight(a.x, a.z) + heightOffset, a.z));
+            vertices.Add(new Vector3(b.x, CalculateAndroidTerrainHeight(b.x, b.z) + heightOffset, b.z));
+            vertices.Add(new Vector3(c.x, CalculateAndroidTerrainHeight(c.x, c.z) + heightOffset, c.z));
+            vertices.Add(new Vector3(d.x, CalculateAndroidTerrainHeight(d.x, d.z) + heightOffset, d.z));
+
+            triangles.Add(start + 0);
+            triangles.Add(start + 2);
+            triangles.Add(start + 1);
+            triangles.Add(start + 0);
+            triangles.Add(start + 3);
+            triangles.Add(start + 2);
+        }
+
         private void BuildAndroidRoadGrid()
         {
             const float roadWidth = 10f;
@@ -334,32 +366,32 @@ namespace PersiaWar.Unity2D5D
 
             for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
             {
-                AddAndroidQuad(roadVertices, roadTriangles,
-                    new Vector3(x, 0.025f, 0f),
-                    new Vector2(roadWidth, worldSize));
+                AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                    new Vector3(x, 0f, 0f),
+                    new Vector2(roadWidth, worldSize), 0.035f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f),
-                    new Vector2(sidewalkWidth, worldSize));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0f, 0f),
+                    new Vector2(sidewalkWidth, worldSize), 0.045f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f),
-                    new Vector2(sidewalkWidth, worldSize));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0f, 0f),
+                    new Vector2(sidewalkWidth, worldSize), 0.045f);
             }
 
             for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
             {
-                AddAndroidQuad(roadVertices, roadTriangles,
-                    new Vector3(0f, 0.025f, z),
-                    new Vector2(worldSize, roadWidth));
+                AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                    new Vector3(0f, 0f, z),
+                    new Vector2(worldSize, roadWidth), 0.035f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0.035f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth), 0.045f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0.035f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth), 0.045f);
             }
 
             CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
@@ -439,6 +471,7 @@ namespace PersiaWar.Unity2D5D
                     height = Mathf.Lerp(3.55f, 4.45f, heightRoll);
                 }
 
+                buildingPoints[i].y = CalculateAndroidTerrainHeight(buildingPoints[i].x, buildingPoints[i].z);
                 androidBuildingCenters.Add(buildingPoints[i]);
                 androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
 
@@ -584,15 +617,16 @@ namespace PersiaWar.Unity2D5D
                 Vector2 interval = blockedIntervals[i];
                 if (interval.x > cursor + 1f)
                 {
-                    AddAndroidQuad(
+                    AddAndroidTerrainFollowingQuad(
                         vertices,
                         triangles,
                         vertical
-                            ? new Vector3(fixedOffset, -0.01f, (cursor + interval.x) * 0.5f)
-                            : new Vector3((cursor + interval.x) * 0.5f, -0.01f, fixedOffset),
+                            ? new Vector3(fixedOffset, 0f, (cursor + interval.x) * 0.5f)
+                            : new Vector3((cursor + interval.x) * 0.5f, 0f, fixedOffset),
                         vertical
                             ? new Vector2(alleyWidth, interval.x - cursor)
-                            : new Vector2(interval.x - cursor, alleyWidth));
+                            : new Vector2(interval.x - cursor, alleyWidth),
+                        0.035f);
                 }
 
                 cursor = Mathf.Max(cursor, interval.y);
@@ -602,20 +636,22 @@ namespace PersiaWar.Unity2D5D
 
             if (cursor < half - 1f)
             {
-                AddAndroidQuad(
+                AddAndroidTerrainFollowingQuad(
                     vertices,
                     triangles,
                     vertical
-                        ? new Vector3(fixedOffset, -0.01f, (cursor + half) * 0.5f)
-                        : new Vector3((cursor + half) * 0.5f, -0.01f, fixedOffset),
+                        ? new Vector3(fixedOffset, 0f, (cursor + half) * 0.5f)
+                        : new Vector3((cursor + half) * 0.5f, 0f, fixedOffset),
                     vertical
                         ? new Vector2(alleyWidth, half - cursor)
-                        : new Vector2(half - cursor, alleyWidth));
+                        : new Vector2(half - cursor, alleyWidth),
+                    0.035f);
             }
         }
 
         private void CreateAndroidVehicle(Vector3 position, Material body, bool longAxisZ)
         {
+            position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             float length = longAxisZ ? 5.2f : 2.9f;
             float width = longAxisZ ? 2.8f : 5.2f;
             CreateAndroidBox(
@@ -669,9 +705,6 @@ namespace PersiaWar.Unity2D5D
             Material curb = MakeMaterial("AndroidCurb", new Color(0.56f, 0.54f, 0.49f));
             float half = worldSize * 0.5f;
 
-            // Build all repeated road markings into a few shared meshes instead of
-            // hundreds of separate GameObjects. This preserves the same visual grid
-            // while dramatically reducing Android hierarchy/renderer overhead.
             List<Vector3> verticalVertices = new List<Vector3>(1024);
             List<int> verticalTriangles = new List<int>(1536);
             List<Vector3> horizontalVertices = new List<Vector3>(1024);
@@ -682,23 +715,25 @@ namespace PersiaWar.Unity2D5D
             for (float x = -half + 5f; x < half; x += 10f)
             {
                 for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
-                    AddAndroidQuad(verticalVertices, verticalTriangles, new Vector3(x, -0.006f, z), new Vector2(0.28f, 4.2f));
+                    AddAndroidTerrainFollowingQuad(verticalVertices, verticalTriangles,
+                        new Vector3(x, 0f, z), new Vector2(0.28f, 4.2f), 0.075f);
             }
 
             for (float z = -half + 5f; z < half; z += 10f)
             {
                 for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
-                    AddAndroidQuad(horizontalVertices, horizontalTriangles, new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f));
+                    AddAndroidTerrainFollowingQuad(horizontalVertices, horizontalTriangles,
+                        new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f), 0.075f);
             }
 
             for (float x = -half + 0.68f; x <= half; x += 24f)
             {
-                AddAndroidQuad(curbVertices, curbTriangles,
-                    new Vector3(x - roadWidth * 0.5f, 0.01f, 0f),
-                    new Vector2(0.08f, worldSize));
-                AddAndroidQuad(curbVertices, curbTriangles,
-                    new Vector3(x + roadWidth * 0.5f, 0.01f, 0f),
-                    new Vector2(0.08f, worldSize));
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(x - roadWidth * 0.5f, 0f, 0f),
+                    new Vector2(0.08f, worldSize), 0.055f);
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(x + roadWidth * 0.5f, 0f, 0f),
+                    new Vector2(0.08f, worldSize), 0.055f);
             }
 
             CreateAndroidQuadBatch("AndroidLaneDashV", verticalVertices, verticalTriangles, lane);
@@ -937,6 +972,7 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateAndroidTree(Vector3 position, float scale)
         {
+            position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             if (androidTreeTrunkMaterial == null)
                 androidTreeTrunkMaterial = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
             if (androidTreeCrownMaterial == null)
@@ -966,6 +1002,7 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateAndroidStreetLamp(Vector3 position)
         {
+            position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             if (androidLampMaterial == null)
                 androidLampMaterial = MakeMaterial("AndroidLamp", new Color(0.10f, 0.12f, 0.14f));
             if (androidLampGlowMaterial == null)
