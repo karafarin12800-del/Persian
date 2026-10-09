@@ -154,9 +154,33 @@ namespace PersiaWar.Unity2D5D
 
         }
 
+        // Release every captured finger when the component is disabled. Without this,
+        // PlayerController keeps the last non-zero movement vector and can continue moving
+        // while the input owner is inactive.
+        private void OnDisable()
+        {
+            ResetAllPointers();
+#if UNITY_ANDROID
+            // Keep menu/pause IMGUI buttons usable after gameplay input is disabled.
+            Input.simulateMouseWithTouches = true;
+#endif
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused)
+                ResetAllPointers();
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            if (!hasFocus)
+                ResetAllPointers();
+        }
+
         private void Update()
         {
-if (!matchActive || matchPaused)
+            if (!matchActive || matchPaused)
                 return;
 
             if (player == null)

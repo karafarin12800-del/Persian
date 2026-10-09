@@ -29,7 +29,6 @@ namespace PersiaWar.Unity2D5D
         private const float AndroidCameraDistance = 16.63f;
         private const float AndroidCameraLookHeight = 0.90f;
         private const float AndroidCameraLookAhead = 4.5f;
-        private AndroidMinimapOverlay androidMinimap;
         private EnemyChase[] minimapEnemies = new EnemyChase[0];
         private float nextMinimapRefresh;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
@@ -1102,13 +1101,17 @@ namespace PersiaWar.Unity2D5D
 #else
             yield return null;
 
-            matchInputArmed = true;
+            // The desktop/editor branch uses the same explicit activation contract as
+            // Android. Enabling the MonoBehaviour alone leaves matchActive false, so
+            // MobileInputHub.Update would return before reading keyboard/mouse input.
             if (mobileInput != null)
             {
+                mobileInput.ActivateForMatch(player, activeCamera);
                 mobileInput.EnableMinimap();
                 mobileInput.enabled = true;
             }
 
+            matchInputArmed = true;
             if (player == null) yield break;
 
             if (enemySpawner == null)

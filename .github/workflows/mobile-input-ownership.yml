@@ -1,0 +1,90 @@
+name: Mobile Input Ownership
+on:
+  pull_request:
+    paths:
+      - 'UnityProject/Assets/Scripts/**'
+      - 'UnityProject/Assets/Scenes/**'
+      - '.github/workflows/mobile-input-ownership.yml'
+  workflow_dispatch:
+jobs:
+  validate-input-ownership:
+    name: Validate single mobile input owner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check active scene and single-owner input architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("UnityProject/Assets")
+          scripts = root / "Scripts"
+          hub_path = scripts / "Input/MobileInputHub.cs"
+          flow_path = scripts / "Core/PrototypeFlow.cs"
+          scene_path = root / "Scenes/PersiaWarPrototype.unity"
+          hub_meta_path = Path(str(hub_path) + ".meta")
+
+          # Remove the unreferenced legacy input/menu/UI owners. Their equivalents
+          # are already implemented by MobileInputHub and PrototypeFlow.
+          obsolete = [
+              "Scripts/Input/MobileMoveInput.cs",
+              "Scripts/Input/MobileMoveInput.cs.meta",
+              "Scripts/Input/MobileMovementJoystick.cs",
+              "Scripts/Input/MobileMovementJoystick.cs.meta",
+              "Scripts/UI/PrototypeMatchFlow.cs",
+              "Scripts/UI/PrototypeMatchFlow.cs.meta",
+              "Scripts/UI/PrototypeMatchFlowBootstrap.cs",
+              "Scripts/UI/PrototypeMatchFlowBootstrap.cs.meta",
+              "Scripts/UI/AndroidMinimapOverlay.cs",
+              "Scripts/UI/AndroidMinimapOverlay.cs.meta",
+              "Scripts/UI/CombatHUD.cs",
+              "Scripts/UI/CombatHUD.cs.meta",
+              "Scripts/UI/GamePauseController.cs",
+              "Scripts/UI/GamePauseController.cs.meta",
+          ]
+          for relative in obsolete:
+              assert not (root / relative).exists(), f"Obsolete duplicate component remains: {relative}"
+
+          hub = hub_path.read_text(encoding="utf-8")
+          flow = flow_path.read_text(encoding="utf-8")
+          scene = scene_path.read_text(encoding="utf-8")
+          guid_match = re.search(r"^guid: ([0-9a-f]+)$", hub_meta_path.read_text(encoding="utf-8"), re.M)
+          assert guid_match, "MobileInputHub meta GUID is missing"
+          hub_guid = guid_match.group(1)
+          assert scene.count("guid: " + hub_guid) == 1, "The active scene must serialize exactly one MobileInputHub"
+          mobile_input_block = scene[scene.index("guid: " + hub_guid) - 400:scene.index("guid: " + hub_guid) + 300]
+          assert "m_Name: MobileInput" in scene, "Expected MobileInput root is missing"
+          assert "m_Enabled: 1" in mobile_input_block, "MobileInputHub must be enabled in the scene"
+          assert "player: {fileID: 300000}" in scene and "gameplayCamera: {fileID: 200000}" in scene, "MobileInputHub must reference the Player and gameplay camera"
+
+          # Exactly one gameplay script may write movement from an external input source.
+          movement_writers = []
+          touch_readers = []
+          for path in sorted(scripts.rglob("*.cs")):
+              source = path.read_text(encoding="utf-8")
+              if "player.SetMoveInput(" in source:
+                  movement_writers.append(path.relative_to(scripts).as_posix())
+              if "Input.GetTouch(" in source or "Input.touchCount" in source:
+                  touch_readers.append(path.relative_to(scripts).as_posix())
+          assert movement_writers == ["Input/MobileInputHub.cs"], f"Movement has competing writers: {movement_writers}"
+          assert touch_readers == ["Core/PrototypeFlow.cs", "Input/MobileInputHub.cs"], f"Unexpected touch owners remain: {touch_readers}"
+
+          # Lifecycle interruption may not leave a stuck movement/fire pointer.
+          for callback in (
+              "private void OnDisable()",
+              "private void OnApplicationPause(bool paused)",
+              "private void OnApplicationFocus(bool hasFocus)",
+              "ResetAllPointers();",
+          ):
+              assert callback in hub, f"Missing input reset lifecycle path: {callback}"
+          assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
+
+          # Both runtime branches must run the same explicit input activation method.
+          assert flow.count("mobileInput.ActivateForMatch(player, activeCamera);") == 2, "Android and desktop/editor must activate the input hub explicitly"
+          assert "mobileInput.EnableMinimap();" in flow, "The existing non-Android minimap path must be retained"
+          print("Mobile input ownership, active scene references, multi-touch capture, and lifecycle resets: PASS")
+          PY
