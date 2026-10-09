@@ -269,6 +269,7 @@ jobs:
           enemy = (root / 'Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           projectile = (root / 'Combat/EnemyProjectile.cs').read_text(encoding='utf-8')
           health = (root / 'Combat/TargetHealth.cs').read_text(encoding='utf-8')
+          spawner = (root / 'World/EnemySpawner.cs').read_text(encoding='utf-8')
           pickup = (root / 'Combat/PickupItem.cs').read_text(encoding='utf-8')
           world = (root / 'Core/GameBootstrap.cs').read_text(encoding='utf-8')
           health_bar = (root / 'UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
