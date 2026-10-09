@@ -81,6 +81,7 @@ namespace PersiaWar.Unity2D5D
             GUI.DrawTexture(rect, mapTexture, ScaleMode.StretchToFill, false);
 
             // The minimap camera follows the player in world space and renders every layer;
+            // Transparent clear pixels let the underlying gameplay remain visible around map geometry.
             // houses therefore remain at their real X/Z world positions relative to the player.
             GUI.color = new Color(0.95f, 0.72f, 0.18f, 0.98f);
             float markerSize = 10f * scale;
