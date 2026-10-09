@@ -53,20 +53,23 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle buttonStyle;
         private GUIStyle smallStyle;
 
+        // These X/Z centers mirror GameBootstrap.BuildAndroidCityPresentation exactly.
+        // Keep the minimap's house marks tied to the actual Android city layout.
         private static readonly Vector2[] AndroidMinimapBuildingPoints =
         {
-            new Vector2(-42f, -42f), new Vector2(-21f, -42f), new Vector2(21f, -42f), new Vector2(42f, -42f),
-            new Vector2(-42f, -21f), new Vector2(42f, -21f),
-            new Vector2(-42f, 0f), new Vector2(42f, 0f),
-            new Vector2(-42f, 21f), new Vector2(42f, 21f),
-            new Vector2(-42f, 42f), new Vector2(-21f, 42f), new Vector2(21f, 42f), new Vector2(42f, 42f),
-            new Vector2(-21f, -21f), new Vector2(21f, -21f),
-            new Vector2(-21f, 21f), new Vector2(21f, 21f),
-            new Vector2(-10f, -34f), new Vector2(10f, 34f),
-            new Vector2(-34f, 10f), new Vector2(34f, -10f),
-            new Vector2(-15f, -14f), new Vector2(15f, -14f),
-            new Vector2(-15f, 14f), new Vector2(15f, 14f)
+            new Vector2(-79f, -79f), new Vector2(-55f, -79f), new Vector2(41f, -79f), new Vector2(65f, -79f),
+            new Vector2(-79f, -55f), new Vector2(-31f, -55f), new Vector2(17f, -55f), new Vector2(65f, -55f),
+            new Vector2(-55f, -31f), new Vector2(-7f, -31f), new Vector2(41f, -31f),
+            new Vector2(-79f, -7f), new Vector2(-31f, -7f), new Vector2(41f, -7f), new Vector2(65f, -7f),
+            new Vector2(-55f, 17f), new Vector2(-7f, 17f), new Vector2(41f, 17f),
+            new Vector2(-79f, 41f), new Vector2(-31f, 41f), new Vector2(17f, 41f), new Vector2(65f, 41f),
+            new Vector2(-55f, 65f), new Vector2(-7f, 65f), new Vector2(41f, 65f), new Vector2(65f, 65f),
+            new Vector2(-79f, 89f), new Vector2(-31f, 89f), new Vector2(17f, 89f), new Vector2(65f, 89f)
         };
+
+        // Center lines copied from BuildAndroidRoadGrid(): start at -91m, then every 24m.
+        private static readonly float[] AndroidMinimapRoadCoordinates =
+            { -91f, -67f, -43f, -19f, 5f, 29f, 53f, 77f };
 
         private static readonly string[] HeroNames =
         {
@@ -290,29 +293,65 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
                 "32", headerStyle);
 
-            // Lightweight city schematic: 15% larger, with the actual street grid,
-            // building blocks, player marker and live enemy positions. No extra camera
-            // or RenderTexture is allocated on Android.
-            float mapSize = Mathf.Clamp(148f * scale * 1.15f, 112f, 218f);
+            // This is the Android minimap that is actually drawn during gameplay.
+            // No opaque backing is painted: the live 3D scene remains visible through it.
+            // A subtle frame and translucent road strokes keep the schematic readable.
+            // 1.38 = the former 1.15 size multiplied by another 20 percent.
+            float mapSize = Mathf.Clamp(148f * scale * 1.38f, 134f, 262f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
-            Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.96f));
 
-            Color roadColor = new Color(0.18f, 0.20f, 0.18f, 0.98f);
-            for (int road = -72; road <= 72; road += 24)
+            Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.32f);
+            float frame = Mathf.Max(1f, 1.5f * scale);
+            Fill(new Rect(map.x, map.y, map.width, frame), frameColor);
+            Fill(new Rect(map.x, map.yMax - frame, map.width, frame), frameColor);
+            Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
+            Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
+
+            Color roadColor = new Color(0.86f, 0.88f, 0.91f, 0.62f);
+            float roadThickness = map.width * (10f / 192f);
+            for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
             {
+                float road = AndroidMinimapRoadCoordinates[i];
                 float x = map.x + Mathf.InverseLerp(-96f, 96f, road) * map.width;
                 float y = map.y + Mathf.InverseLerp(96f, -96f, road) * map.height;
-                Fill(new Rect(x - map.width * 0.018f, map.y, map.width * 0.036f, map.height), roadColor);
-                Fill(new Rect(map.x, y - map.height * 0.018f, map.width, map.height * 0.036f), roadColor);
+                Fill(new Rect(x - roadThickness * 0.5f, map.y, roadThickness, map.height), roadColor);
+                Fill(new Rect(map.x, y - roadThickness * 0.5f, map.width, roadThickness), roadColor);
             }
 
             for (int i = 0; i < AndroidMinimapBuildingPoints.Length; i++)
             {
+                // Repeat the deterministic footprint math from GameBootstrap so the
+                // drawn house rectangles match each real building's center and size.
+                float widthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 12.9898f));
+                float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
+                float footprint = Mathf.Lerp(7.2f, 10.2f, widthRoll);
+                float depth = Mathf.Lerp(6.8f, 9.8f, depthRoll);
+
+                if (i >= 22)
+                {
+                    footprint = Mathf.Lerp(6.5f, 8.2f, widthRoll);
+                    depth = Mathf.Lerp(6.0f, 7.8f, depthRoll);
+                }
+                else if (i >= 18 && i <= 21)
+                {
+                    footprint = Mathf.Lerp(7.5f, 9.8f, widthRoll);
+                    depth = Mathf.Lerp(6.8f, 9.2f, depthRoll);
+                }
+
+                if (i == 0 || i == 7 || i == 13)
+                    footprint = Mathf.Max(footprint, 10.2f);
+
+                if (i == 4 || i == 9 || i == 11 || i == 16)
+                {
+                    footprint = Mathf.Lerp(9.4f, 10.4f, widthRoll);
+                    depth = Mathf.Lerp(8.2f, 10.0f, depthRoll);
+                }
+
                 Vector2 building = WorldToMap(AndroidMinimapBuildingPoints[i], map);
-                float buildingWidth = map.width * (i >= 22 ? 0.055f : 0.065f);
-                float buildingHeight = map.height * (i >= 22 ? 0.045f : 0.055f);
+                float buildingWidth = map.width * (footprint / 192f);
+                float buildingHeight = map.height * (depth / 192f);
                 Fill(new Rect(building.x - buildingWidth * 0.5f, building.y - buildingHeight * 0.5f,
-                    buildingWidth, buildingHeight), new Color(0.70f, 0.48f, 0.22f, 0.98f));
+                    buildingWidth, buildingHeight), new Color(0.70f, 0.48f, 0.22f, 0.96f));
             }
 
             if (Time.unscaledTime >= nextMinimapRefresh)
