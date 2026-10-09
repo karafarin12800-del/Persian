@@ -11,7 +11,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float nextWaveDelay = 3f;
         [SerializeField] private float initialSpawnDelay = 6.5f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
-        [SerializeField] private int maxPerWave = 15;
+        [SerializeField] private int maxPerWave = 12;
         [SerializeField] private int victoryWave = 5;
 
 #if UNITY_ANDROID
@@ -34,9 +34,8 @@ namespace PersiaWar.Unity2D5D
         {
             player = playerTransform;
 #if UNITY_ANDROID
-            // The Android match represents 32 combatants: the player plus 31 opponents.
-            // Raise any older serialized inspector cap so it cannot silently trim the start.
-            maxPerWave = Mathf.Max(maxPerWave, 31);
+            // Enforce a smaller mobile wave cap even when older scene data requested 42+ enemies.
+            maxPerWave = Mathf.Clamp(maxPerWave, 1, 12);
 #endif
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
@@ -95,7 +94,14 @@ namespace PersiaWar.Unity2D5D
             {
                 if (wave >= Mathf.Max(1, victoryWave))
                 {
-                    GameSession.Instance?.EndMission(true);
+                    PlayerController activePlayer = player.GetComponent<PlayerController>();
+                    if (activePlayer != null && !activePlayer.IsDefeated)
+                        ExtractionBeacon.ActivateForVictory(activePlayer);
+                    else
+                        GameSession.Instance?.EndMission(false);
+
+                    // Do not declare victory here. ExtractionBeacon completes the
+                    // mission only after the player reaches the visible blue beam.
                     enabled = false;
                     return;
                 }
@@ -124,7 +130,7 @@ namespace PersiaWar.Unity2D5D
         {
             int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
 #if UNITY_ANDROID
-            count = Mathf.Min(count, 31);
+            count = Mathf.Min(count, 12);
 #endif
 
 #if UNITY_ANDROID

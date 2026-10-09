@@ -9,13 +9,15 @@ namespace PersiaWar.Unity2D5D
             Ammo,
             Medkit,
             Grenade,
-            Shield
+            Shield,
+            Weapon
         }
 
         [SerializeField] private PickupType type = PickupType.Ammo;
         [SerializeField] private int amount = 30;
         [SerializeField] private float rotateSpeed = 90f;
         [SerializeField] private float bobHeight = 0.15f;
+        [SerializeField] private WeaponController.WeaponKind weaponKind = WeaponController.WeaponKind.AssaultRifle;
 
         private float startY;
 
@@ -23,6 +25,13 @@ namespace PersiaWar.Unity2D5D
         {
             type = pickupType;
             amount = Mathf.Max(1, value);
+        }
+
+        public void ConfigureWeapon(WeaponController.WeaponKind kind, int reserveAmmo)
+        {
+            type = PickupType.Weapon;
+            weaponKind = kind;
+            amount = Mathf.Max(1, reserveAmmo);
         }
 
         private void Awake()
@@ -60,6 +69,10 @@ namespace PersiaWar.Unity2D5D
                     break;
                 case PickupType.Shield:
                     player.AddShield(amount);
+                    break;
+                case PickupType.Weapon:
+                    if (player.Weapon != null)
+                        player.Weapon.EquipWeaponFromPickup(weaponKind, amount);
                     break;
             }
 

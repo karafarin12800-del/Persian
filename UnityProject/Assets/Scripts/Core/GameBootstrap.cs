@@ -44,6 +44,9 @@ namespace PersiaWar.Unity2D5D
 
         private readonly Dictionary<Material, AndroidBoxBatch> androidBoxBatches =
             new Dictionary<Material, AndroidBoxBatch>();
+        // Each Android house owns its own batched renderers so the camera can fade
+        // only the building that actually blocks the player, not every house at once.
+        private Transform androidCurrentBuildingRoot;
 
         private void ReportStage(string message, string checkpoint)
         {
@@ -205,13 +208,18 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildWorldBase()
         {
+#if UNITY_ANDROID
+            DisableLegacyWorldBuilderPath();
+#endif
             GameObject legacyGround = GameObject.Find("Ground");
             if (legacyGround != null) legacyGround.SetActive(false);
 
             if (worldRoot != null) Destroy(worldRoot.gameObject);
             worldRoot = new GameObject("BattleRoyaleCity").transform;
 
-            roadMaterial = MakeMaterial("Road", new Color(0.105f, 0.12f, 0.135f));
+            // Mid-light neutral asphalt: the previous near-black tint made streets
+            // too dark on Android and reduced contrast against buildings and sidewalks.
+            roadMaterial = MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
@@ -219,14 +227,23 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
-            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.25f, 0.44f, 0.18f));
+            Material groundMaterial = MakeMaterial("AndroidGround3D", new Color(0.12f, 0.46f, 0.08f));
             buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
             roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
             accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
             androidWindowMaterial = MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
             androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
-            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.38f, 0.36f, 0.31f));
+            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
             BuildAndroidTerrain3D(groundMaterial);
+            // A continuous backing slab extends beyond the terrain bounds. Its top
+            // stays below the lowest terrain vertices, preventing black pinholes
+            // without z-fighting against the visible terrain surface.
+            CreateAndroidBox(
+                "AndroidContinuousGroundFoundation",
+                new Vector3(0f, -0.26f, 0f),
+                new Vector3(worldSize + 8f, 0.35f, worldSize + 8f),
+                groundMaterial,
+                false);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
             return;
@@ -247,6 +264,46 @@ namespace PersiaWar.Unity2D5D
                 CreateBox("RoadZ", new Vector3(0f, -0.04f, z), new Vector3(worldSize, 0.18f, roadWidth), roadMaterial, false);
 #endif
         }
+
+#if UNITY_ANDROID
+        private void DisableLegacyWorldBuilderPath()
+        {
+            // The retired WorldBuilder path used gray-olive ground and nearly black roads.
+            // Disable its generator and clean up its objects if it ran before this bootstrap.
+            WorldBuilder[] legacyBuilders = FindObjectsByType<WorldBuilder>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < legacyBuilders.Length; i++)
+            {
+                if (legacyBuilders[i] != null)
+                    legacyBuilders[i].enabled = false;
+            }
+
+            GameObject[] existingObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            int removed = 0;
+            for (int i = 0; i < existingObjects.Length; i++)
+            {
+                GameObject candidate = existingObjects[i];
+                if (candidate == null)
+                    continue;
+
+                string objectName = candidate.name;
+                bool legacySurface =
+                    objectName == "World_Ground" ||
+                    objectName.StartsWith("MainRoad_") ||
+                    objectName.StartsWith("Alley_");
+
+                if (legacySurface)
+                {
+                    candidate.SetActive(false);
+                    removed++;
+                }
+            }
+
+            Debug.Log("PERSIA_WORLD_CLEANUP: legacy builders=" + legacyBuilders.Length +
+                      ", removed legacy ground/road objects=" + removed);
+        }
+#endif
+
         private void BuildAndroidTerrain3D(Material material)
         {
             const int grid = 17;
@@ -267,16 +324,7 @@ namespace PersiaWar.Unity2D5D
                 for (int x = 0; x < grid; x++)
                 {
                     float worldX = -half + x * step;
-                    float radial = Vector2.Distance(new Vector2(worldX, worldZ), Vector2.zero) / half;
-                    float edge = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((radial - 0.52f) / 0.48f));
-                    float undulation =
-                        Mathf.Sin(worldX * 0.075f) * 0.045f +
-                        Mathf.Cos(worldZ * 0.065f) * 0.04f +
-                        Mathf.Sin((worldX + worldZ) * 0.035f) * 0.025f;
-
-                    // Keep the playable city on a broad, stable plateau while the
-                    // outer terrain gently rises/falls so the 3D camera reads depth.
-                    float y = edge * 0.18f + undulation * 0.35f;
+                    float y = CalculateAndroidTerrainHeight(worldX, worldZ);
                     vertices[z * grid + x] = new Vector3(worldX, y, worldZ);
                     uv[z * grid + x] = new Vector2((float)x / (grid - 1), (float)z / (grid - 1));
                 }
@@ -312,10 +360,71 @@ namespace PersiaWar.Unity2D5D
             collider.sharedMesh = mesh;
         }
 
+        private float CalculateAndroidTerrainHeight(float worldX, float worldZ)
+        {
+            float half = worldSize * 0.5f;
+            float radial = Vector2.Distance(new Vector2(worldX, worldZ), Vector2.zero) / half;
+            float edge = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((radial - 0.52f) / 0.48f));
+            float undulation =
+                Mathf.Sin(worldX * 0.075f) * 0.045f +
+                Mathf.Cos(worldZ * 0.065f) * 0.04f +
+                Mathf.Sin((worldX + worldZ) * 0.035f) * 0.025f;
+            return edge * 0.18f + undulation * 0.35f;
+        }
+
+        private void AddAndroidTerrainFollowingQuad(
+            List<Vector3> vertices,
+            List<int> triangles,
+            Vector3 center,
+            Vector2 size,
+            float heightOffset)
+        {
+            // Long roads and sidewalks use short terrain-sampled segments rather
+            // than one large quad. This prevents the road mesh from floating above
+            // or sinking below the radial terrain profile between its endpoints.
+            const float maxSegmentLength = 8f;
+            int xSegments = Mathf.Max(1, Mathf.CeilToInt(size.x / maxSegmentLength));
+            int zSegments = Mathf.Max(1, Mathf.CeilToInt(size.y / maxSegmentLength));
+            int start = vertices.Count;
+            float halfX = size.x * 0.5f;
+            float halfZ = size.y * 0.5f;
+
+            for (int z = 0; z <= zSegments; z++)
+            {
+                float worldZ = center.z - halfZ + size.y * z / zSegments;
+                for (int x = 0; x <= xSegments; x++)
+                {
+                    float worldX = center.x - halfX + size.x * x / xSegments;
+                    vertices.Add(new Vector3(
+                        worldX,
+                        CalculateAndroidTerrainHeight(worldX, worldZ) + heightOffset,
+                        worldZ));
+                }
+            }
+
+            for (int z = 0; z < zSegments; z++)
+            {
+                for (int x = 0; x < xSegments; x++)
+                {
+                    int a = start + z * (xSegments + 1) + x;
+                    int b = a + 1;
+                    int d = a + xSegments + 1;
+                    int c = d + 1;
+                    // Same upward-facing winding as AddAndroidQuad.
+                    triangles.Add(a);
+                    triangles.Add(c);
+                    triangles.Add(b);
+                    triangles.Add(a);
+                    triangles.Add(d);
+                    triangles.Add(c);
+                }
+            }
+        }
+
         private void BuildAndroidRoadGrid()
         {
             const float roadWidth = 10f;
-            const float sidewalkWidth = 1.35f;
+            const float sidewalkWidth = 1.0f;
             float half = worldSize * 0.5f;
 
             List<Vector3> roadVertices = new List<Vector3>();
@@ -325,32 +434,32 @@ namespace PersiaWar.Unity2D5D
 
             for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
             {
-                AddAndroidQuad(roadVertices, roadTriangles,
-                    new Vector3(x, 0.025f, 0f),
-                    new Vector2(roadWidth, worldSize));
+                AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                    new Vector3(x, 0f, 0f),
+                    new Vector2(roadWidth, worldSize), 0.035f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0.035f, 0f),
-                    new Vector2(sidewalkWidth, worldSize));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0f, 0f),
+                    new Vector2(sidewalkWidth, worldSize), 0.045f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0.035f, 0f),
-                    new Vector2(sidewalkWidth, worldSize));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0f, 0f),
+                    new Vector2(sidewalkWidth, worldSize), 0.045f);
             }
 
             for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
             {
-                AddAndroidQuad(roadVertices, roadTriangles,
-                    new Vector3(0f, 0.025f, z),
-                    new Vector2(worldSize, roadWidth));
+                AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                    new Vector3(0f, 0f, z),
+                    new Vector2(worldSize, roadWidth), 0.035f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0.035f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth), 0.045f);
 
-                AddAndroidQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0.035f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth));
+                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                    new Vector3(0f, 0f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
+                    new Vector2(worldSize, sidewalkWidth), 0.045f);
             }
 
             CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
@@ -363,23 +472,20 @@ namespace PersiaWar.Unity2D5D
             // Dense, readable 2.5D city layout: buildings hug the streets so the
             // gameplay camera never opens onto a large empty floor.
             androidBoxBatches.Clear();
+            androidBuildingCenters.Clear();
+            androidBuildingHalfExtents.Clear();
+            // Spread buildings across the playable map, including outer blocks.
+            // Coordinates sit between the 24m road lanes so streets and intersections stay open.
             Vector3[] buildingPoints =
             {
-                new Vector3(-42f, 0f, -42f), new Vector3(-21f, 0f, -42f), new Vector3(21f, 0f, -42f), new Vector3(42f, 0f, -42f),
-                new Vector3(-42f, 0f, -21f), new Vector3(42f, 0f, -21f),
-                new Vector3(-42f, 0f, 0f),   new Vector3(42f, 0f, 0f),
-                new Vector3(-42f, 0f, 21f),  new Vector3(42f, 0f, 21f),
-                new Vector3(-42f, 0f, 42f),  new Vector3(-21f, 0f, 42f), new Vector3(21f, 0f, 42f), new Vector3(42f, 0f, 42f),
-
-                new Vector3(-21f, 0f, -21f), new Vector3(21f, 0f, -21f),
-                new Vector3(-21f, 0f, 21f),  new Vector3(21f, 0f, 21f),
-                new Vector3(-10f, 0f, -34f),  new Vector3(10f, 0f, 34f),
-                new Vector3(-34f, 0f, 10f),   new Vector3(34f, 0f, -10f),
-
-                // Near-center landmarks keep the playable view from opening onto
-                // a large empty green floor around the spawn area.
-                new Vector3(-15f, 0f, -14f), new Vector3(15f, 0f, -14f),
-                new Vector3(-15f, 0f, 14f),  new Vector3(15f, 0f, 14f)
+                new Vector3(-79f, 0f, -79f), new Vector3(-55f, 0f, -79f), new Vector3(41f, 0f, -79f), new Vector3(65f, 0f, -79f),
+                new Vector3(-79f, 0f, -55f), new Vector3(-31f, 0f, -55f), new Vector3(17f, 0f, -55f), new Vector3(65f, 0f, -55f),
+                new Vector3(-55f, 0f, -31f), new Vector3(-7f, 0f, -31f), new Vector3(41f, 0f, -31f),
+                new Vector3(-79f, 0f, -7f), new Vector3(-31f, 0f, -7f), new Vector3(41f, 0f, -7f), new Vector3(65f, 0f, -7f),
+                new Vector3(-55f, 0f, 17f), new Vector3(-7f, 0f, 17f), new Vector3(41f, 0f, 17f),
+                new Vector3(-79f, 0f, 41f), new Vector3(-31f, 0f, 41f), new Vector3(17f, 0f, 41f), new Vector3(65f, 0f, 41f),
+                new Vector3(-55f, 0f, 65f), new Vector3(-7f, 0f, 65f), new Vector3(41f, 0f, 65f), new Vector3(65f, 0f, 65f),
+                new Vector3(-79f, 0f, 89f), new Vector3(-31f, 0f, 89f), new Vector3(17f, 0f, 89f), new Vector3(65f, 0f, 89f)
             };
 
             for (int i = 0; i < buildingPoints.Length; i++)
@@ -394,12 +500,14 @@ namespace PersiaWar.Unity2D5D
                 float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
 
                 bool isWarehouse = i == 4 || i == 9 || i == 11 || i == 16;
-                bool isPitchedRoof = !isWarehouse &&
-                    (i == 1 || i == 3 || i == 6 || i == 10 ||
-                     i == 12 || i == 14 || i == 18 || i == 24);
+                // Two out of every three residential houses receive a gabled roof.
+                // Warehouses keep broad low rooflines for a readable silhouette.
+                bool isPitchedRoof = !isWarehouse && (i % 3 != 0 || i == 0);
 
-                float footprint = Mathf.Lerp(7.6f, 11.4f, widthRoll);
-                float depth = Mathf.Lerp(7.0f, 10.0f, depthRoll);
+                // Keep the full footprint (including facade trim) within the
+                // sidewalk-to-sidewalk block so roads never run under house walls.
+                float footprint = Mathf.Lerp(7.2f, 10.2f, widthRoll);
+                float depth = Mathf.Lerp(6.8f, 9.8f, depthRoll);
                 bool twoStorey = heightRoll > 0.52f;
                 float height = twoStorey
                     ? Mathf.Lerp(5.4f, 6.4f, Mathf.InverseLerp(0.52f, 1f, heightRoll))
@@ -422,17 +530,27 @@ namespace PersiaWar.Unity2D5D
                 // A few wider corner homes become landmarks without becoming towers.
                 // Four dedicated low, deep industrial buildings are warehouses.
                 if (i == 0 || i == 7 || i == 13)
-                    footprint = Mathf.Max(footprint, 11.8f);
+                    footprint = Mathf.Max(footprint, 10.2f);
 
                 if (isWarehouse)
                 {
-                    footprint = Mathf.Lerp(11.8f, 14.0f, widthRoll);
-                    depth = Mathf.Lerp(9.5f, 12.2f, depthRoll);
+                    footprint = Mathf.Lerp(9.4f, 10.4f, widthRoll);
+                    depth = Mathf.Lerp(8.2f, 10.0f, depthRoll);
                     height = Mathf.Lerp(3.55f, 4.45f, heightRoll);
                 }
 
+                buildingPoints[i].y = CalculateAndroidTerrainHeight(buildingPoints[i].x, buildingPoints[i].z);
+                androidBuildingCenters.Add(buildingPoints[i]);
+                androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
+
+                androidCurrentBuildingRoot = new GameObject("Building_House_" + (i + 1)).transform;
+                androidCurrentBuildingRoot.SetParent(worldRoot, true);
                 CreateAndroidBuilding(
                     buildingPoints[i], footprint, height, depth, i, isWarehouse, isPitchedRoof);
+                // Flush per house into material-group meshes parented beneath this house.
+                // This preserves most batching while making per-house transparency possible.
+                FlushAndroidBoxBatches();
+                androidCurrentBuildingRoot = null;
                 StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_DONE");
             }
 
@@ -486,27 +604,27 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
         }
 
+        private readonly List<Vector3> androidBuildingCenters = new List<Vector3>();
+        private readonly List<Vector2> androidBuildingHalfExtents = new List<Vector2>();
+
         private void BuildAndroidAlleysAndVehicles()
         {
             StartupCheckpoint.Set("CITY_ALLEYS_START");
-            const float alleyWidth = 4.5f;
+            const float alleyWidth = 3.2f;
             const float alleySpacing = 12f;
             const int alleyCountPerAxis = 15;
-            float half = worldSize * 0.5f - alleySpacing;
+            float half = worldSize * 0.5f;
 
-            // 15 lanes in each axis = 30 secondary alleys. Bake them into one
-            // shared road mesh instead of maintaining 30 separate renderers.
+            // Build narrow 12m alleys as clear segments. Each segment stops before
+            // the actual house footprint (including a small safety margin), rather
+            // than drawing an infinite road strip through house interiors.
             List<Vector3> alleyVertices = new List<Vector3>();
             List<int> alleyTriangles = new List<int>();
             for (int i = 0; i < alleyCountPerAxis; i++)
             {
-                float offset = -half + i * alleySpacing;
-                AddAndroidQuad(alleyVertices, alleyTriangles,
-                    new Vector3(offset, -0.01f, 0f),
-                    new Vector2(alleyWidth, worldSize));
-                AddAndroidQuad(alleyVertices, alleyTriangles,
-                    new Vector3(0f, -0.005f, offset),
-                    new Vector2(worldSize, alleyWidth));
+                float offset = -half + alleySpacing + i * alleySpacing;
+                AddClearAndroidAlleySegments(alleyVertices, alleyTriangles, offset, true, half, alleyWidth);
+                AddClearAndroidAlleySegments(alleyVertices, alleyTriangles, offset, false, half, alleyWidth);
             }
             CreateAndroidQuadBatch("AndroidSecondaryAlleys", alleyVertices, alleyTriangles, roadMaterial);
             StartupCheckpoint.Set("CITY_ALLEYS_DONE");
@@ -519,12 +637,13 @@ namespace PersiaWar.Unity2D5D
                 MakeMaterial("VehicleRed", new Color(0.48f, 0.16f, 0.12f))
             };
 
+            // Park vehicles on the primary street centerlines, not on house plots.
             Vector3[] vehiclePoints =
             {
-                new Vector3(-36f, 0f, -12f), new Vector3(36f, 0f, 12f),
-                new Vector3(-60f, 0f, 60f),  new Vector3(60f, 0f, -60f),
-                new Vector3(-12f, 0f, 60f),  new Vector3(12f, 0f, -60f),
-                new Vector3(-72f, 0f, 24f),  new Vector3(72f, 0f, -24f)
+                new Vector3(-43f, 0f, -19f), new Vector3(53f, 0f, 29f),
+                new Vector3(-67f, 0f, 53f),  new Vector3(77f, 0f, -67f),
+                new Vector3(-19f, 0f, 53f),  new Vector3(5f, 0f, -67f),
+                new Vector3(-67f, 0f, 29f),  new Vector3(77f, 0f, -19f)
             };
 
             for (int i = 0; i < vehiclePoints.Length; i++)
@@ -536,8 +655,77 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("CITY_VEHICLES_DONE");
         }
 
+        private void AddClearAndroidAlleySegments(
+            List<Vector3> vertices,
+            List<int> triangles,
+            float fixedOffset,
+            bool vertical,
+            float half,
+            float alleyWidth)
+        {
+            const float safetyMargin = 0.55f;
+            List<Vector2> blockedIntervals = new List<Vector2>();
+
+            for (int i = 0; i < androidBuildingCenters.Count; i++)
+            {
+                Vector3 center = androidBuildingCenters[i];
+                Vector2 extents = androidBuildingHalfExtents[i];
+                float perpendicularDistance = vertical
+                    ? Mathf.Abs(center.x - fixedOffset)
+                    : Mathf.Abs(center.z - fixedOffset);
+                float perpendicularExtent = vertical ? extents.x : extents.y;
+                if (perpendicularDistance >= perpendicularExtent + alleyWidth * 0.5f + safetyMargin)
+                    continue;
+
+                float alongCenter = vertical ? center.z : center.x;
+                float alongExtent = vertical ? extents.y : extents.x;
+                blockedIntervals.Add(new Vector2(
+                    Mathf.Max(-half, alongCenter - alongExtent - safetyMargin),
+                    Mathf.Min(half, alongCenter + alongExtent + safetyMargin)));
+            }
+
+            blockedIntervals.Sort((a, b) => a.x.CompareTo(b.x));
+            float cursor = -half;
+            for (int i = 0; i < blockedIntervals.Count; i++)
+            {
+                Vector2 interval = blockedIntervals[i];
+                if (interval.x > cursor + 1f)
+                {
+                    AddAndroidTerrainFollowingQuad(
+                        vertices,
+                        triangles,
+                        vertical
+                            ? new Vector3(fixedOffset, 0f, (cursor + interval.x) * 0.5f)
+                            : new Vector3((cursor + interval.x) * 0.5f, 0f, fixedOffset),
+                        vertical
+                            ? new Vector2(alleyWidth, interval.x - cursor)
+                            : new Vector2(interval.x - cursor, alleyWidth),
+                        0.035f);
+                }
+
+                cursor = Mathf.Max(cursor, interval.y);
+                if (cursor >= half)
+                    break;
+            }
+
+            if (cursor < half - 1f)
+            {
+                AddAndroidTerrainFollowingQuad(
+                    vertices,
+                    triangles,
+                    vertical
+                        ? new Vector3(fixedOffset, 0f, (cursor + half) * 0.5f)
+                        : new Vector3((cursor + half) * 0.5f, 0f, fixedOffset),
+                    vertical
+                        ? new Vector2(alleyWidth, half - cursor)
+                        : new Vector2(half - cursor, alleyWidth),
+                    0.035f);
+            }
+        }
+
         private void CreateAndroidVehicle(Vector3 position, Material body, bool longAxisZ)
         {
+            position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             float length = longAxisZ ? 5.2f : 2.9f;
             float width = longAxisZ ? 2.8f : 5.2f;
             CreateAndroidBox(
@@ -588,12 +776,9 @@ namespace PersiaWar.Unity2D5D
         private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
         {
             Material lane = MakeMaterial("AndroidLane", new Color(0.78f, 0.68f, 0.34f));
-            Material curb = MakeMaterial("AndroidCurb", new Color(0.56f, 0.54f, 0.49f));
+            Material curb = MakeMaterial("AndroidCurb", new Color(0.78f, 0.74f, 0.65f));
             float half = worldSize * 0.5f;
 
-            // Build all repeated road markings into a few shared meshes instead of
-            // hundreds of separate GameObjects. This preserves the same visual grid
-            // while dramatically reducing Android hierarchy/renderer overhead.
             List<Vector3> verticalVertices = new List<Vector3>(1024);
             List<int> verticalTriangles = new List<int>(1536);
             List<Vector3> horizontalVertices = new List<Vector3>(1024);
@@ -604,23 +789,25 @@ namespace PersiaWar.Unity2D5D
             for (float x = -half + 5f; x < half; x += 10f)
             {
                 for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
-                    AddAndroidQuad(verticalVertices, verticalTriangles, new Vector3(x, -0.006f, z), new Vector2(0.28f, 4.2f));
+                    AddAndroidTerrainFollowingQuad(verticalVertices, verticalTriangles,
+                        new Vector3(x, 0f, z), new Vector2(0.28f, 4.2f), 0.075f);
             }
 
             for (float z = -half + 5f; z < half; z += 10f)
             {
                 for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
-                    AddAndroidQuad(horizontalVertices, horizontalTriangles, new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f));
+                    AddAndroidTerrainFollowingQuad(horizontalVertices, horizontalTriangles,
+                        new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f), 0.075f);
             }
 
-            for (float x = -half + 0.68f; x <= half; x += 24f)
+            for (float roadCenter = -half + roadWidth * 0.5f; roadCenter <= half; roadCenter += 24f)
             {
-                AddAndroidQuad(curbVertices, curbTriangles,
-                    new Vector3(x - roadWidth * 0.5f, 0.01f, 0f),
-                    new Vector2(0.08f, worldSize));
-                AddAndroidQuad(curbVertices, curbTriangles,
-                    new Vector3(x + roadWidth * 0.5f, 0.01f, 0f),
-                    new Vector2(0.08f, worldSize));
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(roadCenter - roadWidth * 0.5f, 0f, 0f),
+                    new Vector2(0.08f, worldSize), 0.055f);
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(roadCenter + roadWidth * 0.5f, 0f, 0f),
+                    new Vector2(0.08f, worldSize), 0.055f);
             }
 
             CreateAndroidQuadBatch("AndroidLaneDashV", verticalVertices, verticalTriangles, lane);
@@ -703,7 +890,10 @@ namespace PersiaWar.Unity2D5D
 
             Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
             QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
-            CreateAndroidCollider("CityBuildingCollider", position, bodySize);
+            // Extend the camera-blocking collider through the roofline so the camera
+            // can detect houses even when its sightline crosses the upper facade/roof.
+            CreateAndroidCollider("CityBuildingCollider", position,
+                new Vector3(footprint, bodyHeight + (isPitchedRoof ? 1.6f : 0.65f), depth));
 
             if (isPitchedRoof)
             {
@@ -859,6 +1049,7 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateAndroidTree(Vector3 position, float scale)
         {
+            position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             if (androidTreeTrunkMaterial == null)
                 androidTreeTrunkMaterial = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
             if (androidTreeCrownMaterial == null)
@@ -869,25 +1060,26 @@ namespace PersiaWar.Unity2D5D
                 position + Vector3.up * (scale * 0.8f),
                 new Vector3(scale * 0.22f, scale * 1.6f, scale * 0.22f),
                 androidTreeTrunkMaterial,
-                false);
+                true);
 
             CreateAndroidBox(
                 "TreeCrownLower",
                 position + Vector3.up * (scale * 1.75f),
                 new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
                 androidTreeCrownMaterial,
-                false);
+                true);
 
             CreateAndroidBox(
                 "TreeCrownUpper",
                 position + Vector3.up * (scale * 2.30f),
                 new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
                 androidTreeCrownMaterial,
-                false);
+                true);
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
         {
+            position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             if (androidLampMaterial == null)
                 androidLampMaterial = MakeMaterial("AndroidLamp", new Color(0.10f, 0.12f, 0.14f));
             if (androidLampGlowMaterial == null)
@@ -986,7 +1178,8 @@ namespace PersiaWar.Unity2D5D
         private void CreateAndroidCollider(string objectName, Vector3 position, Vector3 size)
         {
             GameObject obj = new GameObject(objectName);
-            obj.transform.SetParent(worldRoot, true);
+            Transform parent = androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot;
+            obj.transform.SetParent(parent, true);
             obj.transform.position = position + Vector3.up * (size.y * 0.5f);
             BoxCollider box = obj.AddComponent<BoxCollider>();
             box.center = Vector3.zero;
@@ -1000,8 +1193,10 @@ namespace PersiaWar.Unity2D5D
                 if (batch.Vertices.Count == 0)
                     continue;
 
-                GameObject obj = new GameObject("AndroidCityBatch");
-                obj.transform.SetParent(worldRoot, true);
+                GameObject obj = new GameObject(
+                    androidCurrentBuildingRoot != null ? "BuildingFacadeBatch_" + batch.Material.name : "AndroidCityBatch");
+                Transform batchParent = androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot;
+                obj.transform.SetParent(batchParent, true);
 
                 Mesh mesh = new Mesh { name = "AndroidCityBatchMesh" };
                 if (batch.Vertices.Count > 65000)
@@ -1030,7 +1225,11 @@ namespace PersiaWar.Unity2D5D
             EnsureAndroidPrimitiveMeshes();
 
             GameObject obj = new GameObject(objectName);
-            obj.transform.SetParent(worldRoot, true);
+            // Keep roof panels and other individual building details inside the same
+            // house hierarchy as the facade batches. The occlusion fader discovers
+            // the house root from CityBuildingCollider and fades all child renderers.
+            Transform parent = androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot;
+            obj.transform.SetParent(parent, true);
             obj.transform.position = position;
             obj.transform.localScale = size;
 

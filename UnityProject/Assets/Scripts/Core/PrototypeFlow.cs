@@ -29,7 +29,6 @@ namespace PersiaWar.Unity2D5D
         private const float AndroidCameraDistance = 16.63f;
         private const float AndroidCameraLookHeight = 0.90f;
         private const float AndroidCameraLookAhead = 4.5f;
-        private AndroidMinimapOverlay androidMinimap;
         private EnemyChase[] minimapEnemies = new EnemyChase[0];
         private float nextMinimapRefresh;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
@@ -53,20 +52,23 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle buttonStyle;
         private GUIStyle smallStyle;
 
+        // These X/Z centers mirror GameBootstrap.BuildAndroidCityPresentation exactly.
+        // Keep the minimap's house marks tied to the actual Android city layout.
         private static readonly Vector2[] AndroidMinimapBuildingPoints =
         {
-            new Vector2(-42f, -42f), new Vector2(-21f, -42f), new Vector2(21f, -42f), new Vector2(42f, -42f),
-            new Vector2(-42f, -21f), new Vector2(42f, -21f),
-            new Vector2(-42f, 0f), new Vector2(42f, 0f),
-            new Vector2(-42f, 21f), new Vector2(42f, 21f),
-            new Vector2(-42f, 42f), new Vector2(-21f, 42f), new Vector2(21f, 42f), new Vector2(42f, 42f),
-            new Vector2(-21f, -21f), new Vector2(21f, -21f),
-            new Vector2(-21f, 21f), new Vector2(21f, 21f),
-            new Vector2(-10f, -34f), new Vector2(10f, 34f),
-            new Vector2(-34f, 10f), new Vector2(34f, -10f),
-            new Vector2(-15f, -14f), new Vector2(15f, -14f),
-            new Vector2(-15f, 14f), new Vector2(15f, 14f)
+            new Vector2(-79f, -79f), new Vector2(-55f, -79f), new Vector2(41f, -79f), new Vector2(65f, -79f),
+            new Vector2(-79f, -55f), new Vector2(-31f, -55f), new Vector2(17f, -55f), new Vector2(65f, -55f),
+            new Vector2(-55f, -31f), new Vector2(-7f, -31f), new Vector2(41f, -31f),
+            new Vector2(-79f, -7f), new Vector2(-31f, -7f), new Vector2(41f, -7f), new Vector2(65f, -7f),
+            new Vector2(-55f, 17f), new Vector2(-7f, 17f), new Vector2(41f, 17f),
+            new Vector2(-79f, 41f), new Vector2(-31f, 41f), new Vector2(17f, 41f), new Vector2(65f, 41f),
+            new Vector2(-55f, 65f), new Vector2(-7f, 65f), new Vector2(41f, 65f), new Vector2(65f, 65f),
+            new Vector2(-79f, 89f), new Vector2(-31f, 89f), new Vector2(17f, 89f), new Vector2(65f, 89f)
         };
+
+        // Center lines copied from BuildAndroidRoadGrid(): start at -91m, then every 24m.
+        private static readonly float[] AndroidMinimapRoadCoordinates =
+            { -91f, -67f, -43f, -19f, 5f, 29f, 53f, 77f };
 
         private static readonly string[] HeroNames =
         {
@@ -172,9 +174,15 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            // The spawn map is part of the front-end and must remain interactive
-            // even while the gameplay roots are still dormant.
+            // Use direct Touch.fingerId input for front-end controls on Android.
+            // GUI.Button still draws the visual surface, but must not be the only
+            // path that can advance the menu if touch-to-mouse synthesis is missing.
             if (mode == ScreenMode.Match) return;
+            if (mode == ScreenMode.HeroSelect)
+            {
+                HandleHeroSelectTouches();
+                return;
+            }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
         }
@@ -290,29 +298,80 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
                 "32", headerStyle);
 
-            // Lightweight city schematic: 15% larger, with the actual street grid,
-            // building blocks, player marker and live enemy positions. No extra camera
-            // or RenderTexture is allocated on Android.
-            float mapSize = Mathf.Clamp(148f * scale * 1.15f, 112f, 218f);
+            // This is the Android minimap that is actually drawn during gameplay.
+            // No opaque backing is painted: the live 3D scene remains visible through it.
+            // A subtle frame and translucent road strokes keep the schematic readable.
+            // 1.38 = the former 1.15 size multiplied by another 20 percent.
+            float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
-            Fill(map, new Color(0.08f, 0.16f, 0.10f, 0.96f));
 
-            Color roadColor = new Color(0.18f, 0.20f, 0.18f, 0.98f);
-            for (int road = -72; road <= 72; road += 24)
+            // Keep the map see-through, but tint the live scene with a light
+            // translucent grass-green layer so roads and house symbols remain readable.
+            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));
+
+            Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.46f);
+            float frame = Mathf.Max(1f, 1.5f * scale);
+            Fill(new Rect(map.x, map.y, map.width, frame), frameColor);
+            Fill(new Rect(map.x, map.yMax - frame, map.width, frame), frameColor);
+            Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
+            Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
+
+            Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.66f);
+            float roadThickness = map.width * (10f / 192f);
+            for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
             {
+                float road = AndroidMinimapRoadCoordinates[i];
                 float x = map.x + Mathf.InverseLerp(-96f, 96f, road) * map.width;
                 float y = map.y + Mathf.InverseLerp(96f, -96f, road) * map.height;
-                Fill(new Rect(x - map.width * 0.018f, map.y, map.width * 0.036f, map.height), roadColor);
-                Fill(new Rect(map.x, y - map.height * 0.018f, map.width, map.height * 0.036f), roadColor);
+                Fill(new Rect(x - roadThickness * 0.5f, map.y, roadThickness, map.height), roadColor);
+                Fill(new Rect(map.x, y - roadThickness * 0.5f, map.width, roadThickness), roadColor);
             }
 
             for (int i = 0; i < AndroidMinimapBuildingPoints.Length; i++)
             {
+                // Repeat the deterministic footprint math from GameBootstrap so the
+                // drawn house rectangles match each real building's center and size.
+                float widthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 12.9898f));
+                float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
+                float footprint = Mathf.Lerp(7.2f, 10.2f, widthRoll);
+                float depth = Mathf.Lerp(6.8f, 9.8f, depthRoll);
+
+                if (i >= 22)
+                {
+                    footprint = Mathf.Lerp(6.5f, 8.2f, widthRoll);
+                    depth = Mathf.Lerp(6.0f, 7.8f, depthRoll);
+                }
+                else if (i >= 18 && i <= 21)
+                {
+                    footprint = Mathf.Lerp(7.5f, 9.8f, widthRoll);
+                    depth = Mathf.Lerp(6.8f, 9.2f, depthRoll);
+                }
+
+                if (i == 0 || i == 7 || i == 13)
+                    footprint = Mathf.Max(footprint, 10.2f);
+
+                if (i == 4 || i == 9 || i == 11 || i == 16)
+                {
+                    footprint = Mathf.Lerp(9.4f, 10.4f, widthRoll);
+                    depth = Mathf.Lerp(8.2f, 10.0f, depthRoll);
+                }
+
                 Vector2 building = WorldToMap(AndroidMinimapBuildingPoints[i], map);
-                float buildingWidth = map.width * (i >= 22 ? 0.055f : 0.065f);
-                float buildingHeight = map.height * (i >= 22 ? 0.045f : 0.055f);
-                Fill(new Rect(building.x - buildingWidth * 0.5f, building.y - buildingHeight * 0.5f,
-                    buildingWidth, buildingHeight), new Color(0.70f, 0.48f, 0.22f, 0.98f));
+                float buildingWidth = map.width * (footprint / 192f);
+                float buildingHeight = map.height * (depth / 192f);
+                // A dark outline separates every footprint from the green ground and
+                // gray streets; the inner sand color makes house locations legible
+                // on a transparent map without changing their real world coordinates.
+                float outline = Mathf.Max(1.5f, 2.0f * scale);
+                Rect houseRect = new Rect(
+                    building.x - buildingWidth * 0.5f,
+                    building.y - buildingHeight * 0.5f,
+                    buildingWidth,
+                    buildingHeight);
+                Fill(new Rect(houseRect.x - outline * 0.5f, houseRect.y - outline * 0.5f,
+                    houseRect.width + outline, houseRect.height + outline),
+                    new Color(0.12f, 0.075f, 0.035f, 0.98f));
+                Fill(houseRect, new Color(0.96f, 0.68f, 0.30f, 1f));
             }
 
             if (Time.unscaledTime >= nextMinimapRefresh)
@@ -335,6 +394,16 @@ namespace PersiaWar.Unity2D5D
                 DrawCircle(enemyPoint, 3.5f * scale, new Color(1f, 0.22f, 0.16f, 1f));
             }
 
+            if (ExtractionBeacon.IsActive)
+            {
+                Vector3 extractionWorld = ExtractionBeacon.WorldPosition;
+                Vector2 extractionPoint = WorldToMap(
+                    new Vector2(extractionWorld.x, extractionWorld.z),
+                    map);
+                DrawCircle(extractionPoint, 12f * scale, new Color(0.08f, 0.48f, 1f, 0.62f));
+                DrawCircle(extractionPoint, 5.5f * scale, new Color(0.58f, 0.90f, 1f, 1f));
+            }
+
             Vector2 playerPoint = new Vector2(map.center.x, map.center.y);
             if (player != null)
             {
@@ -353,6 +422,21 @@ namespace PersiaWar.Unity2D5D
             Fill(counters, new Color(0.03f, 0.06f, 0.08f, 0.86f));
             GUI.Label(new Rect(counters.x + 8f * scale, counters.y, counters.width - 16f * scale, counters.height),
                 "WAVE  " + wave + "     KILLS  " + score, smallStyle);
+
+            if (ExtractionBeacon.IsActive)
+            {
+                float objectiveWidth = 360f * scale;
+                Rect objective = new Rect(
+                    (Screen.width - objectiveWidth) * 0.5f,
+                    Screen.height - 43f * scale,
+                    objectiveWidth,
+                    30f * scale);
+                Fill(objective, new Color(0.02f, 0.20f, 0.48f, 0.92f));
+                GUI.Label(
+                    new Rect(objective.x + 8f * scale, objective.y, objective.width - 16f * scale, objective.height),
+                    "EXTRACTION ACTIVE  -  REACH THE BLUE BEAM",
+                    smallStyle);
+            }
         }
 
         private void DrawStatusBar(Rect rect, float ratio, Color fillColor)
@@ -403,6 +487,46 @@ namespace PersiaWar.Unity2D5D
             Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.84f));
             GUI.Label(new Rect(28f, 18f, Screen.width * 0.55f, 48f), "PERSIA WAR", titleStyle);
             GUI.Label(new Rect(30f, 62f, Screen.width * 0.60f, 30f), "CLASSIC BATTLE ROYALE  •  PROTOTYPE", smallStyle);
+        }
+
+        private void HandleHeroSelectTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                float gap = 14f;
+                float totalWidth = Mathf.Min(Screen.width - 44f, 980f);
+                float cardWidth = (totalWidth - gap * 4f) / 5f;
+                float startX = (Screen.width - totalWidth) * 0.5f;
+                float top = 230f;
+                float cardHeight = Mathf.Min(310f, Screen.height - 360f);
+
+                for (int hero = 0; hero < HeroNames.Length; hero++)
+                {
+                    Rect card = new Rect(startX + hero * (cardWidth + gap), top, cardWidth, cardHeight);
+                    if (!card.Contains(gui))
+                        continue;
+
+                    selectedHero = hero;
+                    StartupCheckpoint.Set("HeroSelectedByTouch");
+                    return;
+                }
+
+                Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
+                if (continueRect.Contains(gui))
+                {
+                    mode = ScreenMode.DropMap;
+                    StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                    return;
+                }
+            }
         }
 
         private void DrawHeroSelect()
@@ -563,6 +687,16 @@ namespace PersiaWar.Unity2D5D
             }
 
             screen.y = Screen.height - screen.y;
+
+            // Handle START MATCH through real touch coordinates as well as IMGUI.
+            // Some Android configurations do not synthesize MouseUp for GUI.Button.
+            Rect startRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+            if (spawnChosen && startRect.Contains(screen))
+            {
+                StartMatch();
+                return;
+            }
+
             float size = Mathf.Min(Screen.width - 70f, Screen.height - 330f);
             Rect mapRect = new Rect((Screen.width - size) * 0.5f, 220f, size, size);
             if (!mapRect.Contains(screen)) return;
@@ -815,7 +949,7 @@ namespace PersiaWar.Unity2D5D
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.08f, 0.09f, 0.10f, 1f);
+            camera.backgroundColor = new Color(0.15f, 0.16f, 0.17f, 1f);
             camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
@@ -831,15 +965,24 @@ namespace PersiaWar.Unity2D5D
                     Vector3.up);
             }
 
+            CameraOcclusionFader occlusionFader = cameraObject.AddComponent<CameraOcclusionFader>();
+            occlusionFader.SetTarget(target);
             camera.enabled = false;
             return camera;
         }
+
+        private CameraOcclusionFader cameraOcclusionFader;
 
         private void LateUpdate()
         {
 #if UNITY_ANDROID
             if (androidRuntimeCamera == null || player == null)
                 return;
+
+            if (cameraOcclusionFader == null)
+                cameraOcclusionFader = androidRuntimeCamera.GetComponent<CameraOcclusionFader>();
+            if (cameraOcclusionFader != null)
+                cameraOcclusionFader.SetTarget(player.transform);
 
             Quaternion orbit = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
             Vector3 desired = player.transform.position + orbit * Vector3.back * AndroidCameraDistance;
@@ -1000,7 +1143,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                enemySpawner.Configure(player.transform, 31, 84f, 0f);
+                enemySpawner.Configure(player.transform, 11, 84f, 0f);
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
@@ -1014,13 +1157,17 @@ namespace PersiaWar.Unity2D5D
 #else
             yield return null;
 
-            matchInputArmed = true;
+            // The desktop/editor branch uses the same explicit activation contract as
+            // Android. Enabling the MonoBehaviour alone leaves matchActive false, so
+            // MobileInputHub.Update would return before reading keyboard/mouse input.
             if (mobileInput != null)
             {
+                mobileInput.ActivateForMatch(player, activeCamera);
                 mobileInput.EnableMinimap();
                 mobileInput.enabled = true;
             }
 
+            matchInputArmed = true;
             if (player == null) yield break;
 
             if (enemySpawner == null)
@@ -1190,7 +1337,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
-                    ? "All five enemy waves defeated."
+                    ? "Extraction reached. Mission complete."
                     : "Your fighter was defeated.",
                 bodyStyle);
 

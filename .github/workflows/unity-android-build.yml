@@ -48,6 +48,10 @@ jobs:
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity.meta
           test -f UnityProject/Assets/Resources/PersiaWarLit.shader
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader.meta
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFade.shader
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFade.shader.meta
           test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
           test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
           test -f UnityProject/Assets/Scripts/Core/AndroidSafeRuntimeFactory.cs
@@ -104,7 +108,7 @@ jobs:
           android_path = world_method[android_start:android_end]
           assert 'AddComponent<Terrain3DBuilder>' not in android_path and 'terrain.Build()' not in android_path, 'Android first-match path still invokes Terrain3DBuilder.'
           assert 'GameObject.CreatePrimitive' not in android_path, 'Android first-match path still uses CreatePrimitive.'
-          assert 'CreateFlatMesh' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
+          assert 'BuildAndroidTerrain3D(groundMaterial)' in android_path and 'return;' in android_path, 'Android safe 3D battlefield path is incomplete.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           awake = weapon[weapon.index('private void Awake()'):weapon.index('private void EnsureProjectileTemplate()')]
@@ -113,6 +117,43 @@ jobs:
           visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
           presentation = visual[visual.index('private void EnsurePresentation()'):visual.index('private void LoadCharacterSprite()')]
           assert 'CreateMuzzleFlash()' not in presentation, 'Muzzle flash is still allocated during player presentation setup.'
+          flat_shader = Path('UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader').read_text(encoding='utf-8')
+          factory = Path('UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs').read_text(encoding='utf-8')
+          assert 'Shader "PersiaWar/AndroidFlat"' in flat_shader, 'Project-owned Android flat shader is missing.'
+          assert 'return tex2D(_MainTex, i.uv) * _Color;' in flat_shader, 'Android flat shader must tint textures without lighting.'
+          assert 'Resources.Load<Shader>("PersiaWarAndroidFlat")' in factory, 'Android does not prefer the bundled flat shader.'
+          assert factory.index('Resources.Load<Shader>("PersiaWarAndroidFlat")') < factory.index('Shader.Find("Unlit/Texture")'), 'Built-in lookup runs before the bundled Android shader.'
+          assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
+          assert 'DisableLegacyWorldBuilderPath();' in bootstrap, 'Android does not disable the retired gray-ground/dark-road generator.'
+          legacy_world = Path('UnityProject/Assets/Scripts/World/WorldBuilder.cs').read_text(encoding='utf-8')
+          assert 'new Color(0.12f, 0.46f, 0.08f)' in legacy_world and 'new Color(0.52f, 0.54f, 0.57f)' in legacy_world, 'Legacy fallback colors regress.'
+          assert 'RuntimeMaterialFactory.Create(' in legacy_world, 'Legacy fallback materials bypass the runtime shader path.'
+          fader = Path('UnityProject/Assets/Scripts/Core/CameraOcclusionFader.cs').read_text(encoding='utf-8')
+          flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+          assert 'Physics.SphereCastNonAlloc' in fader and 'Mathf.MoveTowards' in fader, 'Camera occlusion fade must detect blockers and transition smoothly.'
+          fade_shader = Path('UnityProject/Assets/Resources/PersiaWarAndroidFade.shader').read_text(encoding='utf-8')
+          assert 'Blend SrcAlpha OneMinusSrcAlpha' in fade_shader and 'ZWrite Off' in fade_shader, 'Fade shader must use genuine alpha blending.'
+          assert 'Resources.Load<Shader>("PersiaWarAndroidFade")' in fader and 'r.sharedMaterials = fades;' in fader, 'Occlusion fader must swap to the transparent shader.'
+          assert 'Physics.SphereCastNonAlloc' in fader and 'GetComponentsInChildren<Renderer>' in fader, 'Occlusion fader must resolve building collider to house renderers.'
+          assert 'androidCurrentBuildingRoot' in bootstrap and 'FlushAndroidBoxBatches();' in bootstrap, 'Android houses must be independently batchable for selective fading.'
+          box_factory_start = bootstrap.index('private GameObject CreateAndroidBox(')
+          box_factory_end = bootstrap.index('private GameObject CreateFlatMesh(', box_factory_start)
+          box_factory = bootstrap[box_factory_start:box_factory_end]
+          assert 'androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot' in box_factory, 'Pitched roofs and individual house details must remain children of their house for fading.'
+          assert 'cameraObject.AddComponent<CameraOcclusionFader>()' in flow, 'Gameplay camera does not enable occlusion fade.'
+          assert '148f * scale * 1.38f * 1.15f' in flow, 'Gameplay minimap is not enlarged by another 15 percent.'
+          assert '0.42f));' in flow and '0.66f);' in flow, 'Gameplay minimap transparency has regressed.'
+          weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
+          assert 'LightPistolRange = 7.5f' in weapon and 'AssaultRifleRange = 13.5f' in weapon and 'HeavyMachineGunRange = 21f' in weapon, 'Player weapon ranges are not halved.'
+          assert 'GetEffectiveRangeForKind(WeaponKind kind)' in weapon, 'Player/enemy shared weapon-kind range profile is missing.'
+          assert 'case WeaponKind.LightPistol: return LightPistolRange;' in weapon and 'case WeaponKind.HeavyMachineGun: return HeavyMachineGunRange;' in weapon and 'default: return AssaultRifleRange;' in weapon, 'Shared profile does not cover every weapon kind.'
+          enemy = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
+          assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range does not match the weapon it carries/drops.'
+          assert 'PlanLocalRoute(' in enemy and 'Physics.OverlapSphereNonAlloc' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy has no collider-aware route around walls.'
+          assert 'private readonly RaycastHit[] navigationRayHits' in enemy and 'navigationRayHits[i].collider' in enemy, 'SphereCastNonAlloc must use RaycastHit results, not Collider results.'
+          assert 'if (hit is MeshCollider)' in enemy, 'Enemy navigation must ignore the continuous ground mesh.'
+          print('Camera occlusion fade regression checks: PASS')
+          print('Android shader/legacy-ground regression checks: PASS')
           print('Android startup isolation checks: PASS')
           PY
           python3 - <<'PY'
@@ -152,27 +193,32 @@ jobs:
           android_hud_activation = flow[android_pass_start:android_pass_end]
           assert 'combatHud.enabled = false;' in android_hud_activation, 'Overlapping secondary HUD must remain disabled on Android.'
           spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
-          assert 'maxPerWave = Mathf.Max(maxPerWave, 31);' in spawner, 'Android lobby can still be capped below 32 total combatants.'
+          assert 'maxPerWave = Mathf.Clamp(maxPerWave, 1, 12);' in spawner, 'Android enemy wave cap must stay at or below 12.'
           assert 'Random.Range(-82f, 82f)' in spawner and 'Random.Range(-82f, 82f)' in spawner, 'Android opponents are not selected across the full map.'
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
 
-          assert 'enemySpawner.Configure(player.transform, 31, 84f, 0f);' in flow, 'Android match does not request all 31 opponents at start.'
-          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.15f, 112f, 218f);' in active_hud, 'Android minimap is not enlarged by 15%.'
+          assert 'enemySpawner.Configure(player.transform, 11, 84f, 0f);' in flow, 'Android match must start with the reduced 11-opponent lobby.'
+          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in active_hud, 'Active Android minimap must be enlarged by a further 20 percent.'
           assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
-          assert 'AndroidMinimapBuildingPoints' in active_hud and 'for (int road = -72; road <= 72; road += 24)' in active_hud, 'Minimap city roads/buildings are incomplete.'
+          assert 'AndroidMinimapBuildingPoints' in active_hud and 'AndroidMinimapRoadCoordinates' in active_hud, 'Minimap city roads/buildings are incomplete.'
+          assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
+          assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f))' in active_hud, 'Active Android minimap must remain more transparent while retaining its green tint.'
+          assert 'new Color(0.96f, 0.68f, 0.30f, 1f)' in active_hud and 'new Color(0.12f, 0.075f, 0.035f, 0.98f)' in active_hud, 'Minimap houses need high-contrast fill and outline.'
+          assert 'new Color(0.12f, 0.46f, 0.08f)' in bootstrap, 'Android grass must remain green.'
+          assert 'new Color(0.52f, 0.54f, 0.57f)' in bootstrap, 'Android asphalt must remain light gray.'
 
           enemy_ai = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'EnemyRifleVisual' in enemy_ai and 'RifleBarrel' in enemy_ai, 'Enemy characters do not have visible rifle geometry.'
           assert 'visual.WeaponMount' in enemy_ai and 'weaponVisualRoot.SetParent(mount, false);' in enemy_ai, 'Enemy rifle is not attached to the visible character hand/body mount.'
           visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
           assert 'public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;' in visual, 'Mobile weapon mount is missing.'
-          assert 'shot.Configure(shotDirection, rangedDamage, transform);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system.'
+          assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system with an effective range.'
           assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           assert 'enum WeaponKind' in weapon and 'public void CycleWeapon()' in weapon, 'Weapon profiles cannot be cycled at runtime.'
           assert 'public float EffectiveRange => Mathf.Max(1f, weaponRange);' in weapon, 'Weapon range is not exposed to aiming and HUD.'
-          assert 'weaponRange = 15f;' in weapon and 'weaponRange = 27f;' in weapon and 'weaponRange = 42f;' in weapon, 'Weapon profiles do not have distinct light/rifle/heavy ranges.'
+          assert 'LightPistolRange = 7.5f' in weapon and 'AssaultRifleRange = 13.5f' in weapon and 'HeavyMachineGunRange = 21f' in weapon, 'Weapon profiles must have distinct halved light/rifle/heavy ranges.'
           assert 'PistolSlide' in weapon and 'PistolGrip' in weapon, 'The light pistol still uses only a scaled rifle silhouette.'
           assert 'SetWeaponPart("PistolSlide", pistol' in weapon and 'SetWeaponPart("Stock", !pistol' in weapon, 'Weapon profiles do not swap actual visible parts.'
           assert 'heavy ? new Vector3(0.26f, 0.20f, 0.64f)' in weapon and 'heavy ? new Vector3(0.16f, 0.34f, 0.21f)' in weapon, 'Heavy weapon receiver/magazine are not visually distinct.'
@@ -186,6 +232,31 @@ jobs:
           assert 'Mathf.Min(range, weapon.EffectiveRange)' in aim, 'Auto-targeting can select opponents beyond the current weapon range.'
 
           input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
+          assert 'Input.multiTouchEnabled = true;' in input_hub, 'Android must use multi-touch.'
+          assert 'Input.simulateMouseWithTouches = false;' not in input_hub, 'Keep touch-to-mouse simulation enabled for IMGUI controls; suppress it only inside the custom mobile pointer dispatcher.'
+          gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
+          gui_fallback_end = input_hub.index('private void CreateGuiTextures()', gui_fallback_start)
+          gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
+          assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
+          assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
+          assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android IMGUI menu and pause controls must receive synthesized touch events.'
+          assert 'guiFallbackOwnsPointer' in gui_fallback and 'Input.touchCount > 0' in gui_fallback, 'Android IMGUI fallback must defer to live finger IDs but recover if legacy touch entries are missing.'
+          assert 'float fireHit = radius * 1.02f;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile firing touch-zone must tolerate screen differences without stealing other action buttons.'
+          assert 'Screen.width - 352f * scale' in input_hub and 'Screen.height - bottom - 236f * scale' in input_hub and 'Screen.height - bottom - 300f * scale' in input_hub, 'Mobile action-button hit-zones must be separated so fire cannot register as reload/grenade/melee.'
+          assert 'private int guiMoveMouseButton = -1;' in input_hub and 'private int guiFireMouseButton = -1;' in input_hub, 'Fallback touchscreen contacts need independent movement and fire button ownership.'
+          fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
+          fallback_end = input_hub.index('private void CreateGuiTextures()', fallback_start)
+          fallback = input_hub[fallback_start:fallback_end]
+          assert 'if (Application.isMobilePlatform)\n                return;' not in fallback, 'Android IMGUI fallback must not be unconditionally disabled.'
+          assert 'private void HandleHeroSelectTouches()' in flow and 'HeroSelectionContinuedByTouch' in flow, 'Android hero selection must support direct touches.'
+          assert 'startRect.Contains(screen)' in flow, 'Android Start Match must support direct touches.'
+          assert 'guiMoveMouseButton == e.button' in gui_fallback and 'guiFireMouseButton == e.button' in gui_fallback, 'Drag events must only control the finger/button that originally claimed the input.'
+          assert 'movePointerId == -1 &&' in gui_fallback and 'guiMoveMouseButton == -1' in gui_fallback, 'A second touch must not overwrite an already-held fallback movement pointer.'
+          assert 'if (handled)' in gui_fallback and 'e.Use();' in gui_fallback, 'Only owned MouseUp events may be consumed; unrelated UI releases must pass through.'
+          touch_start = input_hub.index('private void HandleAndroidTouches()')
+          touch_end = input_hub.index('private Vector2 ApplyDeadZone(', touch_start)
+          touch_handler = input_hub[touch_start:touch_end]
+          assert 'movePointerId' in touch_handler and 'firePointerId' in touch_handler and 'TryGetTouch(movePointerId' in touch_handler and 'TryGetTouch(firePointerId' in touch_handler, 'Movement and fire must retain separate finger IDs.'
           assert 'DrawAimGuide(' not in input_hub and 'lineTexture' not in input_hub, 'Yellow target line is still drawn by mobile input HUD.'
           assert 'reloadHeldToSwap' in input_hub and 'player.Weapon?.CycleWeapon()' in input_hub, 'Mobile users have no weapon-change gesture.'
           assert 'HOLD SWAP' in input_hub, 'Reload-button hold-to-swap gesture is not labelled.'
@@ -193,6 +264,60 @@ jobs:
           PY
 
           echo 'Unity project structure/settings validation passed.'
+
+      - name: Validate requested enemy weapons, pickups, and city clearances
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('UnityProject/Assets/Scripts')
+          enemy = (root / 'Enemy/EnemyChase.cs').read_text(encoding='utf-8')
+          projectile = (root / 'Combat/EnemyProjectile.cs').read_text(encoding='utf-8')
+          health = (root / 'Combat/TargetHealth.cs').read_text(encoding='utf-8')
+          spawner = (root / 'World/EnemySpawner.cs').read_text(encoding='utf-8')
+          pickup = (root / 'Combat/PickupItem.cs').read_text(encoding='utf-8')
+          world = (root / 'Core/GameBootstrap.cs').read_text(encoding='utf-8')
+          health_bar = (root / 'UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
+          flow = (root / 'Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+
+          assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range must match player range by weapon kind.'
+          assert 'PlanLocalRoute(' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy pursuit must route around blocking colliders.'
+          assert 'PistolSlide' in enemy and 'MachineGunReceiver' in enemy and 'AKMagazine' in enemy, 'Enemy weapon silhouettes must be distinct.'
+          assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy, 'Enemy firing does not pass its effective range to the projectile.'
+          assert 'Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)' in projectile, 'Enemy projectile has no explicit distance cap.'
+          assert 'lifetime = Mathf.Max(0.05f, Mathf.Max(1f, maxRange) / Mathf.Max(1f, speed));' in projectile, 'Enemy projectile lifetime is not tied to weapon range.'
+          assert 'SpawnDroppedWeapon(enemy);' in health and 'pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);' in health, 'Enemy death does not drop the matching weapon.'
+          extraction = (root / 'Core/ExtractionBeacon.cs').read_text(encoding='utf-8')
+          assert 'ExtractionBeacon.NotifyEnemyDefeated(enemy);' not in health, 'Enemy death must not create a permanent premature extraction controller.'
+          assert 'ExtractionBeacon.ActivateForVictory(activePlayer)' in spawner, 'Final-wave clear must activate extraction instead of ending the match.'
+          assert 'FindClearGroundNearPlayer(player)' in extraction and 'BlueExtractionBeamOuter' in extraction and 'BlueExtractionBeamCore' in extraction, 'Final-wave extraction beam is missing or has no nearby ground placement.'
+          assert 'Resources.Load<Shader>("PersiaWarAndroidFade")' in extraction, 'Extraction beam must use the project-owned transparent Android shader.'
+          assert 'GameSession.Instance.EndMission(true)' in extraction, 'Entering the extraction beam does not end the mission as a win.'
+          assert 'ExtractionBeacon.IsActive' in flow and 'ExtractionBeacon.WorldPosition' in flow, 'Extraction objective is not visible on the active Android minimap/HUD.'
+          assert 'GameSession.Instance?.EndMission(true)' not in spawner, 'Enemy spawner must not finish the mission before extraction.'
+          assert 'Weapon' in pickup and 'player.Weapon.EquipWeaponFromPickup(weaponKind, amount);' in pickup, 'Dropped weapon cannot be picked up and equipped as the active weapon.'
+          weapon_controller = (root / 'Combat/WeaponController.cs').read_text(encoding='utf-8')
+          assert 'public void EquipWeaponFromPickup(WeaponKind selectedWeapon, int reserveAmmo)' in weapon_controller, 'Weapon pickup does not use the explicit equip path.'
+          assert 'ApplyWeaponProfile(true);' in weapon_controller and 'projectileLifetime = weaponRange / Mathf.Max(1f, projectileSpeed);' in weapon_controller, 'Equipping a weapon does not refresh its projectile range/lifetime profile.'
+          assert 'distance > EffectiveRange' in weapon_controller, 'Player firing can exceed the active weapon profile range.'
+          assert 'LightPistolRange = 7.5f' in weapon_controller and 'AssaultRifleRange = 13.5f' in weapon_controller and 'HeavyMachineGunRange = 21f' in weapon_controller, 'Picked pistol/rifle/heavy weapons do not have distinct halved effective ranges.'
+          assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to gray.'
+          assert 'AndroidContinuousGroundFoundation' in world, 'Continuous ground foundation is missing.'
+          assert 'AddClearAndroidAlleySegments' in world and 'androidBuildingHalfExtents' in world, 'Alley strips are not clipped around building footprints.'
+          assert 'new Vector3(-79f, 0f, 89f)' in world, 'Outer houses overlap the outermost street.'
+          assert 'bool isPitchedRoof = !isWarehouse && (i % 3 != 0 || i == 0);' in world, 'Most houses should have pitched roofs.'
+          assert 'cameraDistance > Mathf.Max(1f, maxVisibleDistance)' in health_bar and 'Physics.Raycast(' in health_bar, 'Enemy health bars must obey distance and occlusion.'
+          flow = (root / 'Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+          assert not (root / 'UI/AndroidMinimapOverlay.cs').exists(), 'The duplicate minimap camera must stay removed; PrototypeFlow owns the active Android minimap.'
+          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in flow, 'Active Android minimap size has regressed.'
+          assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));' in flow, 'Active Android minimap transparency has regressed.'
+          assert 'AndroidMinimapRoadCoordinates' in flow and 'AndroidMinimapBuildingPoints' in flow, 'Active Android minimap must follow the built city layout.'
+          assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to very light gray.'
+          print('Minimap transparency/size/world-layer and bright-road regression checks: PASS')
+          print('Requested gameplay/terrain regression checks: PASS')
+          PY
 
       - name: Report Unity version
         shell: bash
@@ -259,10 +384,20 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         timeout-minutes: 60
         run: |
           set -euo pipefail
           IMAGE="unityci/editor:2022.3.62f1-android-3"
+
+          # The shared runner may hit Docker Hub's anonymous pull limit.
+          # Authenticate when repository-level Docker Hub secrets are configured.
+          if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_TOKEN:-}" ]]; then
+            printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+          else
+            echo "::warning::Docker Hub secrets are not configured; attempting the public image pull unauthenticated."
+          fi
 
           mkdir -p .ci
           cleanup() {

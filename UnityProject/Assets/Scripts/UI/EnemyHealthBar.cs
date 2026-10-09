@@ -8,6 +8,7 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public sealed class EnemyHealthBar : MonoBehaviour
     {
+        [SerializeField] private float maxVisibleDistance = 26f;
         private TargetHealth health;
         private GUIStyle labelStyle;
         private static Camera sharedWorldCamera;
@@ -76,6 +77,26 @@ namespace PersiaWar.Unity2D5D
             // The enemy root is grounded at y=1. This offset places the label near
             // the top of the character rather than floating a long way above it.
             Vector3 worldPoint = transform.position + Vector3.up * 2.0f;
+            Vector3 cameraToEnemy = worldPoint - worldCamera.transform.position;
+            float cameraDistance = cameraToEnemy.magnitude;
+            if (cameraDistance > Mathf.Max(1f, maxVisibleDistance))
+                return;
+
+            // Screen-space bars must still respect scene visibility. Hide the bar if
+            // a wall, building, tree, or other collider is between camera and enemy.
+            if (cameraDistance > 0.01f && Physics.Raycast(
+                worldCamera.transform.position,
+                cameraToEnemy / cameraDistance,
+                out RaycastHit obstruction,
+                cameraDistance,
+                ~0,
+                QueryTriggerInteraction.Ignore))
+            {
+                Transform hitTransform = obstruction.collider != null ? obstruction.collider.transform : null;
+                if (hitTransform != transform && (hitTransform == null || !hitTransform.IsChildOf(transform)))
+                    return;
+            }
+
             Vector3 screenPoint = worldCamera.WorldToScreenPoint(worldPoint);
             if (screenPoint.z <= 0f ||
                 screenPoint.x < 0f || screenPoint.x > Screen.width ||

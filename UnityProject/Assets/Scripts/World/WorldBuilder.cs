@@ -28,7 +28,7 @@ namespace PersiaWar.Unity2D5D
             ground.name = "World_Ground";
             ground.transform.position = Vector3.zero;
             ground.transform.localScale = Vector3.one * (worldSize / 10f);
-            ApplyMaterial(ground, groundMaterial, new Color(0.32f, 0.34f, 0.28f));
+            ApplyMaterial(ground, groundMaterial, new Color(0.12f, 0.46f, 0.08f));
         }
 
         private void BuildRoads()
@@ -78,7 +78,7 @@ namespace PersiaWar.Unity2D5D
             road.name = name;
             road.transform.position = position;
             road.transform.localScale = scale;
-            ApplyMaterial(road, roadMaterial, new Color(0.12f, 0.12f, 0.11f));
+            ApplyMaterial(road, roadMaterial, new Color(0.52f, 0.54f, 0.57f));
         }
 
         private static void ApplyMaterial(GameObject obj, Material source, Color fallback)
@@ -92,16 +92,8 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            Shader shader = Shader.Find("Standard");
-            if (shader != null)
-            {
-                Material material = new Material(shader)
-                {
-                    color = fallback,
-                    enableInstancing = true
-                };
-                renderer.sharedMaterial = material;
-            }
+            renderer.sharedMaterial = RuntimeMaterialFactory.Create(
+                "WorldBuilderFallback_" + obj.name, fallback);
         }
     }
 }

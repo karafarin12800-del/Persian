@@ -27,7 +27,9 @@ namespace PersiaWar.Unity2D5D
         private float reloadPressedAt;
         private bool reloadHeldToSwap;
 
+        // Keep actual finger origin separate from the clamped visual joystick origin.
         private Vector2 moveStartScreen;
+        private Vector2 moveTouchOriginScreen;
         private Vector2 moveValue;
 
         private float nextFireTime;
@@ -45,6 +47,14 @@ namespace PersiaWar.Unity2D5D
         private bool matchPaused;
         private bool movementTouchCheckpointWritten;
         private bool fireTouchCheckpointWritten;
+
+        // IMGUI fallback maps concurrent touchscreen contacts to mouse buttons.
+        // Keep a distinct owner per simulated button so movement cannot consume fire.
+        private int guiMoveMouseButton = -1;
+        private int guiFireMouseButton = -1;
+        private int guiMeleeMouseButton = -1;
+        private int guiGrenadeMouseButton = -1;
+        private int guiReloadMouseButton = -1;
 
         public Vector2 MoveValue => moveValue;
         public bool IsMovementTouchActive => movePointerId >= 0;
@@ -75,15 +85,19 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Keep real Android multi-touch as the sole touch source. The legacy
-            // mouse simulation only represents one pointer and can cancel/steal
-            // the movement finger when a second finger presses FIRE.
+            Input.simulateMouseWithTouches = true;
+            // Keep synthesized mouse events available for IMGUI menu/pause controls.
+            // During gameplay the fallback dispatcher defers to real touch IDs.
 #endif
             enabled = true;
         }
 
         public void DeactivateMatch()
         {
+#if UNITY_ANDROID
+            // Re-enable touch-to-mouse synthesis for menu/pause IMGUI after gameplay.
+            Input.simulateMouseWithTouches = true;
+#endif
             matchActive = false;
             matchPaused = false;
             ResetAllPointers();
@@ -109,10 +123,16 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+#if UNITY_ANDROID
+            // Keep IMGUI menu/pause controls clickable from the very first frame.
+            // Gameplay prefers real finger IDs and guards its fallback dispatcher.
+            Input.multiTouchEnabled = true;
+            Input.simulateMouseWithTouches = true;
+#endif
             if (moveRadius > 0f)
                 joystickRadius = Mathf.Clamp(moveRadius * 0.98f, 108f, 164f);
 
-if (player == null)
+            if (player == null)
                 player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null)
                 gameplayCamera = Camera.main;
@@ -136,9 +156,33 @@ if (player == null)
 
         }
 
+        // Release every captured finger when the component is disabled. Without this,
+        // PlayerController keeps the last non-zero movement vector and can continue moving
+        // while the input owner is inactive.
+        private void OnDisable()
+        {
+            ResetAllPointers();
+#if UNITY_ANDROID
+            // Keep menu/pause IMGUI buttons usable after gameplay input is disabled.
+            Input.simulateMouseWithTouches = true;
+#endif
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused)
+                ResetAllPointers();
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            if (!hasFocus)
+                ResetAllPointers();
+        }
+
         private void Update()
         {
-if (!matchActive || matchPaused)
+            if (!matchActive || matchPaused)
                 return;
 
             if (player == null)
@@ -197,7 +241,7 @@ if (!matchActive || matchPaused)
                 out Vector2 grenadeGui,
                 out Vector2 reloadGui);
 
-            float fireHit = radius * 0.86f;
+            float fireHit = radius * 1.02f;
             float meleeHit = radius * 0.76f;
             float grenadeHit = radius * 0.76f;
             float reloadHit = radius * 0.72f;
@@ -212,10 +256,46 @@ if (!matchActive || matchPaused)
                     touch.position.x,
                     Screen.height - touch.position.y);
 
-                // Combat buttons get first priority so an oversized touch zone can
-                // never accidentally become a movement touch.
-                if (firePointerId < 0 &&
-                    Vector2.Distance(gui, fireGui) <= fireHit)
+                if (meleePointerId == -1 &&
+                    Vector2.Distance(gui, meleeGui) <= meleeHit)
+                {
+                    meleePointerId = touch.fingerId;
+                    player.Weapon?.TryMelee();
+                    continue;
+                }
+
+                if (grenadePointerId == -1 &&
+                    Vector2.Distance(gui, grenadeGui) <= grenadeHit)
+                {
+                    grenadePointerId = touch.fingerId;
+                    ThrowGrenadeAtTarget();
+                    continue;
+                }
+
+                if (reloadPointerId == -1 &&
+                    Vector2.Distance(gui, reloadGui) <= reloadHit)
+                {
+                    // Tap to reload; hold for 0.55 seconds to cycle weapon profile.
+                    reloadPointerId = touch.fingerId;
+                    reloadPressedAt = Time.time;
+                    reloadHeldToSwap = false;
+                    continue;
+                }
+
+                // Capture firing after melee/grenade/reload so the widened area
+                // cannot steal those controls. The lower-right backup region tolerates
+                // screen-density and safe-area differences on Android.
+                bool insideOtherActionZone =
+                    Vector2.Distance(gui, meleeGui) <= meleeHit ||
+                    Vector2.Distance(gui, grenadeGui) <= grenadeHit ||
+                    Vector2.Distance(gui, reloadGui) <= reloadHit;
+                bool broadFireZone =
+                    gui.x >= Screen.width * 0.70f &&
+                    gui.y >= Screen.height * 0.48f;
+
+                if (firePointerId == -1 &&
+                    !insideOtherActionZone &&
+                    (Vector2.Distance(gui, fireGui) <= fireHit || broadFireZone))
                 {
                     firePointerId = touch.fingerId;
                     if (!fireTouchCheckpointWritten)
@@ -227,40 +307,15 @@ if (!matchActive || matchPaused)
                     continue;
                 }
 
-                if (meleePointerId < 0 &&
-                    Vector2.Distance(gui, meleeGui) <= meleeHit)
-                {
-                    meleePointerId = touch.fingerId;
-                    player.Weapon?.TryMelee();
-                    continue;
-                }
-
-                if (grenadePointerId < 0 &&
-                    Vector2.Distance(gui, grenadeGui) <= grenadeHit)
-                {
-                    grenadePointerId = touch.fingerId;
-                    ThrowGrenadeAtTarget();
-                    continue;
-                }
-
-                if (reloadPointerId < 0 &&
-                    Vector2.Distance(gui, reloadGui) <= reloadHit)
-                {
-                    // Tap to reload; hold for 0.55 seconds to cycle weapon profile.
-                    reloadPointerId = touch.fingerId;
-                    reloadPressedAt = Time.time;
-                    reloadHeldToSwap = false;
-                    continue;
-                }
-
                 // Everything else on the left side becomes the floating movement
                 // stick. The origin follows the player's first touch.
                 if (touch.position.x <= Screen.width * 0.58f &&
                     gui.y >= Screen.height * 0.10f)
                 {
-                    if (movePointerId < 0)
+                    if (movePointerId == -1)
                     {
                         movePointerId = touch.fingerId;
+                        moveTouchOriginScreen = touch.position;
                         moveStartScreen = ClampFloatingOrigin(touch.position, radius);
                         moveValue = Vector2.zero;
                         if (!movementTouchCheckpointWritten)
@@ -276,7 +331,7 @@ if (!matchActive || matchPaused)
             {
                 if (TryGetTouch(movePointerId, out Touch movementTouch))
                 {
-                    Vector2 delta = movementTouch.position - moveStartScreen;
+                    Vector2 delta = movementTouch.position - moveTouchOriginScreen;
                     float touchRadius = Mathf.Max(1f, radius);
                     moveValue = Vector2.ClampMagnitude(delta / touchRadius, 1f);
 
@@ -294,8 +349,9 @@ if (!matchActive || matchPaused)
                     ResetMovementPointer();
                 }
             }
-            else
+            else if (movePointerId != -1000)
             {
+                // Do not erase movement supplied by the IMGUI fallback pointer.
                 player.SetMoveInput(Vector2.zero);
             }
 
@@ -408,9 +464,17 @@ if (!matchActive || matchPaused)
                 ? player.Aim.CurrentTarget
                 : null;
 
-            bool fired = target != null
-                ? player.Weapon.TryFire(target.transform.position)
-                : player.Weapon.TryFireDirection(player.transform.forward);
+            // A target can be selected before it is inside the equipped weapon's
+            // effective range. TryFire(targetPosition) correctly rejects that shot,
+            // but the old dispatcher then did nothing at all while a distant target
+            // remained selected. Fall back to firing forward whenever target fire
+            // cannot produce a projectile, so holding FIRE always has a visible action.
+            bool fired = false;
+            if (target != null)
+                fired = player.Weapon.TryFire(target.transform.position);
+
+            if (!fired && player.Weapon.Magazine > 0)
+                fired = player.Weapon.TryFireDirection(player.transform.forward);
 
             if (fired)
             {
@@ -468,17 +532,20 @@ if (!matchActive || matchPaused)
                 Screen.width - 104f * scale,
                 Screen.height - bottom - 58f * scale);
 
+            // Keep every button's visual disk and touch hit-zone separate at
+            // the smallest and largest supported UI scales. Overlapping fire/reload
+            // zones previously made taps on the fire button reload instead.
             melee = new Vector2(
-                Screen.width - 342f * scale,
+                Screen.width - 352f * scale,
                 Screen.height - bottom - 18f * scale);
 
             grenade = new Vector2(
-                Screen.width - 342f * scale,
-                Screen.height - bottom - 182f * scale);
+                Screen.width - 352f * scale,
+                Screen.height - bottom - 236f * scale);
 
             reload = new Vector2(
                 Screen.width - 104f * scale,
-                Screen.height - bottom - 210f * scale);
+                Screen.height - bottom - 300f * scale);
         }
 
         private float GetUiScale()
@@ -507,7 +574,9 @@ if (!matchActive || matchPaused)
         private void ResetMovementPointer()
         {
             movePointerId = -1;
+            guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
+            moveTouchOriginScreen = Vector2.zero;
             moveValue = Vector2.zero;
 
             if (player != null)
@@ -521,9 +590,15 @@ if (!matchActive || matchPaused)
             meleePointerId = -1;
             grenadePointerId = -1;
             reloadPointerId = -1;
+            guiMoveMouseButton = -1;
+            guiFireMouseButton = -1;
+            guiMeleeMouseButton = -1;
+            guiGrenadeMouseButton = -1;
+            guiReloadMouseButton = -1;
             reloadPressedAt = 0f;
             reloadHeldToSwap = false;
             moveStartScreen = Vector2.zero;
+            moveTouchOriginScreen = Vector2.zero;
             moveValue = Vector2.zero;
 
             if (player != null)
@@ -834,9 +909,30 @@ if (!matchActive || matchPaused)
 
         private void HandleGuiPointerFallback()
         {
+            // Prefer independent Touch.fingerId pointers whenever Unity exposes
+            // live contacts. If the legacy touch list is empty on a device, allow
+            // synthesized IMGUI mouse events to recover the control instead of
+            // returning early for every mobile platform.
             Event e = Event.current;
             if (e == null)
                 return;
+
+            // Use the real Touch.fingerId path whenever Unity exposes live touches.
+            // If we already own an IMGUI fallback pointer, keep the fallback active
+            // until that simulated contact has been released.
+            bool guiFallbackOwnsPointer =
+                movePointerId == -1000 ||
+                firePointerId == -1001 ||
+                meleePointerId == -1002 ||
+                grenadePointerId == -1003 ||
+                reloadPointerId == -1004;
+
+            if (Application.isMobilePlatform &&
+                Input.touchCount > 0 &&
+                !guiFallbackOwnsPointer)
+            {
+                return;
+            }
 
             if (e.type != EventType.MouseDown &&
                 e.type != EventType.MouseDrag &&
@@ -858,106 +954,182 @@ if (!matchActive || matchPaused)
 
             if (e.type == EventType.MouseDown)
             {
-                if (firePointerId < 0 && Vector2.Distance(gui, firePos) <= radius * 0.86f)
+                int mouseButton = e.button;
+                if (mouseButton < 0 || mouseButton > 2)
+                    return;
+
+                // A control is free only when its logical pointer AND simulated
+                // mouse-button owner are free. Negative pointer sentinels are active.
+                if (firePointerId == -1 &&
+                    guiFireMouseButton == -1 &&
+                    Vector2.Distance(gui, firePos) <= radius * 0.86f)
                 {
                     firePointerId = -1001;
+                    guiFireMouseButton = mouseButton;
                     FireAtNearestTarget();
                     e.Use();
                     return;
                 }
 
-                if (meleePointerId < 0 && Vector2.Distance(gui, meleePos) <= radius * 0.76f)
+                if (meleePointerId == -1 &&
+                    guiMeleeMouseButton == -1 &&
+                    Vector2.Distance(gui, meleePos) <= radius * 0.76f)
                 {
                     meleePointerId = -1002;
+                    guiMeleeMouseButton = mouseButton;
                     player.Weapon?.TryMelee();
                     e.Use();
                     return;
                 }
 
-                if (grenadePointerId < 0 && Vector2.Distance(gui, grenadePos) <= radius * 0.76f)
+                if (grenadePointerId == -1 &&
+                    guiGrenadeMouseButton == -1 &&
+                    Vector2.Distance(gui, grenadePos) <= radius * 0.76f)
                 {
                     grenadePointerId = -1003;
+                    guiGrenadeMouseButton = mouseButton;
                     ThrowGrenadeAtTarget();
                     e.Use();
                     return;
                 }
 
-                if (reloadPointerId < 0 && Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
+                if (reloadPointerId == -1 &&
+                    guiReloadMouseButton == -1 &&
+                    Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
                 {
                     reloadPointerId = -1004;
+                    guiReloadMouseButton = mouseButton;
                     reloadPressedAt = Time.time;
                     reloadHeldToSwap = false;
                     e.Use();
                     return;
                 }
 
-                if (gui.x <= Screen.width * 0.58f &&
-                    gui.y >= Screen.height * 0.10f &&
-                    movePointerId < 0)
+                if (movePointerId == -1 &&
+                    guiMoveMouseButton == -1 &&
+                    gui.x <= Screen.width * 0.58f &&
+                    gui.y >= Screen.height * 0.10f)
                 {
                     movePointerId = -1000;
-                    moveStartScreen = ClampFloatingOrigin(
-                        new Vector2(gui.x, Screen.height - gui.y),
-                        radius);
+                    guiMoveMouseButton = mouseButton;
+                    moveTouchOriginScreen = new Vector2(gui.x, Screen.height - gui.y);
+                    moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
                     moveValue = Vector2.zero;
                     e.Use();
                     return;
                 }
-            }
 
-            if (e.type == EventType.MouseDrag && movePointerId == -1000)
-            {
-                Vector2 current = new Vector2(
-                    gui.x,
-                    Screen.height - gui.y);
-                Vector2 delta = current - moveStartScreen;
-                moveValue = Vector2.ClampMagnitude(delta / Mathf.Max(1f, radius), 1f);
-                player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
-                e.Use();
+                // This touch did not start a gameplay control. Let other IMGUI
+                // controls (notably pause/menu) process it normally.
                 return;
             }
 
-            if (e.type == EventType.MouseDrag && firePointerId == -1001)
+            if (e.type == EventType.MouseDrag)
             {
-                if (Time.time >= nextFireTime)
-                    FireAtNearestTarget();
-                e.Use();
-                return;
-            }
-
-            if (e.type == EventType.MouseDrag && reloadPointerId == -1004)
-            {
-                if (!reloadHeldToSwap && Time.time - reloadPressedAt >= 0.55f)
+                // Never route every drag to movement. Each simulated finger keeps
+                // the mouse button captured when that finger first touched down.
+                if (movePointerId == -1000 &&
+                    guiMoveMouseButton == e.button)
                 {
-                    player.Weapon?.CycleWeapon();
-                    reloadHeldToSwap = true;
+                    Vector2 current = new Vector2(
+                        gui.x,
+                        Screen.height - gui.y);
+                    Vector2 delta = current - moveTouchOriginScreen;
+                    moveValue = Vector2.ClampMagnitude(
+                        delta / Mathf.Max(1f, radius),
+                        1f);
+                    player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                    e.Use();
+                    return;
                 }
-                e.Use();
+
+                if (firePointerId == -1001 &&
+                    guiFireMouseButton == e.button)
+                {
+                    if (Time.time >= nextFireTime)
+                        FireAtNearestTarget();
+                    e.Use();
+                    return;
+                }
+
+                if (reloadPointerId == -1004 &&
+                    guiReloadMouseButton == e.button)
+                {
+                    if (!reloadHeldToSwap &&
+                        Time.time - reloadPressedAt >= 0.55f)
+                    {
+                        player.Weapon?.CycleWeapon();
+                        reloadHeldToSwap = true;
+                    }
+
+                    e.Use();
+                    return;
+                }
+
                 return;
             }
 
             if (e.type == EventType.MouseUp)
             {
-                if (movePointerId == -1000)
-                    ResetMovementPointer();
-                if (firePointerId == -1001)
-                    firePointerId = -1;
-                if (meleePointerId == -1002)
-                    meleePointerId = -1;
-                if (grenadePointerId == -1003)
-                    grenadePointerId = -1;
-                if (reloadPointerId == -1004)
+                bool handled = false;
+
+                // Release only the control owned by this simulated finger/button.
+                // A fire finger going up must not stop movement (and vice versa).
+                if (movePointerId == -1000 &&
+                    guiMoveMouseButton == e.button)
                 {
-                    if (!reloadHeldToSwap && Time.time - reloadPressedAt >= 0.55f)
+                    ResetMovementPointer();
+                    handled = true;
+                }
+
+                if (firePointerId == -1001 &&
+                    guiFireMouseButton == e.button)
+                {
+                    firePointerId = -1;
+                    guiFireMouseButton = -1;
+                    handled = true;
+                }
+
+                if (meleePointerId == -1002 &&
+                    guiMeleeMouseButton == e.button)
+                {
+                    meleePointerId = -1;
+                    guiMeleeMouseButton = -1;
+                    handled = true;
+                }
+
+                if (grenadePointerId == -1003 &&
+                    guiGrenadeMouseButton == e.button)
+                {
+                    grenadePointerId = -1;
+                    guiGrenadeMouseButton = -1;
+                    handled = true;
+                }
+
+                if (reloadPointerId == -1004 &&
+                    guiReloadMouseButton == e.button)
+                {
+                    if (!reloadHeldToSwap &&
+                        Time.time - reloadPressedAt >= 0.55f)
+                    {
                         player.Weapon?.CycleWeapon();
+                    }
                     else if (!reloadHeldToSwap)
+                    {
                         player.Weapon?.Reload();
+                    }
 
                     reloadPointerId = -1;
+                    guiReloadMouseButton = -1;
                     reloadHeldToSwap = false;
                     reloadPressedAt = 0f;
+                    handled = true;
                 }
-                e.Use();
+
+                // Unowned MouseUp events must remain available to other IMGUI
+                // controls instead of being swallowed by the gameplay fallback.
+                if (handled)
+                    e.Use();
             }
         }
 

@@ -29,6 +29,8 @@ namespace PersiaWar.Unity2D5D
                 color = color,
                 enableInstancing = true
             };
+            ApplyTintToSupportedColorProperties(material, color);
+            ApplyWhiteBaseTextureWhenRequired(material);
             sharedMaterials[key] = material;
             return material;
         }
@@ -58,12 +60,37 @@ namespace PersiaWar.Unity2D5D
                 return null;
             }
 
-            return new Material(shader)
+            Material material = new Material(shader)
             {
                 name = materialName,
                 color = color,
                 enableInstancing = true
             };
+            ApplyTintToSupportedColorProperties(material, color);
+            ApplyWhiteBaseTextureWhenRequired(material);
+            return material;
+        }
+
+        // Unlit/Texture is selected on Android for compatibility. Without a white
+        // base texture, flat-color materials can render black or appear untinted.
+        // Textured materials replace this with their real texture in CreateTextured.
+        private static void ApplyWhiteBaseTextureWhenRequired(Material material)
+        {
+            if (material != null && material.HasProperty("_MainTex") && material.mainTexture == null)
+                material.mainTexture = Texture2D.whiteTexture;
+        }
+
+        private static void ApplyTintToSupportedColorProperties(Material material, Color color)
+        {
+            if (material == null)
+                return;
+
+            // Explicit property assignment works with the bundled Android shader and
+            // avoids depending on a shader's implicit "main color" alias.
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", color);
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", color);
         }
 
         private static int ComputeKey(Shader shader, Color color)
@@ -91,9 +118,12 @@ namespace PersiaWar.Unity2D5D
             }
 
 #if UNITY_ANDROID
-            // Keep runtime primitive materials on a built-in unlit mobile shader.
-            // This avoids compiling the custom surface shader on the Android path.
-            cachedShader = Shader.Find("Unlit/Texture");
+            // A project-owned shader in Resources is included in the Android build.
+            // Shader.Find fallbacks can be stripped; a lit fallback desaturates grass
+            // and can make road meshes without explicit normals look almost black.
+            cachedShader = Resources.Load<Shader>("PersiaWarAndroidFlat");
+            if (cachedShader == null)
+                cachedShader = Shader.Find("Unlit/Texture");
             if (cachedShader == null)
                 cachedShader = Shader.Find("Unlit/Color");
 #endif
@@ -112,7 +142,10 @@ namespace PersiaWar.Unity2D5D
                 cachedShader = Shader.Find("Sprites/Default");
 
             if (cachedShader != null)
+            {
                 StartupCheckpoint.Set("RuntimeShaderReady");
+                Debug.Log("PERSIA_RUNTIME_SHADER: " + cachedShader.name);
+            }
 
             return cachedShader;
         }
