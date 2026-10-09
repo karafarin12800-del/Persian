@@ -744,7 +744,7 @@ if (!matchActive || matchPaused)
                 "R",
                 buttonTextStyle);
 
-            // Hidden by design: do not draw the yellow line from player to target.
+            DrawAimGuide(scale);
 
             if (minimapTexture != null)
             {
