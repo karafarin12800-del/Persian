@@ -127,6 +127,15 @@ jobs:
           enemy_bar = Path('UnityProject/Assets/Scripts/UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
           assert 'WorldToScreenPoint' in enemy_bar and 'health.CurrentHealth' in enemy_bar and 'health.MaxHealth' in enemy_bar, 'Enemy health bar does not project numeric live health.'
 
+          bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')
+          city_start = bootstrap.index('private void BuildAndroidCityPresentation()')
+          city_end = bootstrap.index('private void BuildAndroidAlleysAndVehicles()', city_start)
+          city = bootstrap[city_start:city_end]
+          assert 'Mathf.Sin((i + 1) * 12.9898f)' in city and 'Mathf.Sin((i + 1) * 78.233f)' in city, 'Android buildings still use a small repeating modulo size pattern.'
+          assert 'Mathf.Lerp(7.4f, 13.6f, widthRoll)' in city and 'Mathf.Lerp(5.4f, 15.2f, heightRoll)' in city, 'Android building footprint/height variation is missing.'
+          assert 'int windowRows = bodyHeight < 7f ? 2 : (bodyHeight < 11f ? 3 : 4);' in bootstrap, 'Building window rows do not reflect building height.'
+          assert 'i >= 22' in city and 'i >= 18 && i <= 21' in city, 'Close central building plots are not protected from oversized footprints.'
+
           flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
           active_hud_start = flow.index('private void DrawAndroidPresentationHUD()')
           active_hud_end = flow.index('private void DrawPreviousRunDiagnostic()', active_hud_start)
