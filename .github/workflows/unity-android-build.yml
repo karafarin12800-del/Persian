@@ -122,7 +122,10 @@ jobs:
           assert 'DrawAimGuide(scale)' not in hub, 'Yellow player-to-target line is still rendered by MobileInputHub.'
 
           spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
-          assert spawner.count('enemy.AddComponent<EnemyHealthBar>();') == 2, 'Enemy health bar is not attached in both spawn paths.'
+          assert spawner.count('enemy.AddComponent<EnemyHealthBar>();') == 2, 'Enemy health bar is not attached in both main spawn paths.'
+
+          offscreen_spawner = Path('UnityProject/Assets/Scripts/World/OffscreenEnemySpawner.cs').read_text(encoding='utf-8')
+          assert 'enemy.GetComponent<EnemyHealthBar>()' in offscreen_spawner and 'enemy.AddComponent<EnemyHealthBar>()' in offscreen_spawner, 'Offscreen enemy spawn path does not ensure a health bar.'
 
           enemy_bar = Path('UnityProject/Assets/Scripts/UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
           assert 'WorldToScreenPoint' in enemy_bar and 'health.CurrentHealth' in enemy_bar and 'health.MaxHealth' in enemy_bar, 'Enemy health bar does not project numeric live health.'
