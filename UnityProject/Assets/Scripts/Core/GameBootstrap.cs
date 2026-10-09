@@ -331,26 +331,46 @@ namespace PersiaWar.Unity2D5D
             Vector2 size,
             float heightOffset)
         {
+            // Long roads and sidewalks use short terrain-sampled segments rather
+            // than one large quad. This prevents the road mesh from floating above
+            // or sinking below the radial terrain profile between its endpoints.
+            const float maxSegmentLength = 8f;
+            int xSegments = Mathf.Max(1, Mathf.CeilToInt(size.x / maxSegmentLength));
+            int zSegments = Mathf.Max(1, Mathf.CeilToInt(size.y / maxSegmentLength));
             int start = vertices.Count;
             float halfX = size.x * 0.5f;
             float halfZ = size.y * 0.5f;
 
-            Vector3 a = new Vector3(center.x - halfX, 0f, center.z - halfZ);
-            Vector3 b = new Vector3(center.x + halfX, 0f, center.z - halfZ);
-            Vector3 c = new Vector3(center.x + halfX, 0f, center.z + halfZ);
-            Vector3 d = new Vector3(center.x - halfX, 0f, center.z + halfZ);
+            for (int z = 0; z <= zSegments; z++)
+            {
+                float worldZ = center.z - halfZ + size.y * z / zSegments;
+                for (int x = 0; x <= xSegments; x++)
+                {
+                    float worldX = center.x - halfX + size.x * x / xSegments;
+                    vertices.Add(new Vector3(
+                        worldX,
+                        CalculateAndroidTerrainHeight(worldX, worldZ) + heightOffset,
+                        worldZ));
+                }
+            }
 
-            vertices.Add(new Vector3(a.x, CalculateAndroidTerrainHeight(a.x, a.z) + heightOffset, a.z));
-            vertices.Add(new Vector3(b.x, CalculateAndroidTerrainHeight(b.x, b.z) + heightOffset, b.z));
-            vertices.Add(new Vector3(c.x, CalculateAndroidTerrainHeight(c.x, c.z) + heightOffset, c.z));
-            vertices.Add(new Vector3(d.x, CalculateAndroidTerrainHeight(d.x, d.z) + heightOffset, d.z));
-
-            triangles.Add(start + 0);
-            triangles.Add(start + 2);
-            triangles.Add(start + 1);
-            triangles.Add(start + 0);
-            triangles.Add(start + 3);
-            triangles.Add(start + 2);
+            for (int z = 0; z < zSegments; z++)
+            {
+                for (int x = 0; x < xSegments; x++)
+                {
+                    int a = start + z * (xSegments + 1) + x;
+                    int b = a + 1;
+                    int d = a + xSegments + 1;
+                    int c = d + 1;
+                    // Same upward-facing winding as AddAndroidQuad.
+                    triangles.Add(a);
+                    triangles.Add(c);
+                    triangles.Add(b);
+                    triangles.Add(a);
+                    triangles.Add(d);
+                    triangles.Add(c);
+                }
+            }
         }
 
         private void BuildAndroidRoadGrid()
