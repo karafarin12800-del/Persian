@@ -144,9 +144,13 @@ jobs:
           assert '148f * scale * 1.38f * 1.15f' in flow, 'Gameplay minimap is not enlarged by another 15 percent.'
           assert '0.42f));' in flow and '0.66f);' in flow, 'Gameplay minimap transparency has regressed.'
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
-          assert 'weaponRange = 7.5f;' in weapon and 'weaponRange = 13.5f;' in weapon and 'weaponRange = 21f;' in weapon, 'Player weapon ranges are not halved.'
+          assert 'LightPistolRange = 7.5f' in weapon and 'AssaultRifleRange = 13.5f' in weapon and 'HeavyMachineGunRange = 21f' in weapon, 'Player weapon ranges are not halved.'
+          assert 'GetEffectiveRangeForKind(WeaponKind kind)' in weapon, 'Player/enemy shared weapon-kind range profile is missing.'
+          assert 'case WeaponKind.LightPistol: return LightPistolRange;' in weapon and 'case WeaponKind.HeavyMachineGun: return HeavyMachineGunRange;' in weapon and 'default: return AssaultRifleRange;' in weapon, 'Shared profile does not cover every weapon kind.'
           enemy = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
-          assert 'rangedRange = archetype == 3 ? 4f : (archetype == 2 ? 2.5f : 1.5f);' in enemy, 'Enemy weapon ranges are not halved.'
+          assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range does not match the weapon it carries/drops.'
+          assert 'PlanLocalRoute(' in enemy and 'Physics.OverlapSphereNonAlloc' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy has no collider-aware route around walls.'
+          assert 'if (hit is MeshCollider)' in enemy, 'Enemy navigation must ignore the continuous ground mesh.'
           print('Camera occlusion fade regression checks: PASS')
           print('Android shader/legacy-ground regression checks: PASS')
           print('Android startup isolation checks: PASS')
@@ -213,7 +217,7 @@ jobs:
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           assert 'enum WeaponKind' in weapon and 'public void CycleWeapon()' in weapon, 'Weapon profiles cannot be cycled at runtime.'
           assert 'public float EffectiveRange => Mathf.Max(1f, weaponRange);' in weapon, 'Weapon range is not exposed to aiming and HUD.'
-          assert 'weaponRange = 7.5f;' in weapon and 'weaponRange = 13.5f;' in weapon and 'weaponRange = 21f;' in weapon, 'Weapon profiles must have distinct halved light/rifle/heavy ranges.'
+          assert 'LightPistolRange = 7.5f' in weapon and 'AssaultRifleRange = 13.5f' in weapon and 'HeavyMachineGunRange = 21f' in weapon, 'Weapon profiles must have distinct halved light/rifle/heavy ranges.'
           assert 'PistolSlide' in weapon and 'PistolGrip' in weapon, 'The light pistol still uses only a scaled rifle silhouette.'
           assert 'SetWeaponPart("PistolSlide", pistol' in weapon and 'SetWeaponPart("Stock", !pistol' in weapon, 'Weapon profiles do not swap actual visible parts.'
           assert 'heavy ? new Vector3(0.26f, 0.20f, 0.64f)' in weapon and 'heavy ? new Vector3(0.16f, 0.34f, 0.21f)' in weapon, 'Heavy weapon receiver/magazine are not visually distinct.'
@@ -227,6 +231,15 @@ jobs:
           assert 'Mathf.Min(range, weapon.EffectiveRange)' in aim, 'Auto-targeting can select opponents beyond the current weapon range.'
 
           input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
+          assert 'Input.multiTouchEnabled = true;' in input_hub and 'Input.simulateMouseWithTouches = false;' in input_hub, 'Android must use real multi-touch without synthesized mouse pointers.'
+          gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
+          gui_fallback_end = input_hub.index('private void CreateGuiTextures()', gui_fallback_start)
+          gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
+          assert 'if (Application.isMobilePlatform)' in gui_fallback and 'return;' in gui_fallback, 'GUI mouse fallback must not take ownership of real Android touch IDs.'
+          touch_start = input_hub.index('private void HandleAndroidTouches()')
+          touch_end = input_hub.index('private Vector2 ApplyDeadZone(', touch_start)
+          touch_handler = input_hub[touch_start:touch_end]
+          assert 'movePointerId' in touch_handler and 'firePointerId' in touch_handler and 'TryGetTouch(movePointerId' in touch_handler and 'TryGetTouch(firePointerId' in touch_handler, 'Movement and fire must retain separate finger IDs.'
           assert 'DrawAimGuide(' not in input_hub and 'lineTexture' not in input_hub, 'Yellow target line is still drawn by mobile input HUD.'
           assert 'reloadHeldToSwap' in input_hub and 'player.Weapon?.CycleWeapon()' in input_hub, 'Mobile users have no weapon-change gesture.'
           assert 'HOLD SWAP' in input_hub, 'Reload-button hold-to-swap gesture is not labelled.'
@@ -250,7 +263,8 @@ jobs:
           world = (root / 'Core/GameBootstrap.cs').read_text(encoding='utf-8')
           health_bar = (root / 'UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
 
-          assert 'rangedRange = archetype == 3 ? 4f : (archetype == 2 ? 2.5f : 1.5f);' in enemy, 'Enemy weapon ranges must be halved.'
+          assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range must match player range by weapon kind.'
+          assert 'PlanLocalRoute(' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy pursuit must route around blocking colliders.'
           assert 'PistolSlide' in enemy and 'MachineGunReceiver' in enemy and 'AKMagazine' in enemy, 'Enemy weapon silhouettes must be distinct.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy, 'Enemy firing does not pass its effective range to the projectile.'
           assert 'Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)' in projectile, 'Enemy projectile has no explicit distance cap.'
@@ -261,7 +275,7 @@ jobs:
           assert 'public void EquipWeaponFromPickup(WeaponKind selectedWeapon, int reserveAmmo)' in weapon_controller, 'Weapon pickup does not use the explicit equip path.'
           assert 'ApplyWeaponProfile(true);' in weapon_controller and 'projectileLifetime = weaponRange / Mathf.Max(1f, projectileSpeed);' in weapon_controller, 'Equipping a weapon does not refresh its projectile range/lifetime profile.'
           assert 'distance > EffectiveRange' in weapon_controller, 'Player firing can exceed the active weapon profile range.'
-          assert 'weaponRange = 7.5f;' in weapon_controller and 'weaponRange = 13.5f;' in weapon_controller and 'weaponRange = 21f;' in weapon_controller, 'Picked pistol/rifle/heavy weapons do not have distinct halved effective ranges.'
+          assert 'LightPistolRange = 7.5f' in weapon_controller and 'AssaultRifleRange = 13.5f' in weapon_controller and 'HeavyMachineGunRange = 21f' in weapon_controller, 'Picked pistol/rifle/heavy weapons do not have distinct halved effective ranges.'
           assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to gray.'
           assert 'AndroidContinuousGroundFoundation' in world, 'Continuous ground foundation is missing.'
           assert 'AddClearAndroidAlleySegments' in world and 'androidBuildingHalfExtents' in world, 'Alley strips are not clipped around building footprints.'

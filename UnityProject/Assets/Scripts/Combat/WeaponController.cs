@@ -36,6 +36,19 @@ namespace PersiaWar.Unity2D5D
         private float recoilAmount;
         private LineRenderer rangeRing;
         private const int RangeRingSegments = 64;
+        private const float LightPistolRange = 7.5f;
+        private const float AssaultRifleRange = 13.5f;
+        private const float HeavyMachineGunRange = 21f;
+
+        public static float GetEffectiveRangeForKind(WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponKind.LightPistol: return LightPistolRange;
+                case WeaponKind.HeavyMachineGun: return HeavyMachineGunRange;
+                default: return AssaultRifleRange;
+            }
+        }
 
         public Transform Muzzle => muzzle != null ? muzzle : transform;
         public WeaponKind CurrentWeapon => weaponKind;
@@ -112,7 +125,7 @@ namespace PersiaWar.Unity2D5D
             {
                 case WeaponKind.LightPistol:
                     projectileSpeed = 34f;
-                    weaponRange = 7.5f;
+                    weaponRange = LightPistolRange;
                     projectileDamage = 14;
                     fireCooldown = 0.24f;
                     magazineSize = 15;
@@ -120,7 +133,7 @@ namespace PersiaWar.Unity2D5D
 
                 case WeaponKind.HeavyMachineGun:
                     projectileSpeed = 40f;
-                    weaponRange = 21f;
+                    weaponRange = HeavyMachineGunRange;
                     projectileDamage = 34;
                     fireCooldown = 0.31f;
                     magazineSize = 36;
@@ -128,7 +141,7 @@ namespace PersiaWar.Unity2D5D
 
                 default:
                     projectileSpeed = 38f;
-                    weaponRange = 13.5f;
+                    weaponRange = AssaultRifleRange;
                     projectileDamage = 22;
                     fireCooldown = 0.19f;
                     magazineSize = 24;

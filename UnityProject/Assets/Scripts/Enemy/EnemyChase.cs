@@ -27,6 +27,25 @@ namespace PersiaWar.Unity2D5D
         private static Material enemyRangeRingMaterial;
         private LineRenderer rangeRing;
         private const int RangeRingSegments = 48;
+        private const int NavigationGridMaxSide = 40;
+        private const int NavigationCellCapacity = NavigationGridMaxSide * NavigationGridMaxSide;
+        private const int MaxNavigationWaypoints = 96;
+        private const float NavigationLookAhead = 17f;
+        private const float NavigationPadding = 8f;
+        private const float NavigationWaypointReach = 0.90f;
+
+        // Allocated once per enemy. Clear-path pursuit stays cheap; the local
+        // occupancy grid is generated only when a wall/prop blocks direct movement.
+        private readonly Collider[] movementHits = new Collider[64];
+        private readonly bool[] navigationBlocked = new bool[NavigationCellCapacity];
+        private readonly int[] navigationPrevious = new int[NavigationCellCapacity];
+        private readonly int[] navigationQueue = new int[NavigationCellCapacity];
+        private readonly int[] navigationReversePath = new int[NavigationCellCapacity];
+        private readonly Vector3[] navigationWaypoints = new Vector3[MaxNavigationWaypoints];
+        private int navigationWaypointCount;
+        private int navigationWaypointIndex;
+        private Vector3 navigationTargetSnapshot;
+        private float nextNavigationPlanTime;
 
         public void SetTarget(Transform targetTransform)
         {
@@ -53,9 +72,9 @@ namespace PersiaWar.Unity2D5D
             moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
-            // Effective enemy weapon ranges are intentionally halved for fairer combat:
-            // pistol = 1.5m, machine gun = 2.5m, AK-style rifle = 4m.
-            rangedRange = archetype == 3 ? 4f : (archetype == 2 ? 2.5f : 1.5f);
+            // Use the same configured range as the weapon the enemy visibly carries/drops.
+            // Archetype 1=pistol, 2=heavy machine gun, 3=assault rifle.
+            rangedRange = WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind);
             stopDistance = Mathf.Max(1f, rangedRange * 0.70f);
             meleeCooldown = archetype == 3 ? 1.05f : (archetype == 2 ? 1.25f : 1.5f);
             rangedCooldown = archetype == 3 ? 0.90f : (archetype == 2 ? 1.10f : 1.35f);
@@ -248,69 +267,355 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             Vector3 direction = delta / distance;
+            PlayerController player = target.GetComponentInParent<PlayerController>();
+            bool hasLineOfSight = player == null || HasLineOfSightToPlayer(player);
+
+            // If a wall blocks sight, keep navigating even inside the normal stop range
+            // instead of idling against a wall with no attack lane.
+            bool shouldMove = distance > stopDistance || (player != null && !hasLineOfSight);
+            if (shouldMove)
+                UpdatePursuitMovement(direction, distance, hasLineOfSight);
+            else
+                ClearNavigationPath();
+
             if (visual != null)
             {
-                visual.SetFacing(direction);
-                visual.SetMoving(distance > stopDistance);
+                visual.SetFacing(shouldMove && !hasLineOfSight ? GetCurrentMovementDirection(direction) : direction);
+                visual.SetMoving(shouldMove);
             }
 
-            if (distance > stopDistance)
-            {
-                float step = moveSpeed * retargetInterval;
-                Vector3 nextPosition = transform.position + direction * Mathf.Min(step, distance - stopDistance);
-                nextPosition.y = 0f;
-
-                if (CanMoveTo(nextPosition))
-                    transform.position = nextPosition;
-            }
-
-            PlayerController player = target.GetComponentInParent<PlayerController>();
             if (player == null)
                 return;
 
-            if (distance <= meleeDistance && Time.time >= nextAttackTime && HasLineOfSightToPlayer(player))
+            if (distance <= meleeDistance && Time.time >= nextAttackTime && hasLineOfSight)
             {
                 player.ReceiveDamage(meleeDamage);
                 nextAttackTime = Time.time + meleeCooldown;
             }
 
-            // Ranged combat is intentionally enabled on Android as well. The
-            // projectile uses the lightweight EnemyProjectile sweep path, so enemies
-            // can fight the player without introducing a second physics system.
-            if (distance <= rangedRange && Time.time >= nextRangedTime)
+            if (distance <= rangedRange && Time.time >= nextRangedTime && hasLineOfSight)
             {
-                if (HasLineOfSightToPlayer(player))
+                FireProjectile(direction);
+                nextRangedTime = Time.time + rangedCooldown;
+            }
+        }
+
+        private Vector3 GetCurrentMovementDirection(Vector3 fallback)
+        {
+            if (navigationWaypointIndex >= 0 && navigationWaypointIndex < navigationWaypointCount)
+            {
+                Vector3 delta = navigationWaypoints[navigationWaypointIndex] - transform.position;
+                delta.y = 0f;
+                if (delta.sqrMagnitude > 0.001f)
+                    return delta.normalized;
+            }
+            return fallback;
+        }
+
+        private void UpdatePursuitMovement(Vector3 direction, float distance, bool hasLineOfSight)
+        {
+            if (navigationWaypointCount > 0 &&
+                HorizontalDistance(target.position, navigationTargetSnapshot) > 3f)
+                ClearNavigationPath();
+
+            while (navigationWaypointIndex < navigationWaypointCount &&
+                   HorizontalDistance(transform.position, navigationWaypoints[navigationWaypointIndex]) <= NavigationWaypointReach)
+                navigationWaypointIndex++;
+
+            float step = Mathf.Max(0.01f, moveSpeed * retargetInterval);
+            if (navigationWaypointIndex < navigationWaypointCount)
+            {
+                Vector3 routeNext = Vector3.MoveTowards(
+                    transform.position,
+                    navigationWaypoints[navigationWaypointIndex],
+                    step);
+                routeNext.y = 0f;
+                if (CanMoveTo(routeNext))
                 {
-                    FireProjectile(direction);
-                    nextRangedTime = Time.time + rangedCooldown;
+                    transform.position = routeNext;
+                    return;
+                }
+
+                // If the map changes or another actor blocks a planned node, abandon it
+                // and replan instead of freezing in place.
+                ClearNavigationPath();
+                nextNavigationPlanTime = Time.time;
+            }
+
+            float keepDistance = hasLineOfSight ? stopDistance : 1.1f;
+            float advance = Mathf.Min(step, Mathf.Max(0f, distance - keepDistance));
+            if (advance > 0.01f)
+            {
+                Vector3 directNext = transform.position + direction * advance;
+                directNext.y = 0f;
+                if (CanMoveTo(directNext))
+                {
+                    transform.position = directNext;
+                    ClearNavigationPath();
+                    return;
                 }
             }
+
+            if (Time.time >= nextNavigationPlanTime)
+                PlanLocalRoute(direction, distance, hasLineOfSight);
+        }
+
+        private void PlanLocalRoute(Vector3 direction, float distance, bool hasLineOfSight)
+        {
+            nextNavigationPlanTime = Time.time + 0.55f;
+            ClearNavigationPath();
+
+            Vector3 start = transform.position;
+            start.y = 0f;
+            float desiredGap = hasLineOfSight ? stopDistance : 1.1f;
+            float advance = Mathf.Min(NavigationLookAhead, Mathf.Max(1.8f, distance - desiredGap));
+            if (distance < 1.8f)
+                advance = distance;
+            if (advance < 0.8f)
+                return;
+
+            Vector3 requestedGoal = start + direction * advance;
+            float minX = Mathf.Max(-94f, Mathf.Min(start.x, requestedGoal.x) - NavigationPadding);
+            float maxX = Mathf.Min(94f, Mathf.Max(start.x, requestedGoal.x) + NavigationPadding);
+            float minZ = Mathf.Max(-94f, Mathf.Min(start.z, requestedGoal.z) - NavigationPadding);
+            float maxZ = Mathf.Min(94f, Mathf.Max(start.z, requestedGoal.z) + NavigationPadding);
+            float cellSize = Mathf.Max(
+                1.35f,
+                Mathf.Max((maxX - minX) / (NavigationGridMaxSide - 1f),
+                          (maxZ - minZ) / (NavigationGridMaxSide - 1f)));
+            int columns = Mathf.Clamp(Mathf.CeilToInt((maxX - minX) / cellSize) + 1, 3, NavigationGridMaxSide);
+            int rows = Mathf.Clamp(Mathf.CeilToInt((maxZ - minZ) / cellSize) + 1, 3, NavigationGridMaxSide);
+            int total = columns * rows;
+
+            for (int i = 0; i < total; i++)
+            {
+                navigationPrevious[i] = -2;
+                navigationBlocked[i] = IsNavigationPointBlocked(GridToWorld(i, columns, minX, minZ, cellSize));
+            }
+
+            int startX = Mathf.Clamp(Mathf.RoundToInt((start.x - minX) / cellSize), 0, columns - 1);
+            int startZ = Mathf.Clamp(Mathf.RoundToInt((start.z - minZ) / cellSize), 0, rows - 1);
+            int startIndex = startZ * columns + startX;
+            navigationBlocked[startIndex] = false;
+
+            Vector3 flatDirection = new Vector3(direction.x, 0f, direction.z).normalized;
+            int goalIndex = -1;
+            float bestGoalScore = float.PositiveInfinity;
+            for (int i = 0; i < total; i++)
+            {
+                if (navigationBlocked[i] || i == startIndex)
+                    continue;
+
+                Vector3 candidate = GridToWorld(i, columns, minX, minZ, cellSize);
+                Vector3 progress = candidate - start;
+                float forward = Vector3.Dot(progress, flatDirection);
+                if (forward < 0.9f)
+                    continue;
+
+                float score = (candidate - requestedGoal).sqrMagnitude;
+                if (forward < advance * 0.25f)
+                    score += 12f;
+                if (score < bestGoalScore)
+                {
+                    bestGoalScore = score;
+                    goalIndex = i;
+                }
+            }
+
+            if (goalIndex < 0)
+                return;
+
+            int head = 0;
+            int tail = 0;
+            navigationQueue[tail++] = startIndex;
+            navigationPrevious[startIndex] = startIndex;
+            bool found = false;
+
+            // Local breadth-first search gives a collision-aware route without a baked
+            // NavMesh. Diagonals cannot cut the corner where either side cell is blocked.
+            while (head < tail)
+            {
+                int current = navigationQueue[head++];
+                if (current == goalIndex)
+                {
+                    found = true;
+                    break;
+                }
+
+                int cx = current % columns;
+                int cz = current / columns;
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dz == 0)
+                            continue;
+
+                        int nx = cx + dx;
+                        int nz = cz + dz;
+                        if (nx < 0 || nx >= columns || nz < 0 || nz >= rows)
+                            continue;
+
+                        int next = nz * columns + nx;
+                        if (navigationBlocked[next] || navigationPrevious[next] != -2)
+                            continue;
+                        if (dx != 0 && dz != 0 &&
+                            (navigationBlocked[cz * columns + nx] ||
+                             navigationBlocked[nz * columns + cx]))
+                            continue;
+
+                        navigationPrevious[next] = current;
+                        navigationQueue[tail++] = next;
+                    }
+                }
+            }
+
+            if (!found)
+                return;
+
+            int reverseCount = 0;
+            int cursor = goalIndex;
+            while (cursor != startIndex && reverseCount < NavigationCellCapacity)
+            {
+                navigationReversePath[reverseCount++] = cursor;
+                cursor = navigationPrevious[cursor];
+                if (cursor < 0 || cursor >= total)
+                    return;
+            }
+
+            if (cursor != startIndex || reverseCount == 0)
+                return;
+
+            // String-pull grid nodes into longer collider-checked segments so enemies
+            // do not stutter at each small occupancy cell.
+            Vector3 from = start;
+            int farthestRemaining = reverseCount - 1;
+            while (farthestRemaining >= 0 && navigationWaypointCount < MaxNavigationWaypoints)
+            {
+                int chosen = -1;
+                for (int k = 0; k <= farthestRemaining; k++)
+                {
+                    Vector3 candidate = GridToWorld(
+                        navigationReversePath[k], columns, minX, minZ, cellSize);
+                    if (CanTravelDirectly(from, candidate))
+                    {
+                        chosen = k;
+                        break;
+                    }
+                }
+
+                if (chosen < 0)
+                    chosen = farthestRemaining;
+
+                Vector3 waypoint = GridToWorld(
+                    navigationReversePath[chosen], columns, minX, minZ, cellSize);
+                navigationWaypoints[navigationWaypointCount++] = waypoint;
+                from = waypoint;
+                farthestRemaining = chosen - 1;
+            }
+
+            navigationWaypointIndex = 0;
+            navigationTargetSnapshot = target.position;
+        }
+
+        private static float HorizontalDistance(Vector3 a, Vector3 b)
+        {
+            a.y = 0f;
+            b.y = 0f;
+            return Vector3.Distance(a, b);
+        }
+
+        private static Vector3 GridToWorld(int index, int columns, float minX, float minZ, float cellSize)
+        {
+            return new Vector3(
+                minX + (index % columns) * cellSize,
+                0f,
+                minZ + (index / columns) * cellSize);
+        }
+
+        private bool IsNavigationPointBlocked(Vector3 position)
+        {
+            int count = Physics.OverlapSphereNonAlloc(
+                position + Vector3.up * 0.75f,
+                collisionRadius + 0.12f,
+                movementHits,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!IsIgnoredMovementCollider(movementHits[i]))
+                    return true;
+            }
+            return false;
         }
 
         private bool CanMoveTo(Vector3 position)
         {
-            Collider[] hits = Physics.OverlapSphere(
+            int count = Physics.OverlapSphereNonAlloc(
                 position + Vector3.up * 0.75f,
                 collisionRadius,
+                movementHits,
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
-            foreach (Collider hit in hits)
+            for (int i = 0; i < count; i++)
             {
-                if (hit == null || hit.transform == transform || hit.transform.IsChildOf(transform))
-                    continue;
-                if (hit.GetComponentInParent<EnemyChase>() != null)
-                    continue;
-                if (hit.GetComponentInParent<PlayerController>() != null)
-                    continue;
-                if (hit.GetComponentInParent<Projectile>() != null)
-                    continue;
-                if (hit.GetComponentInParent<EnemyProjectile>() != null)
-                    continue;
-                return false;
+                if (!IsIgnoredMovementCollider(movementHits[i]))
+                    return false;
             }
-
             return true;
+        }
+
+        private bool CanTravelDirectly(Vector3 from, Vector3 to)
+        {
+            Vector3 delta = to - from;
+            delta.y = 0f;
+            float distance = delta.magnitude;
+            if (distance <= 0.1f)
+                return true;
+
+            int count = Physics.SphereCastNonAlloc(
+                from + Vector3.up * 0.75f,
+                collisionRadius * 0.72f,
+                delta / distance,
+                movementHits,
+                Mathf.Max(0f, distance - 0.08f),
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (movementHits[i] != null && !IsIgnoredMovementCollider(movementHits[i]))
+                    return false;
+            }
+            return true;
+        }
+
+        private bool IsIgnoredMovementCollider(Collider hit)
+        {
+            if (hit == null)
+                return true;
+            if (hit.transform == transform || hit.transform.IsChildOf(transform))
+                return true;
+            if (hit.GetComponentInParent<EnemyChase>() != null)
+                return true;
+            if (hit.GetComponentInParent<PlayerController>() != null)
+                return true;
+            if (hit.GetComponentInParent<Projectile>() != null)
+                return true;
+            if (hit.GetComponentInParent<EnemyProjectile>() != null)
+                return true;
+            // The terrain mesh covers all ground and must not be treated as a blocking wall.
+            if (hit is MeshCollider)
+                return true;
+            return false;
+        }
+
+        private void ClearNavigationPath()
+        {
+            navigationWaypointCount = 0;
+            navigationWaypointIndex = 0;
         }
 
         private bool HasLineOfSightToPlayer(PlayerController player)
