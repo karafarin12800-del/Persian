@@ -240,6 +240,10 @@ jobs:
           assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android IMGUI menu and pause controls must receive synthesized touch events.'
+          assert 'private int guiMoveMouseButton = -1;' in input_hub and 'private int guiFireMouseButton = -1;' in input_hub, 'Fallback touchscreen contacts need independent movement and fire button ownership.'
+          assert 'guiMoveMouseButton == e.button' in gui_fallback and 'guiFireMouseButton == e.button' in gui_fallback, 'Drag events must only control the finger/button that originally claimed the input.'
+          assert 'movePointerId == -1 &&' in gui_fallback and 'guiMoveMouseButton == -1' in gui_fallback, 'A second touch must not overwrite an already-held fallback movement pointer.'
+          assert 'if (handled)' in gui_fallback and 'e.Use();' in gui_fallback, 'Only owned MouseUp events may be consumed; unrelated UI releases must pass through.'
           touch_start = input_hub.index('private void HandleAndroidTouches()')
           touch_end = input_hub.index('private Vector2 ApplyDeadZone(', touch_start)
           touch_handler = input_hub[touch_start:touch_end]
