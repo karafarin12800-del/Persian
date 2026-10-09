@@ -85,7 +85,7 @@ jobs:
           fallback_start = hub.index("private void HandleGuiPointerFallback()")
           fallback_end = hub.index("private void CreateGuiTextures()", fallback_start)
           fallback = hub[fallback_start:fallback_end]
-          assert "if (Application.isMobilePlatform)\\n                return;" not in fallback, "Android must not exit the IMGUI fallback before checking whether legacy touches are missing."
+          assert "if (Application.isMobilePlatform)\n                return;" not in fallback, "Android must not exit the IMGUI fallback before checking whether legacy touches are missing."
           assert "Input.touchCount > 0" in fallback and "guiFallbackOwnsPointer" in fallback, "Android fallback must defer to real fingers but recover when touch entries are absent."
           assert "private void HandleHeroSelectTouches()" in flow and "HeroSelectionContinuedByTouch" in flow, "Hero selection/continue must accept direct Android touches."
           assert "startRect.Contains(screen)" in flow and "StartMatch();" in flow, "Start Match must accept direct Android touches."
