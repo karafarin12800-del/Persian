@@ -7,7 +7,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class GameBootstrap : MonoBehaviour
     {
         [SerializeField] private Camera gameplayCamera;
-        [SerializeField] private float worldSize = 192f;
+        [SerializeField] private float worldSize = 220.8f;
         [SerializeField] private int seed = 32025;
         [SerializeField] private int enemyCount = 8;
         [SerializeField] private float enemySpawnRadius = 44f;
