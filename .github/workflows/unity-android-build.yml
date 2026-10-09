@@ -198,7 +198,7 @@ jobs:
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
 
           assert 'enemySpawner.Configure(player.transform, 11, 84f, 0f);' in flow, 'Android match must start with the reduced 11-opponent lobby.'
-          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f, 150f, 262f);' in active_hud, 'Active Android minimap is not enlarged by another 15 percent.'
+          assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in active_hud, 'Active Android minimap must be enlarged by a further 20 percent.'
           assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
           assert 'AndroidMinimapBuildingPoints' in active_hud and 'AndroidMinimapRoadCoordinates' in active_hud, 'Minimap city roads/buildings are incomplete.'
           assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
@@ -278,6 +278,10 @@ jobs:
           assert 'Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)' in projectile, 'Enemy projectile has no explicit distance cap.'
           assert 'lifetime = Mathf.Max(0.05f, Mathf.Max(1f, maxRange) / Mathf.Max(1f, speed));' in projectile, 'Enemy projectile lifetime is not tied to weapon range.'
           assert 'SpawnDroppedWeapon(enemy);' in health and 'pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);' in health, 'Enemy death does not drop the matching weapon.'
+          extraction = (root / 'Core/ExtractionBeacon.cs').read_text(encoding='utf-8')
+          assert 'ExtractionBeacon.NotifyEnemyDefeated(enemy);' in health, 'Enemy death does not check for the final survivor.'
+          assert 'groundPosition = new Vector3(0f, 0f, 88f);' in extraction and 'BlueExtractionBeamOuter' in extraction and 'BlueExtractionBeamCore' in extraction, 'Final-enemy extraction beam is missing or has no clear spawn location.'
+          assert 'GameSession.Instance.EndMission(true)' in extraction, 'Entering the extraction beam does not end the mission as a win.'
           assert 'Weapon' in pickup and 'player.Weapon.EquipWeaponFromPickup(weaponKind, amount);' in pickup, 'Dropped weapon cannot be picked up and equipped as the active weapon.'
           weapon_controller = (root / 'Combat/WeaponController.cs').read_text(encoding='utf-8')
           assert 'public void EquipWeaponFromPickup(WeaponKind selectedWeapon, int reserveAmmo)' in weapon_controller, 'Weapon pickup does not use the explicit equip path.'
