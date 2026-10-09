@@ -379,7 +379,6 @@ namespace PersiaWar.Unity2D5D
                     // when a second finger is placed. If a new left-side contact appears,
                     // rebind the joystick to it while preserving the current direction.
                     // Otherwise keep the last vector while any contact is still down.
-                    bool rebound = false;
                     float touchRadius = Mathf.Max(1f, radius);
                     for (int i = 0; i < Input.touchCount; i++)
                     {
@@ -396,13 +395,10 @@ namespace PersiaWar.Unity2D5D
 
                         movePointerId = candidate.fingerId;
                         moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
-                        rebound = true;
                         break;
                     }
 
                     player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
-                    if (!rebound)
-                        StartupCheckpoint.Set("MovementTouchTemporarilyMissing");
                 }
                 else
                 {
