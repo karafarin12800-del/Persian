@@ -82,6 +82,26 @@ jobs:
           ):
               assert callback in hub, f"Missing input reset lifecycle path: {callback}"
           assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
+          assert "Screen.height - bottom - 236f * scale" in hub and "Screen.height - bottom - 300f * scale" in hub, "Grenade/reload hit zones must remain separate from adjacent actions"
+
+          # Test every circular action hit zone across the configured minimum/maximum UI scales.
+          import math
+          for scale in (0.75, 1.0, 1.35):
+              radius = 122.0 * scale * 1.12
+              centers = {
+                  "fire": (104.0, 58.0, 1.02),
+                  "melee": (352.0, 18.0, 0.76),
+                  "grenade": (352.0, 236.0, 0.76),
+                  "reload": (104.0, 300.0, 0.72),
+              }
+              names = list(centers)
+              for i, left in enumerate(names):
+                  for right in names[i+1:]:
+                      lx, ly, lr = centers[left]
+                      rx, ry, rr = centers[right]
+                      distance = math.hypot(lx-rx, ly-ry) * scale
+                      min_separation = (lr + rr) * radius
+                      assert distance >= min_separation, f"{left}/{right} button hit-zones overlap at UI scale {scale}: {distance:.1f} < {min_separation:.1f}"
 
           # Both runtime branches must run the same explicit input activation method.
           assert flow.count("mobileInput.ActivateForMatch(player, activeCamera);") == 2, "Android and desktop/editor must activate the input hub explicitly"

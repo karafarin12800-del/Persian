@@ -521,17 +521,20 @@ namespace PersiaWar.Unity2D5D
                 Screen.width - 104f * scale,
                 Screen.height - bottom - 58f * scale);
 
+            // Keep every button's visual disk and touch hit-zone separate at
+            // the smallest and largest supported UI scales. Overlapping fire/reload
+            // zones previously made taps on the fire button reload instead.
             melee = new Vector2(
-                Screen.width - 342f * scale,
+                Screen.width - 352f * scale,
                 Screen.height - bottom - 18f * scale);
 
             grenade = new Vector2(
-                Screen.width - 342f * scale,
-                Screen.height - bottom - 182f * scale);
+                Screen.width - 352f * scale,
+                Screen.height - bottom - 236f * scale);
 
             reload = new Vector2(
                 Screen.width - 104f * scale,
-                Screen.height - bottom - 210f * scale);
+                Screen.height - bottom - 300f * scale);
         }
 
         private float GetUiScale()

@@ -242,6 +242,7 @@ jobs:
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android IMGUI menu and pause controls must receive synthesized touch events.'
           assert 'if (Application.isMobilePlatform)' in input_hub and 'Synthesized IMGUI mouse events can collapse' in input_hub, 'Android gameplay must not route independent finger contacts through the shared mouse fallback.'
           assert 'float fireHit = radius * 1.02f;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile firing touch-zone must tolerate screen differences without stealing other action buttons.'
+          assert 'Screen.width - 352f * scale' in input_hub and 'Screen.height - bottom - 236f * scale' in input_hub and 'Screen.height - bottom - 300f * scale' in input_hub, 'Mobile action-button hit-zones must be separated so fire cannot register as reload/grenade/melee.'
           assert 'private int guiMoveMouseButton = -1;' in input_hub and 'private int guiFireMouseButton = -1;' in input_hub, 'Fallback touchscreen contacts need independent movement and fire button ownership.'
           assert 'guiMoveMouseButton == e.button' in gui_fallback and 'guiFireMouseButton == e.button' in gui_fallback, 'Drag events must only control the finger/button that originally claimed the input.'
           assert 'movePointerId == -1 &&' in gui_fallback and 'guiMoveMouseButton == -1' in gui_fallback, 'A second touch must not overwrite an already-held fallback movement pointer.'
