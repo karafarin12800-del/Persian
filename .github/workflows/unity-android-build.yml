@@ -133,7 +133,7 @@ jobs:
           city_end = bootstrap.index('private void BuildAndroidAlleysAndVehicles()', city_start)
           city = bootstrap[city_start:city_end]
           assert 'Mathf.Lerp(3.25f, 3.95f' in city and 'Mathf.Lerp(5.4f, 6.4f' in city, 'Android houses are not constrained to one/two storeys.'
-          assert 'bool isWarehouse = i == 4 || i == 9 || i == 16 || i == 20;' in city, 'Dedicated warehouse buildings are missing from the Android map.'
+          assert 'bool isWarehouse = i == 4 || i == 9 || i == 11 || i == 16;' in city, 'Dedicated warehouse buildings are missing from the Android map.'
           assert 'CreateAndroidPitchedRoof' in bootstrap and 'bool isPitchedRoof' in city, 'Sloped-roof house variants are missing.'
           assert 'float bodyHeight = Mathf.Clamp(height, 3.2f, 6.5f);' in bootstrap, 'Android building body height is not capped at two storeys.'
           assert 'int windowRows = isWarehouse ? 1 : (bodyHeight >= 5.0f ? 2 : 1);' in bootstrap, 'Window rows can imply extra storeys.'
