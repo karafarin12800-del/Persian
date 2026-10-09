@@ -376,12 +376,33 @@ namespace PersiaWar.Unity2D5D
                 else if (Input.touchCount > 0)
                 {
                     // A few Android devices temporarily expose only one active contact
-                    // when a second finger is placed. If our captured movement finger
-                    // disappears from the touch list, keep the last joystick vector
-                    // while any contact is still down. A visible Ended/Canceled phase
-                    // above releases movement immediately; when all contacts lift,
-                    // ResetMovementPointer runs below.
+                    // when a second finger is placed. If a new left-side contact appears,
+                    // rebind the joystick to it while preserving the current direction.
+                    // Otherwise keep the last vector while any contact is still down.
+                    bool rebound = false;
+                    float touchRadius = Mathf.Max(1f, radius);
+                    for (int i = 0; i < Input.touchCount; i++)
+                    {
+                        Touch candidate = Input.GetTouch(i);
+                        if (candidate.fingerId == firePointerId ||
+                            candidate.fingerId == meleePointerId ||
+                            candidate.fingerId == grenadePointerId ||
+                            candidate.fingerId == reloadPointerId ||
+                            candidate.position.x > Screen.width * 0.58f ||
+                            candidate.position.y < Screen.height * 0.10f ||
+                            candidate.phase == TouchPhase.Ended ||
+                            candidate.phase == TouchPhase.Canceled)
+                            continue;
+
+                        movePointerId = candidate.fingerId;
+                        moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
+                        rebound = true;
+                        break;
+                    }
+
                     player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                    if (!rebound)
+                        StartupCheckpoint.Set("MovementTouchTemporarilyMissing");
                 }
                 else
                 {
