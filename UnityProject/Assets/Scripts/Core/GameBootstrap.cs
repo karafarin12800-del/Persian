@@ -894,18 +894,17 @@ namespace PersiaWar.Unity2D5D
             Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
             Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
 
-            Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
-            QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
-            // Split solid collision around the front door. Windows remain blocked;
-            // the player can enter only through the doorway-sized opening.
-            float doorWidthForCollision = isWarehouse
+            float doorWidth = isWarehouse
                 ? Mathf.Min(3.4f, footprint * 0.32f)
                 : Mathf.Min(1.35f, footprint * 0.18f);
-            float doorHeightForCollision = isWarehouse ? 2.35f : 2.15f;
+            float doorHeight = isWarehouse ? 2.35f : 2.15f;
+            QueueAndroidBuildingFacade(position, footprint, bodyHeight, depth, doorWidth, doorHeight, facade);
+
+            // Split solid collision around the same visible doorway. Windows and all
+            // other wall sections remain blocked by solid colliders.
             float collisionHeight = bodyHeight + (isPitchedRoof ? 1.6f : 0.65f);
             CreateAndroidBuildingColliders(
-                position, footprint, depth, collisionHeight,
-                doorWidthForCollision, doorHeightForCollision);
+                position, footprint, depth, collisionHeight, doorWidth, doorHeight);
 
             if (isPitchedRoof)
             {
@@ -959,9 +958,6 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            float doorWidth = isWarehouse
-                ? Mathf.Min(3.4f, footprint * 0.32f)
-                : Mathf.Min(1.35f, footprint * 0.18f);
             QueueAndroidBox(
                 isWarehouse ? "WarehouseLoadingDoor" : "Door",
                 position + new Vector3(0f, 1.12f, -depth * 0.54f),
@@ -1185,6 +1181,45 @@ namespace PersiaWar.Unity2D5D
             triangles.Add(start + 0);
             triangles.Add(start + 2);
             triangles.Add(start + 3);
+        }
+
+        private void QueueAndroidBuildingFacade(
+            Vector3 position,
+            float footprint,
+            float bodyHeight,
+            float depth,
+            float doorWidth,
+            float doorHeight,
+            Material facade)
+        {
+            float thickness = Mathf.Clamp(Mathf.Min(footprint, depth) * 0.08f, 0.35f, 0.60f);
+            float frontZ = -depth * 0.5f + thickness * 0.5f;
+            float backZ = depth * 0.5f - thickness * 0.5f;
+            float sideWidth = Mathf.Max(0.35f, (footprint - doorWidth) * 0.5f);
+
+            // Build a hollow wall shell so the doorway is a visible opening rather
+            // than a collision gap hidden behind a solid facade cube.
+            QueueAndroidBox("CityBuildingSideWall",
+                position + new Vector3(-footprint * 0.5f + thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade);
+            QueueAndroidBox("CityBuildingSideWall",
+                position + new Vector3(footprint * 0.5f - thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade);
+            QueueAndroidBox("CityBuildingRearWall",
+                position + new Vector3(0f, bodyHeight * 0.5f, backZ),
+                new Vector3(footprint, bodyHeight, thickness), facade);
+
+            QueueAndroidBox("CityBuildingFrontWall",
+                position + new Vector3(-doorWidth * 0.5f - sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade);
+            QueueAndroidBox("CityBuildingFrontWall",
+                position + new Vector3(doorWidth * 0.5f + sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade);
+
+            float headerHeight = Mathf.Max(0.1f, bodyHeight - doorHeight);
+            QueueAndroidBox("CityBuildingDoorHeader",
+                position + new Vector3(0f, doorHeight + headerHeight * 0.5f, frontZ),
+                new Vector3(doorWidth, headerHeight, thickness), facade);
         }
 
         private void CreateAndroidBuildingColliders(
