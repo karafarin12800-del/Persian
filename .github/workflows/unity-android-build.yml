@@ -166,7 +166,7 @@ jobs:
           assert 'visual.WeaponMount' in enemy_ai and 'weaponVisualRoot.SetParent(mount, false);' in enemy_ai, 'Enemy rifle is not attached to the visible character hand/body mount.'
           visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
           assert 'public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;' in visual, 'Mobile weapon mount is missing.'
-          assert 'shot.Configure(shotDirection, rangedDamage, transform);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system.'
+          assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system with an effective range.'
           assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
