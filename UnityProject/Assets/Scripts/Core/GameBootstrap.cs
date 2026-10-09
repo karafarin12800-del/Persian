@@ -44,6 +44,9 @@ namespace PersiaWar.Unity2D5D
 
         private readonly Dictionary<Material, AndroidBoxBatch> androidBoxBatches =
             new Dictionary<Material, AndroidBoxBatch>();
+        // Each Android house owns its own batched renderers so the camera can fade
+        // only the building that actually blocks the player, not every house at once.
+        private Transform androidCurrentBuildingRoot;
 
         private void ReportStage(string message, string checkpoint)
         {
@@ -540,8 +543,14 @@ namespace PersiaWar.Unity2D5D
                 androidBuildingCenters.Add(buildingPoints[i]);
                 androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
 
+                androidCurrentBuildingRoot = new GameObject("Building_House_" + (i + 1)).transform;
+                androidCurrentBuildingRoot.SetParent(worldRoot, true);
                 CreateAndroidBuilding(
                     buildingPoints[i], footprint, height, depth, i, isWarehouse, isPitchedRoof);
+                // Flush per house into material-group meshes parented beneath this house.
+                // This preserves most batching while making per-house transparency possible.
+                FlushAndroidBoxBatches();
+                androidCurrentBuildingRoot = null;
                 StartupCheckpoint.Set("CITY_BUILDING_" + (i + 1) + "_DONE");
             }
 
@@ -881,7 +890,10 @@ namespace PersiaWar.Unity2D5D
 
             Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
             QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
-            CreateAndroidCollider("CityBuildingCollider", position, bodySize);
+            // Extend the camera-blocking collider through the roofline so the camera
+            // can detect houses even when its sightline crosses the upper facade/roof.
+            CreateAndroidCollider("CityBuildingCollider", position,
+                new Vector3(footprint, bodyHeight + (isPitchedRoof ? 1.6f : 0.65f), depth));
 
             if (isPitchedRoof)
             {
@@ -1048,21 +1060,21 @@ namespace PersiaWar.Unity2D5D
                 position + Vector3.up * (scale * 0.8f),
                 new Vector3(scale * 0.22f, scale * 1.6f, scale * 0.22f),
                 androidTreeTrunkMaterial,
-                false);
+                true);
 
             CreateAndroidBox(
                 "TreeCrownLower",
                 position + Vector3.up * (scale * 1.75f),
                 new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
                 androidTreeCrownMaterial,
-                false);
+                true);
 
             CreateAndroidBox(
                 "TreeCrownUpper",
                 position + Vector3.up * (scale * 2.30f),
                 new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
                 androidTreeCrownMaterial,
-                false);
+                true);
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
@@ -1166,7 +1178,8 @@ namespace PersiaWar.Unity2D5D
         private void CreateAndroidCollider(string objectName, Vector3 position, Vector3 size)
         {
             GameObject obj = new GameObject(objectName);
-            obj.transform.SetParent(worldRoot, true);
+            Transform parent = androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot;
+            obj.transform.SetParent(parent, true);
             obj.transform.position = position + Vector3.up * (size.y * 0.5f);
             BoxCollider box = obj.AddComponent<BoxCollider>();
             box.center = Vector3.zero;
@@ -1180,8 +1193,10 @@ namespace PersiaWar.Unity2D5D
                 if (batch.Vertices.Count == 0)
                     continue;
 
-                GameObject obj = new GameObject("AndroidCityBatch");
-                obj.transform.SetParent(worldRoot, true);
+                GameObject obj = new GameObject(
+                    androidCurrentBuildingRoot != null ? "BuildingFacadeBatch_" + batch.Material.name : "AndroidCityBatch");
+                Transform batchParent = androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot;
+                obj.transform.SetParent(batchParent, true);
 
                 Mesh mesh = new Mesh { name = "AndroidCityBatchMesh" };
                 if (batch.Vertices.Count > 65000)

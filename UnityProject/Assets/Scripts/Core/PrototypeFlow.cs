@@ -297,21 +297,21 @@ namespace PersiaWar.Unity2D5D
             // No opaque backing is painted: the live 3D scene remains visible through it.
             // A subtle frame and translucent road strokes keep the schematic readable.
             // 1.38 = the former 1.15 size multiplied by another 20 percent.
-            float mapSize = Mathf.Clamp(148f * scale * 1.38f, 134f, 262f);
+            float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f, 150f, 262f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
 
             // Keep the map see-through, but tint the live scene with a light
             // translucent grass-green layer so roads and house symbols remain readable.
-            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.78f));
+            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));
 
-            Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.62f);
+            Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.46f);
             float frame = Mathf.Max(1f, 1.5f * scale);
             Fill(new Rect(map.x, map.y, map.width, frame), frameColor);
             Fill(new Rect(map.x, map.yMax - frame, map.width, frame), frameColor);
             Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
             Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
 
-            Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.88f);
+            Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.66f);
             float roadThickness = map.width * (10f / 192f);
             for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
             {

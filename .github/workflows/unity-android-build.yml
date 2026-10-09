@@ -50,6 +50,8 @@ jobs:
           test -f UnityProject/Assets/Resources/PersiaWarLit.shader
           test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader
           test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader.meta
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFade.shader
+          test -f UnityProject/Assets/Resources/PersiaWarAndroidFade.shader.meta
           test -f UnityProject/Assets/Scripts/Core/GameBootstrap.cs
           test -f UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs
           test -f UnityProject/Assets/Scripts/Core/AndroidSafeRuntimeFactory.cs
@@ -129,8 +131,18 @@ jobs:
           fader = Path('UnityProject/Assets/Scripts/Core/CameraOcclusionFader.cs').read_text(encoding='utf-8')
           flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
           assert 'Physics.SphereCastNonAlloc' in fader and 'Mathf.MoveTowards' in fader, 'Camera occlusion fade must detect blockers and transition smoothly.'
-          assert 'SetPropertyBlock' in fader, 'Occlusion fade must not mutate shared materials.'
+          fade_shader = Path('UnityProject/Assets/Resources/PersiaWarAndroidFade.shader').read_text(encoding='utf-8')
+          assert 'Blend SrcAlpha OneMinusSrcAlpha' in fade_shader and 'ZWrite Off' in fade_shader, 'Fade shader must use genuine alpha blending.'
+          assert 'Resources.Load<Shader>("PersiaWarAndroidFade")' in fader and 'r.sharedMaterials = fades;' in fader, 'Occlusion fader must swap to the transparent shader.'
+          assert 'Physics.SphereCastNonAlloc' in fader and 'GetComponentsInChildren<Renderer>' in fader, 'Occlusion fader must resolve building collider to house renderers.'
+          assert 'androidCurrentBuildingRoot' in bootstrap and 'FlushAndroidBoxBatches();' in city, 'Android houses must be independently batchable for selective fading.'
           assert 'cameraObject.AddComponent<CameraOcclusionFader>()' in flow, 'Gameplay camera does not enable occlusion fade.'
+          assert '148f * scale * 1.38f * 1.15f' in flow, 'Gameplay minimap is not enlarged by another 15 percent.'
+          assert '0.42f));' in flow and '0.66f);' in flow, 'Gameplay minimap transparency has regressed.'
+          weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
+          assert 'weaponRange = 7.5f;' in weapon and 'weaponRange = 13.5f;' in weapon and 'weaponRange = 21f;' in weapon, 'Player weapon ranges are not halved.'
+          enemy = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
+          assert 'rangedRange = archetype == 3 ? 4f : (archetype == 2 ? 2.5f : 1.5f);' in enemy, 'Enemy weapon ranges are not halved.'
           print('Camera occlusion fade regression checks: PASS')
           print('Android shader/legacy-ground regression checks: PASS')
           print('Android startup isolation checks: PASS')

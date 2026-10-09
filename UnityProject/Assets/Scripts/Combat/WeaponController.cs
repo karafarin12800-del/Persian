@@ -112,7 +112,7 @@ namespace PersiaWar.Unity2D5D
             {
                 case WeaponKind.LightPistol:
                     projectileSpeed = 34f;
-                    weaponRange = 15f;
+                    weaponRange = 7.5f;
                     projectileDamage = 14;
                     fireCooldown = 0.24f;
                     magazineSize = 15;
@@ -120,7 +120,7 @@ namespace PersiaWar.Unity2D5D
 
                 case WeaponKind.HeavyMachineGun:
                     projectileSpeed = 40f;
-                    weaponRange = 42f;
+                    weaponRange = 21f;
                     projectileDamage = 34;
                     fireCooldown = 0.31f;
                     magazineSize = 36;
@@ -128,7 +128,7 @@ namespace PersiaWar.Unity2D5D
 
                 default:
                     projectileSpeed = 38f;
-                    weaponRange = 27f;
+                    weaponRange = 13.5f;
                     projectileDamage = 22;
                     fireCooldown = 0.19f;
                     magazineSize = 24;

@@ -53,9 +53,9 @@ namespace PersiaWar.Unity2D5D
             moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
-            // Exact effective enemy weapon ranges in world metres:
-            // pistol = 3m, machine gun = 5m, AK-style rifle = 8m.
-            rangedRange = archetype == 3 ? 8f : (archetype == 2 ? 5f : 3f);
+            // Effective enemy weapon ranges are intentionally halved for fairer combat:
+            // pistol = 1.5m, machine gun = 2.5m, AK-style rifle = 4m.
+            rangedRange = archetype == 3 ? 4f : (archetype == 2 ? 2.5f : 1.5f);
             stopDistance = Mathf.Max(1f, rangedRange * 0.70f);
             meleeCooldown = archetype == 3 ? 1.05f : (archetype == 2 ? 1.25f : 1.5f);
             rangedCooldown = archetype == 3 ? 0.90f : (archetype == 2 ? 1.10f : 1.35f);
