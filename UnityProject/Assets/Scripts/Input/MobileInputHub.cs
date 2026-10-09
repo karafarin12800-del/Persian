@@ -75,10 +75,9 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // HandleAndroidTouches owns the real finger IDs. Keep Unity's built-in
-            // touch-to-mouse simulation enabled for IMGUI controls such as PAUSE;
-            // HandleGuiPointerFallback ignores those events on mobile so they cannot
-            // overwrite the joystick/FIRE finger IDs.
+            Input.simulateMouseWithTouches = true;
+            // Real finger IDs are the primary path; IMGUI mouse events are only a
+            // guarded fallback when Unity fails to expose a live touch pointer.
 #endif
             enabled = true;
         }
@@ -110,10 +109,17 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+#if UNITY_ANDROID
+            // Keep IMGUI menu/pause controls clickable from the very first frame.
+            // Gameplay prefers real finger IDs and uses the guarded GUI fallback
+            // only if Unity does not expose a corresponding Input.touchCount.
+            Input.multiTouchEnabled = true;
+            Input.simulateMouseWithTouches = true;
+#endif
             if (moveRadius > 0f)
                 joystickRadius = Mathf.Clamp(moveRadius * 0.98f, 108f, 164f);
 
-if (player == null)
+            if (player == null)
                 player = FindFirstObjectByType<PlayerController>();
             if (gameplayCamera == null)
                 gameplayCamera = Camera.main;
@@ -215,7 +221,7 @@ if (!matchActive || matchPaused)
 
                 // Combat buttons get first priority so an oversized touch zone can
                 // never accidentally become a movement touch.
-                if (firePointerId < 0 &&
+                if (firePointerId == -1 &&
                     Vector2.Distance(gui, fireGui) <= fireHit)
                 {
                     firePointerId = touch.fingerId;
@@ -228,7 +234,7 @@ if (!matchActive || matchPaused)
                     continue;
                 }
 
-                if (meleePointerId < 0 &&
+                if (meleePointerId == -1 &&
                     Vector2.Distance(gui, meleeGui) <= meleeHit)
                 {
                     meleePointerId = touch.fingerId;
@@ -236,7 +242,7 @@ if (!matchActive || matchPaused)
                     continue;
                 }
 
-                if (grenadePointerId < 0 &&
+                if (grenadePointerId == -1 &&
                     Vector2.Distance(gui, grenadeGui) <= grenadeHit)
                 {
                     grenadePointerId = touch.fingerId;
@@ -244,7 +250,7 @@ if (!matchActive || matchPaused)
                     continue;
                 }
 
-                if (reloadPointerId < 0 &&
+                if (reloadPointerId == -1 &&
                     Vector2.Distance(gui, reloadGui) <= reloadHit)
                 {
                     // Tap to reload; hold for 0.55 seconds to cycle weapon profile.
@@ -259,7 +265,7 @@ if (!matchActive || matchPaused)
                 if (touch.position.x <= Screen.width * 0.58f &&
                     gui.y >= Screen.height * 0.10f)
                 {
-                    if (movePointerId < 0)
+                    if (movePointerId == -1)
                     {
                         movePointerId = touch.fingerId;
                         moveStartScreen = ClampFloatingOrigin(touch.position, radius);
@@ -295,8 +301,9 @@ if (!matchActive || matchPaused)
                     ResetMovementPointer();
                 }
             }
-            else
+            else if (movePointerId != -1000)
             {
+                // Do not erase movement supplied by the IMGUI fallback pointer.
                 player.SetMoveInput(Vector2.zero);
             }
 
@@ -835,15 +842,28 @@ if (!matchActive || matchPaused)
 
         private void HandleGuiPointerFallback()
         {
-            // Android uses real finger IDs in HandleAndroidTouches. Handling Unity's
-            // synthesized MouseDown/MouseDrag events here creates a second input owner
-            // and can steal the joystick finger when FIRE is pressed with another finger.
-            if (Application.isMobilePlatform)
-                return;
-
             Event e = Event.current;
             if (e == null)
                 return;
+
+            // Real Input.touchCount/fingerId input wins on mobile. Some Android/Unity
+            // combinations still deliver IMGUI touch-to-mouse events without a live
+            // legacy Touch entry; in that case this fallback must stay enabled or the
+            // drawn joystick and combat controls are visible but inert. Keep ownership
+            // if this fallback already owns a pointer, even if touchCount changes later.
+            bool guiFallbackOwnsPointer =
+                movePointerId == -1000 ||
+                firePointerId == -1001 ||
+                meleePointerId == -1002 ||
+                grenadePointerId == -1003 ||
+                reloadPointerId == -1004;
+
+            if (Application.isMobilePlatform &&
+                Input.touchCount > 0 &&
+                !guiFallbackOwnsPointer)
+            {
+                return;
+            }
 
             if (e.type != EventType.MouseDown &&
                 e.type != EventType.MouseDrag &&
