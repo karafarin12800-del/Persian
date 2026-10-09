@@ -5,7 +5,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class PlayerController : MonoBehaviour
     {
         [SerializeField] private float moveSpeed = 11.5f;
-        [SerializeField] private float worldLimit = 94f;
+        [SerializeField] private float worldLimit = 108.1f;
         [SerializeField] private float turnSpeed = 18f;
         [SerializeField] private float collisionRadius = 0.62f;
         [SerializeField] private int shield = 0;
