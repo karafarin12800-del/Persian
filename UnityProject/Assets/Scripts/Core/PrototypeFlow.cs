@@ -1253,7 +1253,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
-                    ? "All five enemy waves defeated."
+                    ? "Extraction reached. Mission complete."
                     : "Your fighter was defeated.",
                 bodyStyle);
 
