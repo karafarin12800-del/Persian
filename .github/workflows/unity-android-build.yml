@@ -135,7 +135,7 @@ jobs:
           assert 'Blend SrcAlpha OneMinusSrcAlpha' in fade_shader and 'ZWrite Off' in fade_shader, 'Fade shader must use genuine alpha blending.'
           assert 'Resources.Load<Shader>("PersiaWarAndroidFade")' in fader and 'r.sharedMaterials = fades;' in fader, 'Occlusion fader must swap to the transparent shader.'
           assert 'Physics.SphereCastNonAlloc' in fader and 'GetComponentsInChildren<Renderer>' in fader, 'Occlusion fader must resolve building collider to house renderers.'
-          assert 'androidCurrentBuildingRoot' in bootstrap and 'FlushAndroidBoxBatches();' in city, 'Android houses must be independently batchable for selective fading.'
+          assert 'androidCurrentBuildingRoot' in bootstrap and 'FlushAndroidBoxBatches();' in bootstrap, 'Android houses must be independently batchable for selective fading.'
           assert 'cameraObject.AddComponent<CameraOcclusionFader>()' in flow, 'Gameplay camera does not enable occlusion fade.'
           assert '148f * scale * 1.38f * 1.15f' in flow, 'Gameplay minimap is not enlarged by another 15 percent.'
           assert '0.42f));' in flow and '0.66f);' in flow, 'Gameplay minimap transparency has regressed.'
