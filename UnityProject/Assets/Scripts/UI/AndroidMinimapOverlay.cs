@@ -35,7 +35,9 @@ namespace PersiaWar.Unity2D5D
             mapCamera.nearClipPlane = 0.1f;
             mapCamera.farClipPlane = 300f;
             mapCamera.clearFlags = CameraClearFlags.SolidColor;
-            mapCamera.backgroundColor = new Color(0.07f, 0.10f, 0.08f, 1f);
+            mapCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            mapCamera.cullingMask = ~0;
+            mapCamera.aspect = 1f;
 
             mapTexture = new RenderTexture(textureSize, textureSize, 16, RenderTextureFormat.ARGB32);
             mapTexture.filterMode = FilterMode.Bilinear;
@@ -69,18 +71,31 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-            float size = 178f * scale;
+            float size = 214f * scale;
             Rect rect = new Rect(Screen.width - size - 18f * scale, 18f * scale, size, size);
 
-            GUI.DrawTexture(rect, mapTexture, ScaleMode.StretchToFill, false);
             Color old = GUI.color;
-            GUI.color = new Color(0.95f, 0.72f, 0.18f, 0.95f);
+            GUI.color = Color.white;
+            // The render camera uses a transparent clear color so the game world remains visible
+            // around streets and buildings instead of a solid dark square.
+            GUI.DrawTexture(rect, mapTexture, ScaleMode.StretchToFill, false);
+
+            // The minimap camera follows the player in world space and renders every layer;
+            // houses therefore remain at their real X/Z world positions relative to the player.
+            GUI.color = new Color(0.95f, 0.72f, 0.18f, 0.98f);
             float markerSize = 10f * scale;
             GUI.DrawTexture(
                 new Rect(rect.center.x - markerSize * 0.5f, rect.center.y - markerSize * 0.5f, markerSize, markerSize),
                 marker);
+
+            // Draw only a thin outline; avoid GUI.Box because its default skin paints an opaque panel.
+            GUI.color = new Color(0.78f, 0.82f, 0.84f, 0.72f);
+            float border = Mathf.Max(1f, 1.5f * scale);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, border), marker);
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - border, rect.width, border), marker);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, border, rect.height), marker);
+            GUI.DrawTexture(new Rect(rect.xMax - border, rect.y, border, rect.height), marker);
             GUI.color = old;
-            GUI.Box(rect, GUIContent.none);
         }
 
         private void OnDestroy()
