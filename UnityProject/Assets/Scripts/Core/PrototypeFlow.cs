@@ -815,7 +815,7 @@ namespace PersiaWar.Unity2D5D
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.08f, 0.09f, 0.10f, 1f);
+            camera.backgroundColor = new Color(0.15f, 0.16f, 0.17f, 1f);
             camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
