@@ -27,7 +27,9 @@ namespace PersiaWar.Unity2D5D
         private float reloadPressedAt;
         private bool reloadHeldToSwap;
 
+        // Keep actual finger origin separate from the clamped visual joystick origin.
         private Vector2 moveStartScreen;
+        private Vector2 moveTouchOriginScreen;
         private Vector2 moveValue;
 
         private float nextFireTime;
@@ -313,6 +315,7 @@ namespace PersiaWar.Unity2D5D
                     if (movePointerId == -1)
                     {
                         movePointerId = touch.fingerId;
+                        moveTouchOriginScreen = touch.position;
                         moveStartScreen = ClampFloatingOrigin(touch.position, radius);
                         moveValue = Vector2.zero;
                         if (!movementTouchCheckpointWritten)
@@ -328,7 +331,7 @@ namespace PersiaWar.Unity2D5D
             {
                 if (TryGetTouch(movePointerId, out Touch movementTouch))
                 {
-                    Vector2 delta = movementTouch.position - moveStartScreen;
+                    Vector2 delta = movementTouch.position - moveTouchOriginScreen;
                     float touchRadius = Mathf.Max(1f, radius);
                     moveValue = Vector2.ClampMagnitude(delta / touchRadius, 1f);
 
@@ -565,6 +568,7 @@ namespace PersiaWar.Unity2D5D
             movePointerId = -1;
             guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
+            moveTouchOriginScreen = Vector2.zero;
             moveValue = Vector2.zero;
 
             if (player != null)
@@ -999,9 +1003,8 @@ namespace PersiaWar.Unity2D5D
                 {
                     movePointerId = -1000;
                     guiMoveMouseButton = mouseButton;
-                    moveStartScreen = ClampFloatingOrigin(
-                        new Vector2(gui.x, Screen.height - gui.y),
-                        radius);
+                    moveTouchOriginScreen = new Vector2(gui.x, Screen.height - gui.y);
+                    moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
                     moveValue = Vector2.zero;
                     e.Use();
                     return;
@@ -1022,7 +1025,7 @@ namespace PersiaWar.Unity2D5D
                     Vector2 current = new Vector2(
                         gui.x,
                         Screen.height - gui.y);
-                    Vector2 delta = current - moveStartScreen;
+                    Vector2 delta = current - moveTouchOriginScreen;
                     moveValue = Vector2.ClampMagnitude(
                         delta / Mathf.Max(1f, radius),
                         1f);
