@@ -46,6 +46,14 @@ namespace PersiaWar.Unity2D5D
         private bool movementTouchCheckpointWritten;
         private bool fireTouchCheckpointWritten;
 
+        // IMGUI fallback maps concurrent touchscreen contacts to mouse buttons.
+        // Keep a distinct owner per simulated button so movement cannot consume fire.
+        private int guiMoveMouseButton = -1;
+        private int guiFireMouseButton = -1;
+        private int guiMeleeMouseButton = -1;
+        private int guiGrenadeMouseButton = -1;
+        private int guiReloadMouseButton = -1;
+
         public Vector2 MoveValue => moveValue;
         public bool IsMovementTouchActive => movePointerId >= 0;
         public bool IsMatchActive => matchActive && !matchPaused;
@@ -515,6 +523,7 @@ if (!matchActive || matchPaused)
         private void ResetMovementPointer()
         {
             movePointerId = -1;
+            guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
             moveValue = Vector2.zero;
 
@@ -529,6 +538,11 @@ if (!matchActive || matchPaused)
             meleePointerId = -1;
             grenadePointerId = -1;
             reloadPointerId = -1;
+            guiMoveMouseButton = -1;
+            guiFireMouseButton = -1;
+            guiMeleeMouseButton = -1;
+            guiGrenadeMouseButton = -1;
+            guiReloadMouseButton = -1;
             reloadPressedAt = 0f;
             reloadHeldToSwap = false;
             moveStartScreen = Vector2.zero;
@@ -846,11 +860,9 @@ if (!matchActive || matchPaused)
             if (e == null)
                 return;
 
-            // Real Input.touchCount/fingerId input wins on mobile. Some Android/Unity
-            // combinations still deliver IMGUI touch-to-mouse events without a live
-            // legacy Touch entry; in that case this fallback must stay enabled or the
-            // drawn joystick and combat controls are visible but inert. Keep ownership
-            // if this fallback already owns a pointer, even if touchCount changes later.
+            // Use the real Touch.fingerId path whenever Unity exposes live touches.
+            // If we already own an IMGUI fallback pointer, keep the fallback active
+            // until that simulated contact has been released.
             bool guiFallbackOwnsPointer =
                 movePointerId == -1000 ||
                 firePointerId == -1001 ||
@@ -885,44 +897,64 @@ if (!matchActive || matchPaused)
 
             if (e.type == EventType.MouseDown)
             {
-                if (firePointerId < 0 && Vector2.Distance(gui, firePos) <= radius * 0.86f)
+                int mouseButton = e.button;
+                if (mouseButton < 0 || mouseButton > 2)
+                    return;
+
+                // A control is free only when its logical pointer AND simulated
+                // mouse-button owner are free. Negative pointer sentinels are active.
+                if (firePointerId == -1 &&
+                    guiFireMouseButton == -1 &&
+                    Vector2.Distance(gui, firePos) <= radius * 0.86f)
                 {
                     firePointerId = -1001;
+                    guiFireMouseButton = mouseButton;
                     FireAtNearestTarget();
                     e.Use();
                     return;
                 }
 
-                if (meleePointerId < 0 && Vector2.Distance(gui, meleePos) <= radius * 0.76f)
+                if (meleePointerId == -1 &&
+                    guiMeleeMouseButton == -1 &&
+                    Vector2.Distance(gui, meleePos) <= radius * 0.76f)
                 {
                     meleePointerId = -1002;
+                    guiMeleeMouseButton = mouseButton;
                     player.Weapon?.TryMelee();
                     e.Use();
                     return;
                 }
 
-                if (grenadePointerId < 0 && Vector2.Distance(gui, grenadePos) <= radius * 0.76f)
+                if (grenadePointerId == -1 &&
+                    guiGrenadeMouseButton == -1 &&
+                    Vector2.Distance(gui, grenadePos) <= radius * 0.76f)
                 {
                     grenadePointerId = -1003;
+                    guiGrenadeMouseButton = mouseButton;
                     ThrowGrenadeAtTarget();
                     e.Use();
                     return;
                 }
 
-                if (reloadPointerId < 0 && Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
+                if (reloadPointerId == -1 &&
+                    guiReloadMouseButton == -1 &&
+                    Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
                 {
                     reloadPointerId = -1004;
+                    guiReloadMouseButton = mouseButton;
                     reloadPressedAt = Time.time;
                     reloadHeldToSwap = false;
                     e.Use();
                     return;
                 }
 
-                if (gui.x <= Screen.width * 0.58f &&
-                    gui.y >= Screen.height * 0.10f &&
-                    movePointerId < 0)
+                if (movePointerId == -1 &&
+                    guiMoveMouseButton == -1 &&
+                    gui.x <= Screen.width * 0.58f &&
+                    gui.y >= Screen.height * 0.10f)
                 {
                     movePointerId = -1000;
+                    guiMoveMouseButton = mouseButton;
                     moveStartScreen = ClampFloatingOrigin(
                         new Vector2(gui.x, Screen.height - gui.y),
                         radius);
@@ -930,61 +962,118 @@ if (!matchActive || matchPaused)
                     e.Use();
                     return;
                 }
-            }
 
-            if (e.type == EventType.MouseDrag && movePointerId == -1000)
-            {
-                Vector2 current = new Vector2(
-                    gui.x,
-                    Screen.height - gui.y);
-                Vector2 delta = current - moveStartScreen;
-                moveValue = Vector2.ClampMagnitude(delta / Mathf.Max(1f, radius), 1f);
-                player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
-                e.Use();
+                // This touch did not start a gameplay control. Let other IMGUI
+                // controls (notably pause/menu) process it normally.
                 return;
             }
 
-            if (e.type == EventType.MouseDrag && firePointerId == -1001)
+            if (e.type == EventType.MouseDrag)
             {
-                if (Time.time >= nextFireTime)
-                    FireAtNearestTarget();
-                e.Use();
-                return;
-            }
-
-            if (e.type == EventType.MouseDrag && reloadPointerId == -1004)
-            {
-                if (!reloadHeldToSwap && Time.time - reloadPressedAt >= 0.55f)
+                // Never route every drag to movement. Each simulated finger keeps
+                // the mouse button captured when that finger first touched down.
+                if (movePointerId == -1000 &&
+                    guiMoveMouseButton == e.button)
                 {
-                    player.Weapon?.CycleWeapon();
-                    reloadHeldToSwap = true;
+                    Vector2 current = new Vector2(
+                        gui.x,
+                        Screen.height - gui.y);
+                    Vector2 delta = current - moveStartScreen;
+                    moveValue = Vector2.ClampMagnitude(
+                        delta / Mathf.Max(1f, radius),
+                        1f);
+                    player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                    e.Use();
+                    return;
                 }
-                e.Use();
+
+                if (firePointerId == -1001 &&
+                    guiFireMouseButton == e.button)
+                {
+                    if (Time.time >= nextFireTime)
+                        FireAtNearestTarget();
+                    e.Use();
+                    return;
+                }
+
+                if (reloadPointerId == -1004 &&
+                    guiReloadMouseButton == e.button)
+                {
+                    if (!reloadHeldToSwap &&
+                        Time.time - reloadPressedAt >= 0.55f)
+                    {
+                        player.Weapon?.CycleWeapon();
+                        reloadHeldToSwap = true;
+                    }
+
+                    e.Use();
+                    return;
+                }
+
                 return;
             }
 
             if (e.type == EventType.MouseUp)
             {
-                if (movePointerId == -1000)
-                    ResetMovementPointer();
-                if (firePointerId == -1001)
-                    firePointerId = -1;
-                if (meleePointerId == -1002)
-                    meleePointerId = -1;
-                if (grenadePointerId == -1003)
-                    grenadePointerId = -1;
-                if (reloadPointerId == -1004)
+                bool handled = false;
+
+                // Release only the control owned by this simulated finger/button.
+                // A fire finger going up must not stop movement (and vice versa).
+                if (movePointerId == -1000 &&
+                    guiMoveMouseButton == e.button)
                 {
-                    if (!reloadHeldToSwap && Time.time - reloadPressedAt >= 0.55f)
+                    ResetMovementPointer();
+                    handled = true;
+                }
+
+                if (firePointerId == -1001 &&
+                    guiFireMouseButton == e.button)
+                {
+                    firePointerId = -1;
+                    guiFireMouseButton = -1;
+                    handled = true;
+                }
+
+                if (meleePointerId == -1002 &&
+                    guiMeleeMouseButton == e.button)
+                {
+                    meleePointerId = -1;
+                    guiMeleeMouseButton = -1;
+                    handled = true;
+                }
+
+                if (grenadePointerId == -1003 &&
+                    guiGrenadeMouseButton == e.button)
+                {
+                    grenadePointerId = -1;
+                    guiGrenadeMouseButton = -1;
+                    handled = true;
+                }
+
+                if (reloadPointerId == -1004 &&
+                    guiReloadMouseButton == e.button)
+                {
+                    if (!reloadHeldToSwap &&
+                        Time.time - reloadPressedAt >= 0.55f)
+                    {
                         player.Weapon?.CycleWeapon();
+                    }
                     else if (!reloadHeldToSwap)
+                    {
                         player.Weapon?.Reload();
+                    }
 
                     reloadPointerId = -1;
+                    guiReloadMouseButton = -1;
                     reloadHeldToSwap = false;
                     reloadPressedAt = 0f;
+                    handled = true;
                 }
-                e.Use();
+
+                // Unowned MouseUp events must remain available to other IMGUI
+                // controls instead of being swallowed by the gameplay fallback.
+                if (handled)
+                    e.Use();
             }
         }
 
