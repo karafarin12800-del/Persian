@@ -384,10 +384,20 @@ jobs:
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         timeout-minutes: 60
         run: |
           set -euo pipefail
           IMAGE="unityci/editor:2022.3.62f1-android-3"
+
+          # The shared runner may hit Docker Hub's anonymous pull limit.
+          # Authenticate when repository-level Docker Hub secrets are configured.
+          if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_TOKEN:-}" ]]; then
+            printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+          else
+            echo "::warning::Docker Hub secrets are not configured; attempting the public image pull unauthenticated."
+          fi
 
           mkdir -p .ci
           cleanup() {
