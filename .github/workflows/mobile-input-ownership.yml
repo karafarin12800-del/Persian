@@ -82,9 +82,19 @@ jobs:
           ):
               assert callback in hub, f"Missing input reset lifecycle path: {callback}"
           assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
-          assert "private const int MovementTouchGraceFrames = 3;" in hub, "Brief Android movement-touch gaps must not instantly cancel movement while firing"
-          assert "missingMovementTouchFrames < MovementTouchGraceFrames" in hub and "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement continuity fallback must preserve the last vector briefly"
+          assert "else if (Input.touchCount > 0)" in hub and "while any contact is still down" in hub, "Movement must remain active if Android temporarily omits the captured finger while another contact remains"
+          assert "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement continuity fallback must preserve the last joystick vector"
           assert "if (!Input.multiTouchEnabled)" in hub and "Input.multiTouchEnabled = true;" in hub, "Android multi-touch must be enforced during active touch dispatch"
+          player_controller = (scripts / "Player/PlayerController.cs").read_text(encoding="utf-8")
+          assert "if (!WouldCollide(next))" in player_controller and "WouldCollide(slideX)" in player_controller, "Player movement must respect solid obstacles and allow wall sliding"
+          bootstrap = (scripts / "Core/GameBootstrap.cs").read_text(encoding="utf-8")
+          assert "worldSize = 220.8f" in bootstrap and "CreateAndroidBuildingColliders(" in bootstrap and "CityVehicleCollider" in bootstrap, "Expanded city, door gaps, and vehicle colliders must be present"
+          enemy = (scripts / "Enemy/EnemyChase.cs").read_text(encoding="utf-8")
+          assert "new Color(0.10f, 0.55f, 1f)" in enemy, "Enemy projectiles must be blue"
+          audio = scripts / "Core/RuntimeGameAudio.cs"
+          assert audio.exists() and "BuildMusicLoop()" in audio.read_text(encoding="utf-8") and "PlayPlayerShot()" in audio.read_text(encoding="utf-8"), "Runtime music and shot audio must be present"
+          hud = (scripts / "UI/RuntimeCombatHUD.cs").read_text(encoding="utf-8")
+          assert "fontSize = 18" in hud and "fontSize = 24" in hud, "Player HUD text must be larger"
           assert "private const float BaseActionHitRadius = 122f;" in hub, "Action touch zones must not inherit the enlarged movement-joystick radius"
           assert hub.count("float actionHitRadius = BaseActionHitRadius * scale * controlScale;") == 2, "Real touch and IMGUI fallback must share the same action hit radius"
           fallback_start = hub.index("private void HandleGuiPointerFallback()")
