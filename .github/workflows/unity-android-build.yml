@@ -104,7 +104,7 @@ jobs:
           android_path = world_method[android_start:android_end]
           assert 'AddComponent<Terrain3DBuilder>' not in android_path and 'terrain.Build()' not in android_path, 'Android first-match path still invokes Terrain3DBuilder.'
           assert 'GameObject.CreatePrimitive' not in android_path, 'Android first-match path still uses CreatePrimitive.'
-          assert 'CreateFlatMesh' in android_path and 'return;' in android_path, 'Android safe battlefield path is incomplete.'
+          assert 'BuildAndroidTerrain3D(groundMaterial)' in android_path and 'return;' in android_path, 'Android safe 3D battlefield path is incomplete.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           awake = weapon[weapon.index('private void Awake()'):weapon.index('private void EnsureProjectileTemplate()')]
@@ -152,11 +152,11 @@ jobs:
           android_hud_activation = flow[android_pass_start:android_pass_end]
           assert 'combatHud.enabled = false;' in android_hud_activation, 'Overlapping secondary HUD must remain disabled on Android.'
           spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
-          assert 'maxPerWave = Mathf.Max(maxPerWave, 31);' in spawner, 'Android lobby can still be capped below 32 total combatants.'
+          assert 'maxPerWave = Mathf.Clamp(maxPerWave, 1, 12);' in spawner, 'Android enemy wave cap must stay at or below 12.'
           assert 'Random.Range(-82f, 82f)' in spawner and 'Random.Range(-82f, 82f)' in spawner, 'Android opponents are not selected across the full map.'
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
 
-          assert 'enemySpawner.Configure(player.transform, 31, 84f, 0f);' in flow, 'Android match does not request all 31 opponents at start.'
+          assert 'enemySpawner.Configure(player.transform, 11, 84f, 0f);' in flow, 'Android match must start with the reduced 11-opponent lobby.'
           assert 'float mapSize = Mathf.Clamp(148f * scale * 1.15f, 112f, 218f);' in active_hud, 'Android minimap is not enlarged by 15%.'
           assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
           assert 'AndroidMinimapBuildingPoints' in active_hud and 'for (int road = -72; road <= 72; road += 24)' in active_hud, 'Minimap city roads/buildings are incomplete.'
