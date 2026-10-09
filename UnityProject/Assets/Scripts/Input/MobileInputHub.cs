@@ -464,9 +464,17 @@ namespace PersiaWar.Unity2D5D
                 ? player.Aim.CurrentTarget
                 : null;
 
-            bool fired = target != null
-                ? player.Weapon.TryFire(target.transform.position)
-                : player.Weapon.TryFireDirection(player.transform.forward);
+            // A target can be selected before it is inside the equipped weapon's
+            // effective range. TryFire(targetPosition) correctly rejects that shot,
+            // but the old dispatcher then did nothing at all while a distant target
+            // remained selected. Fall back to firing forward whenever target fire
+            // cannot produce a projectile, so holding FIRE always has a visible action.
+            bool fired = false;
+            if (target != null)
+                fired = player.Weapon.TryFire(target.transform.position);
+
+            if (!fired && player.Weapon.Magazine > 0)
+                fired = player.Weapon.TryFireDirection(player.transform.forward);
 
             if (fired)
             {
