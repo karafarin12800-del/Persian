@@ -241,7 +241,7 @@ jobs:
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android IMGUI menu and pause controls must receive synthesized touch events.'
           assert 'guiFallbackOwnsPointer' in gui_fallback and 'Input.touchCount > 0' in gui_fallback, 'Android IMGUI fallback must defer to live finger IDs but recover if legacy touch entries are missing.'
-          assert 'float fireHit = radius * 1.02f;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile firing touch-zone must tolerate screen differences without stealing other action buttons.'
+          assert 'float fireHit = actionHitRadius * 1.02f;' in input_hub and 'float actionHitRadius = BaseActionHitRadius * scale * controlScale;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile action hit zones must use the tested radius independent from the movement stick and preserve firing priority.'
           assert 'Screen.width - 352f * scale' in input_hub and 'Screen.height - bottom - 236f * scale' in input_hub and 'Screen.height - bottom - 300f * scale' in input_hub, 'Mobile action-button hit-zones must be separated so fire cannot register as reload/grenade/melee.'
           assert 'private int guiMoveMouseButton = -1;' in input_hub and 'private int guiFireMouseButton = -1;' in input_hub, 'Fallback touchscreen contacts need independent movement and fire button ownership.'
           fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
