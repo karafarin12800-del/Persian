@@ -363,23 +363,18 @@ namespace PersiaWar.Unity2D5D
             // Dense, readable 2.5D city layout: buildings hug the streets so the
             // gameplay camera never opens onto a large empty floor.
             androidBoxBatches.Clear();
+            // Spread buildings across the playable map, including outer blocks.
+            // Coordinates sit between the 24m road lanes so streets and intersections stay open.
             Vector3[] buildingPoints =
             {
-                new Vector3(-42f, 0f, -42f), new Vector3(-21f, 0f, -42f), new Vector3(21f, 0f, -42f), new Vector3(42f, 0f, -42f),
-                new Vector3(-42f, 0f, -21f), new Vector3(42f, 0f, -21f),
-                new Vector3(-42f, 0f, 0f),   new Vector3(42f, 0f, 0f),
-                new Vector3(-42f, 0f, 21f),  new Vector3(42f, 0f, 21f),
-                new Vector3(-42f, 0f, 42f),  new Vector3(-21f, 0f, 42f), new Vector3(21f, 0f, 42f), new Vector3(42f, 0f, 42f),
-
-                new Vector3(-21f, 0f, -21f), new Vector3(21f, 0f, -21f),
-                new Vector3(-21f, 0f, 21f),  new Vector3(21f, 0f, 21f),
-                new Vector3(-10f, 0f, -34f),  new Vector3(10f, 0f, 34f),
-                new Vector3(-34f, 0f, 10f),   new Vector3(34f, 0f, -10f),
-
-                // Near-center landmarks keep the playable view from opening onto
-                // a large empty green floor around the spawn area.
-                new Vector3(-15f, 0f, -14f), new Vector3(15f, 0f, -14f),
-                new Vector3(-15f, 0f, 14f),  new Vector3(15f, 0f, 14f)
+                new Vector3(-79f, 0f, -79f), new Vector3(-55f, 0f, -79f), new Vector3(41f, 0f, -79f), new Vector3(65f, 0f, -79f),
+                new Vector3(-79f, 0f, -55f), new Vector3(-31f, 0f, -55f), new Vector3(17f, 0f, -55f), new Vector3(65f, 0f, -55f),
+                new Vector3(-55f, 0f, -31f), new Vector3(-7f, 0f, -31f), new Vector3(41f, 0f, -31f),
+                new Vector3(-79f, 0f, -7f), new Vector3(-31f, 0f, -7f), new Vector3(41f, 0f, -7f), new Vector3(65f, 0f, -7f),
+                new Vector3(-55f, 0f, 17f), new Vector3(-7f, 0f, 17f), new Vector3(41f, 0f, 17f),
+                new Vector3(-79f, 0f, 41f), new Vector3(-31f, 0f, 41f), new Vector3(17f, 0f, 41f), new Vector3(65f, 0f, 41f),
+                new Vector3(-55f, 0f, 65f), new Vector3(-7f, 0f, 65f), new Vector3(41f, 0f, 65f), new Vector3(65f, 0f, 65f),
+                new Vector3(-79f, 0f, 79f), new Vector3(-31f, 0f, 79f), new Vector3(17f, 0f, 79f), new Vector3(65f, 0f, 79f)
             };
 
             for (int i = 0; i < buildingPoints.Length; i++)
