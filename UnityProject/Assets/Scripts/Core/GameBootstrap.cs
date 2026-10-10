@@ -247,6 +247,7 @@ namespace PersiaWar.Unity2D5D
                 false);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
+            BuildAndroidSkyGuideBeacon();
             return;
 #else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
@@ -466,6 +467,96 @@ namespace PersiaWar.Unity2D5D
             CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
             CreateAndroidQuadBatch("AndroidSidewalkGrid", sidewalkVertices, sidewalkTriangles, androidSidewalkMaterial);
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
+        }
+
+        private void BuildAndroidSkyGuideBeacon()
+        {
+            // Permanent 3D landmark at the clear road intersection (5,5).
+            const float beaconX = 5f;
+            const float beaconZ = 5f;
+            Vector3 ground = new Vector3(
+                beaconX,
+                CalculateAndroidTerrainHeight(beaconX, beaconZ) + 0.08f,
+                beaconZ);
+
+            CreateAndroidSkyGuideCylinder(
+                "BlueSkyGuideBeamOuter", ground + Vector3.up * 19f,
+                new Vector3(3.4f, 19f, 3.4f),
+                new Color(0.04f, 0.25f, 1f, 0.20f), true);
+            CreateAndroidSkyGuideCylinder(
+                "BlueSkyGuideBeamCore", ground + Vector3.up * 19f,
+                new Vector3(1.15f, 19f, 1.15f),
+                new Color(0.20f, 0.66f, 1f, 0.48f), true);
+            CreateAndroidSkyGuideCylinder(
+                "BlueSkyGuideGroundRing", ground + Vector3.up * 0.06f,
+                new Vector3(4.6f, 0.06f, 4.6f),
+                new Color(0.12f, 0.60f, 1f, 0.96f), false);
+
+            // Small, shadowless ground light adds a subtle blue pool below the beam.
+            GameObject lightObject = new GameObject("BlueSkyGuideGroundLight");
+            lightObject.transform.SetParent(worldRoot, false);
+            lightObject.transform.position = ground + Vector3.up * 0.45f;
+            Light blueLight = lightObject.AddComponent<Light>();
+            blueLight.type = LightType.Point;
+            blueLight.color = new Color(0.12f, 0.42f, 1f);
+            blueLight.intensity = 1.25f;
+            blueLight.range = 7f;
+            blueLight.shadows = LightShadows.None;
+        }
+
+        private void CreateAndroidSkyGuideCylinder(
+            string objectName,
+            Vector3 position,
+            Vector3 scale,
+            Color color,
+            bool transparent)
+        {
+            GameObject cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cylinder.name = objectName;
+            cylinder.transform.SetParent(worldRoot, false);
+            cylinder.transform.position = position;
+            cylinder.transform.localScale = scale;
+
+            Collider collider = cylinder.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            Shader shader = transparent
+                ? (Resources.Load<Shader>("PersiaWarAndroidFade") ??
+                   Shader.Find("PersiaWar/AndroidFade") ??
+                   Shader.Find("Unlit/Transparent") ??
+                   Shader.Find("Sprites/Default"))
+                : (Resources.Load<Shader>("PersiaWarAndroidFlat") ??
+                   Shader.Find("PersiaWar/AndroidFlat") ??
+                   Shader.Find("Unlit/Color"));
+            if (shader == null)
+            {
+                Debug.LogWarning("PERSIA_GUIDE: no supported shader for " + objectName);
+                Destroy(cylinder);
+                return;
+            }
+
+            Material material = new Material(shader)
+            {
+                name = objectName + "Material",
+                color = color
+            };
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", color);
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", color);
+            if (material.HasProperty("_FadeAlpha"))
+                material.SetFloat("_FadeAlpha", 1f);
+            if (transparent)
+                material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+            Renderer renderer = cylinder.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
         }
 
         private void BuildAndroidCityPresentation()
