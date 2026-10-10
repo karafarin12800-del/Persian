@@ -247,7 +247,7 @@ namespace PersiaWar.Unity2D5D
                 false);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
-            BuildAndroidSkyGuideBeacon();
+            // Extraction beacon is spawned only when the last enemy is defeated.
             return;
 #else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
@@ -469,30 +469,26 @@ namespace PersiaWar.Unity2D5D
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
         }
 
-        private void BuildAndroidSkyGuideBeacon()
+        private bool extractionBeaconShown;
+
+        public void ShowRandomExtractionBeacon()
         {
-            // Permanent 3D landmark at the clear road intersection (5,5).
-            const float beaconX = 5f;
-            const float beaconZ = 5f;
-            Vector3 ground = new Vector3(
-                beaconX,
-                CalculateAndroidTerrainHeight(beaconX, beaconZ) + 0.08f,
-                beaconZ);
+            if (extractionBeaconShown || worldRoot == null) return;
+            extractionBeaconShown = true;
 
-            CreateAndroidSkyGuideCylinder(
-                "BlueSkyGuideBeamOuter", ground + Vector3.up * 19f,
-                new Vector3(3.4f, 19f, 3.4f),
-                new Color(0.04f, 0.25f, 1f, 0.20f), true);
-            CreateAndroidSkyGuideCylinder(
-                "BlueSkyGuideBeamCore", ground + Vector3.up * 19f,
-                new Vector3(1.15f, 19f, 1.15f),
-                new Color(0.20f, 0.66f, 1f, 0.48f), true);
-            CreateAndroidSkyGuideCylinder(
-                "BlueSkyGuideGroundRing", ground + Vector3.up * 0.06f,
-                new Vector3(4.6f, 0.06f, 4.6f),
-                new Color(0.12f, 0.60f, 1f, 0.96f), false);
+            // Random road intersection chosen only at victory; no blue beam is visible during the match.
+            float[] roads = { -67f, -43f, -19f, 5f, 29f, 53f, 77f };
+            float beaconX = roads[Random.Range(0, roads.Length)];
+            float beaconZ = roads[Random.Range(0, roads.Length)];
+            Vector3 ground = new Vector3(beaconX, CalculateAndroidTerrainHeight(beaconX, beaconZ) + 0.08f, beaconZ);
 
-            // Small, shadowless ground light adds a subtle blue pool below the beam.
+            CreateAndroidSkyGuideCylinder("BlueSkyGuideBeamOuter", ground + Vector3.up * 19f,
+                new Vector3(3.4f, 19f, 3.4f), new Color(0.04f, 0.25f, 1f, 0.20f), true);
+            CreateAndroidSkyGuideCylinder("BlueSkyGuideBeamCore", ground + Vector3.up * 19f,
+                new Vector3(1.15f, 19f, 1.15f), new Color(0.20f, 0.66f, 1f, 0.48f), true);
+            CreateAndroidSkyGuideCylinder("BlueSkyGuideGroundRing", ground + Vector3.up * 0.06f,
+                new Vector3(4.6f, 0.06f, 4.6f), new Color(0.12f, 0.60f, 1f, 0.96f), false);
+
             GameObject lightObject = new GameObject("BlueSkyGuideGroundLight");
             lightObject.transform.SetParent(worldRoot, false);
             lightObject.transform.position = ground + Vector3.up * 0.45f;
@@ -502,6 +498,7 @@ namespace PersiaWar.Unity2D5D
             blueLight.intensity = 1.25f;
             blueLight.range = 7f;
             blueLight.shadows = LightShadows.None;
+            Debug.Log("PERSIA_GUIDE: Random extraction beacon activated at " + beaconX + "," + beaconZ);
         }
 
         private void CreateAndroidSkyGuideCylinder(
