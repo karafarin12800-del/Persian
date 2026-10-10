@@ -30,6 +30,7 @@ namespace PersiaWar.Unity2D5D
         private const float AndroidCameraLookHeight = 0.90f;
         private const float AndroidCameraLookAhead = 4.5f;
         private EnemyChase[] minimapEnemies = new EnemyChase[0];
+        private PickupItem[] minimapPickups = new PickupItem[0];
         private float nextMinimapRefresh;
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
@@ -69,6 +70,9 @@ namespace PersiaWar.Unity2D5D
         // Center lines copied from BuildAndroidRoadGrid(): start at -91m, then every 24m.
         private static readonly float[] AndroidMinimapRoadCoordinates =
             { -91f, -67f, -43f, -19f, 5f, 29f, 53f, 77f };
+
+        // Kept aligned with the 3D beacon created in GameBootstrap.
+        private static readonly Vector2 AndroidSkyGuideBeaconPoint = new Vector2(5f, 5f);
 
         private static readonly string[] HeroNames =
         {
@@ -254,6 +258,21 @@ namespace PersiaWar.Unity2D5D
             GameSession session = GameSession.Instance;
             int score = session != null ? session.Score : 0;
 
+            if (Time.unscaledTime >= nextMinimapRefresh)
+            {
+                nextMinimapRefresh = Time.unscaledTime + 0.40f;
+                minimapEnemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+                minimapPickups = FindObjectsByType<PickupItem>(FindObjectsSortMode.None);
+            }
+
+            int survivorCount = player != null && !player.IsDefeated ? 1 : 0;
+            for (int i = 0; i < minimapEnemies.Length; i++)
+            {
+                EnemyChase enemy = minimapEnemies[i];
+                if (enemy != null && enemy.gameObject.activeInHierarchy)
+                    survivorCount++;
+            }
+
             float leftW = 340f * scale;
             float leftH = 100f * scale;
             Rect left = new Rect(margin, margin, leftW, leftH);
@@ -296,18 +315,13 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 6f * scale, right.width - 24f * scale, 22f * scale),
                 "SURVIVORS", smallStyle);
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
-                "32", headerStyle);
+                survivorCount.ToString(), headerStyle);
 
-            // This is the Android minimap that is actually drawn during gameplay.
-            // No opaque backing is painted: the live 3D scene remains visible through it.
-            // A subtle frame and translucent road strokes keep the schematic readable.
-            // 1.38 = the former 1.15 size multiplied by another 20 percent.
+            // Tactical minimap: a dark translucent base improves contrast over the
+            // live 3D scene, while city blocks, roads and dynamic markers stay visible.
             float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
-
-            // Keep the map see-through, but tint the live scene with a light
-            // translucent grass-green layer so roads and house symbols remain readable.
-            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));
+            Fill(map, new Color(0.035f, 0.065f, 0.095f, 0.88f));
 
             Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.46f);
             float frame = Mathf.Max(1f, 1.5f * scale);
@@ -316,8 +330,8 @@ namespace PersiaWar.Unity2D5D
             Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
             Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
 
-            Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.66f);
-            float roadThickness = map.width * (10f / 192f);
+            Color roadColor = new Color(0.62f, 0.68f, 0.75f, 0.92f);
+            float roadThickness = map.width * (7f / 192f);
             for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
             {
                 float road = AndroidMinimapRoadCoordinates[i];
@@ -374,12 +388,6 @@ namespace PersiaWar.Unity2D5D
                 Fill(houseRect, new Color(0.96f, 0.68f, 0.30f, 1f));
             }
 
-            if (Time.unscaledTime >= nextMinimapRefresh)
-            {
-                nextMinimapRefresh = Time.unscaledTime + 0.25f;
-                minimapEnemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
-            }
-
             for (int i = 0; i < minimapEnemies.Length; i++)
             {
                 EnemyChase enemy = minimapEnemies[i];
@@ -393,6 +401,28 @@ namespace PersiaWar.Unity2D5D
                 Vector2 enemyPoint = WorldToMap(new Vector2(enemyPosition.x, enemyPosition.z), map);
                 DrawCircle(enemyPoint, 3.5f * scale, new Color(1f, 0.22f, 0.16f, 1f));
             }
+
+            // Cyan squares show live collectible pickups/dropped supplies.
+            for (int i = 0; i < minimapPickups.Length; i++)
+            {
+                PickupItem pickup = minimapPickups[i];
+                if (pickup == null || !pickup.gameObject.activeInHierarchy)
+                    continue;
+                Vector3 pickupPosition = pickup.transform.position;
+                if (Mathf.Abs(pickupPosition.x) > 96f || Mathf.Abs(pickupPosition.z) > 96f)
+                    continue;
+
+                Vector2 pickupPoint = WorldToMap(new Vector2(pickupPosition.x, pickupPosition.z), map);
+                float markerSize = 5f * scale;
+                Fill(new Rect(pickupPoint.x - markerSize * 0.5f,
+                    pickupPoint.y - markerSize * 0.5f, markerSize, markerSize),
+                    new Color(0.20f, 0.95f, 1f, 1f));
+            }
+
+            // Blue marker matches the permanent pillar visible in the 3D city.
+            Vector2 skyGuidePoint = WorldToMap(AndroidSkyGuideBeaconPoint, map);
+            DrawCircle(skyGuidePoint, 8.5f * scale, new Color(0.03f, 0.32f, 1f, 1f));
+            DrawCircle(skyGuidePoint, 3.7f * scale, new Color(0.56f, 0.90f, 1f, 1f));
 
             if (ExtractionBeacon.IsActive)
             {
@@ -412,7 +442,22 @@ namespace PersiaWar.Unity2D5D
             }
             DrawCircle(playerPoint, 6.5f * scale, new Color(0.95f, 0.86f, 0.20f, 1f));
             GUI.Label(new Rect(map.x + 7f * scale, map.y + 5f * scale, map.width - 12f * scale, 22f * scale),
-                "MAP   P: YOU   E: ENEMY", smallStyle);
+                "N ↑   MAP   P:YOU   E:ENEMY", smallStyle);
+
+            Rect legend = new Rect(
+                map.x + 4f * scale,
+                map.yMax - 27f * scale,
+                map.width - 8f * scale,
+                22f * scale);
+            Fill(legend, new Color(0.02f, 0.035f, 0.055f, 0.84f));
+            DrawCircle(new Vector2(legend.x + 10f * scale, legend.center.y),
+                3f * scale, new Color(0.20f, 0.95f, 1f, 1f));
+            GUI.Label(new Rect(legend.x + 18f * scale, legend.y, 118f * scale, legend.height),
+                "L: LOOT", smallStyle);
+            DrawCircle(new Vector2(legend.x + 148f * scale, legend.center.y),
+                3.5f * scale, new Color(0.20f, 0.58f, 1f, 1f));
+            GUI.Label(new Rect(legend.x + 157f * scale, legend.y, legend.width - 162f * scale, legend.height),
+                "B: BEACON", smallStyle);
 
             Rect counters = new Rect(
                 Screen.width - rightW - margin,
@@ -421,7 +466,7 @@ namespace PersiaWar.Unity2D5D
                 30f * scale);
             Fill(counters, new Color(0.03f, 0.06f, 0.08f, 0.86f));
             GUI.Label(new Rect(counters.x + 8f * scale, counters.y, counters.width - 16f * scale, counters.height),
-                "WAVE  " + wave + "     KILLS  " + score, smallStyle);
+                "WAVE  " + wave + "     SCORE  " + score, smallStyle);
 
             if (ExtractionBeacon.IsActive)
             {
