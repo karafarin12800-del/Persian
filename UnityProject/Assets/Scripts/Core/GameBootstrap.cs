@@ -247,7 +247,8 @@ namespace PersiaWar.Unity2D5D
                 false);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
-            // Extraction beacon is spawned only when the last enemy is defeated.
+            SpawnRandomHouseLoot();
+            RemoveAnyExtractionBeacon();
             return;
 #else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
@@ -471,9 +472,23 @@ namespace PersiaWar.Unity2D5D
 
         private bool extractionBeaconShown;
 
+        private void RemoveAnyExtractionBeacon()
+        {
+            string[] names = { "BlueSkyGuideBeamOuter", "BlueSkyGuideBeamCore", "BlueSkyGuideGroundRing", "BlueSkyGuideGroundLight" };
+            GameObject[] existing = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            for (int i = 0; i < existing.Length; i++)
+            {
+                if (existing[i] == null) continue;
+                for (int n = 0; n < names.Length; n++)
+                    if (existing[i].name == names[n]) Destroy(existing[i]);
+            }
+            extractionBeaconShown = false;
+        }
+
         public void ShowRandomExtractionBeacon()
         {
             if (extractionBeaconShown || worldRoot == null) return;
+            RemoveAnyExtractionBeacon();
             extractionBeaconShown = true;
 
             // Random road intersection chosen only at victory; no blue beam is visible during the match.
@@ -499,6 +514,46 @@ namespace PersiaWar.Unity2D5D
             blueLight.range = 7f;
             blueLight.shadows = LightShadows.None;
             Debug.Log("PERSIA_GUIDE: Random extraction beacon activated at " + beaconX + "," + beaconZ);
+        }
+
+        private void SpawnRandomHouseLoot()
+        {
+            // Eight of each supply type are placed at randomized floor positions
+            // inside generated houses each time a new match is built.
+            if (androidBuildingCenters.Count == 0) return;
+            const int countPerType = 8;
+            for (int i = 0; i < countPerType * 3; i++)
+            {
+                int houseIndex = Random.Range(0, androidBuildingCenters.Count);
+                Vector3 center = androidBuildingCenters[houseIndex];
+                Vector2 half = androidBuildingHalfExtents[houseIndex];
+                float x = center.x + Random.Range(-half.x * 0.42f, half.x * 0.42f);
+                float z = center.z + Random.Range(-half.y * 0.42f, half.y * 0.42f);
+                float y = CalculateAndroidTerrainHeight(x, z) + 0.38f;
+                PickupItem.PickupType type = i < countPerType ? PickupItem.PickupType.Weapon
+                    : (i < countPerType * 2 ? PickupItem.PickupType.Shield : PickupItem.PickupType.Grenade);
+                Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
+                    : (type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f) : new Color(0.95f, 0.28f, 0.12f));
+
+                GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube : PrimitiveType.Sphere);
+                item.name = "HouseLoot_" + type + "_" + i;
+                item.transform.SetParent(worldRoot, true);
+                item.transform.position = new Vector3(x, y, z);
+                item.transform.localScale = type == PickupItem.PickupType.Weapon ? new Vector3(0.72f, 0.18f, 0.24f) : Vector3.one * 0.48f;
+                Renderer renderer = item.GetComponent<Renderer>();
+                if (renderer != null) renderer.sharedMaterial = MakeMaterial("HouseLootMaterial_" + type + "_" + i, color);
+                Collider collider = item.GetComponent<Collider>();
+                if (collider != null) collider.isTrigger = true;
+                Rigidbody body = item.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
+                PickupItem pickup = item.AddComponent<PickupItem>();
+                if (type == PickupItem.PickupType.Weapon)
+                    pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
+                else
+                    pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
+            }
+            Debug.Log("PERSIA_LOOT: spawned 8 weapons, 8 shields and 8 grenade pickups in houses");
         }
 
         private void CreateAndroidSkyGuideCylinder(
