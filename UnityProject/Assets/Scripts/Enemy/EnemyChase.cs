@@ -173,14 +173,13 @@ namespace PersiaWar.Unity2D5D
                 ? new Vector3(0.34f, 0.86f, 0.10f)
                 : new Vector3(0.24f, 0.78f, 0.34f);
             weaponVisualRoot.localRotation = Quaternion.identity;
-            // Enlarge the silhouette so it reads clearly on a phone display.
-            weaponVisualRoot.localScale = Vector3.one * 1.35f;
+            weaponVisualRoot.localScale = Vector3.one;
 
             if (enemyRifleReceiverMaterial == null)
-                enemyRifleReceiverMaterial = CreateEnemyWeaponOverlayMaterial(
+                enemyRifleReceiverMaterial = RuntimeMaterialFactory.Create(
                     "EnemyRifleReceiver", new Color(0.07f, 0.09f, 0.11f));
             if (enemyRifleMetalMaterial == null)
-                enemyRifleMetalMaterial = CreateEnemyWeaponOverlayMaterial(
+                enemyRifleMetalMaterial = RuntimeMaterialFactory.Create(
                     "EnemyRifleMetal", new Color(0.42f, 0.43f, 0.39f));
 
             if (archetype == 1)
@@ -219,34 +218,6 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
-        private static Material CreateEnemyWeaponOverlayMaterial(string materialName, Color color)
-        {
-            // Late-sorted transparent geometry avoids hiding the weapon behind the
-            // character billboard. Depth testing still lets buildings occlude it.
-            Shader shader = Resources.Load<Shader>("PersiaWarAndroidFade")
-                ?? Shader.Find("PersiaWar/AndroidFade")
-                ?? Shader.Find("Sprites/Default")
-                ?? RuntimeMaterialFactory.GetShader();
-            if (shader == null)
-                return null;
-
-            Material material = new Material(shader)
-            {
-                name = materialName,
-                color = color,
-                renderQueue = 3001
-            };
-            if (material.HasProperty("_MainTex"))
-                material.mainTexture = Texture2D.whiteTexture;
-            if (material.HasProperty("_Color"))
-                material.SetColor("_Color", color);
-            if (material.HasProperty("_BaseColor"))
-                material.SetColor("_BaseColor", color);
-            if (material.HasProperty("_FadeAlpha"))
-                material.SetFloat("_FadeAlpha", 1f);
-            return material;
-        }
-
         private void CreateEnemyWeaponPart(
             string partName,
             Vector3 localPosition,
@@ -267,7 +238,6 @@ namespace PersiaWar.Unity2D5D
             if (renderer != null)
             {
                 renderer.sharedMaterial = material;
-                renderer.sortingOrder = 40;
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
             }
@@ -722,7 +692,7 @@ namespace PersiaWar.Unity2D5D
                 "EnemyProjectile",
                 origin + shotDirection * 0.16f,
                 Quaternion.LookRotation(shotDirection, Vector3.up),
-                new Vector3(0.12f, 0.12f, 0.12f),
+                new Vector3(0.07f, 0.07f, 0.07f),
                 new Color(0.10f, 0.55f, 1f));
 #else
             GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Capsule);
@@ -752,8 +722,8 @@ namespace PersiaWar.Unity2D5D
             Renderer renderer = projectile.GetComponent<Renderer>();
             if (renderer != null)
                 renderer.sharedMaterial = RuntimeMaterialFactory.Create(
-                    "EnemyProjectileBlueMaterial",
-                    new Color(0.10f, 0.55f, 1f));
+                    "EnemyProjectileMaterial",
+                    new Color(0.92f, 0.18f, 0.10f));
 #endif
 
             EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
