@@ -72,9 +72,11 @@ namespace PersiaWar.Unity2D5D
 
             // Faster mobile combat pacing, tuned by the enemy's carried weapon:
             // pistol users close distance fastest; heavy-gun users move more slowly.
+            // Keep enemies challenging but controllable on mobile: reduce the
+            // previous sprint speeds by 25 percent.
             moveSpeed = DroppedWeaponKind == WeaponController.WeaponKind.LightPistol
-                ? 11.6f
-                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 9.2f : 10.5f);
+                ? 8.7f
+                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 6.9f : 7.875f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
             // Use the same configured range as the weapon the enemy visibly carries/drops.
@@ -277,21 +279,33 @@ namespace PersiaWar.Unity2D5D
             PlayerController player = target.GetComponentInParent<PlayerController>();
             bool hasLineOfSight = player == null || HasLineOfSightToPlayer(player);
 
+            // Lightweight mobile AI: when critically wounded, disengage and create
+            // distance instead of blindly charging. Reuses existing obstacle navigation.
+            TargetHealth ownHealth = GetComponent<TargetHealth>();
+            bool retreating = ownHealth != null &&
+                ownHealth.MaxHealth > 0 &&
+                ownHealth.CurrentHealth <= Mathf.CeilToInt(ownHealth.MaxHealth * 0.30f) &&
+                player != null;
+            Vector3 movementDirection = retreating ? -direction : direction;
+
             // If a wall blocks sight, keep navigating even inside the normal stop range
             // instead of idling against a wall with no attack lane.
-            bool shouldMove = distance > stopDistance || (player != null && !hasLineOfSight);
+            bool shouldMove = retreating || distance > stopDistance || (player != null && !hasLineOfSight);
             if (shouldMove)
-                UpdatePursuitMovement(direction, distance, hasLineOfSight);
+                UpdatePursuitMovement(movementDirection, distance, retreating ? false : hasLineOfSight);
             else
                 ClearNavigationPath();
 
             if (visual != null)
             {
-                visual.SetFacing(shouldMove && !hasLineOfSight ? GetCurrentMovementDirection(direction) : direction);
+                Vector3 facing = retreating
+                    ? GetCurrentMovementDirection(movementDirection)
+                    : (shouldMove && !hasLineOfSight ? GetCurrentMovementDirection(direction) : direction);
+                visual.SetFacing(facing);
                 visual.SetMoving(shouldMove);
             }
 
-            if (player == null)
+            if (player == null || retreating)
                 return;
 
             if (distance <= meleeDistance && Time.time >= nextAttackTime && hasLineOfSight)
