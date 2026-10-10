@@ -38,6 +38,7 @@ namespace PersiaWar.Unity2D5D
         private bool startingMatch;
         private bool matchInputArmed;
         private bool matchPaused;
+        private float resultOverlayStartTime = -1f;
         private string startupStatus = string.Empty;
         private GameObject mainCameraRoot;
         private GameObject playerRoot;
@@ -201,7 +202,11 @@ namespace PersiaWar.Unity2D5D
                 DrawAndroidPauseControl();
 
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
+                {
+                    if (resultOverlayStartTime < 0f)
+                        resultOverlayStartTime = Time.unscaledTime;
                     DrawAndroidResultOverlay();
+                }
 #endif
                 return;
             }
@@ -522,15 +527,22 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawBackdrop()
         {
+            // Bright blue lobby palette inspired by the supplied battle-royale waiting screen.
             Color old = GUI.color;
-            GUI.color = new Color(0.035f, 0.08f, 0.13f, 0.96f);
+            GUI.color = new Color(0.14f, 0.49f, 0.70f, 1f);
             GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), pixel);
             GUI.color = old;
-
+            for (int band = 0; band < 8; band++)
+            {
+                float t = band / 7f;
+                Fill(new Rect(0f, band * Screen.height / 8f, Screen.width, Screen.height / 8f + 1f),
+                    Color.Lerp(new Color(0.10f, 0.38f, 0.61f, 0.30f),
+                               new Color(0.37f, 0.72f, 0.83f, 0.22f), t));
+            }
             Rect topBar = new Rect(0f, 0f, Screen.width, Mathf.Min(110f, Screen.height * 0.16f));
-            Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.84f));
-            GUI.Label(new Rect(28f, 18f, Screen.width * 0.55f, 48f), "PERSIA WAR", titleStyle);
-            GUI.Label(new Rect(30f, 62f, Screen.width * 0.60f, 30f), "CLASSIC BATTLE ROYALE  •  PROTOTYPE", smallStyle);
+            Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.48f));
+            GUI.Label(new Rect(28f, 18f, Screen.width * 0.55f, 48f), "♛  PERSIA WAR", titleStyle);
+            GUI.Label(new Rect(30f, 62f, Screen.width * 0.60f, 30f), "CLASSIC BATTLE ROYALE", smallStyle);
         }
 
         private void HandleHeroSelectTouches()
@@ -687,14 +699,19 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawTacticalMap(Rect rect)
         {
-            Fill(rect, new Color(0.39f, 0.66f, 0.27f, 1f));
+            Fill(rect, new Color(0.34f, 0.68f, 0.28f, 1f));
             float block = rect.width / 6f;
-
+            // District colors: residential green, industrial sand, and a central blue urban zone.
+            Fill(new Rect(rect.x + rect.width * 0.64f, rect.y, rect.width * 0.36f, rect.height * 0.40f), new Color(0.79f, 0.75f, 0.35f, 1f));
+            Fill(new Rect(rect.x + rect.width * 0.64f, rect.y + rect.height * 0.40f, rect.width * 0.36f, rect.height * 0.60f), new Color(0.78f, 0.52f, 0.28f, 1f));
+            Fill(new Rect(rect.x + rect.width * 0.32f, rect.y + rect.height * 0.22f, rect.width * 0.34f, rect.height * 0.52f), new Color(0.38f, 0.56f, 0.65f, 1f));
             for (int i = 1; i < 6; i++)
             {
                 float road = rect.x + i * block;
-                Fill(new Rect(road - 13f, rect.y, 26f, rect.height), new Color(0.16f, 0.18f, 0.19f));
-                Fill(new Rect(rect.x, rect.y + i * block - 13f, rect.width, 26f), new Color(0.16f, 0.18f, 0.19f));
+                Fill(new Rect(road - 15f, rect.y, 30f, rect.height), new Color(0.75f, 0.72f, 0.61f, 1f));
+                Fill(new Rect(road - 8f, rect.y, 16f, rect.height), new Color(0.22f, 0.25f, 0.27f, 1f));
+                Fill(new Rect(rect.x, rect.y + i * block - 15f, rect.width, 30f), new Color(0.75f, 0.72f, 0.61f, 1f));
+                Fill(new Rect(rect.x, rect.y + i * block - 8f, rect.width, 16f), new Color(0.22f, 0.25f, 0.27f, 1f));
             }
 
             for (int gx = 0; gx < 6; gx++)
@@ -703,11 +720,20 @@ namespace PersiaWar.Unity2D5D
                 {
                     Rect cell = new Rect(rect.x + gx * block + 7f, rect.y + gy * block + 7f, block - 14f, block - 14f);
                     Color c = new Color(0.50f, 0.72f, 0.31f, 1f);
-                    if (gx >= 4 && gy <= 2) c = new Color(0.48f, 0.44f, 0.39f, 1f);
+                    if (gx >= 4 && gy <= 2) c = new Color(0.83f, 0.76f, 0.38f, 1f);
+                    if (gx >= 4 && gy > 2) c = new Color(0.78f, 0.52f, 0.28f, 1f);
                     if (gx == 2 && gy == 3) c = new Color(0.30f, 0.50f, 0.66f, 1f);
                     Fill(cell, c);
                     if (gx != 5 && gy != 5)
-                        Fill(new Rect(cell.x + 10f, cell.y + 10f, cell.width * 0.42f, cell.height * 0.34f), new Color(0.86f, 0.69f, 0.30f, 1f));
+                    {
+                        float bw = cell.width * (0.26f + 0.18f * Mathf.Abs(Mathf.Sin(gx * 4.7f + gy)));
+                        float bh = cell.height * (0.20f + 0.18f * Mathf.Abs(Mathf.Cos(gy * 3.2f + gx)));
+                        Fill(new Rect(cell.x + 10f, cell.y + 10f, bw, bh), new Color(0.86f, 0.69f, 0.30f, 1f));
+                        Fill(new Rect(cell.x + cell.width * 0.56f, cell.y + cell.height * 0.52f, cell.width * 0.16f, cell.height * 0.13f), new Color(0.19f, 0.26f, 0.22f, 1f));
+                    }
+                    if ((gx + gy) % 2 == 0)
+                        DrawCircle(new Vector2(cell.x + cell.width * 0.78f, cell.y + cell.height * 0.78f),
+                            Mathf.Max(2f, rect.width * 0.006f), new Color(0.12f, 0.35f, 0.12f, 1f));
                 }
             }
 
@@ -1358,7 +1384,21 @@ namespace PersiaWar.Unity2D5D
             GameSession session = GameSession.Instance;
             if (session == null || !session.IsFinished)
                 return;
-
+            // Show the blue sky-to-ground beacon briefly after the final elimination,
+            // then reveal the end-of-match text.
+            float elapsed = Mathf.Max(0f, Time.unscaledTime - resultOverlayStartTime);
+            if (elapsed < 1.65f)
+            {
+                float pulse = 0.72f + 0.28f * Mathf.Sin(Time.unscaledTime * 8f);
+                float beamWidth = Mathf.Max(18f, Screen.width * 0.055f);
+                float beamX = Screen.width * 0.5f;
+                Fill(new Rect(beamX - beamWidth * 1.8f, 0f, beamWidth * 3.6f, Screen.height), new Color(0.10f, 0.44f, 1f, 0.12f * pulse));
+                Fill(new Rect(beamX - beamWidth * 0.55f, 0f, beamWidth * 1.1f, Screen.height), new Color(0.18f, 0.58f, 1f, 0.24f * pulse));
+                Fill(new Rect(beamX - beamWidth * 0.12f, 0f, beamWidth * 0.24f, Screen.height), new Color(0.72f, 0.91f, 1f, 0.52f * pulse));
+                DrawCircle(new Vector2(beamX, Screen.height * 0.82f), Screen.width * (0.08f + 0.02f * pulse), new Color(0.14f, 0.60f, 1f, 0.75f * pulse));
+                GUI.Label(new Rect(0f, Screen.height * 0.22f, Screen.width, 64f), "BLUE BEACON ACTIVATED", headerStyle);
+                return;
+            }
             float width = Mathf.Min(Screen.width - 64f, 720f);
             float height = Mathf.Min(Screen.height - 80f, 340f);
             Rect panel = new Rect(
