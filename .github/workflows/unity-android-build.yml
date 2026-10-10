@@ -149,6 +149,10 @@ jobs:
           assert 'case WeaponKind.LightPistol: return LightPistolRange;' in weapon and 'case WeaponKind.HeavyMachineGun: return HeavyMachineGunRange;' in weapon and 'default: return AssaultRifleRange;' in weapon, 'Shared profile does not cover every weapon kind.'
           enemy = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range does not match the weapon it carries/drops.'
+          assert 'ClampInsidePlayableArea();' in enemy, 'Enemy AI does not recover enemies beyond map boundaries.'
+          assert 'ClampToPlayableArea(ref routeNext);' in enemy and 'ClampToPlayableArea(ref directNext);' in enemy, 'Enemy navigation can move beyond the playable map.'
+          player = Path('UnityProject/Assets/Scripts/Player/PlayerController.cs').read_text(encoding='utf-8')
+          assert 'public float WorldLimit => worldLimit;' in player, 'Enemy AI does not share the player world boundary setting.'
           assert 'PlanLocalRoute(' in enemy and 'Physics.OverlapSphereNonAlloc' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy has no collider-aware route around walls.'
           assert 'private readonly RaycastHit[] navigationRayHits' in enemy and 'navigationRayHits[i].collider' in enemy, 'SphereCastNonAlloc must use RaycastHit results, not Collider results.'
           assert 'if (hit is MeshCollider)' in enemy, 'Enemy navigation must ignore the continuous ground mesh.'

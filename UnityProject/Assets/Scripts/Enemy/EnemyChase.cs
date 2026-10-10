@@ -20,6 +20,8 @@ namespace PersiaWar.Unity2D5D
         private float nextRangedTime;
         private int archetype = 1;
         private float collisionRadius = 0.55f;
+        [SerializeField] private float fallbackWorldLimit = 108.1f;
+        private PlayerController targetPlayer;
         private StylizedCharacterVisual visual;
         private Transform weaponVisualRoot;
         private static Material enemyRifleReceiverMaterial;
@@ -51,6 +53,7 @@ namespace PersiaWar.Unity2D5D
         public void SetTarget(Transform targetTransform)
         {
             target = targetTransform;
+            targetPlayer = target != null ? target.GetComponentInParent<PlayerController>() : null;
         }
 
         public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
@@ -64,7 +67,7 @@ namespace PersiaWar.Unity2D5D
 
         public void Configure(Transform targetTransform, int enemyArchetype)
         {
-            target = targetTransform;
+            SetTarget(targetTransform);
             archetype = Mathf.Clamp(enemyArchetype, 1, 3);
             // With a full 32-combatant lobby, lower mobile AI polling frequency to
             // reduce per-frame physics-query pressure without changing attack rules.
@@ -253,6 +256,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            if (target != null)
+                targetPlayer = target.GetComponentInParent<PlayerController>();
+
             CapsuleCollider capsule = GetComponent<CapsuleCollider>();
             if (capsule != null)
                 collisionRadius = Mathf.Max(
@@ -264,6 +270,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            // Enforce arena bounds every frame, including during AI retarget cooldown.
+            ClampInsidePlayableArea();
+
             if (target == null || Time.time < nextRetargetTime)
                 return;
 
@@ -351,6 +360,7 @@ namespace PersiaWar.Unity2D5D
                     navigationWaypoints[navigationWaypointIndex],
                     step);
                 routeNext.y = 0f;
+                ClampToPlayableArea(ref routeNext);
                 if (CanMoveTo(routeNext))
                 {
                     transform.position = routeNext;
@@ -369,6 +379,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Vector3 directNext = transform.position + direction * advance;
                 directNext.y = 0f;
+                ClampToPlayableArea(ref directNext);
                 if (CanMoveTo(directNext))
                 {
                     transform.position = directNext;
@@ -586,6 +597,32 @@ namespace PersiaWar.Unity2D5D
                     return false;
             }
             return true;
+        }
+
+        private float GetWorldLimit()
+        {
+            if (targetPlayer == null && target != null)
+                targetPlayer = target.GetComponentInParent<PlayerController>();
+
+            return targetPlayer != null
+                ? Mathf.Max(1f, targetPlayer.WorldLimit)
+                : Mathf.Max(1f, fallbackWorldLimit);
+        }
+
+        private void ClampToPlayableArea(ref Vector3 position)
+        {
+            float limit = GetWorldLimit();
+            position.x = Mathf.Clamp(position.x, -limit, limit);
+            position.z = Mathf.Clamp(position.z, -limit, limit);
+        }
+
+        private void ClampInsidePlayableArea()
+        {
+            Vector3 position = transform.position;
+            Vector3 clamped = position;
+            ClampToPlayableArea(ref clamped);
+            if ((position - clamped).sqrMagnitude > 0.0001f)
+                transform.position = clamped;
         }
 
         private bool CanTravelDirectly(Vector3 from, Vector3 to)
