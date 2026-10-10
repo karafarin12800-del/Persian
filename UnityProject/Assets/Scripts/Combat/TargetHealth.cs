@@ -99,6 +99,12 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, -0.015f, 0.02f), new Vector3(0.085f, 0.12f, 0.10f), metal);
             }
 
+            // Add an extra 2x size boost specifically to enemy drops; PickupItem
+            // applies its own 2x readable-pickup scale after this, for a clear 4x
+            // visible weapon compared with the original tiny dropped model.
+            for (int childIndex = 0; childIndex < dropped.transform.childCount; childIndex++)
+                dropped.transform.GetChild(childIndex).localScale *= 2f;
+
             PickupItem pickup = dropped.AddComponent<PickupItem>();
             pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);
             Debug.Log("PERSIA_COMBAT: dropped enemy weapon " + enemy.DroppedWeaponKind);
