@@ -6,11 +6,12 @@ on:
       build_ref:
         description: 'Unity branch or commit to build'
         required: true
-        default: 'unity-2.5d'
+        default: 'fix/android-multitouch-pointer-zones'
         type: string
   push:
     branches:
       - unity-2.5d
+      - fix/android-multitouch-pointer-zones
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
@@ -197,13 +198,14 @@ jobs:
           android_hud_activation = flow[android_pass_start:android_pass_end]
           assert 'combatHud.enabled = false;' in android_hud_activation, 'Overlapping secondary HUD must remain disabled on Android.'
           spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
-          assert 'maxPerWave = Mathf.Clamp(maxPerWave, 1, 12);' in spawner, 'Android enemy wave cap must stay at or below 12.'
+          assert 'maxPerWave = Mathf.Clamp(maxPerWave, 1, 24);' in spawner, 'Android enemy wave cap must stay at or below 24.'
+          assert 'startingCount = 24' in spawner and 'count = Mathf.Min(count, 24);' in spawner, 'Android match must start with 24 enemies.'
           assert 'Random.Range(-82f, 82f)' in spawner and 'Random.Range(-82f, 82f)' in spawner, 'Android opponents are not selected across the full map.'
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
 
-          assert 'enemySpawner.Configure(player.transform, 11, 84f, 0f);' in flow, 'Android match must start with the reduced 11-opponent lobby.'
+          assert 'enemySpawner.Configure(player.transform, 24, 84f, 0f);' in flow, 'Android match must start with 24 enemies.'
           assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in active_hud, 'Active Android minimap must be enlarged by a further 20 percent.'
-          assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
+          assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'DrawCircle(enemyPoint, 7f * scale, new Color(0.22f, 0.56f, 0.98f, 1f))' in active_hud and 'new Color(0.035f, 0.075f, 0.24f, 1f)' in active_hud, 'Minimap enemy markers must be twice as large with a clear navy center.'
           assert 'AndroidMinimapBuildingPoints' in active_hud and 'AndroidMinimapRoadCoordinates' in active_hud, 'Minimap city roads/buildings are incomplete.'
           assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
           assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f))' in active_hud, 'Active Android minimap must remain more transparent while retaining its green tint.'
@@ -218,6 +220,7 @@ jobs:
           assert 'public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;' in visual, 'Mobile weapon mount is missing.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system with an effective range.'
           assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
+          assert 'retreatUntil = Time.time + retreatDuration;' in enemy_ai and 'TrackMovementProgress();' in enemy_ai and 'ChooseRecoveryDirection()' in enemy_ai, 'Enemy AI must time-box retreat and recover from corner/wall stalls.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           assert 'enum WeaponKind' in weapon and 'public void CycleWeapon()' in weapon, 'Weapon profiles cannot be cycled at runtime.'
