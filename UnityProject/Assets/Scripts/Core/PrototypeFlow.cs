@@ -204,7 +204,11 @@ namespace PersiaWar.Unity2D5D
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                 {
                     if (resultOverlayStartTime < 0f)
+                    {
                         resultOverlayStartTime = Time.unscaledTime;
+                        if (GameSession.Instance.PlayerWon && gameBootstrap != null)
+                            gameBootstrap.ShowRandomExtractionBeacon();
+                    }
                     DrawAndroidResultOverlay();
                 }
 #endif
@@ -422,11 +426,6 @@ namespace PersiaWar.Unity2D5D
                     pickupPoint.y - markerSize * 0.5f, markerSize, markerSize),
                     new Color(0.20f, 0.95f, 1f, 1f));
             }
-
-            // Blue marker matches the permanent pillar visible in the 3D city.
-            Vector2 skyGuidePoint = WorldToMap(AndroidSkyGuideBeaconPoint, map);
-            DrawCircle(skyGuidePoint, 8.5f * scale, new Color(0.03f, 0.32f, 1f, 1f));
-            DrawCircle(skyGuidePoint, 3.7f * scale, new Color(0.56f, 0.90f, 1f, 1f));
 
             if (ExtractionBeacon.IsActive)
             {
@@ -739,9 +738,6 @@ namespace PersiaWar.Unity2D5D
                 Fill(house, (i == 0 || i == 7 || i == 13) ? new Color(0.75f, 0.69f, 0.57f, 1f) : new Color(0.89f, 0.67f, 0.36f, 1f));
             }
 
-            Vector2 beacon = WorldToMap(AndroidSkyGuideBeaconPoint, rect);
-            DrawCircle(beacon, Mathf.Max(3f, rect.width * 0.012f), new Color(0.08f, 0.34f, 1f, 1f));
-            DrawCircle(beacon, Mathf.Max(1.5f, rect.width * 0.005f), new Color(0.62f, 0.91f, 1f, 1f));
             GUI.Label(new Rect(rect.x + 8f, rect.y + 7f, 170f, 24f), "PERSIA WAR • CITY MAP", smallStyle);
         }
 
