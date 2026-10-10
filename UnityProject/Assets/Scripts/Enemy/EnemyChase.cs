@@ -75,8 +75,8 @@ namespace PersiaWar.Unity2D5D
             // Keep enemies challenging but controllable on mobile: reduce the
             // previous sprint speeds by 25 percent.
             moveSpeed = DroppedWeaponKind == WeaponController.WeaponKind.LightPistol
-                ? 8.7f
-                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 6.9f : 7.875f);
+                ? 7.83f
+                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 6.21f : 7.0875f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
             // Use the same configured range as the weapon the enemy visibly carries/drops.
