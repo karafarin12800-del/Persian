@@ -20,6 +20,20 @@ namespace PersiaWar.Unity2D5D
         private float nextRangedTime;
         private int archetype = 1;
         private float collisionRadius = 0.55f;
+
+        // Tactical disengage is time-boxed; enemies resume combat instead of fleeing forever.
+        [SerializeField] private float retreatDuration = 2.1f;
+        [SerializeField] private float retreatCooldown = 6.0f;
+        [SerializeField] private float stuckRecoveryDelay = 1.35f;
+        [SerializeField] private float stuckRecoveryDuration = 2.2f;
+        private float retreatUntil;
+        private float nextRetreatAllowed;
+        private float recoveryUntil;
+        private float nextRecoveryAllowed;
+        private float lastProgressTime;
+        private Vector3 lastObservedPosition;
+        private Vector3 recoveryDirection;
+        private bool movementRequested;
         [SerializeField] private float fallbackWorldLimit = 108.1f;
         private PlayerController targetPlayer;
         private StylizedCharacterVisual visual;
@@ -265,13 +279,18 @@ namespace PersiaWar.Unity2D5D
                     0.35f,
                     capsule.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
 
+            lastObservedPosition = transform.position;
+            lastProgressTime = Time.time;
+
             // Wait for Configure() so the correct archetype is known before loading art.
         }
 
         private void Update()
         {
-            // Enforce arena bounds every frame, including during AI retarget cooldown.
+            // Keep actors inside the arena and detect stalled movement every frame,
+            // not only on the slower mobile AI retarget ticks.
             ClampInsidePlayableArea();
+            TrackMovementProgress();
 
             if (target == null || Time.time < nextRetargetTime)
                 return;
@@ -288,28 +307,51 @@ namespace PersiaWar.Unity2D5D
             PlayerController player = target.GetComponentInParent<PlayerController>();
             bool hasLineOfSight = player == null || HasLineOfSightToPlayer(player);
 
-            // Lightweight mobile AI: when critically wounded, disengage and create
-            // distance instead of blindly charging. Reuses existing obstacle navigation.
             TargetHealth ownHealth = GetComponent<TargetHealth>();
-            bool retreating = ownHealth != null &&
+            bool criticallyWounded = ownHealth != null &&
                 ownHealth.MaxHealth > 0 &&
                 ownHealth.CurrentHealth <= Mathf.CeilToInt(ownHealth.MaxHealth * 0.30f) &&
                 player != null;
-            Vector3 movementDirection = retreating ? -direction : direction;
 
-            // If a wall blocks sight, keep navigating even inside the normal stop range
-            // instead of idling against a wall with no attack lane.
-            bool shouldMove = retreating || distance > stopDistance || (player != null && !hasLineOfSight);
+            // Retreat only for a short burst, then re-engage. This avoids the old
+            // permanent flee state that pushed wounded enemies into map corners.
+            if (criticallyWounded && Time.time >= nextRetreatAllowed)
+            {
+                retreatUntil = Time.time + retreatDuration;
+                nextRetreatAllowed = Time.time + retreatCooldown;
+            }
+
+            bool retreating = criticallyWounded && Time.time < retreatUntil;
+            bool recoveringFromStall = Time.time < recoveryUntil;
+            Vector3 movementDirection = retreating
+                ? GetBoundaryAwareRetreatDirection(-direction)
+                : direction;
+
+            // A lateral recovery step breaks wall/corner deadlocks; it takes priority
+            // over both pursuit and retreat for a short, bounded interval.
+            if (recoveringFromStall)
+                movementDirection = recoveryDirection;
+
+            // If a wall blocks sight, keep navigating even inside the normal stop range.
+            bool shouldMove = recoveringFromStall || retreating ||
+                distance > stopDistance || (player != null && !hasLineOfSight);
+            movementRequested = shouldMove;
+
             if (shouldMove)
-                UpdatePursuitMovement(movementDirection, distance, retreating ? false : hasLineOfSight);
+                UpdatePursuitMovement(
+                    movementDirection,
+                    distance,
+                    (retreating || recoveringFromStall) ? false : hasLineOfSight);
             else
                 ClearNavigationPath();
 
             if (visual != null)
             {
-                Vector3 facing = retreating
+                bool repositioning = retreating || recoveringFromStall ||
+                    (shouldMove && !hasLineOfSight);
+                Vector3 facing = repositioning
                     ? GetCurrentMovementDirection(movementDirection)
-                    : (shouldMove && !hasLineOfSight ? GetCurrentMovementDirection(direction) : direction);
+                    : direction;
                 visual.SetFacing(facing);
                 visual.SetMoving(shouldMove);
             }
@@ -328,6 +370,100 @@ namespace PersiaWar.Unity2D5D
                 FireProjectile(direction);
                 nextRangedTime = Time.time + rangedCooldown;
             }
+        }
+
+        private void TrackMovementProgress()
+        {
+            Vector3 current = transform.position;
+            if (!movementRequested)
+            {
+                lastObservedPosition = current;
+                lastProgressTime = Time.time;
+                return;
+            }
+
+            if (HorizontalDistance(current, lastObservedPosition) >= 0.18f)
+            {
+                lastObservedPosition = current;
+                lastProgressTime = Time.time;
+                return;
+            }
+
+            lastObservedPosition = current;
+            if (Time.time - lastProgressTime < stuckRecoveryDelay ||
+                Time.time < nextRecoveryAllowed)
+                return;
+
+            recoveryDirection = ChooseRecoveryDirection();
+            recoveryUntil = Time.time + stuckRecoveryDuration;
+            nextRecoveryAllowed = recoveryUntil + 0.8f;
+            lastProgressTime = Time.time;
+            ClearNavigationPath();
+        }
+
+        private Vector3 GetBoundaryAwareRetreatDirection(Vector3 awayFromTarget)
+        {
+            float safeLimit = Mathf.Max(1f, GetWorldLimit() - 5f);
+            Vector3 position = transform.position;
+
+            if ((position.x >= safeLimit && awayFromTarget.x > 0f) ||
+                (position.x <= -safeLimit && awayFromTarget.x < 0f))
+                awayFromTarget.x = 0f;
+
+            if ((position.z >= safeLimit && awayFromTarget.z > 0f) ||
+                (position.z <= -safeLimit && awayFromTarget.z < 0f))
+                awayFromTarget.z = 0f;
+
+            if (awayFromTarget.sqrMagnitude < 0.01f)
+            {
+                // At a corner, move inward rather than repeatedly pressing against bounds.
+                awayFromTarget = new Vector3(
+                    -Mathf.Sign(position.x),
+                    0f,
+                    -Mathf.Sign(position.z));
+            }
+
+            return awayFromTarget.sqrMagnitude > 0.01f
+                ? awayFromTarget.normalized
+                : Vector3.forward;
+        }
+
+        private Vector3 ChooseRecoveryDirection()
+        {
+            Vector3 towardTarget = target != null
+                ? target.position - transform.position
+                : transform.forward;
+            towardTarget.y = 0f;
+            if (towardTarget.sqrMagnitude < 0.01f)
+                towardTarget = transform.forward;
+            towardTarget.Normalize();
+
+            Vector3 tangent = Vector3.Cross(Vector3.up, towardTarget).normalized;
+            if ((GetInstanceID() & 1) != 0)
+                tangent = -tangent;
+
+            Vector3 candidate = transform.position + tangent * 2.5f;
+            ClampToPlayableArea(ref candidate);
+            if (CanMoveTo(candidate))
+                return tangent;
+
+            tangent = -tangent;
+            candidate = transform.position + tangent * 2.5f;
+            ClampToPlayableArea(ref candidate);
+            if (CanMoveTo(candidate))
+                return tangent;
+
+            Vector3 inward = new Vector3(
+                -Mathf.Sign(transform.position.x),
+                0f,
+                -Mathf.Sign(transform.position.z)).normalized;
+            candidate = transform.position + inward * 2.5f;
+            ClampToPlayableArea(ref candidate);
+            if (inward.sqrMagnitude > 0.01f && CanMoveTo(candidate))
+                return inward;
+
+            // Last resort: advance toward the fight instead of staying in place.
+            return towardTarget;
         }
 
         private Vector3 GetCurrentMovementDirection(Vector3 fallback)

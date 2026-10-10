@@ -407,7 +407,12 @@ namespace PersiaWar.Unity2D5D
                     continue;
 
                 Vector2 enemyPoint = WorldToMap(new Vector2(enemyPosition.x, enemyPosition.z), map);
-                DrawCircle(enemyPoint, 3.5f * scale, new Color(1f, 0.22f, 0.16f, 1f));
+                // The outer marker is twice the old full diameter; a navy center keeps
+                // the requested enemy color while the brighter blue rim remains legible.
+                enemyPoint.x = Mathf.Clamp(enemyPoint.x, map.x + 7f * scale, map.xMax - 7f * scale);
+                enemyPoint.y = Mathf.Clamp(enemyPoint.y, map.y + 7f * scale, map.yMax - 7f * scale);
+                DrawCircle(enemyPoint, 7f * scale, new Color(0.22f, 0.56f, 0.98f, 1f));
+                DrawCircle(enemyPoint, 5f * scale, new Color(0.035f, 0.075f, 0.24f, 1f));
             }
 
             // Cyan squares show live collectible pickups/dropped supplies.
@@ -1223,7 +1228,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                enemySpawner.Configure(player.transform, 11, 84f, 0f);
+                enemySpawner.Configure(player.transform, 24, 84f, 0f);
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
@@ -1255,7 +1260,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null)
             {
-                enemySpawner.Configure(player.transform, 8, 44f, 0f);
+                enemySpawner.Configure(player.transform, 24, 84f, 0f);
                 enemySpawner.enabled = true;
             }
 

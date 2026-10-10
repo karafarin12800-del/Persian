@@ -6,17 +6,16 @@ namespace PersiaWar.Unity2D5D
     public sealed class EnemySpawner : MonoBehaviour
     {
         [SerializeField] private Transform player;
-        [SerializeField] private int startingCount = 8;
+        [SerializeField] private int startingCount = 24;
         [SerializeField] private float spawnRadius = 44f;
         [SerializeField] private float nextWaveDelay = 3f;
         [SerializeField] private float initialSpawnDelay = 6.5f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
-        [SerializeField] private int maxPerWave = 12;
+        [SerializeField] private int maxPerWave = 24;
         [SerializeField] private int victoryWave = 5;
 
 #if UNITY_ANDROID
-        // Android enemy gameplay is reopened in a staged configuration:
-        // the first wave contains one enemy and later waves grow after kills.
+        // Spawn 24 enemies in the initial Android match, spreading construction across frames.
         private const bool AndroidEnemyDiagnosticDisabled = false;
 #endif
 
@@ -35,7 +34,7 @@ namespace PersiaWar.Unity2D5D
             player = playerTransform;
 #if UNITY_ANDROID
             // Enforce a smaller mobile wave cap even when older scene data requested 42+ enemies.
-            maxPerWave = Mathf.Clamp(maxPerWave, 1, 12);
+            maxPerWave = Mathf.Clamp(maxPerWave, 1, 24);
 #endif
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
@@ -130,7 +129,7 @@ namespace PersiaWar.Unity2D5D
         {
             int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
 #if UNITY_ANDROID
-            count = Mathf.Min(count, 12);
+            count = Mathf.Min(count, 24);
 #endif
 
 #if UNITY_ANDROID
