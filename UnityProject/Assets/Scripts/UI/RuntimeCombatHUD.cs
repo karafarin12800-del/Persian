@@ -173,9 +173,9 @@ namespace PersiaWar.Unity2D5D
                 float dotY = centerY - offset.z * pixelsPerUnit;
                 float dotSize = 7f * scale;
                 Fill(new Rect(dotX - dotSize * 0.5f, dotY - dotSize * 0.5f, dotSize, dotSize),
-                    new Color(0.08f, 0.55f, 1f, 1f));
+                    new Color(0.06f, 0.12f, 0.32f, 1f));
                 Fill(new Rect(dotX - dotSize * 0.5f - scale, dotY - dotSize * 0.5f - scale,
-                    dotSize + 2f * scale, dotSize + 2f * scale), new Color(0.30f, 0.78f, 1f, 0.35f));
+                    dotSize + 2f * scale, dotSize + 2f * scale), new Color(0.18f, 0.28f, 0.52f, 0.62f));
             }
 
             float playerDot = 8f * scale;
