@@ -317,11 +317,10 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
                 survivorCount.ToString(), headerStyle);
 
-            // Tactical minimap: a dark translucent base improves contrast over the
-            // live 3D scene, while city blocks, roads and dynamic markers stay visible.
+            // Tactical minimap remains see-through so the 3D battle stays visible.
             float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
-            Fill(map, new Color(0.035f, 0.065f, 0.095f, 0.88f));
+            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));
 
             Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.46f);
             float frame = Mathf.Max(1f, 1.5f * scale);
@@ -330,8 +329,8 @@ namespace PersiaWar.Unity2D5D
             Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
             Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
 
-            Color roadColor = new Color(0.62f, 0.68f, 0.75f, 0.92f);
-            float roadThickness = map.width * (7f / 192f);
+            Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.66f);
+            float roadThickness = map.width * (10f / 192f);
             for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
             {
                 float road = AndroidMinimapRoadCoordinates[i];
