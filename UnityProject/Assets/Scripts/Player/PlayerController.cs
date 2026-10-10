@@ -5,7 +5,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class PlayerController : MonoBehaviour
     {
         [SerializeField] private float moveSpeed = 11.5f;
-        [SerializeField] private float worldLimit = 94f;
+        [SerializeField] private float worldLimit = 108.1f;
         [SerializeField] private float turnSpeed = 18f;
         [SerializeField] private float collisionRadius = 0.62f;
         [SerializeField] private int shield = 0;
@@ -28,6 +28,7 @@ namespace PersiaWar.Unity2D5D
         public PlayerInventory Inventory => inventory;
         public GrenadeController Grenades => grenadeController;
         public int Shield => shield;
+        public float WorldLimit => worldLimit;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
         public bool IsMovementEnabled => movementEnabled && Time.time >= movementLockUntil && !IsDefeated;
@@ -164,11 +165,25 @@ namespace PersiaWar.Unity2D5D
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
             next.y = 0f;
 
-            // Android input validation phase: movement must not be blocked by
-            // procedural city colliders. Collision-aware navigation will be restored
-            // after the input path is proven stable.
             if (desired.sqrMagnitude > 0.00001f)
-                transform.position = next;
+            {
+                if (!WouldCollide(next))
+                {
+                    transform.position = next;
+                }
+                else
+                {
+                    // Slide along walls and parked vehicles instead of stopping at
+                    // every diagonal collision. Both candidate positions still pass
+                    // through the same solid-obstacle query.
+                    Vector3 slideX = new Vector3(next.x, next.y, transform.position.z);
+                    Vector3 slideZ = new Vector3(transform.position.x, next.y, next.z);
+                    if (!WouldCollide(slideX))
+                        transform.position = slideX;
+                    else if (!WouldCollide(slideZ))
+                        transform.position = slideZ;
+                }
+            }
 
             if (visual != null)
                 visual.SetMoving(input.sqrMagnitude > 0.0001f);

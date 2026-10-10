@@ -10,6 +10,7 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public sealed class MobileInputHub : MonoBehaviour
     {
+        private const float BaseActionHitRadius = 122f;
         [SerializeField] private PlayerController player;
         [SerializeField] private float joystickRadius = 122f;
         [SerializeField] private float minimapSize = 190f;
@@ -171,13 +172,31 @@ namespace PersiaWar.Unity2D5D
         private void OnApplicationPause(bool paused)
         {
             if (paused)
+            {
                 ResetAllPointers();
+                return;
+            }
+
+            RestoreAndroidTouchSettings();
         }
 
         private void OnApplicationFocus(bool hasFocus)
         {
             if (!hasFocus)
+            {
                 ResetAllPointers();
+                return;
+            }
+
+            RestoreAndroidTouchSettings();
+        }
+
+        private static void RestoreAndroidTouchSettings()
+        {
+#if UNITY_ANDROID
+            Input.multiTouchEnabled = true;
+            Input.simulateMouseWithTouches = true;
+#endif
         }
 
         private void Update()
@@ -231,6 +250,12 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleAndroidTouches()
         {
+#if UNITY_ANDROID
+            // Keep Android's native multi-pointer input enabled throughout gameplay,
+            // not only during Awake/scene activation or app focus restoration.
+            if (!Input.multiTouchEnabled)
+                Input.multiTouchEnabled = true;
+#endif
             float scale = GetUiScale();
             float radius = joystickRadius * scale * controlScale;
 
@@ -241,10 +266,11 @@ namespace PersiaWar.Unity2D5D
                 out Vector2 grenadeGui,
                 out Vector2 reloadGui);
 
-            float fireHit = radius * 1.02f;
-            float meleeHit = radius * 0.76f;
-            float grenadeHit = radius * 0.76f;
-            float reloadHit = radius * 0.72f;
+            float actionHitRadius = BaseActionHitRadius * scale * controlScale;
+            float fireHit = actionHitRadius * 1.02f;
+            float meleeHit = actionHitRadius * 0.76f;
+            float grenadeHit = actionHitRadius * 0.76f;
+            float reloadHit = actionHitRadius * 0.72f;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -343,6 +369,36 @@ namespace PersiaWar.Unity2D5D
                     {
                         ResetMovementPointer();
                     }
+                    else
+                    {
+                                }
+                }
+                else if (Input.touchCount > 0)
+                {
+                    // A few Android devices temporarily expose only one active contact
+                    // when a second finger is placed. If a new left-side contact appears,
+                    // rebind the joystick to it while preserving the current direction.
+                    // Otherwise keep the last vector while any contact is still down.
+                    float touchRadius = Mathf.Max(1f, radius);
+                    for (int i = 0; i < Input.touchCount; i++)
+                    {
+                        Touch candidate = Input.GetTouch(i);
+                        if (candidate.fingerId == firePointerId ||
+                            candidate.fingerId == meleePointerId ||
+                            candidate.fingerId == grenadePointerId ||
+                            candidate.fingerId == reloadPointerId ||
+                            candidate.position.x > Screen.width * 0.58f ||
+                            candidate.position.y < Screen.height * 0.10f ||
+                            candidate.phase == TouchPhase.Ended ||
+                            candidate.phase == TouchPhase.Canceled)
+                            continue;
+
+                        movePointerId = candidate.fingerId;
+                        moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
+                        break;
+                    }
+
+                    player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                 }
                 else
                 {
@@ -574,6 +630,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetMovementPointer()
         {
             movePointerId = -1;
+
             guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
             moveTouchOriginScreen = Vector2.zero;
@@ -586,6 +643,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetAllPointers()
         {
             movePointerId = -1;
+
             firePointerId = -1;
             meleePointerId = -1;
             grenadePointerId = -1;
@@ -944,6 +1002,7 @@ namespace PersiaWar.Unity2D5D
             Vector2 gui = e.mousePosition;
             float scale = GetUiScale();
             float radius = joystickRadius * scale * controlScale;
+            float actionHitRadius = BaseActionHitRadius * scale * controlScale;
 
             GetActionCenters(
                 scale,
@@ -962,7 +1021,7 @@ namespace PersiaWar.Unity2D5D
                 // mouse-button owner are free. Negative pointer sentinels are active.
                 if (firePointerId == -1 &&
                     guiFireMouseButton == -1 &&
-                    Vector2.Distance(gui, firePos) <= radius * 0.86f)
+                    Vector2.Distance(gui, firePos) <= actionHitRadius * 1.02f)
                 {
                     firePointerId = -1001;
                     guiFireMouseButton = mouseButton;
@@ -973,7 +1032,7 @@ namespace PersiaWar.Unity2D5D
 
                 if (meleePointerId == -1 &&
                     guiMeleeMouseButton == -1 &&
-                    Vector2.Distance(gui, meleePos) <= radius * 0.76f)
+                    Vector2.Distance(gui, meleePos) <= actionHitRadius * 0.76f)
                 {
                     meleePointerId = -1002;
                     guiMeleeMouseButton = mouseButton;
@@ -984,7 +1043,7 @@ namespace PersiaWar.Unity2D5D
 
                 if (grenadePointerId == -1 &&
                     guiGrenadeMouseButton == -1 &&
-                    Vector2.Distance(gui, grenadePos) <= radius * 0.76f)
+                    Vector2.Distance(gui, grenadePos) <= actionHitRadius * 0.76f)
                 {
                     grenadePointerId = -1003;
                     guiGrenadeMouseButton = mouseButton;
@@ -995,7 +1054,7 @@ namespace PersiaWar.Unity2D5D
 
                 if (reloadPointerId == -1 &&
                     guiReloadMouseButton == -1 &&
-                    Vector2.Distance(gui, reloadPos) <= radius * 0.72f)
+                    Vector2.Distance(gui, reloadPos) <= actionHitRadius * 0.72f)
                 {
                     reloadPointerId = -1004;
                     guiReloadMouseButton = mouseButton;

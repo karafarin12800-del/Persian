@@ -7,7 +7,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class GameBootstrap : MonoBehaviour
     {
         [SerializeField] private Camera gameplayCamera;
-        [SerializeField] private float worldSize = 192f;
+        [SerializeField] private float worldSize = 220.8f;
         [SerializeField] private int seed = 32025;
         [SerializeField] private int enemyCount = 8;
         [SerializeField] private float enemySpawnRadius = 44f;
@@ -89,6 +89,7 @@ namespace PersiaWar.Unity2D5D
                 QualitySettings.vSyncCount = 0;
                 Random.InitState(seed);
                 EnsureGameSession();
+                RuntimeGameAudio.EnsureInstance();
                 GameSession.Instance?.ResetMatch();
                 ReportStage("Stage 2: creating game session...", "GameSessionReady");
                 ConfigureCameraSafe();
@@ -246,6 +247,8 @@ namespace PersiaWar.Unity2D5D
                 false);
             BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
+            SpawnRandomHouseLoot();
+            RemoveAnyExtractionBeacon();
             return;
 #else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
@@ -465,6 +468,147 @@ namespace PersiaWar.Unity2D5D
             CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
             CreateAndroidQuadBatch("AndroidSidewalkGrid", sidewalkVertices, sidewalkTriangles, androidSidewalkMaterial);
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
+        }
+
+        private bool extractionBeaconShown;
+
+        private void RemoveAnyExtractionBeacon()
+        {
+            string[] names = { "BlueSkyGuideBeamOuter", "BlueSkyGuideBeamCore", "BlueSkyGuideGroundRing", "BlueSkyGuideGroundLight" };
+            GameObject[] existing = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            for (int i = 0; i < existing.Length; i++)
+            {
+                if (existing[i] == null) continue;
+                for (int n = 0; n < names.Length; n++)
+                    if (existing[i].name == names[n]) Destroy(existing[i]);
+            }
+            extractionBeaconShown = false;
+        }
+
+        public void ShowRandomExtractionBeacon()
+        {
+            if (extractionBeaconShown || worldRoot == null) return;
+            RemoveAnyExtractionBeacon();
+            extractionBeaconShown = true;
+
+            // Random road intersection chosen only at victory; no blue beam is visible during the match.
+            float[] roads = { -67f, -43f, -19f, 5f, 29f, 53f, 77f };
+            float beaconX = roads[Random.Range(0, roads.Length)];
+            float beaconZ = roads[Random.Range(0, roads.Length)];
+            Vector3 ground = new Vector3(beaconX, CalculateAndroidTerrainHeight(beaconX, beaconZ) + 0.08f, beaconZ);
+
+            CreateAndroidSkyGuideCylinder("BlueSkyGuideBeamOuter", ground + Vector3.up * 19f,
+                new Vector3(3.4f, 19f, 3.4f), new Color(0.04f, 0.25f, 1f, 0.20f), true);
+            CreateAndroidSkyGuideCylinder("BlueSkyGuideBeamCore", ground + Vector3.up * 19f,
+                new Vector3(1.15f, 19f, 1.15f), new Color(0.20f, 0.66f, 1f, 0.48f), true);
+            CreateAndroidSkyGuideCylinder("BlueSkyGuideGroundRing", ground + Vector3.up * 0.06f,
+                new Vector3(4.6f, 0.06f, 4.6f), new Color(0.12f, 0.60f, 1f, 0.96f), false);
+
+            GameObject lightObject = new GameObject("BlueSkyGuideGroundLight");
+            lightObject.transform.SetParent(worldRoot, false);
+            lightObject.transform.position = ground + Vector3.up * 0.45f;
+            Light blueLight = lightObject.AddComponent<Light>();
+            blueLight.type = LightType.Point;
+            blueLight.color = new Color(0.12f, 0.42f, 1f);
+            blueLight.intensity = 1.25f;
+            blueLight.range = 7f;
+            blueLight.shadows = LightShadows.None;
+            Debug.Log("PERSIA_GUIDE: Random extraction beacon activated at " + beaconX + "," + beaconZ);
+        }
+
+        private void SpawnRandomHouseLoot()
+        {
+            // Eight of each supply type are placed at randomized floor positions
+            // inside generated houses each time a new match is built.
+            if (androidBuildingCenters.Count == 0) return;
+            const int countPerType = 8;
+            for (int i = 0; i < countPerType * 3; i++)
+            {
+                int houseIndex = Random.Range(0, androidBuildingCenters.Count);
+                Vector3 center = androidBuildingCenters[houseIndex];
+                Vector2 half = androidBuildingHalfExtents[houseIndex];
+                float x = center.x + Random.Range(-half.x * 0.42f, half.x * 0.42f);
+                float z = center.z + Random.Range(-half.y * 0.42f, half.y * 0.42f);
+                float y = CalculateAndroidTerrainHeight(x, z) + 0.38f;
+                PickupItem.PickupType type = i < countPerType ? PickupItem.PickupType.Weapon
+                    : (i < countPerType * 2 ? PickupItem.PickupType.Shield : PickupItem.PickupType.Grenade);
+                Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
+                    : (type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f) : new Color(0.95f, 0.28f, 0.12f));
+
+                GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube : PrimitiveType.Sphere);
+                item.name = "HouseLoot_" + type + "_" + i;
+                item.transform.SetParent(worldRoot, true);
+                item.transform.position = new Vector3(x, y, z);
+                item.transform.localScale = type == PickupItem.PickupType.Weapon ? new Vector3(0.72f, 0.18f, 0.24f) : Vector3.one * 0.48f;
+                Renderer renderer = item.GetComponent<Renderer>();
+                if (renderer != null) renderer.sharedMaterial = MakeMaterial("HouseLootMaterial_" + type + "_" + i, color);
+                Collider collider = item.GetComponent<Collider>();
+                if (collider != null) collider.isTrigger = true;
+                Rigidbody body = item.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
+                PickupItem pickup = item.AddComponent<PickupItem>();
+                if (type == PickupItem.PickupType.Weapon)
+                    pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
+                else
+                    pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
+            }
+            Debug.Log("PERSIA_LOOT: spawned 8 weapons, 8 shields and 8 grenade pickups in houses");
+        }
+
+        private void CreateAndroidSkyGuideCylinder(
+            string objectName,
+            Vector3 position,
+            Vector3 scale,
+            Color color,
+            bool transparent)
+        {
+            GameObject cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cylinder.name = objectName;
+            cylinder.transform.SetParent(worldRoot, false);
+            cylinder.transform.position = position;
+            cylinder.transform.localScale = scale;
+
+            Collider collider = cylinder.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            Shader shader = transparent
+                ? (Resources.Load<Shader>("PersiaWarAndroidFade") ??
+                   Shader.Find("PersiaWar/AndroidFade") ??
+                   Shader.Find("Unlit/Transparent") ??
+                   Shader.Find("Sprites/Default"))
+                : (Resources.Load<Shader>("PersiaWarAndroidFlat") ??
+                   Shader.Find("PersiaWar/AndroidFlat") ??
+                   Shader.Find("Unlit/Color"));
+            if (shader == null)
+            {
+                Debug.LogWarning("PERSIA_GUIDE: no supported shader for " + objectName);
+                Destroy(cylinder);
+                return;
+            }
+
+            Material material = new Material(shader)
+            {
+                name = objectName + "Material",
+                color = color
+            };
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", color);
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", color);
+            if (material.HasProperty("_FadeAlpha"))
+                material.SetFloat("_FadeAlpha", 1f);
+            if (transparent)
+                material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+            Renderer renderer = cylinder.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
         }
 
         private void BuildAndroidCityPresentation()
@@ -771,6 +915,11 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(longAxisZ ? width * 0.38f : 0.34f, 0.16f, longAxisZ ? 0.16f : length * 0.38f),
                 light,
                 false);
+
+            // Visual car pieces have no individual colliders; one solid body collider
+            // makes the entire parked vehicle an obstacle for player movement.
+            CreateAndroidCollider("CityVehicleCollider", position,
+                new Vector3(width, 1.35f, length));
         }
 
         private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
@@ -888,12 +1037,17 @@ namespace PersiaWar.Unity2D5D
             Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
             Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
 
-            Vector3 bodySize = new Vector3(footprint, bodyHeight, depth);
-            QueueAndroidBox("CityBuilding", position + Vector3.up * (bodyHeight * 0.5f), bodySize, facade);
-            // Extend the camera-blocking collider through the roofline so the camera
-            // can detect houses even when its sightline crosses the upper facade/roof.
-            CreateAndroidCollider("CityBuildingCollider", position,
-                new Vector3(footprint, bodyHeight + (isPitchedRoof ? 1.6f : 0.65f), depth));
+            float doorWidth = isWarehouse
+                ? Mathf.Min(3.4f, footprint * 0.32f)
+                : Mathf.Min(1.35f, footprint * 0.18f);
+            float doorHeight = isWarehouse ? 2.35f : 2.15f;
+            QueueAndroidBuildingFacade(position, footprint, bodyHeight, depth, doorWidth, doorHeight, facade);
+
+            // Split solid collision around the same visible doorway. Windows and all
+            // other wall sections remain blocked by solid colliders.
+            float collisionHeight = bodyHeight + (isPitchedRoof ? 1.6f : 0.65f);
+            CreateAndroidBuildingColliders(
+                position, footprint, depth, collisionHeight, doorWidth, doorHeight);
 
             if (isPitchedRoof)
             {
@@ -947,9 +1101,6 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            float doorWidth = isWarehouse
-                ? Mathf.Min(3.4f, footprint * 0.32f)
-                : Mathf.Min(1.35f, footprint * 0.18f);
             QueueAndroidBox(
                 isWarehouse ? "WarehouseLoadingDoor" : "Door",
                 position + new Vector3(0f, 1.12f, -depth * 0.54f),
@@ -1173,6 +1324,84 @@ namespace PersiaWar.Unity2D5D
             triangles.Add(start + 0);
             triangles.Add(start + 2);
             triangles.Add(start + 3);
+        }
+
+        private void QueueAndroidBuildingFacade(
+            Vector3 position,
+            float footprint,
+            float bodyHeight,
+            float depth,
+            float doorWidth,
+            float doorHeight,
+            Material facade)
+        {
+            float thickness = Mathf.Clamp(Mathf.Min(footprint, depth) * 0.08f, 0.35f, 0.60f);
+            float frontZ = -depth * 0.5f + thickness * 0.5f;
+            float backZ = depth * 0.5f - thickness * 0.5f;
+            float sideWidth = Mathf.Max(0.35f, (footprint - doorWidth) * 0.5f);
+
+            // Build a hollow wall shell so the doorway is a visible opening rather
+            // than a collision gap hidden behind a solid facade cube.
+            QueueAndroidBox("CityBuildingSideWall",
+                position + new Vector3(-footprint * 0.5f + thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade);
+            QueueAndroidBox("CityBuildingSideWall",
+                position + new Vector3(footprint * 0.5f - thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade);
+            QueueAndroidBox("CityBuildingRearWall",
+                position + new Vector3(0f, bodyHeight * 0.5f, backZ),
+                new Vector3(footprint, bodyHeight, thickness), facade);
+
+            QueueAndroidBox("CityBuildingFrontWall",
+                position + new Vector3(-doorWidth * 0.5f - sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade);
+            QueueAndroidBox("CityBuildingFrontWall",
+                position + new Vector3(doorWidth * 0.5f + sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade);
+
+            float headerHeight = Mathf.Max(0.1f, bodyHeight - doorHeight);
+            QueueAndroidBox("CityBuildingDoorHeader",
+                position + new Vector3(0f, doorHeight + headerHeight * 0.5f, frontZ),
+                new Vector3(doorWidth, headerHeight, thickness), facade);
+        }
+
+        private void CreateAndroidBuildingColliders(
+            Vector3 position,
+            float footprint,
+            float depth,
+            float totalHeight,
+            float doorWidth,
+            float doorHeight)
+        {
+            float thickness = Mathf.Clamp(Mathf.Min(footprint, depth) * 0.08f, 0.35f, 0.60f);
+            float frontZ = -depth * 0.5f + thickness * 0.5f;
+            float backZ = depth * 0.5f - thickness * 0.5f;
+            float sideWidth = Mathf.Max(0.35f, (footprint - doorWidth) * 0.5f);
+
+            // Side and rear walls stay fully solid.
+            CreateAndroidCollider("CityBuildingSideCollider",
+                position + Vector3.left * (footprint * 0.5f - thickness * 0.5f),
+                new Vector3(thickness, totalHeight, depth));
+            CreateAndroidCollider("CityBuildingSideCollider",
+                position + Vector3.right * (footprint * 0.5f - thickness * 0.5f),
+                new Vector3(thickness, totalHeight, depth));
+            CreateAndroidCollider("CityBuildingRearCollider",
+                position + Vector3.forward * backZ,
+                new Vector3(footprint, totalHeight, thickness));
+
+            // The two front sections leave a gap only as wide as the door.
+            CreateAndroidCollider("CityBuildingFrontCollider",
+                position + new Vector3(-(doorWidth * 0.5f + sideWidth * 0.5f), 0f, frontZ),
+                new Vector3(sideWidth, totalHeight, thickness));
+            CreateAndroidCollider("CityBuildingFrontCollider",
+                position + new Vector3(doorWidth * 0.5f + sideWidth * 0.5f, 0f, frontZ),
+                new Vector3(sideWidth, totalHeight, thickness));
+
+            // The wall above the door is still solid.
+            float headerHeight = Mathf.Max(0.1f, totalHeight - doorHeight);
+            CreateAndroidCollider("CityBuildingDoorHeaderCollider",
+                position + new Vector3(0f, doorHeight, frontZ),
+                new Vector3(doorWidth, headerHeight, thickness));
         }
 
         private void CreateAndroidCollider(string objectName, Vector3 position, Vector3 size)

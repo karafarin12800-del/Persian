@@ -6,11 +6,12 @@ on:
       build_ref:
         description: 'Unity branch or commit to build'
         required: true
-        default: 'unity-2.5d'
+        default: 'fix/android-multitouch-pointer-zones'
         type: string
   push:
     branches:
       - unity-2.5d
+      - fix/android-multitouch-pointer-zones
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
@@ -149,6 +150,10 @@ jobs:
           assert 'case WeaponKind.LightPistol: return LightPistolRange;' in weapon and 'case WeaponKind.HeavyMachineGun: return HeavyMachineGunRange;' in weapon and 'default: return AssaultRifleRange;' in weapon, 'Shared profile does not cover every weapon kind.'
           enemy = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
           assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range does not match the weapon it carries/drops.'
+          assert 'ClampInsidePlayableArea();' in enemy, 'Enemy AI does not recover enemies beyond map boundaries.'
+          assert 'ClampToPlayableArea(ref routeNext);' in enemy and 'ClampToPlayableArea(ref directNext);' in enemy, 'Enemy navigation can move beyond the playable map.'
+          player = Path('UnityProject/Assets/Scripts/Player/PlayerController.cs').read_text(encoding='utf-8')
+          assert 'public float WorldLimit => worldLimit;' in player, 'Enemy AI does not share the player world boundary setting.'
           assert 'PlanLocalRoute(' in enemy and 'Physics.OverlapSphereNonAlloc' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy has no collider-aware route around walls.'
           assert 'private readonly RaycastHit[] navigationRayHits' in enemy and 'navigationRayHits[i].collider' in enemy, 'SphereCastNonAlloc must use RaycastHit results, not Collider results.'
           assert 'if (hit is MeshCollider)' in enemy, 'Enemy navigation must ignore the continuous ground mesh.'
@@ -193,13 +198,14 @@ jobs:
           android_hud_activation = flow[android_pass_start:android_pass_end]
           assert 'combatHud.enabled = false;' in android_hud_activation, 'Overlapping secondary HUD must remain disabled on Android.'
           spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
-          assert 'maxPerWave = Mathf.Clamp(maxPerWave, 1, 12);' in spawner, 'Android enemy wave cap must stay at or below 12.'
+          assert 'maxPerWave = Mathf.Clamp(maxPerWave, 1, 24);' in spawner, 'Android enemy wave cap must stay at or below 24.'
+          assert 'startingCount = 24' in spawner and 'count = Mathf.Min(count, 24);' in spawner, 'Android match must start with 24 enemies.'
           assert 'Random.Range(-82f, 82f)' in spawner and 'Random.Range(-82f, 82f)' in spawner, 'Android opponents are not selected across the full map.'
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
 
-          assert 'enemySpawner.Configure(player.transform, 11, 84f, 0f);' in flow, 'Android match must start with the reduced 11-opponent lobby.'
+          assert 'enemySpawner.Configure(player.transform, 24, 84f, 0f);' in flow, 'Android match must start with 24 enemies.'
           assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in active_hud, 'Active Android minimap must be enlarged by a further 20 percent.'
-          assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'new Color(1f, 0.22f, 0.16f, 1f)' in active_hud, 'Minimap does not draw live enemy markers.'
+          assert 'FindObjectsByType<EnemyChase>(FindObjectsSortMode.None)' in active_hud and 'DrawCircle(enemyPoint, 7f * scale, new Color(0.22f, 0.56f, 0.98f, 1f))' in active_hud and 'new Color(0.035f, 0.075f, 0.24f, 1f)' in active_hud, 'Minimap enemy markers must be twice as large with a clear navy center.'
           assert 'AndroidMinimapBuildingPoints' in active_hud and 'AndroidMinimapRoadCoordinates' in active_hud, 'Minimap city roads/buildings are incomplete.'
           assert 'new Vector2(-79f, -79f)' in flow and 'new Vector2(65f, 89f)' in flow, 'Minimap house locations do not cover the actual Android city layout.'
           assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f))' in active_hud, 'Active Android minimap must remain more transparent while retaining its green tint.'
@@ -214,6 +220,7 @@ jobs:
           assert 'public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;' in visual, 'Mobile weapon mount is missing.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system with an effective range.'
           assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
+          assert 'retreatUntil = Time.time + retreatDuration;' in enemy_ai and 'TrackMovementProgress();' in enemy_ai and 'ChooseRecoveryDirection()' in enemy_ai, 'Enemy AI must time-box retreat and recover from corner/wall stalls.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           assert 'enum WeaponKind' in weapon and 'public void CycleWeapon()' in weapon, 'Weapon profiles cannot be cycled at runtime.'
@@ -241,7 +248,7 @@ jobs:
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android IMGUI menu and pause controls must receive synthesized touch events.'
           assert 'guiFallbackOwnsPointer' in gui_fallback and 'Input.touchCount > 0' in gui_fallback, 'Android IMGUI fallback must defer to live finger IDs but recover if legacy touch entries are missing.'
-          assert 'float fireHit = radius * 1.02f;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile firing touch-zone must tolerate screen differences without stealing other action buttons.'
+          assert 'float fireHit = actionHitRadius * 1.02f;' in input_hub and 'float actionHitRadius = BaseActionHitRadius * scale * controlScale;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile action hit zones must use the tested radius independent from the movement stick and preserve firing priority.'
           assert 'Screen.width - 352f * scale' in input_hub and 'Screen.height - bottom - 236f * scale' in input_hub and 'Screen.height - bottom - 300f * scale' in input_hub, 'Mobile action-button hit-zones must be separated so fire cannot register as reload/grenade/melee.'
           assert 'private int guiMoveMouseButton = -1;' in input_hub and 'private int guiFireMouseButton = -1;' in input_hub, 'Fallback touchscreen contacts need independent movement and fire button ownership.'
           fallback_start = input_hub.index('private void HandleGuiPointerFallback()')

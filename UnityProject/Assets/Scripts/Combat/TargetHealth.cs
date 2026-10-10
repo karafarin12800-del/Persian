@@ -46,9 +46,83 @@ namespace PersiaWar.Unity2D5D
                 }
 
                 SpawnDroppedWeapon(enemy);
+                BeginEnemyDeathSequence(enemy);
+                return;
             }
 
             Destroy(gameObject);
+        }
+
+        private void BeginEnemyDeathSequence(EnemyChase enemy)
+        {
+            // Keep the enemy body for a short fall-and-fade beat instead of deleting it instantly.
+            if (enemy != null)
+            {
+                enemy.enabled = false;
+                Collider[] colliders = enemy.GetComponentsInChildren<Collider>();
+                for (int i = 0; i < colliders.Length; i++)
+                    if (colliders[i] != null) colliders[i].enabled = false;
+                MonoBehaviour[] behaviours = enemy.GetComponentsInChildren<MonoBehaviour>();
+                for (int i = 0; i < behaviours.Length; i++)
+                    if (behaviours[i] != null && behaviours[i] != this) behaviours[i].enabled = false;
+                StartCoroutine(FallAndFadeEnemy(enemy.transform));
+            }
+            SpawnBloodEffect(transform.position + Vector3.up * 0.35f);
+        }
+
+        private System.Collections.IEnumerator FallAndFadeEnemy(Transform body)
+        {
+            if (body == null) yield break;
+            Vector3 startPosition = body.position;
+            Quaternion startRotation = body.rotation;
+            float elapsed = 0f;
+            const float fallDuration = 0.55f;
+            while (elapsed < fallDuration && body != null)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / fallDuration);
+                body.position = startPosition + Vector3.down * (0.45f * t);
+                body.rotation = startRotation * Quaternion.Euler(75f * t, 0f, 18f * t);
+                yield return null;
+            }
+            if (body == null) yield break;
+            Renderer[] renderers = body.GetComponentsInChildren<Renderer>();
+            float fadeElapsed = 0f;
+            const float fadeDuration = 1.35f;
+            while (fadeElapsed < fadeDuration && body != null)
+            {
+                fadeElapsed += Time.deltaTime;
+                float scale = Mathf.Lerp(1f, 0.08f, fadeElapsed / fadeDuration);
+                body.localScale = Vector3.one * scale;
+                yield return null;
+            }
+            if (body != null) Destroy(body.gameObject);
+        }
+
+        private static void SpawnBloodEffect(Vector3 position)
+        {
+            GameObject blood = new GameObject("EnemyDefeatBloodEffect");
+            blood.transform.position = position;
+            ParticleSystem particles = blood.AddComponent<ParticleSystem>();
+            var main = particles.main;
+            main.duration = 0.55f;
+            main.loop = false;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.65f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, 2.0f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.07f, 0.16f);
+            main.startColor = new Color(0.62f, 0.025f, 0.035f, 0.9f);
+            main.maxParticles = 28;
+            var emission = particles.emission;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 22) });
+            var shape = particles.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 42f;
+            shape.radius = 0.12f;
+            var renderer = particles.GetComponent<ParticleSystemRenderer>();
+            renderer.material = RuntimeMaterialFactory.Create("EnemyBloodEffectMaterial", new Color(0.62f, 0.025f, 0.035f));
+            particles.Play();
+            Destroy(blood, 1.6f);
         }
 
         private void SpawnDroppedWeapon(EnemyChase enemy)
@@ -98,6 +172,12 @@ namespace PersiaWar.Unity2D5D
                 CreateDroppedWeaponPart(dropped.transform, "WeaponMagazine",
                     new Vector3(0f, -0.015f, 0.02f), new Vector3(0.085f, 0.12f, 0.10f), metal);
             }
+
+            // Add an extra 2x size boost specifically to enemy drops; PickupItem
+            // applies its own 2x readable-pickup scale after this, for a clear 4x
+            // visible weapon compared with the original tiny dropped model.
+            for (int childIndex = 0; childIndex < dropped.transform.childCount; childIndex++)
+                dropped.transform.GetChild(childIndex).localScale *= 2f;
 
             PickupItem pickup = dropped.AddComponent<PickupItem>();
             pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);
