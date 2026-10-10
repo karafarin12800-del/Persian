@@ -11,6 +11,9 @@ public sealed class RuntimeGameAudio : MonoBehaviour
     private AudioSource musicSource;
     private AudioSource effectsSource;
     private AudioClip playerShot;
+    private AudioClip pistolShot;
+    private AudioClip rifleShot;
+    private AudioClip heavyShot;
     private AudioClip enemyShot;
 
     public static RuntimeGameAudio EnsureInstance()
@@ -27,6 +30,16 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         RuntimeGameAudio audio = EnsureInstance();
         if (audio.effectsSource != null && audio.playerShot != null)
             audio.effectsSource.PlayOneShot(audio.playerShot, 0.75f);
+    }
+
+    public static void PlayWeaponShot(int weaponKind)
+    {
+        RuntimeGameAudio audio = EnsureInstance();
+        if (audio.effectsSource == null) return;
+        AudioClip clip = weaponKind == 0 ? audio.pistolShot
+            : (weaponKind == 2 ? audio.heavyShot : audio.rifleShot);
+        if (clip != null)
+            audio.effectsSource.PlayOneShot(clip, weaponKind == 2 ? 0.9f : 0.76f);
     }
 
     public static void PlayEnemyShot()
@@ -60,6 +73,9 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         effectsSource.volume = 0.70f;
 
         playerShot = BuildShotClip("PersiaWar_PlayerShot", 145f, 1250f, 0.13f);
+        pistolShot = BuildShotClip("PersiaWar_PistolShot", 235f, 1850f, 0.085f);
+        rifleShot = BuildShotClip("PersiaWar_RifleShot", 145f, 1250f, 0.13f);
+        heavyShot = BuildShotClip("PersiaWar_HeavyShot", 72f, 540f, 0.22f);
         enemyShot = BuildShotClip("PersiaWar_EnemyShot", 95f, 760f, 0.16f);
         musicSource.clip = BuildMusicLoop();
         musicSource.Play();
