@@ -70,7 +70,11 @@ namespace PersiaWar.Unity2D5D
             // reduce per-frame physics-query pressure without changing attack rules.
             retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;
 
-            moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
+            // Faster mobile combat pacing, tuned by the enemy's carried weapon:
+            // pistol users close distance fastest; heavy-gun users move more slowly.
+            moveSpeed = DroppedWeaponKind == WeaponController.WeaponKind.LightPistol
+                ? 5.8f
+                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 4.6f : 5.25f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
             // Use the same configured range as the weapon the enemy visibly carries/drops.
@@ -170,10 +174,11 @@ namespace PersiaWar.Unity2D5D
             weaponVisualRoot = new GameObject("EnemyRifleVisual").transform;
             weaponVisualRoot.SetParent(mount, false);
             weaponVisualRoot.localPosition = mount == visual.transform
-                ? new Vector3(0.34f, 0.86f, 0.10f)
-                : new Vector3(0.24f, 0.78f, 0.34f);
-            weaponVisualRoot.localRotation = Quaternion.identity;
-            weaponVisualRoot.localScale = Vector3.one;
+                ? new Vector3(0.20f, 0.83f, 0.28f)
+                : new Vector3(0.16f, 0.72f, 0.42f);
+            // Make the silhouette readable at the game's isometric camera distance.
+            weaponVisualRoot.localRotation = Quaternion.Euler(0f, -8f, 0f);
+            weaponVisualRoot.localScale = Vector3.one * 1.45f;
 
             if (enemyRifleReceiverMaterial == null)
                 enemyRifleReceiverMaterial = RuntimeMaterialFactory.Create(
@@ -229,6 +234,7 @@ namespace PersiaWar.Unity2D5D
             part.transform.SetParent(weaponVisualRoot, false);
             part.transform.localPosition = localPosition;
             part.transform.localScale = localScale;
+            part.transform.localRotation = Quaternion.identity;
 
             Collider collider = part.GetComponent<Collider>();
             if (collider != null)
