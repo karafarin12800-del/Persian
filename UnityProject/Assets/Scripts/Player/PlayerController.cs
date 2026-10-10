@@ -28,6 +28,7 @@ namespace PersiaWar.Unity2D5D
         public PlayerInventory Inventory => inventory;
         public GrenadeController Grenades => grenadeController;
         public int Shield => shield;
+        public float WorldLimit => worldLimit;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
         public bool IsMovementEnabled => movementEnabled && Time.time >= movementLockUntil && !IsDefeated;

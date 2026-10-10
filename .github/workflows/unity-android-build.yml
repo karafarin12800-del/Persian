@@ -168,6 +168,8 @@ jobs:
           assert 'public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;' in visual, 'Mobile weapon mount is missing.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system.'
           assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
+          assert 'ClampInsidePlayableArea();' in enemy_ai, 'Enemy movement is not clamped to the playable map.'
+          assert 'nextPosition.x = Mathf.Clamp(nextPosition.x, -worldLimit, worldLimit);' in enemy_ai and 'nextPosition.z = Mathf.Clamp(nextPosition.z, -worldLimit, worldLimit);' in enemy_ai, 'Enemy chase movement can escape the playable map.'
 
           weapon = Path('UnityProject/Assets/Scripts/Combat/WeaponController.cs').read_text(encoding='utf-8')
           assert 'enum WeaponKind' in weapon and 'public void CycleWeapon()' in weapon, 'Weapon profiles cannot be cycled at runtime.'
@@ -179,6 +181,7 @@ jobs:
 
           player_controller = Path('UnityProject/Assets/Scripts/Player/PlayerController.cs').read_text(encoding='utf-8')
           assert 'weapon.MoveSpeedMultiplier' in player_controller, 'Player movement is not linked to the active weapon weight.'
+          assert 'public float WorldLimit => worldLimit;' in player_controller, 'Enemy clamp cannot reuse the player\'s configured world limit.'
           aim = Path('UnityProject/Assets/Scripts/Combat/NearestTargetAim.cs').read_text(encoding='utf-8')
           assert 'Mathf.Min(range, weapon.EffectiveRange)' in aim, 'Auto-targeting can select opponents beyond the current weapon range.'
 
