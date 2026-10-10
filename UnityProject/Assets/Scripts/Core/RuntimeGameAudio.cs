@@ -64,7 +64,7 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         musicSource.playOnAwake = false;
         musicSource.loop = true;
         musicSource.spatialBlend = 0f;
-        musicSource.volume = 0.18f;
+        musicSource.volume = 0.48f;
 
         effectsSource = gameObject.AddComponent<AudioSource>();
         effectsSource.playOnAwake = false;
@@ -91,9 +91,9 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         const float duration = 8f;
         int count = Mathf.RoundToInt(SampleRate * duration);
         float[] data = new float[count];
-        float[] roots = { 110f, 130.81f, 146.83f, 98f };
-        float[] melody = { 440f, 523.25f, 587.33f, 659.25f, 587.33f, 523.25f, 392f, 440f,
-                           493.88f, 587.33f, 659.25f, 783.99f, 659.25f, 587.33f, 440f, 493.88f };
+        float[] roots = { 82.41f, 98f, 110f, 73.42f };
+        float[] melody = { 329.63f, 392f, 440f, 493.88f, 440f, 392f, 293.66f, 329.63f,
+                           392f, 493.88f, 587.33f, 659.25f, 587.33f, 493.88f, 392f, 440f };
 
         for (int i = 0; i < count; i++)
         {
@@ -107,7 +107,8 @@ public sealed class RuntimeGameAudio : MonoBehaviour
                         + Mathf.Sin(2f * Mathf.PI * roots[bar] * 2f * t) * 0.12f;
             float lead = Mathf.Sin(2f * Mathf.PI * melody[note] * t) * noteEnvelope * 0.24f;
             float edgeFade = Mathf.Clamp01(Mathf.Min(t / 0.12f, (duration - t) / 0.12f));
-            data[i] = Mathf.Clamp((chord * 0.15f + lead) * edgeFade, -0.8f, 0.8f);
+            float pulse = Mathf.Sin(2f * Mathf.PI * 55f * t) * ((t % 0.5f) < 0.08f ? 0.22f : 0f);
+            data[i] = Mathf.Clamp((chord * 0.28f + lead * 1.45f + pulse) * edgeFade, -0.92f, 0.92f);
         }
 
         AudioClip clip = AudioClip.Create("PersiaWar_BackgroundLoop", count, 1, SampleRate, false);
