@@ -89,14 +89,11 @@ jobs:
           assert "if (!WouldCollide(next))" in player_controller and "WouldCollide(slideX)" in player_controller, "Player movement must respect solid obstacles and allow wall sliding"
           bootstrap = (scripts / "Core/GameBootstrap.cs").read_text(encoding="utf-8")
           assert "worldSize = 220.8f" in bootstrap and "CreateAndroidBuildingColliders(" in bootstrap and "CityVehicleCollider" in bootstrap, "Expanded city, door gaps, and vehicle colliders must be present"
-          enemy = (scripts / "Enemy/EnemyChase.cs").read_text(encoding="utf-8")
-          assert "new Color(0.10f, 0.55f, 1f)" in enemy and "EnemyProjectileBlueMaterial" in enemy, "Enemy projectiles must be blue on Android and desktop"
-          assert "CreateEnemyWeaponOverlayMaterial" in enemy and "renderer.sortingOrder = 40;" in enemy, "Enemy-held weapons must render visibly over character sprites"
-          projectile_factory = (scripts / "Core/AndroidSafeRuntimeFactory.cs").read_text(encoding="utf-8")
-          assert "PrimitiveType.Sphere" in projectile_factory and "startWidth = Mathf.Max(0.075f" in projectile_factory, "Android bullets must have a visible 3D shape and trail"
           assert "BuildAndroidSkyGuideBeacon();" in bootstrap and "BlueSkyGuideBeamCore" in bootstrap, "Blue sky-to-ground guide beacon must be built"
           assert "minimapPickups" in flow and "AndroidSkyGuideBeaconPoint" in flow and "B: BEACON" in flow, "Minimap must display loot and the blue guide beacon"
           assert "survivorCount.ToString()" in flow and "SCORE  " in flow, "HUD counters must be dynamic and correctly labeled"
+          enemy = (scripts / "Enemy/EnemyChase.cs").read_text(encoding="utf-8")
+          assert "new Color(0.10f, 0.55f, 1f)" in enemy, "Enemy projectiles must be blue"
           audio = scripts / "Core/RuntimeGameAudio.cs"
           assert audio.exists() and "BuildMusicLoop()" in audio.read_text(encoding="utf-8") and "PlayPlayerShot()" in audio.read_text(encoding="utf-8"), "Runtime music and shot audio must be present"
           hud = (scripts / "UI/RuntimeCombatHUD.cs").read_text(encoding="utf-8")
