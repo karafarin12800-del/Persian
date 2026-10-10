@@ -121,7 +121,7 @@ namespace PersiaWar.Unity2D5D
             DrawChip(waveRect, "WAVE  " + wave, new Color(0.10f, 0.12f, 0.18f));
 
             Rect scoreRect = new Rect(Screen.width - w - margin, waveRect.yMax + 8f * scale, w, 38f * scale);
-            DrawChip(scoreRect, "KILLS  " + score, new Color(0.18f, 0.10f, 0.10f));
+            DrawChip(scoreRect, "SCORE  " + score, new Color(0.18f, 0.10f, 0.10f));
         }
 
         private void DrawBar(Rect rect, float value, Color fill)
