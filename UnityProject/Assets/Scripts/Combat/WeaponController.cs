@@ -354,7 +354,7 @@ namespace PersiaWar.Unity2D5D
             StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (characterVisual != null)
                 characterVisual.PlayFire();
-            RuntimeGameAudio.PlayPlayerShot();
+            RuntimeGameAudio.PlayWeaponShot((int)weaponKind);
             return true;
         }
 
@@ -391,7 +391,7 @@ namespace PersiaWar.Unity2D5D
             StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (characterVisual != null)
                 characterVisual.PlayFire();
-            RuntimeGameAudio.PlayPlayerShot();
+            RuntimeGameAudio.PlayWeaponShot((int)weaponKind);
             return true;
         }
 
