@@ -59,8 +59,18 @@ namespace PersiaWar.Unity2D5D
             Vector3 scale,
             Color tint)
         {
-            GameObject obj = CreateMarker(objectName, position, scale, tint, true);
+            GameObject obj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            obj.name = objectName;
+            obj.transform.position = position;
             obj.transform.rotation = rotation;
+            obj.transform.localScale = scale;
+
+            SphereCollider collider = obj.GetComponent<SphereCollider>();
+            if (collider != null)
+            {
+                collider.isTrigger = true;
+                collider.radius = 0.5f;
+            }
 
             Rigidbody body = obj.GetComponent<Rigidbody>();
             if (body == null)
@@ -69,11 +79,19 @@ namespace PersiaWar.Unity2D5D
             body.useGravity = false;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
+            Renderer projectileRenderer = obj.GetComponent<Renderer>();
+            if (projectileRenderer != null)
+            {
+                projectileRenderer.sharedMaterial = RuntimeMaterialFactory.Create(objectName + "Material", tint);
+                projectileRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                projectileRenderer.receiveShadows = false;
+            }
+
             TrailRenderer trail = obj.AddComponent<TrailRenderer>();
-            trail.time = 0.08f;
+            trail.time = 0.12f;
             trail.minVertexDistance = 0.03f;
-            trail.startWidth = Mathf.Max(0.035f, scale.x * 0.55f);
-            trail.endWidth = 0f;
+            trail.startWidth = Mathf.Max(0.075f, scale.x * 0.85f);
+            trail.endWidth = 0.012f;
             trail.material = RuntimeMaterialFactory.Create(objectName + "TrailMaterial", tint);
             trail.startColor = tint;
             trail.endColor = new Color(tint.r, tint.g, tint.b, 0f);
