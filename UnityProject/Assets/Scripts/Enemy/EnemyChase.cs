@@ -73,8 +73,8 @@ namespace PersiaWar.Unity2D5D
             // Faster mobile combat pacing, tuned by the enemy's carried weapon:
             // pistol users close distance fastest; heavy-gun users move more slowly.
             moveSpeed = DroppedWeaponKind == WeaponController.WeaponKind.LightPistol
-                ? 5.8f
-                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 4.6f : 5.25f);
+                ? 11.6f
+                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 9.2f : 10.5f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
             // Use the same configured range as the weapon the enemy visibly carries/drops.
