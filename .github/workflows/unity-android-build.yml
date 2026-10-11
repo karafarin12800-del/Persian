@@ -238,18 +238,20 @@ jobs:
 
           player_controller = Path('UnityProject/Assets/Scripts/Player/PlayerController.cs').read_text(encoding='utf-8')
           assert 'weapon.MoveSpeedMultiplier' in player_controller, 'Player movement is not linked to the active weapon weight.'
+          assert 'public void SetAimDirection(Vector3 direction)' in player_controller and 'hasAimDirection ? aimDirection : input' in player_controller, 'Player aim orientation must be independent from movement direction.'
           aim = Path('UnityProject/Assets/Scripts/Combat/NearestTargetAim.cs').read_text(encoding='utf-8')
           assert 'Mathf.Min(range, weapon.EffectiveRange)' in aim, 'Auto-targeting can select opponents beyond the current weapon range.'
 
           input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
           assert 'Input.multiTouchEnabled = true;' in input_hub, 'Android must use multi-touch.'
-          assert 'Input.simulateMouseWithTouches = false;' not in input_hub, 'Keep touch-to-mouse simulation enabled for IMGUI controls; suppress it only inside the custom mobile pointer dispatcher.'
+          assert 'Input.simulateMouseWithTouches = false;' in input_hub and 'Input.simulateMouseWithTouches = !matchActive;' in input_hub, 'Active Android gameplay must use native touch IDs while the front end restores mouse simulation.'
           gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
           gui_fallback_end = input_hub.index('private void CreateGuiTextures()', gui_fallback_start)
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
           assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
-          assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android IMGUI menu and pause controls must receive synthesized touch events.'
+          assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android front-end IMGUI must retain synthesized touch support.'
+          assert 'private void HandleAndroidPauseTouches()' in flow and 'MatchPausedByNativeTouch' in flow, 'Android pause/resume must use direct touch while gameplay mouse simulation is off.'
           assert 'guiFallbackOwnsPointer' in gui_fallback and 'Input.touchCount > 0' in gui_fallback, 'Android IMGUI fallback must defer to live finger IDs but recover if legacy touch entries are missing.'
           assert 'float fireHit = actionHitRadius * 1.02f;' in input_hub and 'float actionHitRadius = BaseActionHitRadius * scale * controlScale;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile action hit zones must use the tested radius independent from the movement stick and preserve firing priority.'
           assert 'Screen.width - 352f * scale' in input_hub and 'Screen.height - bottom - 236f * scale' in input_hub and 'Screen.height - bottom - 300f * scale' in input_hub, 'Mobile action-button hit-zones must be separated so fire cannot register as reload/grenade/melee.'
@@ -267,6 +269,7 @@ jobs:
           touch_end = input_hub.index('private Vector2 ApplyDeadZone(', touch_start)
           touch_handler = input_hub[touch_start:touch_end]
           assert 'movePointerId' in touch_handler and 'firePointerId' in touch_handler and 'TryGetTouch(movePointerId' in touch_handler and 'TryGetTouch(firePointerId' in touch_handler, 'Movement and fire must retain separate finger IDs.'
+          assert 'MobileMoveAndFireTouchConcurrent' in input_hub and 'MobileShotFiredWhileMoving' in input_hub, 'Native touch and shot-while-moving diagnostic checkpoints are missing.'
           assert 'DrawAimGuide(' not in input_hub and 'lineTexture' not in input_hub, 'Yellow target line is still drawn by mobile input HUD.'
           assert 'reloadHeldToSwap' in input_hub and 'player.Weapon?.CycleWeapon()' in input_hub, 'Mobile users have no weapon-change gesture.'
           assert 'HOLD SWAP' in input_hub, 'Reload-button hold-to-swap gesture is not labelled.'
