@@ -12,7 +12,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float initialSpawnDelay = 6.5f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
         [SerializeField] private int maxPerWave = 24;
-        [SerializeField] private int victoryWave = 5;
+        [SerializeField] private int victoryWave = 4;
 
 #if UNITY_ANDROID
         // Spawn 24 enemies in the initial Android match, spreading construction across frames.
@@ -127,7 +127,7 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnWave()
         {
-            int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
+            // Four sequential combat waves: six enemies per wave when the match is configured for 24.\n            // The next wave is not spawned until Update confirms every enemy in this wave is gone.\n            int count = Mathf.Clamp(Mathf.CeilToInt(startingCount / 4f), 1, maxPerWave);
 #if UNITY_ANDROID
             count = Mathf.Min(count, 24);
 #endif
@@ -142,7 +142,7 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < count * 3 && spawned < count; i++)
             {
                 float angle = Random.Range(0f, Mathf.PI * 2f);
-                float distance = Random.Range(spawnRadius * 0.72f, spawnRadius);
+                float distance = Random.Range(Mathf.Max(45f, spawnRadius * 0.72f), Mathf.Max(50f, spawnRadius));
                 Vector3 position = player.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
                 position.y = 1f;
 
@@ -194,7 +194,7 @@ namespace PersiaWar.Unity2D5D
                         ? new Vector2(player.position.x, player.position.z)
                         : Vector2.zero;
 
-                    if (Vector2.Distance(candidateXZ, playerXZ) < 18f)
+                    if (Vector2.Distance(candidateXZ, playerXZ) < 45f)
                         continue;
 
                     if (Physics.CheckSphere(candidate + Vector3.up * 0.7f, 0.85f, ~0,
@@ -211,7 +211,7 @@ namespace PersiaWar.Unity2D5D
                     // Deterministic fallback ring prevents a crowded city tile from
                     // silently reducing the requested 32-player starting lobby.
                     float angle = (spawned + 0.5f) / Mathf.Max(1, count) * Mathf.PI * 2f;
-                    float distance = 70f;
+                    float distance = 76f;
                     position = new Vector3(
                         Mathf.Clamp((player != null ? player.position.x : 0f) + Mathf.Cos(angle) * distance, -84f, 84f),
                         1f,
