@@ -303,7 +303,13 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch touch = Input.GetTouch(i);
-                if (touch.phase != TouchPhase.Began)
+
+                // Some Android legacy-input frames report an already-held contact as
+                // Moved/Stationary when another finger is added. Permit an unowned
+                // active contact to claim a free control, so a second finger can start
+                // movement or fire even if its Began phase was missed by this reader.
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled ||
+                    touch.fingerId == movePointerId || touch.fingerId == firePointerId)
                     continue;
 
                 Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
