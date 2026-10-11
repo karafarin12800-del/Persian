@@ -419,7 +419,7 @@ namespace PersiaWar.Unity2D5D
                         if (firePointerMissingSince < 0f)
                             firePointerMissingSince = Time.unscaledTime;
 
-                        bool rebound = TryRebindCoreFirePointer(scale, fireGui);
+                        bool rebound = TryRebindCoreFirePointer(scale);
                         if (rebound &&
                             TryGetTouch(firePointerId, out fireTouch) &&
                             fireTouch.phase != TouchPhase.Ended &&
@@ -486,7 +486,7 @@ namespace PersiaWar.Unity2D5D
             return false;
         }
 
-        private bool TryRebindCoreFirePointer(float scale, Vector2 fireGui)
+        private bool TryRebindCoreFirePointer(float scale)
         {
             float actionRadius = BaseActionHitRadius * scale * controlScale;
             GetActionCenters(
