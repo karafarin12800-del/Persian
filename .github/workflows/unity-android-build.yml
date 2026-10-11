@@ -255,7 +255,7 @@ jobs:
           assert 'CoreMoveFireTestMode = true' in input_hub, 'Android test build must isolate movement and fire from secondary controls.'
           assert 'private void HandleCoreMoveFireTouches()' in input_hub and 'HandleCoreMoveFireTouches();' in input_hub, 'Core movement/fire touch dispatcher is missing.'
           core_touch_start = input_hub.index('private void HandleCoreMoveFireTouches()')
-          core_touch_end = input_hub.index('private bool TryRebindCoreMovementPointer()', core_touch_start)
+          core_touch_end = input_hub.index('private bool TryRebindCoreMovementPointer(', core_touch_start)
           core_touch = input_hub[core_touch_start:core_touch_end]
           assert 'player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)))' in core_touch and 'FireAtNearestTarget();' in core_touch and 'MobileMoveAndFireTouchConcurrent' in core_touch, 'Core touch dispatcher must independently update movement, fire, and concurrent-touch diagnostics.'
           assert 'M:' in input_hub and 'V:' in input_hub and 'F:' in input_hub and 'T:' in input_hub, 'Core test build must display live movement/fire/touch diagnostics.'
