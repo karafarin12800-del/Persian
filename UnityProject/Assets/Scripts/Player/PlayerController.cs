@@ -12,6 +12,8 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float spawnMovementLockSeconds = 0.45f;
 
         private Vector3 input;
+        private Vector3 aimDirection;
+        private bool hasAimDirection;
         private WeaponController weapon;
         private NearestTargetAim aim;
         private TargetHealth health;
@@ -60,6 +62,8 @@ namespace PersiaWar.Unity2D5D
         {
             IsDefeated = false;
             input = Vector3.zero;
+            aimDirection = Vector3.zero;
+            hasAimDirection = false;
             movementEnabled = true;
             groundY = 0f;
             movementLockUntil = Time.time + Mathf.Max(0f, spawnMovementLockSeconds);
@@ -85,7 +89,10 @@ namespace PersiaWar.Unity2D5D
         {
             movementEnabled = enabled;
             if (!enabled)
+            {
                 SetMoveInput(Vector2.zero);
+                ClearAimDirection();
+            }
         }
 
         public void LockMovementFor(float seconds)
@@ -104,6 +111,28 @@ namespace PersiaWar.Unity2D5D
 
             Vector2 clamped = Vector2.ClampMagnitude(value, 1f);
             input = new Vector3(clamped.x, 0f, clamped.y);
+        }
+
+        // Aim is a separate intent from movement: the player can keep strafing
+        // while facing the assisted target under the held-fire control.
+        public void SetAimDirection(Vector3 direction)
+        {
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 0.0001f || IsDefeated)
+            {
+                hasAimDirection = false;
+                aimDirection = Vector3.zero;
+                return;
+            }
+
+            aimDirection = direction.normalized;
+            hasAimDirection = true;
+        }
+
+        public void ClearAimDirection()
+        {
+            hasAimDirection = false;
+            aimDirection = Vector3.zero;
         }
 
         public void ReceiveDamage(int amount)
@@ -137,6 +166,7 @@ namespace PersiaWar.Unity2D5D
             IsDefeated = true;
             movementEnabled = false;
             input = Vector3.zero;
+            ClearAimDirection();
             enabled = false;
             GameSession.Instance?.EndMission(false);
         }
@@ -188,9 +218,10 @@ namespace PersiaWar.Unity2D5D
             if (visual != null)
                 visual.SetMoving(input.sqrMagnitude > 0.0001f);
 
-            if (input.sqrMagnitude > 0.0001f)
+            Vector3 facingDirection = hasAimDirection ? aimDirection : input;
+            if (facingDirection.sqrMagnitude > 0.0001f)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(input, Vector3.up);
+                Quaternion targetRotation = Quaternion.LookRotation(facingDirection, Vector3.up);
                 transform.rotation = Quaternion.Slerp(
                     transform.rotation,
                     targetRotation,
