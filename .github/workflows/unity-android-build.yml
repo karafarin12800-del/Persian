@@ -13,6 +13,7 @@ on:
       - unity-2.5d
       - fix/android-multitouch-pointer-zones
       - fix/combat-buttons-ammo-multitouch
+      - test/core-move-fire-input
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
@@ -251,6 +252,13 @@ jobs:
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
           assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
+          assert 'CoreMoveFireTestMode = true' in input_hub, 'Android test build must isolate movement and fire from secondary controls.'
+          assert 'private void HandleCoreMoveFireTouches()' in input_hub and 'HandleCoreMoveFireTouches();' in input_hub, 'Core movement/fire touch dispatcher is missing.'
+          core_touch_start = input_hub.index('private void HandleCoreMoveFireTouches()')
+          core_touch_end = input_hub.index('private bool TryRebindCoreMovementPointer()', core_touch_start)
+          core_touch = input_hub[core_touch_start:core_touch_end]
+          assert 'player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)))' in core_touch and 'FireAtNearestTarget();' in core_touch and 'MobileMoveAndFireTouchConcurrent' in core_touch, 'Core touch dispatcher must independently update movement, fire, and concurrent-touch diagnostics.'
+          assert 'M:' in input_hub and 'V:' in input_hub and 'F:' in input_hub and 'T:' in input_hub, 'Core test build must display live movement/fire/touch diagnostics.'
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android front-end IMGUI must retain synthesized touch support.'
           assert 'private void HandleAndroidPauseTouches()' in flow and 'MatchPausedByNativeTouch' in flow, 'Android pause/resume must use direct touch while gameplay mouse simulation is off.'
           assert 'guiFallbackOwnsPointer' in gui_fallback and 'Input.touchCount > 0' in gui_fallback, 'Android IMGUI fallback must defer to live finger IDs but recover if legacy touch entries are missing.'
