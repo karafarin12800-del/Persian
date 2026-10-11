@@ -182,7 +182,11 @@ namespace PersiaWar.Unity2D5D
             // Use direct Touch.fingerId input for front-end controls on Android.
             // GUI.Button still draws the visual surface, but must not be the only
             // path that can advance the menu if touch-to-mouse synthesis is missing.
-            if (mode == ScreenMode.Match) return;
+            if (mode == ScreenMode.Match)
+            {
+                HandleAndroidPauseTouches();
+                return;
+            }
             if (mode == ScreenMode.HeroSelect)
             {
                 HandleHeroSelectTouches();
@@ -190,6 +194,45 @@ namespace PersiaWar.Unity2D5D
             }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
+        }
+
+        private void HandleAndroidPauseTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            float scale = Mathf.Clamp(
+                Mathf.Min(Screen.width, Screen.height) / 720f,
+                0.75f,
+                1.35f);
+            float size = 58f * scale;
+            Rect button = new Rect(
+                Screen.width * 0.5f - size * 0.5f,
+                14f * scale,
+                size,
+                size);
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 gui = new Vector2(
+                    touch.position.x,
+                    Screen.height - touch.position.y);
+                if (!button.Contains(gui))
+                    continue;
+
+                matchPaused = !matchPaused;
+                Time.timeScale = matchPaused ? 0f : 1f;
+                if (mobileInput != null)
+                    mobileInput.SetPaused(matchPaused);
+
+                StartupCheckpoint.Set(
+                    matchPaused ? "MatchPausedByNativeTouch" : "MatchResumedByNativeTouch");
+                return;
+            }
         }
 
         private void OnGUI()
@@ -848,7 +891,10 @@ namespace PersiaWar.Unity2D5D
                 size,
                 size);
 
-            if (GUI.Button(button, matchPaused ? "▶" : "Ⅱ", buttonStyle))
+            // Android uses the native touch dispatcher above instead of synthesizing
+            // mouse clicks. Keep this IMGUI button for desktop/editor navigation only.
+            if (!Application.isMobilePlatform &&
+                GUI.Button(button, matchPaused ? "▶" : "Ⅱ", buttonStyle))
             {
                 matchPaused = !matchPaused;
                 Time.timeScale = matchPaused ? 0f : 1f;
