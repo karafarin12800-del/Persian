@@ -10,7 +10,8 @@ namespace PersiaWar.Unity2D5D
             Medkit,
             Grenade,
             Shield,
-            Weapon
+            Weapon,
+            QuickDash
         }
 
         [SerializeField] private PickupType type = PickupType.Ammo;
@@ -95,6 +96,9 @@ namespace PersiaWar.Unity2D5D
                 case PickupType.Weapon:
                     if (player.Weapon != null)
                         player.Weapon.EquipWeaponFromPickup(weaponKind, amount);
+                    break;
+                case PickupType.QuickDash:
+                    player.AddQuickDashCharges(2);
                     break;
             }
 
