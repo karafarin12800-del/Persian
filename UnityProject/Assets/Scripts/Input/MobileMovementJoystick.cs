@@ -18,7 +18,6 @@ namespace PersiaWar.Unity2D5D
         private Vector2 value;
         private bool matchActive;
         private bool matchPaused;
-        private MobileInputHub inputHub;
         private Camera movementCamera;
         private Texture2D circleTexture;
         private GUIStyle labelStyle;
@@ -46,8 +45,6 @@ namespace PersiaWar.Unity2D5D
         public void ActivateForMatch(PlayerController target)
         {
             player = target;
-            if (inputHub == null)
-                inputHub = FindFirstObjectByType<MobileInputHub>();
             movementCamera = Camera.main;
             if (movementCamera == null)
                 movementCamera = FindFirstObjectByType<Camera>();
@@ -70,7 +67,6 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
-            inputHub = FindFirstObjectByType<MobileInputHub>();
             circleTexture = CreateCircleTexture(64);
             labelStyle = new GUIStyle(GUI.skin.label)
             {
@@ -96,13 +92,6 @@ namespace PersiaWar.Unity2D5D
         private void Update()
         {
             if (!matchActive || matchPaused || player == null)
-                return;
-
-            // Experiment 1: MobileInputHub owns movement and combat touch dispatch.
-            // Do not let this secondary joystick reader overwrite its movement input.
-            if (inputHub == null)
-                inputHub = FindFirstObjectByType<MobileInputHub>();
-            if (inputHub != null && inputHub.IsMatchActive)
                 return;
 
             if (!Application.isMobilePlatform)
