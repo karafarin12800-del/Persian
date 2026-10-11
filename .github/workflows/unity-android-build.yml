@@ -12,6 +12,7 @@ on:
     branches:
       - unity-2.5d
       - fix/android-multitouch-pointer-zones
+      - fix/combat-buttons-ammo-multitouch
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
