@@ -1524,7 +1524,7 @@ namespace PersiaWar.Unity2D5D
                 // Large, high-contrast diagnostic banner: do not scale this down
                 // with the gameplay UI scale, which made it unreadable on phones.
                 float debugWidth = Mathf.Min(Screen.width - 24f, 560f);
-                float debugHeight = Mathf.Min(76f, Screen.height * 0.10f);
+                float debugHeight = Mathf.Min(126f, Screen.height * 0.18f);
                 Rect debugRect = new Rect(
                     (Screen.width - debugWidth) * 0.5f,
                     Mathf.Max(12f, Screen.height * 0.12f),
@@ -1536,17 +1536,27 @@ namespace PersiaWar.Unity2D5D
                 GUI.contentColor = Color.white;
                 GUI.Box(debugRect, GUIContent.none);
                 smallButtonHintStyle.fontSize = Mathf.Clamp(
-                    Mathf.RoundToInt(Screen.width / 22f), 22, 34);
+                    Mathf.RoundToInt(Screen.width / 34f), 16, 23);
                 smallButtonHintStyle.fontStyle = FontStyle.Bold;
-                smallButtonHintStyle.alignment = TextAnchor.MiddleCenter;
+                smallButtonHintStyle.alignment = TextAnchor.MiddleLeft;
                 smallButtonHintStyle.normal.textColor = Color.white;
                 smallButtonHintStyle.normal.background = Texture2D.whiteTexture;
-                GUI.Label(debugRect,
-                    "M " + (movementPointerActive ? "1" : "0") +
-                    "     V " + (movementVectorActive ? "1" : "0") +
-                    "     F " + (firePointerActive ? "1" : "0") +
-                    "     T " + Input.touchCount,
-                    smallButtonHintStyle);
+                string touchSummary = "";
+                for (int touchIndex = 0; touchIndex < Input.touchCount && touchIndex < 4; touchIndex++)
+                {
+                    Touch diagnosticTouch = Input.GetTouch(touchIndex);
+                    touchSummary += (touchIndex == 0 ? "" : " | ") +
+                        diagnosticTouch.fingerId + ":" + diagnosticTouch.phase;
+                }
+                string diagnosticText =
+                    "M id:" + movePointerId + " V:" + (movementVectorActive ? "1" : "0") +
+                    " mv:" + moveValue.x.ToString("F1") + "," + moveValue.y.ToString("F1") +
+                    "\nF id:" + firePointerId + " F:" + (firePointerActive ? "1" : "0") +
+                    " T:" + Input.touchCount + " canMove:" + (player.IsMovementEnabled ? "1" : "0") +
+                    "\nTouches: " + (touchSummary.Length == 0 ? "none" : touchSummary);
+                GUI.Label(new Rect(debugRect.x + 8f, debugRect.y + 4f,
+                    debugRect.width - 16f, debugRect.height - 8f),
+                    diagnosticText, smallButtonHintStyle);
                 GUI.backgroundColor = oldBackground;
                 GUI.contentColor = oldContent;
             }
