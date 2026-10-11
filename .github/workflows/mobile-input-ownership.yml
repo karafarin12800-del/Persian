@@ -83,7 +83,8 @@ jobs:
               assert callback in hub, f"Missing input reset lifecycle path: {callback}"
           assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
           assert "else if (Input.touchCount > 0)" in hub and "while any contact is still down" in hub, "Movement must remain active if Android temporarily omits the captured finger while another contact remains"
-          assert "if (movementTouch.phase == TouchPhase.Canceled)" in hub and "if (Input.touchCount == 0)" in hub, "A canceled joystick pointer must not stop movement while another touch remains"
+          assert "MovePointerRecoveryGraceSeconds = 0.24f" in hub and "movePointerMissingSince" in hub, "A canceled/missing joystick pointer must use a recovery window instead of being immediately reset"
+          assert "movementStillHeld" in hub and "FirePointerRecoveryGraceSeconds = 0.24f" in hub, "Movement and held-fire input must survive transient touch-ID gaps independently"
           assert "Input.simulateMouseWithTouches = false;" in hub and "Input.simulateMouseWithTouches = !matchActive;" in hub, "Android gameplay must use native multi-touch while menu IMGUI retains mouse simulation"
           assert "MobileMoveAndFireTouchConcurrent" in hub and "MobileShotFiredWhileMoving" in hub, "One-shot breadcrumbs must record whether simultaneous touch and moving-fire paths were reached"
           assert "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement continuity fallback must preserve the last joystick vector"
@@ -113,6 +114,7 @@ jobs:
           assert "Input.touchCount > 0" in fallback and "guiFallbackOwnsPointer" in fallback, "Android fallback must defer to real fingers but recover when touch entries are absent."
           assert "private void HandleHeroSelectTouches()" in flow and "HeroSelectionContinuedByTouch" in flow, "Hero selection/continue must accept direct Android touches."
           assert "private void HandleAndroidPauseTouches()" in flow and "MatchPausedByNativeTouch" in flow, "Android pause/resume must use native touch while mouse simulation is disabled."
+          assert "bool pauseButtonPressed = GUI.Button(" in flow and "if (!Application.isMobilePlatform && pauseButtonPressed)" in flow, "The pause/resume button must remain visible on Android while native touch owns its activation."
           assert "startRect.Contains(screen)" in flow and "StartMatch();" in flow, "Start Match must accept direct Android touches."
           assert "Screen.height - bottom - 236f * scale" in hub and "Screen.height - bottom - 300f * scale" in hub, "Grenade/reload hit zones must remain separate from adjacent actions"
 
