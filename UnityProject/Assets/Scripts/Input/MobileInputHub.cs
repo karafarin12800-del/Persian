@@ -391,14 +391,20 @@ namespace PersiaWar.Unity2D5D
                     Vector2 movement = ApplyDeadZone(moveValue);
                     player.SetMoveInput(ToWorldMove(movement));
 
-                    if (movementTouch.phase == TouchPhase.Ended ||
-                        movementTouch.phase == TouchPhase.Canceled)
+                    if (movementTouch.phase == TouchPhase.Ended)
                     {
+                        // A normal lift releases movement immediately.
                         ResetMovementPointer();
                     }
-                    else
+                    else if (movementTouch.phase == TouchPhase.Canceled)
                     {
-                                }
+                        // Android can cancel the original pointer when another finger
+                        // is placed on the screen. Do not zero movement if another
+                        // contact remains; the missing-pointer recovery below keeps the
+                        // last joystick vector until the remaining contacts are released.
+                        if (Input.touchCount <= 1)
+                            ResetMovementPointer();
+                    }
                 }
                 else if (Input.touchCount > 0)
                 {
