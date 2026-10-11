@@ -1136,7 +1136,7 @@ namespace PersiaWar.Unity2D5D
                 "R",
                 buttonTextStyle);
             Rect volumeRect = new Rect(Screen.width * 0.5f - 116f * scale, 18f * scale, 232f * scale, 28f * scale);
-            Fill(volumeRect, new Color(0.02f, 0.035f, 0.055f, 0.78f));
+            GUI.Box(volumeRect, GUIContent.none);
             GUI.Label(new Rect(volumeRect.x + 4f * scale, volumeRect.y, 58f * scale, volumeRect.height), "MUSIC", smallButtonHintStyle);
             musicVolume = GUI.HorizontalSlider(new Rect(volumeRect.x + 62f * scale, volumeRect.y + 7f * scale, 104f * scale, 16f * scale), musicVolume, 0f, 1f);
             AudioListener.volume = musicVolume;
