@@ -1520,20 +1520,34 @@ namespace PersiaWar.Unity2D5D
                 bool movementPointerActive = movePointerId >= 0 || movePointerId == -1000;
                 bool movementVectorActive = player.MoveInput.sqrMagnitude > 0.02f;
                 bool firePointerActive = firePointerId >= 0 || firePointerId == -1001;
+                // Large, high-contrast diagnostic banner: do not scale this down
+                // with the gameplay UI scale, which made it unreadable on phones.
+                float debugWidth = Mathf.Min(Screen.width - 24f, 560f);
+                float debugHeight = Mathf.Min(76f, Screen.height * 0.10f);
                 Rect debugRect = new Rect(
-                    Screen.width * 0.5f - 92f * scale,
-                    Screen.height - 38f * scale,
-                    184f * scale,
-                    26f * scale);
+                    (Screen.width - debugWidth) * 0.5f,
+                    Mathf.Max(12f, Screen.height * 0.12f),
+                    debugWidth,
+                    debugHeight);
+                Color oldBackground = GUI.backgroundColor;
+                Color oldContent = GUI.contentColor;
+                GUI.backgroundColor = new Color(0.02f, 0.04f, 0.08f, 0.98f);
+                GUI.contentColor = Color.white;
                 GUI.Box(debugRect, GUIContent.none);
-                smallButtonHintStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(12f * scale), 9, 14);
+                smallButtonHintStyle.fontSize = Mathf.Clamp(
+                    Mathf.RoundToInt(Screen.width / 22f), 22, 34);
+                smallButtonHintStyle.fontStyle = FontStyle.Bold;
+                smallButtonHintStyle.alignment = TextAnchor.MiddleCenter;
                 smallButtonHintStyle.normal.textColor = Color.white;
+                smallButtonHintStyle.normal.background = Texture2D.whiteTexture;
                 GUI.Label(debugRect,
-                    "M:" + (movementPointerActive ? "1" : "0") +
-                    " V:" + (movementVectorActive ? "1" : "0") +
-                    " F:" + (firePointerActive ? "1" : "0") +
-                    " T:" + Input.touchCount,
+                    "M " + (movementPointerActive ? "1" : "0") +
+                    "     V " + (movementVectorActive ? "1" : "0") +
+                    "     F " + (firePointerActive ? "1" : "0") +
+                    "     T " + Input.touchCount,
                     smallButtonHintStyle);
+                GUI.backgroundColor = oldBackground;
+                GUI.contentColor = oldContent;
             }
         }
 
