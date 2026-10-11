@@ -246,7 +246,8 @@ jobs:
 
           input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
           assert 'Input.multiTouchEnabled = true;' in input_hub, 'Android must use multi-touch.'
-          assert 'Input.simulateMouseWithTouches = false;' in input_hub and 'Input.simulateMouseWithTouches = !matchActive;' in input_hub, 'Active Android gameplay must use native touch IDs while the front end restores mouse simulation.'
+          assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android must retain synthesized mouse fallback for IMGUI input.'
+          assert 'HandleGuiPointerFallback();' in input_hub, 'Android gameplay must call the guarded GUI input fallback.'
           gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
           gui_fallback_end = input_hub.index('private void CreateGuiTextures()', gui_fallback_start)
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
