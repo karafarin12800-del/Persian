@@ -27,6 +27,7 @@ namespace PersiaWar.Unity2D5D
         private int meleePointerId = -1;
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
+        private float musicVolume = 0.75f;
         private float movePointerMissingSince = -1f;
         private float firePointerMissingSince = -1f;
         private float reloadPressedAt;
@@ -300,6 +301,8 @@ namespace PersiaWar.Unity2D5D
             float meleeHit = actionHitRadius * 0.76f;
             float grenadeHit = actionHitRadius * 0.76f;
             float reloadHit = actionHitRadius * 0.72f;
+            Vector2 dashGui = new Vector2(Screen.width - 222f * scale, Screen.height - actionBottomMargin * scale - 154f * scale);
+            float dashHit = actionHitRadius * 0.62f;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -310,6 +313,7 @@ namespace PersiaWar.Unity2D5D
                 Vector2 gui = new Vector2(
                     touch.position.x,
                     Screen.height - touch.position.y);
+                if (player != null && player.QuickDashCharges > 0 && Vector2.Distance(gui, dashGui) <= dashHit) { player.TryQuickDash(); continue; }
 
                 if (meleePointerId == -1 &&
                     Vector2.Distance(gui, meleeGui) <= meleeHit)
@@ -1047,6 +1051,13 @@ namespace PersiaWar.Unity2D5D
                 new Color(0.18f, 0.40f, 0.16f,
                     grenadePointerId >= 0 ? 0.72f : 0.52f));
 
+            if (player != null && player.QuickDashCharges > 0)
+            {
+                Vector2 dashPos = new Vector2(Screen.width - 222f * scale, Screen.height - actionBottomMargin * scale - 154f * scale);
+                DrawCircle(dashPos, radius * 0.62f, new Color(0.88f, 0.12f, 0.92f, 0.88f));
+                DrawCircle(dashPos, radius * 0.48f, new Color(0.18f, 0.04f, 0.24f, 0.96f));
+                GUI.Label(new Rect(dashPos.x - radius * 0.65f, dashPos.y - radius * 0.38f, radius * 1.3f, radius * 0.76f), "DASH " + player.QuickDashCharges, buttonTextStyle ?? GUI.skin.label);
+            }
             DrawCircle(
                 reloadPos,
                 radius * 0.56f,
@@ -1109,6 +1120,12 @@ namespace PersiaWar.Unity2D5D
                     radius * 0.80f),
                 "R",
                 buttonTextStyle);
+            Rect volumeRect = new Rect(Screen.width * 0.5f - 116f * scale, 18f * scale, 232f * scale, 28f * scale);
+            Fill(volumeRect, new Color(0.02f, 0.035f, 0.055f, 0.78f));
+            GUI.Label(new Rect(volumeRect.x + 4f * scale, volumeRect.y, 58f * scale, volumeRect.height), "MUSIC", smallButtonHintStyle);
+            musicVolume = GUI.HorizontalSlider(new Rect(volumeRect.x + 62f * scale, volumeRect.y + 7f * scale, 104f * scale, 16f * scale), musicVolume, 0f, 1f);
+            AudioListener.volume = musicVolume;
+            GUI.Label(new Rect(volumeRect.x + 168f * scale, volumeRect.y, 60f * scale, volumeRect.height), Mathf.RoundToInt(musicVolume * 100f) + "%", smallButtonHintStyle);
             GUI.Label(
                 new Rect(
                     reloadPos.x - radius * 0.72f,
