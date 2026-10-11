@@ -891,10 +891,14 @@ namespace PersiaWar.Unity2D5D
                 size,
                 size);
 
-            // Android uses the native touch dispatcher above instead of synthesizing
-            // mouse clicks. Keep this IMGUI button for desktop/editor navigation only.
-            if (!Application.isMobilePlatform &&
-                GUI.Button(button, matchPaused ? "▶" : "Ⅱ", buttonStyle))
+            // Always render the pause/resume button on every platform. Android
+            // activates it through HandleAndroidPauseTouches() using native finger IDs;
+            // GUI.Button remains the visible control and is only the click owner on desktop.
+            bool pauseButtonPressed = GUI.Button(
+                button,
+                matchPaused ? "▶" : "Ⅱ",
+                buttonStyle);
+            if (!Application.isMobilePlatform && pauseButtonPressed)
             {
                 matchPaused = !matchPaused;
                 Time.timeScale = matchPaused ? 0f : 1f;
