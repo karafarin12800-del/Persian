@@ -50,6 +50,8 @@ namespace PersiaWar.Unity2D5D
         private bool matchPaused;
         private bool movementTouchCheckpointWritten;
         private bool fireTouchCheckpointWritten;
+        private bool simultaneousTouchCheckpointWritten;
+        private bool movingShotCheckpointWritten;
 
         // IMGUI fallback maps concurrent touchscreen contacts to mouse buttons.
         // Keep a distinct owner per simulated button so movement cannot consume fire.
@@ -86,11 +88,14 @@ namespace PersiaWar.Unity2D5D
             ResetAllPointers();
             movementTouchCheckpointWritten = false;
             fireTouchCheckpointWritten = false;
+            simultaneousTouchCheckpointWritten = false;
+            movingShotCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            Input.simulateMouseWithTouches = true;
-            // Keep synthesized mouse events available for IMGUI menu/pause controls.
-            // During gameplay the fallback dispatcher defers to real touch IDs.
+            // The match uses independent Touch.fingerId contacts only. Synthesized
+            // mouse buttons compete with touch-driven controls on some Android devices,
+            // so reserve mouse simulation for the front end, not active gameplay.
+            Input.simulateMouseWithTouches = false;
 #endif
             enabled = true;
         }
@@ -111,6 +116,12 @@ namespace PersiaWar.Unity2D5D
             matchPaused = paused;
             if (paused)
                 ResetAllPointers();
+#if UNITY_ANDROID
+            // Pause toggling uses direct Touch input too, so don't re-enable the
+            // synthetic mouse stream when the match is paused.
+            if (matchActive)
+                Input.simulateMouseWithTouches = false;
+#endif
         }
 
         public void EnableMinimap()
@@ -193,11 +204,13 @@ namespace PersiaWar.Unity2D5D
             RestoreAndroidTouchSettings();
         }
 
-        private static void RestoreAndroidTouchSettings()
+        private void RestoreAndroidTouchSettings()
         {
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            Input.simulateMouseWithTouches = true;
+            // Front-end IMGUI needs synthesized clicks. In an active match, input
+            // and pause are handled using native Touch.fingerId values.
+            Input.simulateMouseWithTouches = !matchActive;
 #endif
         }
 
@@ -205,6 +218,14 @@ namespace PersiaWar.Unity2D5D
         {
             if (!matchActive || matchPaused)
                 return;
+
+#if UNITY_ANDROID
+            // Reassert the gameplay policy after focus changes or other scripts.
+            if (!Input.multiTouchEnabled)
+                Input.multiTouchEnabled = true;
+            if (Input.simulateMouseWithTouches)
+                Input.simulateMouseWithTouches = false;
+#endif
 
             if (player == null)
             {
@@ -487,6 +508,17 @@ namespace PersiaWar.Unity2D5D
 
             ReleasePointer(ref meleePointerId);
             ReleasePointer(ref grenadePointerId);
+
+#if UNITY_ANDROID
+            if (!simultaneousTouchCheckpointWritten &&
+                movePointerId >= 0 &&
+                firePointerId >= 0 &&
+                movePointerId != firePointerId)
+            {
+                simultaneousTouchCheckpointWritten = true;
+                StartupCheckpoint.Set("MobileMoveAndFireTouchConcurrent");
+            }
+#endif
         }
 
         private Vector2 ApplyDeadZone(Vector2 inputValue)
@@ -573,6 +605,15 @@ namespace PersiaWar.Unity2D5D
             if (fired)
             {
                 nextFireTime = Time.time + fireRepeatInterval;
+#if UNITY_ANDROID
+                if (!movingShotCheckpointWritten &&
+                    Application.isMobilePlatform &&
+                    player.MoveInput.sqrMagnitude > 0.01f)
+                {
+                    movingShotCheckpointWritten = true;
+                    StartupCheckpoint.Set("MobileShotFiredWhileMoving");
+                }
+#endif
             }
             else if (player.Weapon.Magazine <= 0)
             {
