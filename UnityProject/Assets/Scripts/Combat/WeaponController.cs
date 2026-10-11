@@ -18,9 +18,9 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float projectileLifetime = 0.72f;
         [SerializeField] private float weaponRange = 27f;
         [SerializeField] private int projectileDamage = 22;
-        [SerializeField] private int magazineSize = 24;
-        [SerializeField] private int startingMagazine = 24;
-        [SerializeField] private int startingReserve = 90;
+        [SerializeField] private int magazineSize = 29;
+        [SerializeField] private int startingMagazine = 29;
+        [SerializeField] private int startingReserve = 29;
         [SerializeField] private WeaponKind weaponKind = WeaponKind.AssaultRifle;
         [SerializeField] private int meleeDamage = 45;
         [SerializeField] private float meleeRange = 3.1f;
@@ -30,6 +30,9 @@ namespace PersiaWar.Unity2D5D
         private float nextMeleeTime;
         private int magazine;
         private int reserve;
+        private readonly int[] magazineByWeapon = new int[3];
+        private readonly int[] reserveByWeapon = new int[3];
+        private bool ammoPoolsInitialized;
         private PlayerController player;
         private Transform gunRoot;
         private Vector3 gunRestLocalPosition;
@@ -68,6 +71,7 @@ namespace PersiaWar.Unity2D5D
         {
             player = GetComponent<PlayerController>();
             ApplyWeaponProfile(false);
+            InitializeAmmoPools();
             // The projectile template creates a collider and Rigidbody. Defer that
             // physics allocation until the player actually fires.
 
@@ -86,8 +90,10 @@ namespace PersiaWar.Unity2D5D
 
         public void CycleWeapon()
         {
+            StoreCurrentAmmo();
             weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
             ApplyWeaponProfile(true);
+            RestoreCurrentAmmo();
             RefreshWeaponVisual();
             UpdateRangeIndicator();
             StartupCheckpoint.Set("WeaponSwitched_" + CurrentWeaponName);
@@ -96,12 +102,14 @@ namespace PersiaWar.Unity2D5D
         public void SelectWeapon(WeaponKind selectedWeapon)
         {
             bool changed = weaponKind != selectedWeapon;
+            StoreCurrentAmmo();
             weaponKind = selectedWeapon;
 
             // Always re-apply the chosen profile. In particular, a pickup must
             // restore the weapon's configured range, projectile lifetime, damage,
             // fire cadence, and magazine size even if its kind is already selected.
             ApplyWeaponProfile(true);
+            RestoreCurrentAmmo();
             RefreshWeaponVisual();
             UpdateRangeIndicator();
 
@@ -116,6 +124,35 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("WeaponPickupEquipped_" + CurrentWeaponName);
         }
 
+        private void InitializeAmmoPools()
+        {
+            if (ammoPoolsInitialized) return;
+            for (int i = 0; i < magazineByWeapon.Length; i++)
+            {
+                magazineByWeapon[i] = 29;
+                reserveByWeapon[i] = startingReserve;
+            }
+            ammoPoolsInitialized = true;
+            StoreCurrentAmmo();
+        }
+
+        private void StoreCurrentAmmo()
+        {
+            if (!ammoPoolsInitialized) return;
+            int index = Mathf.Clamp((int)weaponKind, 0, magazineByWeapon.Length - 1);
+            magazineByWeapon[index] = Mathf.Clamp(magazine, 0, magazineSize);
+            reserveByWeapon[index] = Mathf.Clamp(reserve, 0, 29);
+        }
+
+        private void RestoreCurrentAmmo()
+        {
+            if (!ammoPoolsInitialized) return;
+            int index = Mathf.Clamp((int)weaponKind, 0, magazineByWeapon.Length - 1);
+            magazine = Mathf.Clamp(magazineByWeapon[index], 0, magazineSize);
+            reserve = Mathf.Clamp(reserveByWeapon[index], 0, 29);
+            StoreCurrentAmmo();
+        }
+
         private void ApplyWeaponProfile(bool preserveAmmo)
         {
             int oldMagazineSize = Mathf.Max(1, magazineSize);
@@ -128,7 +165,7 @@ namespace PersiaWar.Unity2D5D
                     weaponRange = LightPistolRange;
                     projectileDamage = 14;
                     fireCooldown = 0.24f;
-                    magazineSize = 15;
+                    magazineSize = 29;
                     break;
 
                 case WeaponKind.HeavyMachineGun:
@@ -136,7 +173,7 @@ namespace PersiaWar.Unity2D5D
                     weaponRange = HeavyMachineGunRange;
                     projectileDamage = 34;
                     fireCooldown = 0.31f;
-                    magazineSize = 36;
+                    magazineSize = 29;
                     break;
 
                 default:
@@ -144,7 +181,7 @@ namespace PersiaWar.Unity2D5D
                     weaponRange = AssaultRifleRange;
                     projectileDamage = 22;
                     fireCooldown = 0.19f;
-                    magazineSize = 24;
+                    magazineSize = 29;
                     break;
             }
 
@@ -343,6 +380,7 @@ namespace PersiaWar.Unity2D5D
 
             nextFireTime = Time.time + fireCooldown;
             magazine--;
+            StoreCurrentAmmo();
             transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
 
             Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
@@ -380,6 +418,7 @@ namespace PersiaWar.Unity2D5D
 
             nextFireTime = Time.time + fireCooldown;
             magazine--;
+            StoreCurrentAmmo();
             transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
 
             Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
@@ -489,11 +528,13 @@ namespace PersiaWar.Unity2D5D
             int amount = Mathf.Min(magazineSize - magazine, reserve);
             magazine += amount;
             reserve -= amount;
+            StoreCurrentAmmo();
         }
 
         public void AddReserveAmmo(int amount)
         {
-            reserve = Mathf.Clamp(reserve + Mathf.Max(0, amount), 0, 180);
+            reserve = Mathf.Clamp(reserve + Mathf.Max(0, amount), 0, 29);
+            StoreCurrentAmmo();
         }
 
         public bool TryMelee()
