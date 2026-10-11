@@ -99,7 +99,9 @@ jobs:
           enemy = (scripts / "Enemy/EnemyChase.cs").read_text(encoding="utf-8")
           assert "new Color(0.10f, 0.55f, 1f)" in enemy, "Enemy projectiles must be blue"
           audio = scripts / "Core/RuntimeGameAudio.cs"
-          assert audio.exists() and "BuildMusicLoop()" in audio.read_text(encoding="utf-8") and "PlayPlayerShot()" in audio.read_text(encoding="utf-8"), "Runtime music and shot audio must be present"
+          audio_source = audio.read_text(encoding="utf-8")
+          assert audio.exists() and "BuildMusicLoop()" in audio_source and "PlayPlayerShot()" in audio_source, "Runtime music and shot audio must be present"
+          assert 'activity.Call("setVolumeControlStream", 3)' in audio_source, "Android hardware volume keys must target the media stream"
           hud = (scripts / "UI/RuntimeCombatHUD.cs").read_text(encoding="utf-8")
           assert "fontSize = 18" in hud and "fontSize = 24" in hud, "Player HUD text must be larger"
           assert "private const float BaseActionHitRadius = 122f;" in hub, "Action touch zones must not inherit the enlarged movement-joystick radius"
