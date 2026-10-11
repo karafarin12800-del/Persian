@@ -393,10 +393,34 @@ namespace PersiaWar.Unity2D5D
                     }
                     else if (movementTouch.phase == TouchPhase.Canceled)
                     {
-                        // Do not treat Canceled as a normal lift. Android may report
-                        // this transiently when a second finger goes down, or briefly
-                        // expose zero touches before the surviving fire pointer appears.
-                        if (movePointerMissingSince < 0f)
+                        // Some Android builds keep a Canceled Touch in the touch list
+                        // for more than one frame. Rebind to a different active LEFT
+                        // finger immediately; otherwise the joystick remains attached
+                        // to a dead finger and movement+fire cannot coexist.
+                        bool rebound = false;
+                        for (int j = 0; j < Input.touchCount; j++)
+                        {
+                            Touch candidate = Input.GetTouch(j);
+                            if (candidate.fingerId == movePointerId ||
+                                candidate.fingerId == firePointerId ||
+                                candidate.fingerId == meleePointerId ||
+                                candidate.fingerId == grenadePointerId ||
+                                candidate.fingerId == reloadPointerId ||
+                                candidate.position.x > Screen.width * 0.58f ||
+                                candidate.position.y < Screen.height * 0.10f ||
+                                candidate.phase == TouchPhase.Ended ||
+                                candidate.phase == TouchPhase.Canceled)
+                                continue;
+
+                            movePointerId = candidate.fingerId;
+                            moveTouchOriginScreen = candidate.position - moveValue * Mathf.Max(1f, radius);
+                            movePointerMissingSince = -1f;
+                            player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                            rebound = true;
+                            break;
+                        }
+
+                        if (!rebound && movePointerMissingSince < 0f)
                             movePointerMissingSince = Time.unscaledTime;
                     }
                     else
