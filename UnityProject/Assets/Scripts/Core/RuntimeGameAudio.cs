@@ -60,6 +60,24 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         instance = this;
         DontDestroyOnLoad(gameObject);
 
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Android can otherwise route hardware volume keys to the ring/alarm stream
+        // instead of the active game's audio. STREAM_MUSIC is value 3.
+        try
+        {
+            using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+            using (AndroidJavaObject activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+            {
+                if (activity != null)
+                    activity.Call("setVolumeControlStream", 3);
+            }
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogWarning("Persia War could not select the Android media volume stream: " + exception.Message);
+        }
+#endif
+
         musicSource = gameObject.AddComponent<AudioSource>();
         musicSource.playOnAwake = false;
         musicSource.loop = true;
