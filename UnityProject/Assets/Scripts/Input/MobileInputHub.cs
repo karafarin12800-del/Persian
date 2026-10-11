@@ -11,7 +11,8 @@ namespace PersiaWar.Unity2D5D
     public sealed class MobileInputHub : MonoBehaviour
     {
         private const float BaseActionHitRadius = 122f;
-        private const float FirePointerRecoveryGraceSeconds = 0.12f;
+        private const float MovePointerRecoveryGraceSeconds = 0.24f;
+        private const float FirePointerRecoveryGraceSeconds = 0.24f;
         [SerializeField] private PlayerController player;
         [SerializeField] private float joystickRadius = 122f;
         [SerializeField] private float minimapSize = 190f;
@@ -26,6 +27,7 @@ namespace PersiaWar.Unity2D5D
         private int meleePointerId = -1;
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
+        private float movePointerMissingSince = -1f;
         private float firePointerMissingSince = -1f;
         private float reloadPressedAt;
         private bool reloadHeldToSwap;
@@ -384,39 +386,37 @@ namespace PersiaWar.Unity2D5D
             {
                 if (TryGetTouch(movePointerId, out Touch movementTouch))
                 {
-                    Vector2 delta = movementTouch.position - moveTouchOriginScreen;
-                    float touchRadius = Mathf.Max(1f, radius);
-                    moveValue = Vector2.ClampMagnitude(delta / touchRadius, 1f);
-
-                    Vector2 movement = ApplyDeadZone(moveValue);
-                    player.SetMoveInput(ToWorldMove(movement));
-
                     if (movementTouch.phase == TouchPhase.Ended)
                     {
-                        // A normal lift releases movement immediately.
+                        // A normal lift is definitive: stop immediately.
                         ResetMovementPointer();
                     }
                     else if (movementTouch.phase == TouchPhase.Canceled)
                     {
-                        // Android can cancel the original pointer when another finger
-                        // is placed on the screen. Do not zero movement if another
-                        // contact remains; the missing-pointer recovery below keeps the
-                        // last joystick vector until the remaining contacts are released.
-                        // A canceled finger may disappear from touchCount before the
-                        // fire finger is enumerated, so touchCount == 1 does not mean
-                        // the joystick was the only active contact. Only clear the
-                        // retained movement when the device reports no contacts at all.
-                        if (Input.touchCount == 0)
-                            ResetMovementPointer();
+                        // Do not treat Canceled as a normal lift. Android may report
+                        // this transiently when a second finger goes down, or briefly
+                        // expose zero touches before the surviving fire pointer appears.
+                        if (movePointerMissingSince < 0f)
+                            movePointerMissingSince = Time.unscaledTime;
+                    }
+                    else
+                    {
+                        movePointerMissingSince = -1f;
+                        Vector2 delta = movementTouch.position - moveTouchOriginScreen;
+                        float touchRadius = Mathf.Max(1f, radius);
+                        moveValue = Vector2.ClampMagnitude(delta / touchRadius, 1f);
+
+                        Vector2 movement = ApplyDeadZone(moveValue);
+                        player.SetMoveInput(ToWorldMove(movement));
                     }
                 }
                 else if (Input.touchCount > 0)
                 {
-                    // A few Android devices temporarily expose only one active contact
-                    // when a second finger is placed. If a new left-side contact appears,
-                    // rebind the joystick to it while preserving the current direction.
-                    // Otherwise keep the last vector while any contact is still down.
+                    // Recover the joystick if Android changes the active finger ID.
+                    // Exclude all captured action contacts so the fire finger can never
+                    // be rebound as the movement thumb.
                     float touchRadius = Mathf.Max(1f, radius);
+                    bool movementRebound = false;
                     for (int i = 0; i < Input.touchCount; i++)
                     {
                         Touch candidate = Input.GetTouch(i);
@@ -432,14 +432,42 @@ namespace PersiaWar.Unity2D5D
 
                         movePointerId = candidate.fingerId;
                         moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
+                        movePointerMissingSince = -1f;
+                        movementRebound = true;
                         break;
                     }
+
+                    // If Android reports only the still-held fire finger, keep the last
+                    // joystick vector rather than replacing movement with zero. A normal
+                    // Ended event still releases movement immediately above.
+                    if (!movementRebound && movePointerMissingSince < 0f)
+                        movePointerMissingSince = Time.unscaledTime;
 
                     player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                 }
                 else
                 {
-                    ResetMovementPointer();
+                    // A brief empty touch list is not enough evidence that the user
+                    // lifted the joystick: some devices drop the list during a second
+                    // finger transition. Keep movement during the recovery window, and
+                    // while the independently captured fire finger is still held.
+                    if (movePointerMissingSince < 0f)
+                        movePointerMissingSince = Time.unscaledTime;
+
+                    bool fireStillHeld = firePointerId >= 0 &&
+                        TryGetTouch(firePointerId, out Touch heldFireTouch) &&
+                        heldFireTouch.phase != TouchPhase.Ended &&
+                        heldFireTouch.phase != TouchPhase.Canceled;
+
+                    if (fireStillHeld ||
+                        Time.unscaledTime - movePointerMissingSince <= MovePointerRecoveryGraceSeconds)
+                    {
+                        player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                    }
+                    else
+                    {
+                        ResetMovementPointer();
+                    }
                 }
             }
             else if (movePointerId != -1000)
@@ -452,37 +480,76 @@ namespace PersiaWar.Unity2D5D
             {
                 if (TryGetTouch(firePointerId, out Touch fireTouch))
                 {
-                    firePointerMissingSince = -1f;
-                    if (fireTouch.phase == TouchPhase.Began ||
-                        fireTouch.phase == TouchPhase.Moved ||
-                        fireTouch.phase == TouchPhase.Stationary)
+                    if (fireTouch.phase == TouchPhase.Ended)
                     {
-                        // The active target updates independently of the movement thumb.
-                        // Cooldowns inside FireAtNearestTarget prevent frame-rate firing.
-                        FireAtNearestTarget();
-                    }
-
-                    if (fireTouch.phase == TouchPhase.Ended ||
-                        fireTouch.phase == TouchPhase.Canceled)
-                    {
+                        // Ended means the user lifted the fire finger: release now.
                         ReleaseFirePointer();
                     }
-                }
-                else if (Input.touchCount > 0)
-                {
-                    // A transient Android touch-list gap should not immediately cancel
-                    // aiming/firing while another contact is still held.
-                    if (firePointerMissingSince < 0f)
-                        firePointerMissingSince = Time.unscaledTime;
-
-                    if (Time.unscaledTime - firePointerMissingSince <= FirePointerRecoveryGraceSeconds)
+                    else if (fireTouch.phase == TouchPhase.Canceled)
+                    {
+                        // A canceled pointer may be a multitouch hand-off, not a release.
+                        if (firePointerMissingSince < 0f)
+                            firePointerMissingSince = Time.unscaledTime;
+                    }
+                    else if (fireTouch.phase == TouchPhase.Began ||
+                             fireTouch.phase == TouchPhase.Moved ||
+                             fireTouch.phase == TouchPhase.Stationary)
+                    {
+                        firePointerMissingSince = -1f;
                         FireAtNearestTarget();
-                    else
-                        ReleaseFirePointer();
+                    }
                 }
                 else
                 {
-                    ReleaseFirePointer();
+                    bool fireRebound = false;
+                    if (Input.touchCount > 0)
+                    {
+                        // If Unity drops/re-numbers the fire pointer, only recover it
+                        // from a remaining right-side finger. Never steal the joystick,
+                        // melee, grenade, or reload contacts for firing.
+                        for (int i = 0; i < Input.touchCount; i++)
+                        {
+                            Touch candidate = Input.GetTouch(i);
+                            if (candidate.fingerId == movePointerId ||
+                                candidate.fingerId == meleePointerId ||
+                                candidate.fingerId == grenadePointerId ||
+                                candidate.fingerId == reloadPointerId ||
+                                candidate.position.x < Screen.width * 0.58f ||
+                                candidate.phase == TouchPhase.Ended ||
+                                candidate.phase == TouchPhase.Canceled)
+                                continue;
+
+                            firePointerId = candidate.fingerId;
+                            firePointerMissingSince = -1f;
+                            fireRebound = true;
+                            FireAtNearestTarget();
+                            break;
+                        }
+                    }
+
+                    if (!fireRebound)
+                    {
+                        if (firePointerMissingSince < 0f)
+                            firePointerMissingSince = Time.unscaledTime;
+
+                        bool movementStillHeld = movePointerId >= 0 &&
+                            TryGetTouch(movePointerId, out Touch heldMoveTouch) &&
+                            heldMoveTouch.phase != TouchPhase.Ended &&
+                            heldMoveTouch.phase != TouchPhase.Canceled;
+
+                        // Preserve a held-fire action through a transient input-list gap
+                        // while the movement finger remains down. A normal fire Ended
+                        // event above always stops firing immediately.
+                        if ((Input.touchCount > 0 && movementStillHeld) ||
+                            Time.unscaledTime - firePointerMissingSince <= FirePointerRecoveryGraceSeconds)
+                        {
+                            FireAtNearestTarget();
+                        }
+                        else
+                        {
+                            ReleaseFirePointer();
+                        }
+                    }
                 }
             }
 
@@ -727,6 +794,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetMovementPointer()
         {
             movePointerId = -1;
+            movePointerMissingSince = -1f;
 
             guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
@@ -740,6 +808,7 @@ namespace PersiaWar.Unity2D5D
         private void ResetAllPointers()
         {
             movePointerId = -1;
+            movePointerMissingSince = -1f;
 
             ReleaseFirePointer();
             meleePointerId = -1;
