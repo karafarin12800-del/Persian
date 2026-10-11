@@ -184,8 +184,9 @@ namespace PersiaWar.Unity2D5D
         {
             ResetAllPointers();
 #if UNITY_ANDROID
-            // Keep menu/pause IMGUI buttons usable after gameplay input is disabled.
-            Input.simulateMouseWithTouches = true;
+            // Never re-enable synthetic touch-to-mouse input while the match is active.
+            // Menus regain synthesis after DeactivateMatch clears matchActive.
+            Input.simulateMouseWithTouches = !matchActive;
 #endif
         }
 
@@ -266,11 +267,11 @@ namespace PersiaWar.Unity2D5D
             if (Input.GetMouseButton(0))
                 FireAtNearestTarget();
 #else
+            // Android gameplay is intentionally native-touch-only for this A/B test.
+            // Do not poll any mouse/IMGUI sentinel here: the GUI fallback is disabled
+            // on mobile while a match is active so a synthetic mouse cannot claim a
+            // finger or overwrite move/fire ownership.
             HandleAndroidTouches();
-            // Some devices expose the IMGUI fallback pointer rather than a Touch ID.
-            // Poll it every frame so holding FIRE repeats shots even without MouseDrag events.
-            if (firePointerId == -1001)
-                FireAtNearestTarget();
 #endif
 
             if (minimapEnabled)
@@ -1268,7 +1269,11 @@ namespace PersiaWar.Unity2D5D
             if (!matchActive || matchPaused)
                 return;
 
-            HandleGuiPointerFallback();
+            // The mouse/IMGUI dispatcher is retained for desktop testing only.
+            // On Android it can create a second pointer owner while native Touch IDs
+            // are active, so this A/B build disables that path for the entire match.
+            if (!Application.isMobilePlatform)
+                HandleGuiPointerFallback();
 
             if (circleTexture == null)
                 CreateGuiTextures();
