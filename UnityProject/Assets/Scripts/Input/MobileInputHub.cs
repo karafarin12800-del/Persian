@@ -28,6 +28,7 @@ namespace PersiaWar.Unity2D5D
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
         private float musicVolume = 0.75f;
+        private int volumePointerId = -1;
         private float movePointerMissingSince = -1f;
         private float firePointerMissingSince = -1f;
         private float reloadPressedAt;
@@ -307,12 +308,26 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch touch = Input.GetTouch(i);
-                if (touch.phase != TouchPhase.Began)
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                Rect volumeTouchRect = new Rect(Screen.width * 0.5f - 116f * scale, 18f * scale, 232f * scale, 28f * scale);
+                if (volumePointerId == touch.fingerId)
+                {
+                    if (touch.phase == TouchPhase.Moved || touch.phase == TouchPhase.Stationary)
+                    {
+                        musicVolume = Mathf.Clamp01((gui.x - (volumeTouchRect.x + 62f * scale)) / (104f * scale));
+                        AudioListener.volume = musicVolume;
+                    }
+                    if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled) volumePointerId = -1;
                     continue;
-
-                Vector2 gui = new Vector2(
-                    touch.position.x,
-                    Screen.height - touch.position.y);
+                }
+                if (touch.phase != TouchPhase.Began) continue;
+                if (volumeTouchRect.Contains(gui))
+                {
+                    volumePointerId = touch.fingerId;
+                    musicVolume = Mathf.Clamp01((gui.x - (volumeTouchRect.x + 62f * scale)) / (104f * scale));
+                    AudioListener.volume = musicVolume;
+                    continue;
+                }
                 if (player != null && player.QuickDashCharges > 0 && Vector2.Distance(gui, dashGui) <= dashHit) { player.TryQuickDash(); continue; }
 
                 if (meleePointerId == -1 &&
