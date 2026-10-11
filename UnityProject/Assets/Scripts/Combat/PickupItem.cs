@@ -15,7 +15,7 @@ namespace PersiaWar.Unity2D5D
         }
 
         [SerializeField] private PickupType type = PickupType.Ammo;
-        [SerializeField] private int amount = 30;
+        [SerializeField] private int amount = 29;
         [SerializeField] private float rotateSpeed = 90f;
         [SerializeField] private float bobHeight = 0.15f;
         [SerializeField] private WeaponController.WeaponKind weaponKind = WeaponController.WeaponKind.AssaultRifle;
@@ -26,14 +26,14 @@ namespace PersiaWar.Unity2D5D
         public void Configure(PickupType pickupType, int value)
         {
             type = pickupType;
-            amount = Mathf.Max(1, value);
+            amount = Mathf.Clamp(value, 1, 29);
         }
 
         public void ConfigureWeapon(WeaponController.WeaponKind kind, int reserveAmmo)
         {
             type = PickupType.Weapon;
             weaponKind = kind;
-            amount = Mathf.Max(1, reserveAmmo);
+            amount = Mathf.Clamp(reserveAmmo, 1, 29);
             ApplyWeaponPickupScale();
         }
 
