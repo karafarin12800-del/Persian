@@ -11,6 +11,7 @@ namespace PersiaWar.Unity2D5D
     public sealed class MobileInputHub : MonoBehaviour
     {
         private const float BaseActionHitRadius = 122f;
+        private const float FirePointerRecoveryGraceSeconds = 0.12f;
         [SerializeField] private PlayerController player;
         [SerializeField] private float joystickRadius = 122f;
         [SerializeField] private float minimapSize = 190f;
@@ -25,6 +26,7 @@ namespace PersiaWar.Unity2D5D
         private int meleePointerId = -1;
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
+        private float firePointerMissingSince = -1f;
         private float reloadPressedAt;
         private bool reloadHeldToSwap;
 
@@ -58,7 +60,7 @@ namespace PersiaWar.Unity2D5D
         private int guiReloadMouseButton = -1;
 
         public Vector2 MoveValue => moveValue;
-        public bool IsMovementTouchActive => movePointerId >= 0;
+        public bool IsMovementTouchActive => movePointerId >= 0 || movePointerId == -1000;
         public bool IsMatchActive => matchActive && !matchPaused;
 
         public void Configure(PlayerController target, Camera camera)
@@ -233,10 +235,14 @@ namespace PersiaWar.Unity2D5D
             if (Input.GetKeyDown(KeyCode.G))
                 ThrowGrenadeAtTarget();
 
-            if (Input.GetMouseButton(0) && Time.time >= nextFireTime)
+            if (Input.GetMouseButton(0))
                 FireAtNearestTarget();
 #else
             HandleAndroidTouches();
+            // Some devices expose the IMGUI fallback pointer rather than a Touch ID.
+            // Poll it every frame so holding FIRE repeats shots even without MouseDrag events.
+            if (firePointerId == -1001)
+                FireAtNearestTarget();
 #endif
 
             if (minimapEnabled)
@@ -324,12 +330,12 @@ namespace PersiaWar.Unity2D5D
                     (Vector2.Distance(gui, fireGui) <= fireHit || broadFireZone))
                 {
                     firePointerId = touch.fingerId;
+                    firePointerMissingSince = -1f;
                     if (!fireTouchCheckpointWritten)
                     {
                         fireTouchCheckpointWritten = true;
                         StartupCheckpoint.Set("MobileFireTouchAccepted");
                     }
-                    FireAtNearestTarget();
                     continue;
                 }
 
@@ -415,22 +421,37 @@ namespace PersiaWar.Unity2D5D
             {
                 if (TryGetTouch(firePointerId, out Touch fireTouch))
                 {
-                    if ((fireTouch.phase == TouchPhase.Moved ||
-                         fireTouch.phase == TouchPhase.Stationary) &&
-                        Time.time >= nextFireTime)
+                    firePointerMissingSince = -1f;
+                    if (fireTouch.phase == TouchPhase.Began ||
+                        fireTouch.phase == TouchPhase.Moved ||
+                        fireTouch.phase == TouchPhase.Stationary)
                     {
+                        // The active target updates independently of the movement thumb.
+                        // Cooldowns inside FireAtNearestTarget prevent frame-rate firing.
                         FireAtNearestTarget();
                     }
 
                     if (fireTouch.phase == TouchPhase.Ended ||
                         fireTouch.phase == TouchPhase.Canceled)
                     {
-                        firePointerId = -1;
+                        ReleaseFirePointer();
                     }
+                }
+                else if (Input.touchCount > 0)
+                {
+                    // A transient Android touch-list gap should not immediately cancel
+                    // aiming/firing while another contact is still held.
+                    if (firePointerMissingSince < 0f)
+                        firePointerMissingSince = Time.unscaledTime;
+
+                    if (Time.unscaledTime - firePointerMissingSince <= FirePointerRecoveryGraceSeconds)
+                        FireAtNearestTarget();
+                    else
+                        ReleaseFirePointer();
                 }
                 else
                 {
-                    firePointerId = -1;
+                    ReleaseFirePointer();
                 }
             }
 
@@ -513,24 +534,41 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            if (Time.time < nextFireTime)
-                return;
-
             TargetHealth target = player.Aim != null
                 ? player.Aim.CurrentTarget
                 : null;
 
-            // A target can be selected before it is inside the equipped weapon's
-            // effective range. TryFire(targetPosition) correctly rejects that shot,
-            // but the old dispatcher then did nothing at all while a distant target
-            // remained selected. Fall back to firing forward whenever target fire
-            // cannot produce a projectile, so holding FIRE always has a visible action.
+            // Aim and movement are separate: auto-aim at the nearest visible target.
+            // Without a target, use the current travel vector, falling back to the
+            // previous facing direction so firing does not pull movement to a stop.
+            Vector3 aimDirection;
+            if (target != null)
+            {
+                aimDirection = target.transform.position - player.transform.position;
+            }
+            else
+            {
+                Vector2 movement = player.MoveInput;
+                aimDirection = movement.sqrMagnitude > 0.01f
+                    ? new Vector3(movement.x, 0f, movement.y)
+                    : player.transform.forward;
+            }
+
+            aimDirection.y = 0f;
+            if (aimDirection.sqrMagnitude < 0.001f)
+                aimDirection = player.transform.forward;
+            aimDirection.Normalize();
+            player.SetAimDirection(aimDirection);
+
+            if (Time.time < nextFireTime)
+                return;
+
             bool fired = false;
             if (target != null)
                 fired = player.Weapon.TryFire(target.transform.position);
 
             if (!fired && player.Weapon.Magazine > 0)
-                fired = player.Weapon.TryFireDirection(player.transform.forward);
+                fired = player.Weapon.TryFireDirection(aimDirection);
 
             if (fired)
             {
@@ -627,6 +665,14 @@ namespace PersiaWar.Unity2D5D
                     Screen.height - margin));
         }
 
+        private void ReleaseFirePointer()
+        {
+            firePointerId = -1;
+            firePointerMissingSince = -1f;
+            if (player != null)
+                player.ClearAimDirection();
+        }
+
         private void ResetMovementPointer()
         {
             movePointerId = -1;
@@ -644,7 +690,7 @@ namespace PersiaWar.Unity2D5D
         {
             movePointerId = -1;
 
-            firePointerId = -1;
+            ReleaseFirePointer();
             meleePointerId = -1;
             grenadePointerId = -1;
             reloadPointerId = -1;
@@ -750,7 +796,7 @@ namespace PersiaWar.Unity2D5D
 
             // Floating joystick: nothing is fixed on the screen. The control
             // appears at the exact touch origin and remains visible while held.
-            if (movePointerId >= 0)
+            if (movePointerId >= 0 || movePointerId == -1000)
             {
                 Vector2 basePos = new Vector2(
                     moveStartScreen.x,
@@ -1105,8 +1151,7 @@ namespace PersiaWar.Unity2D5D
                 if (firePointerId == -1001 &&
                     guiFireMouseButton == e.button)
                 {
-                    if (Time.time >= nextFireTime)
-                        FireAtNearestTarget();
+                    FireAtNearestTarget();
                     e.Use();
                     return;
                 }
@@ -1144,7 +1189,7 @@ namespace PersiaWar.Unity2D5D
                 if (firePointerId == -1001 &&
                     guiFireMouseButton == e.button)
                 {
-                    firePointerId = -1;
+                    ReleaseFirePointer();
                     guiFireMouseButton = -1;
                     handled = true;
                 }
