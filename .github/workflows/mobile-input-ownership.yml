@@ -82,7 +82,7 @@ jobs:
           ):
               assert callback in hub, f"Missing input reset lifecycle path: {callback}"
           assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
-          assert "else if (Input.touchCount > 0)" in hub and "while any contact is still down" in hub, "Movement must remain active if Android temporarily omits the captured finger while another contact remains"
+          assert "else if (Input.touchCount > 0)" in hub and "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement must preserve the last joystick vector while Android reports another active contact"
           assert "MovePointerRecoveryGraceSeconds = 0.24f" in hub and "movePointerMissingSince" in hub, "A canceled/missing joystick pointer must use a recovery window instead of being immediately reset"
           assert "movementStillHeld" in hub and "FirePointerRecoveryGraceSeconds = 0.24f" in hub, "Movement and held-fire input must survive transient touch-ID gaps independently"
           assert "Input.simulateMouseWithTouches = false;" in hub and "Input.simulateMouseWithTouches = !matchActive;" in hub, "Android gameplay must use native multi-touch while menu IMGUI retains mouse simulation"
