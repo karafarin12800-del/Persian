@@ -439,8 +439,14 @@ namespace PersiaWar.Unity2D5D
                             break;
                         }
 
-                        if (!rebound && movePointerMissingSince < 0f)
-                            movePointerMissingSince = Time.unscaledTime;
+                        if (!rebound)
+                        {
+                            // Canceled is a terminal state for this finger. Never keep its
+                            // ID captured: Unity may retain the canceled Touch in the list,
+                            // preventing the joystick from acquiring the next real contact.
+                            // The next Update can capture a fresh left-side finger normally.
+                            ResetMovementPointer();
+                        }
                     }
                     else
                     {
