@@ -127,7 +127,9 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnWave()
         {
-            // Four sequential combat waves: six enemies per wave when the match is configured for 24.\n            // The next wave is not spawned until Update confirms every enemy in this wave is gone.\n            int count = Mathf.Clamp(Mathf.CeilToInt(startingCount / 4f), 1, maxPerWave);
+            // Four sequential combat waves: six enemies per wave when the match is configured for 24.
+            // The next wave is not spawned until Update confirms every enemy in this wave is gone.
+            int count = Mathf.Clamp(Mathf.CeilToInt(startingCount / 4f), 1, maxPerWave);
 #if UNITY_ANDROID
             count = Mathf.Min(count, 24);
 #endif
