@@ -402,7 +402,11 @@ namespace PersiaWar.Unity2D5D
                         // is placed on the screen. Do not zero movement if another
                         // contact remains; the missing-pointer recovery below keeps the
                         // last joystick vector until the remaining contacts are released.
-                        if (Input.touchCount <= 1)
+                        // A canceled finger may disappear from touchCount before the
+                        // fire finger is enumerated, so touchCount == 1 does not mean
+                        // the joystick was the only active contact. Only clear the
+                        // retained movement when the device reports no contacts at all.
+                        if (Input.touchCount == 0)
                             ResetMovementPointer();
                     }
                 }
