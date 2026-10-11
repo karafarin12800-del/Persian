@@ -393,11 +393,21 @@ namespace PersiaWar.Unity2D5D
                         if (movePointerMissingSince < 0f)
                             movePointerMissingSince = Time.unscaledTime;
 
-                        bool allowBriefRecovery = firePointerId >= 0;
+                        // Recovery must not depend on FIRE still being held. Android can
+                        // briefly omit/cancel the joystick contact during a second-touch
+                        // transition; if FIRE is released first, keep the movement intent
+                        // alive for the same short grace window while attempting rebind.
+                        bool allowBriefRecovery =
+                            Time.unscaledTime - movePointerMissingSince <= MovePointerRecoveryGraceSeconds;
                         if (allowBriefRecovery)
+                        {
                             player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                        }
                         else
+                        {
                             ResetMovementPointer();
+                            movementWasReleased = true;
+                        }
                     }
                 }
             }
