@@ -23,6 +23,8 @@ namespace PersiaWar.Unity2D5D
         private float groundY;
         private float movementLockUntil;
         private bool movementEnabled = true;
+        [SerializeField] private int quickDashCharges;
+        public int QuickDashCharges => quickDashCharges;
 
         public NearestTargetAim Aim => aim;
         public WeaponController Weapon => weapon;
@@ -159,6 +161,20 @@ namespace PersiaWar.Unity2D5D
         public void AddShield(int amount)
         {
             shield = Mathf.Clamp(shield + Mathf.Max(0, amount), 0, 100);
+        }
+
+        public void AddQuickDashCharges(int amount) { quickDashCharges = Mathf.Clamp(quickDashCharges + Mathf.Max(0, amount), 0, 12); }
+        public bool TryQuickDash()
+        {
+            if (!IsMovementEnabled || quickDashCharges <= 0) return false;
+            Vector3 direction = input.sqrMagnitude > 0.01f ? input.normalized : transform.forward;
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 0.001f) return false;
+            direction.Normalize(); Vector3 origin = transform.position; float moved = 0f;
+            const float distance = 2.6f, step = 0.20f;
+            while (moved < distance) { float delta = Mathf.Min(step, distance - moved); Vector3 candidate = origin + direction * (moved + delta); candidate.y = groundY; candidate.x = Mathf.Clamp(candidate.x, -worldLimit, worldLimit); candidate.z = Mathf.Clamp(candidate.z, -worldLimit, worldLimit); if (WouldCollide(candidate)) break; moved += delta; }
+            if (moved < 0.35f) return false;
+            transform.position = new Vector3(origin.x + direction.x * moved, groundY, origin.z + direction.z * moved); quickDashCharges--; StartupCheckpoint.Set("QuickDashUsed"); return true;
         }
 
         public void HandleDefeat()
