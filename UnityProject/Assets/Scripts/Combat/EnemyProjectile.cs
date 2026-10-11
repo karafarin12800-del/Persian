@@ -30,7 +30,7 @@ namespace PersiaWar.Unity2D5D
             // Lifetime is the physical range limit: the projectile cannot damage
             // anything after travelling farther than the configured weapon range.
             remainingDistance = Mathf.Max(0f, maxRange);
-            lifetime = Mathf.Max(0.05f, remainingDistance / Mathf.Max(1f, speed));
+            lifetime = Mathf.Max(0.05f, Mathf.Max(1f, maxRange) / Mathf.Max(1f, speed));
         }
 
         private void Update()
