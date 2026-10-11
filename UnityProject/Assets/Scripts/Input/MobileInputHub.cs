@@ -304,6 +304,9 @@ namespace PersiaWar.Unity2D5D
             float reloadHit = actionHitRadius * 0.72f;
             Vector2 dashGui = new Vector2(Screen.width - 222f * scale, Screen.height - actionBottomMargin * scale - 154f * scale);
             float dashHit = actionHitRadius * 0.62f;
+            bool canFire = player != null && player.Weapon != null && (player.Weapon.Magazine > 0 || player.Weapon.Reserve > 0);
+            bool canMelee = player != null && player.Weapon != null && !player.IsDefeated;
+            bool canThrowGrenade = grenadeController != null && grenadeController.Grenades > 0;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -330,7 +333,7 @@ namespace PersiaWar.Unity2D5D
                 }
                 if (player != null && player.QuickDashCharges > 0 && Vector2.Distance(gui, dashGui) <= dashHit) { player.TryQuickDash(); continue; }
 
-                if (meleePointerId == -1 &&
+                if (canMelee && meleePointerId == -1 &&
                     Vector2.Distance(gui, meleeGui) <= meleeHit)
                 {
                     meleePointerId = touch.fingerId;
@@ -338,7 +341,7 @@ namespace PersiaWar.Unity2D5D
                     continue;
                 }
 
-                if (grenadePointerId == -1 &&
+                if (canThrowGrenade && grenadePointerId == -1 &&
                     Vector2.Distance(gui, grenadeGui) <= grenadeHit)
                 {
                     grenadePointerId = touch.fingerId;
@@ -367,7 +370,7 @@ namespace PersiaWar.Unity2D5D
                     gui.x >= Screen.width * 0.70f &&
                     gui.y >= Screen.height * 0.48f;
 
-                if (firePointerId == -1 &&
+                if (canFire && firePointerId == -1 &&
                     !insideOtherActionZone &&
                     (Vector2.Distance(gui, fireGui) <= fireHit || broadFireZone))
                 {
@@ -445,7 +448,15 @@ namespace PersiaWar.Unity2D5D
                             // ID captured: Unity may retain the canceled Touch in the list,
                             // preventing the joystick from acquiring the next real contact.
                             // The next Update can capture a fresh left-side finger normally.
-                            ResetMovementPointer();
+                            // Android may cancel the joystick contact when a second
+                            // finger lands. Release only the stale ID and preserve the
+                            // last vector while fire is held; a live left finger can rebind.
+                            movePointerId = -1;
+                            guiMoveMouseButton = -1;
+                            if (movePointerMissingSince < 0f)
+                                movePointerMissingSince = Time.unscaledTime;
+                            if (firePointerId >= 0)
+                                player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                         }
                     }
                     else
@@ -521,8 +532,46 @@ namespace PersiaWar.Unity2D5D
             }
             else if (movePointerId != -1000)
             {
-                // Do not erase movement supplied by the IMGUI fallback pointer.
-                player.SetMoveInput(Vector2.zero);
+                // Recover from Android devices that cancel/omit the joystick finger
+                // when a second (fire) finger appears. Keep the movement channel
+                // independent and rebind only to a live LEFT-side contact.
+                bool fireStillHeld = firePointerId >= 0 &&
+                    TryGetTouch(firePointerId, out Touch heldFireTouch) &&
+                    heldFireTouch.phase != TouchPhase.Ended &&
+                    heldFireTouch.phase != TouchPhase.Canceled;
+                if (fireStillHeld)
+                {
+                    float touchRadius = Mathf.Max(1f, radius);
+                    for (int i = 0; i < Input.touchCount; i++)
+                    {
+                        Touch candidate = Input.GetTouch(i);
+                        if (candidate.fingerId == firePointerId ||
+                            candidate.fingerId == meleePointerId ||
+                            candidate.fingerId == grenadePointerId ||
+                            candidate.fingerId == reloadPointerId ||
+                            candidate.position.x > Screen.width * 0.58f ||
+                            candidate.position.y < Screen.height * 0.10f ||
+                            candidate.phase == TouchPhase.Ended ||
+                            candidate.phase == TouchPhase.Canceled)
+                            continue;
+                        movePointerId = candidate.fingerId;
+                        moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
+                        movePointerMissingSince = -1f;
+                        break;
+                    }
+                }
+
+                if (movePointerId >= 0 || (fireStillHeld && moveValue.sqrMagnitude > 0.01f))
+                {
+                    // A fire touch must never clear the movement vector.
+                    player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                }
+                else
+                {
+                    player.SetMoveInput(Vector2.zero);
+                    moveValue = Vector2.zero;
+                    movePointerMissingSince = -1f;
+                }
             }
 
             if (firePointerId >= 0)
@@ -1054,23 +1103,26 @@ namespace PersiaWar.Unity2D5D
                     buttonTextStyle);
             }
 
+            bool canFire = player != null && player.Weapon != null && (player.Weapon.Magazine > 0 || player.Weapon.Reserve > 0);
+            bool canMelee = player != null && player.Weapon != null && !player.IsDefeated;
+            bool canThrowGrenade = grenadeController != null && grenadeController.Grenades > 0;
             DrawCircle(
                 firePos,
                 radius * 0.76f,
                 new Color(0.72f, 0.12f, 0.08f,
-                    firePointerId >= 0 ? 0.70f : 0.48f));
+                    canFire ? (firePointerId >= 0 ? 0.70f : 0.48f) : 0.16f));
 
             DrawCircle(
                 meleePos,
                 radius * 0.58f,
                 new Color(0.16f, 0.18f, 0.22f,
-                    meleePointerId >= 0 ? 0.78f : 0.56f));
+                    canMelee ? (meleePointerId >= 0 ? 0.78f : 0.56f) : 0.16f));
 
             DrawCircle(
                 grenadePos,
                 radius * 0.58f,
                 new Color(0.18f, 0.40f, 0.16f,
-                    grenadePointerId >= 0 ? 0.72f : 0.52f));
+                    canThrowGrenade ? (grenadePointerId >= 0 ? 0.72f : 0.52f) : 0.16f));
 
             if (player != null && player.QuickDashCharges > 0)
             {
@@ -1106,6 +1158,7 @@ namespace PersiaWar.Unity2D5D
             smallButtonHintStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(10f * scale), 8, 11);
             smallButtonHintStyle.normal.textColor = new Color(1f, 0.93f, 0.62f, 0.95f);
 
+            buttonTextStyle.normal.textColor = canFire ? Color.white : new Color(1f, 1f, 1f, 0.32f);
             GUI.Label(
                 new Rect(
                     firePos.x - radius,
@@ -1114,6 +1167,7 @@ namespace PersiaWar.Unity2D5D
                     radius * 0.60f),
                 "FIRE",
                 buttonTextStyle);
+            buttonTextStyle.normal.textColor = canMelee ? Color.white : new Color(1f, 1f, 1f, 0.32f);
 
             GUI.Label(
                 new Rect(
@@ -1123,6 +1177,7 @@ namespace PersiaWar.Unity2D5D
                     radius * 0.80f),
                 "FIST",
                 buttonTextStyle);
+            buttonTextStyle.normal.textColor = canThrowGrenade ? Color.white : new Color(1f, 1f, 1f, 0.32f);
 
             GUI.Label(
                 new Rect(
@@ -1132,6 +1187,7 @@ namespace PersiaWar.Unity2D5D
                     radius * 0.80f),
                 "G",
                 buttonTextStyle);
+            buttonTextStyle.normal.textColor = Color.white;
 
             GUI.Label(
                 new Rect(
@@ -1247,7 +1303,10 @@ namespace PersiaWar.Unity2D5D
 
                 // A control is free only when its logical pointer AND simulated
                 // mouse-button owner are free. Negative pointer sentinels are active.
-                if (firePointerId == -1 &&
+                bool canFire = player != null && player.Weapon != null && (player.Weapon.Magazine > 0 || player.Weapon.Reserve > 0);
+                bool canMelee = player != null && player.Weapon != null && !player.IsDefeated;
+                bool canThrowGrenade = grenadeController != null && grenadeController.Grenades > 0;
+                if (canFire && firePointerId == -1 &&
                     guiFireMouseButton == -1 &&
                     Vector2.Distance(gui, firePos) <= actionHitRadius * 1.02f)
                 {
@@ -1258,7 +1317,7 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                if (meleePointerId == -1 &&
+                if (canMelee && meleePointerId == -1 &&
                     guiMeleeMouseButton == -1 &&
                     Vector2.Distance(gui, meleePos) <= actionHitRadius * 0.76f)
                 {
@@ -1269,7 +1328,7 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                if (grenadePointerId == -1 &&
+                if (canThrowGrenade && grenadePointerId == -1 &&
                     guiGrenadeMouseButton == -1 &&
                     Vector2.Distance(gui, grenadePos) <= actionHitRadius * 0.76f)
                 {
