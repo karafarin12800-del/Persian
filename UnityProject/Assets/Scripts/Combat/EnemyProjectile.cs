@@ -47,12 +47,16 @@ namespace PersiaWar.Unity2D5D
 
         private bool TryResolveSweep(float distance)
         {
-            RaycastHit[] hits = Physics.RaycastAll(
+            // Enemy shots are visible capsules, not mathematical zero-width rays.
+            // Sweep a small radius and include trigger colliders so the projectile can
+            // reliably register the player's runtime collider on Android.
+            RaycastHit[] hits = Physics.SphereCastAll(
                 transform.position,
+                0.22f,
                 direction,
                 distance + 0.08f,
                 ~0,
-                QueryTriggerInteraction.Ignore);
+                QueryTriggerInteraction.Collide);
 
             if (hits == null || hits.Length == 0)
                 return false;
