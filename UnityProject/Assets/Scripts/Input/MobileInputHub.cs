@@ -356,11 +356,13 @@ namespace PersiaWar.Unity2D5D
                         foundMovementTouch = TryRebindCoreMovementPointer(radius);
                         if (foundMovementTouch)
                             foundMovementTouch = TryGetTouch(movePointerId, out movementTouch);
-                        else if (firePointerId >= 0 && moveValue.sqrMagnitude > 0.01f)
+                        else if (firePointerId >= 0)
                         {
-                            // Android may cancel/drop the joystick finger when a second
-                            // finger begins. Preserve the last movement intent while FIRE
-                            // remains held and keep trying to rebind the live left finger.
+                            // Android can cancel the joystick finger as soon as a second
+                            // finger starts, before the joystick has produced a non-zero
+                            // vector. Keep movement ownership while FIRE is held, including
+                            // that zero-vector startup window, so the live left finger can
+                            // be rebound instead of being discarded.
                             if (movePointerMissingSince < 0f)
                                 movePointerMissingSince = Time.unscaledTime;
                         }
@@ -391,8 +393,7 @@ namespace PersiaWar.Unity2D5D
                         if (movePointerMissingSince < 0f)
                             movePointerMissingSince = Time.unscaledTime;
 
-                        bool allowBriefRecovery = firePointerId >= 0 &&
-                            moveValue.sqrMagnitude > 0.01f;
+                        bool allowBriefRecovery = firePointerId >= 0;
                         if (allowBriefRecovery)
                             player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                         else
