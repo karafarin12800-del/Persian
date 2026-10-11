@@ -171,10 +171,12 @@ namespace PersiaWar.Unity2D5D
         {
             int spawned = 0;
             int attemptsPerEnemy = 60;
+            const int enemiesPerArrivalBatch = 6;
+            const float delayBetweenArrivalBatches = 1.5f;
 
             // Select positions throughout the playable city instead of clustering
-            // everyone in a ring around the player. Spawn one valid enemy per frame
-            // to avoid a single-frame allocation spike on Android.
+            // everyone in a ring around the player. Spawn one valid enemy per frame,
+            // in four clearly separated groups of six, to smooth both visuals and CPU load.
             while (spawned < count)
             {
                 bool foundPosition = false;
@@ -221,6 +223,10 @@ namespace PersiaWar.Unity2D5D
                 spawned++;
                 StartupCheckpoint.Set("AndroidEnemySpawnComplete");
                 yield return null;
+
+                // 24 enemies arrive as 4 groups of 6, with a short pause between groups.
+                if (spawned < count && spawned % enemiesPerArrivalBatch == 0)
+                    yield return new WaitForSecondsRealtime(delayBetweenArrivalBatches);
             }
 
             failedSpawnAttempts = 0;

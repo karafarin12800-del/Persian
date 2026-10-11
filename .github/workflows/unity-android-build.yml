@@ -202,6 +202,7 @@ jobs:
           assert 'startingCount = 24' in spawner and 'count = Mathf.Min(count, 24);' in spawner, 'Android match must start with 24 enemies.'
           assert 'Random.Range(-82f, 82f)' in spawner and 'Random.Range(-82f, 82f)' in spawner, 'Android opponents are not selected across the full map.'
           assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
+          assert 'const int enemiesPerArrivalBatch = 6;' in spawner and 'const float delayBetweenArrivalBatches = 1.5f;' in spawner and 'spawned % enemiesPerArrivalBatch == 0' in spawner, 'Android enemies must arrive in four spaced batches of six.'
 
           assert 'enemySpawner.Configure(player.transform, 24, 84f, 0f);' in flow, 'Android match must start with 24 enemies.'
           assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in active_hud, 'Active Android minimap must be enlarged by a further 20 percent.'
