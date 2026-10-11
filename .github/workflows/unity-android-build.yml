@@ -258,7 +258,7 @@ jobs:
           core_touch_end = input_hub.index('private bool TryRebindCoreMovementPointer(', core_touch_start)
           core_touch = input_hub[core_touch_start:core_touch_end]
           assert 'player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)))' in core_touch and 'FireAtNearestTarget();' in core_touch and 'MobileMoveAndFireTouchConcurrent' in core_touch, 'Core touch dispatcher must independently update movement, fire, and concurrent-touch diagnostics.'
-          assert (('M:' in input_hub and 'V:' in input_hub and 'F:' in input_hub and 'T:' in input_hub) or ('"M "' in input_hub and '"     V "' in input_hub and '"     F "' in input_hub and '"     T "' in input_hub)), 'Core test build must display live movement/fire/touch diagnostics.'
+          assert (('M:' in input_hub and 'V:' in input_hub and 'F:' in input_hub and 'T:' in input_hub) or ('"M "' in input_hub and '"     V "' in input_hub and '"     F "' in input_hub and '"     T "' in input_hub) or ('"M id:"' in input_hub and '"\\nF id:"' in input_hub and '" T:"' in input_hub and '"\\nTouches: "' in input_hub)), 'Core test build must display live movement/fire/touch diagnostics.'
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android front-end IMGUI must retain synthesized touch support.'
           assert 'private void HandleAndroidPauseTouches()' in flow and 'MatchPausedByNativeTouch' in flow, 'Android pause/resume must use direct touch while gameplay mouse simulation is off.'
           assert 'guiFallbackOwnsPointer' in gui_fallback and 'Input.touchCount > 0' in gui_fallback, 'Android IMGUI fallback must defer to live finger IDs but recover if legacy touch entries are missing.'
