@@ -10,6 +10,7 @@ namespace PersiaWar.Unity2D5D
 
         private Vector3 direction;
         private Transform owner;
+        private float remainingDistance;
 
         public void Configure(Vector3 launchDirection, int damageAmount)
         {
@@ -28,20 +29,28 @@ namespace PersiaWar.Unity2D5D
             owner = ownerTransform;
             // Lifetime is the physical range limit: the projectile cannot damage
             // anything after travelling farther than the configured weapon range.
-            lifetime = Mathf.Max(0.05f, Mathf.Max(1f, maxRange) / Mathf.Max(1f, speed));
+            remainingDistance = Mathf.Max(0f, maxRange);
+            lifetime = Mathf.Max(0.05f, remainingDistance / Mathf.Max(1f, speed));
         }
 
         private void Update()
         {
-            float step = speed * Time.deltaTime;
+            float step = Mathf.Min(speed * Time.deltaTime, remainingDistance);
 
-            if (step > 0.001f && TryResolveSweep(step))
+            if (step <= 0.001f || remainingDistance <= 0.001f)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            if (TryResolveSweep(step))
                 return;
 
             transform.position += direction * step;
+            remainingDistance -= step;
             lifetime -= Time.deltaTime;
 
-            if (lifetime <= 0f)
+            if (lifetime <= 0f || remainingDistance <= 0.001f)
                 Destroy(gameObject);
         }
 
@@ -54,7 +63,7 @@ namespace PersiaWar.Unity2D5D
                 transform.position,
                 0.22f,
                 direction,
-                distance + 0.08f,
+                distance,
                 ~0,
                 QueryTriggerInteraction.Collide);
 
