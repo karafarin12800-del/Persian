@@ -1614,20 +1614,22 @@ namespace PersiaWar.Unity2D5D
                 grenadePointerId == -1003 ||
                 reloadPointerId == -1004;
 
-            if (Application.isMobilePlatform &&
-                Input.touchCount > 0 &&
-                !guiFallbackOwnsPointer)
+            if (Application.isMobilePlatform && Input.touchCount > 0)
             {
-                // If a native contact (for example, the held action-button finger)
-                // is visible but the second finger is only surfaced as a synthesized
-                // IMGUI mouse event, do not discard a left-zone movement MouseDown.
-                // All other GUI fallback events still yield to native Touch IDs.
-                bool isUnclaimedLeftMoveDown =
-                    e.type == EventType.MouseDown &&
-                    movePointerId == -1 &&
-                    e.mousePosition.x <= Screen.width * 0.58f &&
-                    e.mousePosition.y >= Screen.height * 0.10f;
-                if (!isUnclaimedLeftMoveDown)
+                // Unity may expose one contact through Touch.fingerId and another
+                // through touch-simulated IMGUI mouse events. If this MouseDown is
+                // already represented in the native Touch list, let the native
+                // dispatcher own it so one physical finger cannot be claimed twice.
+                if (e.type == EventType.MouseDown &&
+                    IsGuiPositionNearNativeTouch(e.mousePosition, Mathf.Max(48f, 42f * GetUiScale())))
+                    return;
+
+                // With native contacts live, only continue fallback processing for
+                // a new, unrepresented MouseDown or for a fallback pointer already
+                // captured by this dispatcher. This permits a second touch to use
+                // either movement or an action button when Android's legacy Touch
+                // list omits that contact, without double-dispatching native touches.
+                if (!guiFallbackOwnsPointer && e.type != EventType.MouseDown)
                     return;
             }
 
@@ -1831,6 +1833,24 @@ namespace PersiaWar.Unity2D5D
                 if (handled)
                     e.Use();
             }
+        }
+
+        private bool IsGuiPositionNearNativeTouch(Vector2 guiPosition, float tolerance)
+        {
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                    continue;
+
+                Vector2 touchGuiPosition = new Vector2(
+                    touch.position.x,
+                    Screen.height - touch.position.y);
+                if (Vector2.Distance(guiPosition, touchGuiPosition) <= tolerance)
+                    return true;
+            }
+
+            return false;
         }
 
         private void CreateGuiTextures()
