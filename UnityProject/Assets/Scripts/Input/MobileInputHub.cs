@@ -584,9 +584,42 @@ namespace PersiaWar.Unity2D5D
                     }
                     else if (fireTouch.phase == TouchPhase.Canceled)
                     {
-                        // A canceled pointer may be a multitouch hand-off, not a release.
+                        // Android can retain the canceled record for several frames.
+                        // Look for a different live right-side contact before treating
+                        // this as a release, so a transient pointer hand-off cannot
+                        // permanently drop held FIRE while the movement thumb is active.
                         if (firePointerMissingSince < 0f)
                             firePointerMissingSince = Time.unscaledTime;
+
+                        bool fireRebound = false;
+                        for (int i = 0; i < Input.touchCount; i++)
+                        {
+                            Touch candidate = Input.GetTouch(i);
+                            if (candidate.fingerId == firePointerId ||
+                                candidate.fingerId == movePointerId ||
+                                candidate.fingerId == meleePointerId ||
+                                candidate.fingerId == grenadePointerId ||
+                                candidate.fingerId == reloadPointerId ||
+                                candidate.rawPosition.x < Screen.width * 0.58f ||
+                                candidate.phase == TouchPhase.Ended ||
+                                candidate.phase == TouchPhase.Canceled)
+                                continue;
+
+                            firePointerId = candidate.fingerId;
+                            firePointerMissingSince = -1f;
+                            fireRebound = true;
+                            StartupCheckpoint.Set("MobileFirePointerReboundAfterCancel");
+                            FireAtNearestTarget();
+                            break;
+                        }
+
+                        if (!fireRebound)
+                        {
+                            if (Time.unscaledTime - firePointerMissingSince <= FirePointerRecoveryGraceSeconds)
+                                FireAtNearestTarget();
+                            else
+                                ReleaseFirePointer();
+                        }
                     }
                     else if (fireTouch.phase == TouchPhase.Began ||
                              fireTouch.phase == TouchPhase.Moved ||
