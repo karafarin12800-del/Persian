@@ -644,9 +644,12 @@ namespace PersiaWar.Unity2D5D
                         gui.y >= Screen.height * 0.10f)
                     {
                         movePointerId = touch.fingerId;
-                        moveTouchOriginScreen = touch.position;
-                        moveStartScreen = ClampFloatingOrigin(touch.position, radius);
-                        moveValue = Vector2.zero;
+                        // Active-contact rebind: preserve the previous joystick vector.
+                        // Putting the origin under the thumb would force the next delta
+                        // to zero and make movement appear to stop after the fire touch.
+                        moveTouchOriginScreen = touch.position -
+                            moveValue * Mathf.Max(1f, radius);
+                        moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
                         movePointerMissingSince = -1f;
                         if (!movementTouchCheckpointWritten)
                         {
