@@ -102,10 +102,9 @@ namespace PersiaWar.Unity2D5D
             movingShotCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Keep Unity's touch-to-mouse synthesis available as a fallback for
-            // Android devices/IMGUI frames where the legacy Touch list is empty.
-            // The GUI dispatcher is guarded so native Touch IDs remain preferred.
-            Input.simulateMouseWithTouches = true;
+            // During active Android gameplay, accept native Touch IDs only.
+            // Touch-to-mouse synthesis can make one finger appear in two input paths.
+            Input.simulateMouseWithTouches = false;
 #endif
             enabled = true;
         }
@@ -113,7 +112,7 @@ namespace PersiaWar.Unity2D5D
         public void DeactivateMatch()
         {
 #if UNITY_ANDROID
-            // Re-enable touch-to-mouse synthesis for menu/pause IMGUI after gameplay.
+            // Mouse simulation is allowed again outside the active match for menus.
             Input.simulateMouseWithTouches = true;
 #endif
             matchActive = false;
@@ -127,8 +126,8 @@ namespace PersiaWar.Unity2D5D
             if (paused)
                 ResetAllPointers();
 #if UNITY_ANDROID
-            // Preserve IMGUI pause/resume and input fallback while paused.
-            Input.simulateMouseWithTouches = true;
+            // Pause/menu UI may use IMGUI mouse events; active gameplay is native-touch-only.
+            Input.simulateMouseWithTouches = paused;
 #endif
         }
 
@@ -146,8 +145,8 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
 #if UNITY_ANDROID
-            // Keep IMGUI menu/pause controls clickable from the very first frame.
-            // Gameplay prefers real finger IDs and guards its fallback dispatcher.
+            // Keep menu UI compatible with IMGUI before a match starts.
+            // ActivateForMatch switches mouse simulation off for native touch-only gameplay.
             Input.multiTouchEnabled = true;
             Input.simulateMouseWithTouches = true;
 #endif
@@ -185,8 +184,7 @@ namespace PersiaWar.Unity2D5D
         {
             ResetAllPointers();
 #if UNITY_ANDROID
-            // Keep the fallback available; the GUI handler yields whenever real
-            // touch IDs are present, so it cannot replace native multi-touch input.
+            // Restore menu-compatible input after this gameplay input owner is disabled.
             Input.simulateMouseWithTouches = true;
 #endif
         }
@@ -217,9 +215,9 @@ namespace PersiaWar.Unity2D5D
         {
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Keep synthesized mouse events available for IMGUI fallback on devices
-            // that report no live Touch contacts. Native touch ownership remains primary.
-            Input.simulateMouseWithTouches = true;
+            // Respect the current screen: native touch only in active gameplay,
+            // synthesized mouse events only outside gameplay or while paused.
+            Input.simulateMouseWithTouches = !matchActive || matchPaused;
 #endif
         }
 
@@ -229,12 +227,12 @@ namespace PersiaWar.Unity2D5D
                 return;
 
 #if UNITY_ANDROID
-            // Reassert multi-touch support. Do not disable touch-to-mouse synthesis:
-            // the guarded IMGUI fallback is required on some Android input paths.
+            // Reassert native multi-touch and keep simulated mouse input disabled
+            // for the full duration of an active Android match.
             if (!Input.multiTouchEnabled)
                 Input.multiTouchEnabled = true;
-            if (!Input.simulateMouseWithTouches)
-                Input.simulateMouseWithTouches = true;
+            if (Input.simulateMouseWithTouches)
+                Input.simulateMouseWithTouches = false;
 #endif
 
             if (player == null)
@@ -1590,10 +1588,12 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleGuiPointerFallback()
         {
-            // Prefer independent Touch.fingerId pointers whenever Unity exposes
-            // live contacts. If the legacy touch list is empty on a device, allow
-            // synthesized IMGUI mouse events to recover the control instead of
-            // returning early for every mobile platform.
+            // Android match gameplay is native Touch.fingerId only.
+            // Do not let IMGUI mouse events claim movement/fire or overwrite touch ownership.
+            // OnGUI still draws the controls; only its mouse-input fallback is disabled.
+            if (Application.isMobilePlatform && matchActive && !matchPaused)
+                return;
+
             Event e = Event.current;
             if (e == null)
                 return;
