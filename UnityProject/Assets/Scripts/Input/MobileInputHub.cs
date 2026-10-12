@@ -1311,30 +1311,15 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleGuiPointerFallback()
         {
-            // Prefer independent Touch.fingerId pointers whenever Unity exposes
-            // live contacts. If the legacy touch list is empty on a device, allow
-            // synthesized IMGUI mouse events to recover the control instead of
-            // returning early for every mobile platform.
+            // Native finger IDs are acquired first by HandleAndroidTouches.
+            // Keep this dispatcher active as a per-control fallback even when some
+            // native contacts exist: suppressing it globally whenever touchCount > 0
+            // drops a second finger if the legacy Touch API misses that contact.
+            // Each mouse event below can claim only a still-unowned control, and
+            // Drag/Up are accepted only by the exact mouse button that claimed it.
             Event e = Event.current;
             if (e == null)
                 return;
-
-            // Use the real Touch.fingerId path whenever Unity exposes live touches.
-            // If we already own an IMGUI fallback pointer, keep the fallback active
-            // until that simulated contact has been released.
-            bool guiFallbackOwnsPointer =
-                movePointerId == -1000 ||
-                firePointerId == -1001 ||
-                meleePointerId == -1002 ||
-                grenadePointerId == -1003 ||
-                reloadPointerId == -1004;
-
-            if (Application.isMobilePlatform &&
-                Input.touchCount > 0 &&
-                !guiFallbackOwnsPointer)
-            {
-                return;
-            }
 
             if (e.type != EventType.MouseDown &&
                 e.type != EventType.MouseDrag &&
