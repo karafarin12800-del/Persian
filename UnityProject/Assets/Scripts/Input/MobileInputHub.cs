@@ -779,9 +779,91 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("MobileMoveAndFireTouchConcurrent");
             }
         
+            // Some Android devices omit TouchPhase.Began for a second finger when
+            // another finger is already held. Recover unowned contacts over the combat
+            // controls as well as the joystick, otherwise move+fire silently becomes
+            // move-only. Every action still claims a unique finger ID and fires once.
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Moved && touch.phase != TouchPhase.Stationary)
+                    continue;
+
+                if (touch.fingerId == movePointerId ||
+                    touch.fingerId == firePointerId ||
+                    touch.fingerId == meleePointerId ||
+                    touch.fingerId == grenadePointerId ||
+                    touch.fingerId == reloadPointerId ||
+                    touch.fingerId == volumePointerId)
+                    continue;
+
+                Vector2 gui = new Vector2(
+                    touch.position.x,
+                    Screen.height - touch.position.y);
+
+                if (volumePointerId == -1 && volumeRect.Contains(gui))
+                {
+                    volumePointerId = touch.fingerId;
+                    musicVolume = Mathf.Clamp01(
+                        (gui.x - (volumeRect.x + 62f * scale)) / (104f * scale));
+                    AudioListener.volume = musicVolume;
+                    continue;
+                }
+
+                if (meleePointerId == -1 && player.Weapon != null &&
+                    !player.IsDefeated &&
+                    Vector2.Distance(gui, meleeGui) <= actionRadius * 0.76f)
+                {
+                    meleePointerId = touch.fingerId;
+                    player.Weapon.TryMelee();
+                    continue;
+                }
+
+                if (grenadePointerId == -1 && grenadeController != null &&
+                    grenadeController.Grenades > 0 &&
+                    Vector2.Distance(gui, grenadeGui) <= actionRadius * 0.76f)
+                {
+                    grenadePointerId = touch.fingerId;
+                    ThrowGrenadeAtTarget();
+                    continue;
+                }
+
+                if (reloadPointerId == -1 &&
+                    Vector2.Distance(gui, reloadGui) <= actionRadius * 0.72f)
+                {
+                    reloadPointerId = touch.fingerId;
+                    reloadPressedAt = Time.time;
+                    reloadHeldToSwap = false;
+                    continue;
+                }
+
+                bool canFireRecovered = player.Weapon != null &&
+                    !player.IsDefeated &&
+                    (player.Weapon.Magazine > 0 || player.Weapon.Reserve > 0);
+                bool overOtherAction = 
+                    Vector2.Distance(gui, meleeGui) <= actionRadius * 0.76f ||
+                    Vector2.Distance(gui, grenadeGui) <= actionRadius * 0.76f ||
+                    Vector2.Distance(gui, reloadGui) <= actionRadius * 0.72f;
+                bool inFireZone =
+                    Vector2.Distance(gui, fireGui) <= actionRadius * 1.02f ||
+                    (gui.x >= Screen.width * 0.70f && gui.y >= Screen.height * 0.48f);
+
+                if (canFireRecovered && firePointerId == -1 &&
+                    !overOtherAction && inFireZone)
+                {
+                    firePointerId = touch.fingerId;
+                    firePointerMissingSince = -1f;
+                    if (!fireTouchCheckpointWritten)
+                    {
+                        fireTouchCheckpointWritten = true;
+                        StartupCheckpoint.Set("MobileFireTouchRecoveredWithoutBegan");
+                    }
+                    FireAtNearestTarget();
+                }
+            }
+
             // Recovery for Android devices that omit TouchPhase.Began when a second
-            // finger is added while another contact is already held. Only the left
-            // movement zone may recover here; action buttons remain Began-only.
+            // finger is added while another contact is already held. The left movement zone also recovers here if its Began phase was omitted.
             if (movePointerId == -1)
             {
                 for (int i = 0; i < Input.touchCount; i++)
