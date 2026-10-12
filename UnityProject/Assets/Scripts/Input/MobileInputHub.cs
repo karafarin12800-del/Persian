@@ -776,7 +776,48 @@ namespace PersiaWar.Unity2D5D
                 simultaneousTouchCheckpointWritten = true;
                 StartupCheckpoint.Set("MobileMoveAndFireTouchConcurrent");
             }
-        }
+        
+            // Recovery for Android devices that omit TouchPhase.Began when a second
+            // finger is added while another contact is already held. Only the left
+            // movement zone may recover here; action buttons remain Began-only.
+            if (movePointerId == -1)
+            {
+                for (int i = 0; i < Input.touchCount; i++)
+                {
+                    Touch touch = Input.GetTouch(i);
+                    if (touch.phase != TouchPhase.Moved &&
+                        touch.phase != TouchPhase.Stationary)
+                        continue;
+
+                    if (touch.fingerId == firePointerId ||
+                        touch.fingerId == meleePointerId ||
+                        touch.fingerId == grenadePointerId ||
+                        touch.fingerId == reloadPointerId ||
+                        touch.fingerId == volumePointerId)
+                        continue;
+
+                    Vector2 gui = new Vector2(
+                        touch.position.x,
+                        Screen.height - touch.position.y);
+                    if (touch.position.x > Screen.width * 0.58f ||
+                        gui.y < Screen.height * 0.10f)
+                        continue;
+
+                    movePointerId = touch.fingerId;
+                    moveTouchOriginScreen = touch.position;
+                    moveStartScreen = ClampFloatingOrigin(touch.position, radius);
+                    moveValue = Vector2.zero;
+                    movePointerMissingSince = -1f;
+                    player.SetMoveInput(Vector2.zero);
+                    if (!movementTouchCheckpointWritten)
+                    {
+                        movementTouchCheckpointWritten = true;
+                        StartupCheckpoint.Set("MobileMoveTouchRecoveredWithoutBegan");
+                    }
+                    break;
+                }
+            }
+}
 
         private Vector2 ApplyDeadZone(Vector2 inputValue)
         {
