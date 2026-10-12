@@ -13,9 +13,9 @@ namespace PersiaWar.Unity2D5D
         private const float BaseActionHitRadius = 122f;
         private const float MovePointerRecoveryGraceSeconds = 0.24f;
         private const float FirePointerRecoveryGraceSeconds = 0.24f;
-        // Temporary diagnostic mode: isolate the two controls that must work together.
-        // Re-enable secondary controls only after Android move+fire is confirmed.
-        private const bool CoreMoveFireTestMode = true;
+        // Use the full gameplay touch dispatcher; the isolated diagnostic path hid
+        // other controls and had a shorter movement-recovery path on Android.
+        private const bool CoreMoveFireTestMode = false;
         [SerializeField] private PlayerController player;
         [SerializeField] private float joystickRadius = 122f;
         [SerializeField] private float minimapSize = 190f;
@@ -600,7 +600,63 @@ namespace PersiaWar.Unity2D5D
                     if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled) volumePointerId = -1;
                     continue;
                 }
-                if (touch.phase != TouchPhase.Began) continue;
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                    continue;
+
+                // A second Android contact is not guaranteed to arrive through this
+                // legacy-input loop as Began on every frame/device. An unowned active
+                // contact may claim only MOVE or FIRE; never re-trigger tap actions
+                // (dash/melee/grenade/reload) from Moved/Stationary contacts.
+                if (touch.phase != TouchPhase.Began)
+                {
+                    if (touch.fingerId == movePointerId ||
+                        touch.fingerId == firePointerId ||
+                        touch.fingerId == meleePointerId ||
+                        touch.fingerId == grenadePointerId ||
+                        touch.fingerId == reloadPointerId)
+                        continue;
+
+                    bool activeTouchInsideOtherActionZone =
+                        Vector2.Distance(gui, meleeGui) <= meleeHit ||
+                        Vector2.Distance(gui, grenadeGui) <= grenadeHit ||
+                        Vector2.Distance(gui, reloadGui) <= reloadHit;
+                    bool activeTouchInFireZone =
+                        Vector2.Distance(gui, fireGui) <= fireHit ||
+                        (gui.x >= Screen.width * 0.70f &&
+                         gui.y >= Screen.height * 0.48f);
+
+                    if (canFire && firePointerId == -1 &&
+                        !activeTouchInsideOtherActionZone &&
+                        activeTouchInFireZone)
+                    {
+                        firePointerId = touch.fingerId;
+                        firePointerMissingSince = -1f;
+                        if (!fireTouchCheckpointWritten)
+                        {
+                            fireTouchCheckpointWritten = true;
+                            StartupCheckpoint.Set("MobileFireTouchAccepted");
+                        }
+                        continue;
+                    }
+
+                    if (movePointerId == -1 &&
+                        touch.position.x <= Screen.width * 0.58f &&
+                        gui.y >= Screen.height * 0.10f)
+                    {
+                        movePointerId = touch.fingerId;
+                        moveTouchOriginScreen = touch.position;
+                        moveStartScreen = ClampFloatingOrigin(touch.position, radius);
+                        moveValue = Vector2.zero;
+                        movePointerMissingSince = -1f;
+                        if (!movementTouchCheckpointWritten)
+                        {
+                            movementTouchCheckpointWritten = true;
+                            StartupCheckpoint.Set("MobileMoveTouchAccepted");
+                        }
+                    }
+                    continue;
+                }
+
                 if (volumeTouchRect.Contains(gui))
                 {
                     volumePointerId = touch.fingerId;
@@ -809,38 +865,40 @@ namespace PersiaWar.Unity2D5D
             }
             else if (movePointerId != -1000)
             {
-                // Recover from Android devices that cancel/omit the joystick finger
-                // when a second (fire) finger appears. Keep the movement channel
-                // independent and rebind only to a live LEFT-side contact.
+                // The previous movement finger may have been canceled during a
+                // second-touch transition. Search for a live LEFT contact every frame,
+                // even after FIRE is released; recovery must not depend on the fire state.
                 bool fireStillHeld = firePointerId >= 0 &&
                     TryGetTouch(firePointerId, out Touch heldFireTouch) &&
                     heldFireTouch.phase != TouchPhase.Ended &&
                     heldFireTouch.phase != TouchPhase.Canceled;
-                if (fireStillHeld)
+
+                float touchRadius = Mathf.Max(1f, radius);
+                for (int i = 0; i < Input.touchCount; i++)
                 {
-                    float touchRadius = Mathf.Max(1f, radius);
-                    for (int i = 0; i < Input.touchCount; i++)
-                    {
-                        Touch candidate = Input.GetTouch(i);
-                        if (candidate.fingerId == firePointerId ||
-                            candidate.fingerId == meleePointerId ||
-                            candidate.fingerId == grenadePointerId ||
-                            candidate.fingerId == reloadPointerId ||
-                            candidate.position.x > Screen.width * 0.58f ||
-                            candidate.position.y < Screen.height * 0.10f ||
-                            candidate.phase == TouchPhase.Ended ||
-                            candidate.phase == TouchPhase.Canceled)
-                            continue;
-                        movePointerId = candidate.fingerId;
-                        moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
-                        movePointerMissingSince = -1f;
-                        break;
-                    }
+                    Touch candidate = Input.GetTouch(i);
+                    if (candidate.fingerId == firePointerId ||
+                        candidate.fingerId == meleePointerId ||
+                        candidate.fingerId == grenadePointerId ||
+                        candidate.fingerId == reloadPointerId ||
+                        candidate.position.x > Screen.width * 0.58f ||
+                        candidate.position.y < Screen.height * 0.10f ||
+                        candidate.phase == TouchPhase.Ended ||
+                        candidate.phase == TouchPhase.Canceled)
+                        continue;
+
+                    movePointerId = candidate.fingerId;
+                    moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
+                    moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
+                    movePointerMissingSince = -1f;
+                    break;
                 }
 
-                if (movePointerId >= 0 || (fireStillHeld && moveValue.sqrMagnitude > 0.01f))
+                if (movePointerId >= 0 ||
+                    (fireStillHeld && moveValue.sqrMagnitude > 0.01f))
                 {
-                    // A fire touch must never clear the movement vector.
+                    // A fire touch must never clear the movement vector. If the
+                    // original finger vanished, preserve intent briefly while rebinding.
                     player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                 }
                 else
