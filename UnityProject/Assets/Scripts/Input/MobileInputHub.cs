@@ -100,10 +100,10 @@ namespace PersiaWar.Unity2D5D
             lateTouchRecoveryCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // The match uses independent Touch.fingerId contacts only. Synthesized
-            // mouse buttons compete with touch-driven controls on some Android devices,
-            // so reserve mouse simulation for the front end, not active gameplay.
-            Input.simulateMouseWithTouches = false;
+            // Keep the IMGUI fallback alive for devices/frames where the legacy Touch
+            // API reports no contacts. HandleGuiPointerFallback yields to native touch
+            // whenever Input.touchCount > 0, so native finger IDs remain authoritative.
+            Input.simulateMouseWithTouches = true;
 #endif
             enabled = true;
         }
@@ -125,10 +125,9 @@ namespace PersiaWar.Unity2D5D
             if (paused)
                 ResetAllPointers();
 #if UNITY_ANDROID
-            // Pause toggling uses direct Touch input too, so don't re-enable the
-            // synthetic mouse stream when the match is paused.
-            if (matchActive)
-                Input.simulateMouseWithTouches = false;
+            // Preserve IMGUI fallback support while paused; PrototypeFlow's native
+            // pause touch handler remains primary on Android.
+            Input.simulateMouseWithTouches = true;
 #endif
         }
 
@@ -216,9 +215,9 @@ namespace PersiaWar.Unity2D5D
         {
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Front-end IMGUI needs synthesized clicks. In an active match, input
-            // and pause are handled using native Touch.fingerId values.
-            Input.simulateMouseWithTouches = !matchActive;
+            // Keep mouse synthesis enabled as a compatibility fallback. The gameplay
+            // fallback dispatcher ignores synthesized events while native touches exist.
+            Input.simulateMouseWithTouches = true;
 #endif
         }
 
@@ -228,11 +227,14 @@ namespace PersiaWar.Unity2D5D
                 return;
 
 #if UNITY_ANDROID
-            // Reassert the gameplay policy after focus changes or other scripts.
+            // Reassert multi-touch, but do not disable mouse synthesis here: the
+            // fallback needs it when the old Touch API temporarily reports zero.
+            // HandleGuiPointerFallback ignores mouse events whenever native contacts
+            // are available, preventing a single contact from being processed twice.
             if (!Input.multiTouchEnabled)
                 Input.multiTouchEnabled = true;
-            if (Input.simulateMouseWithTouches)
-                Input.simulateMouseWithTouches = false;
+            if (!Input.simulateMouseWithTouches)
+                Input.simulateMouseWithTouches = true;
 #endif
 
             if (player == null)
@@ -286,10 +288,12 @@ namespace PersiaWar.Unity2D5D
         private void HandleAndroidTouches()
         {
 #if UNITY_ANDROID
-            // Keep Android's native multi-pointer input enabled throughout gameplay,
-            // not only during Awake/scene activation or app focus restoration.
+            // Enable native multi-touch continuously. Mouse synthesis stays available
+            // only as a fallback; the dispatcher below prefers native contacts.
             if (!Input.multiTouchEnabled)
                 Input.multiTouchEnabled = true;
+            if (!Input.simulateMouseWithTouches)
+                Input.simulateMouseWithTouches = true;
 #endif
             float scale = GetUiScale();
             float radius = joystickRadius * scale * controlScale;
