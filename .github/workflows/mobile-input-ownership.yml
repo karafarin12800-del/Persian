@@ -87,6 +87,13 @@ jobs:
           assert "movementStillHeld" in hub and "FirePointerRecoveryGraceSeconds = 0.24f" in hub, "Movement and held-fire input must survive transient touch-ID gaps independently"
           assert "Input.simulateMouseWithTouches = false;" in hub and "Input.simulateMouseWithTouches = !matchActive;" in hub, "Android gameplay must use native multi-touch while menu IMGUI retains mouse simulation"
           assert "MobileMoveAndFireTouchConcurrent" in hub and "MobileShotFiredWhileMoving" in hub, "One-shot breadcrumbs must record whether simultaneous touch and moving-fire paths were reached"
+          native_touch_start = hub.index("private void HandleAndroidTouches()")
+          native_touch_end = hub.index("private void MarkLateTouchRecovery(Touch touch)", native_touch_start)
+          native_touch_dispatch = hub[native_touch_start:native_touch_end]
+          assert "Vector2 touchStartScreen = touch.rawPosition;" in native_touch_dispatch, "Late-discovered contacts must use their original touch position"
+          assert "if (touch.phase != TouchPhase.Began) continue;" not in native_touch_dispatch, "A missed Began frame must not permanently lose a movement/fire pointer"
+          assert "touch.fingerId == movePointerId" in native_touch_dispatch and "touch.fingerId == firePointerId" in native_touch_dispatch, "Late contact recovery must preserve independent movement/fire finger ownership"
+          assert "MobileLateTouchRecoveredFromActivePhase" in hub, "Late contact recovery must leave a diagnostic breadcrumb"
           assert "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement continuity fallback must preserve the last joystick vector"
           assert "if (!Input.multiTouchEnabled)" in hub and "Input.multiTouchEnabled = true;" in hub, "Android multi-touch must be enforced during active touch dispatch"
           player_controller = (scripts / "Player/PlayerController.cs").read_text(encoding="utf-8")
