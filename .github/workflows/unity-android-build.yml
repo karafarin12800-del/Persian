@@ -245,7 +245,7 @@ jobs:
           input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
           assert 'Input.multiTouchEnabled = true;' in input_hub, 'Android must use multi-touch.'
           assert 'Input.simulateMouseWithTouches = false;' in input_hub and 'Input.simulateMouseWithTouches = true;' in input_hub, 'Mouse synthesis must be disabled during gameplay and restored for menus/pause.'
-          assert 'if (matchActive && !matchPaused)' in input_hub and 'Native Touch' in input_hub, 'Gameplay IMGUI fallback must not compete with native finger ownership.'
+          assert 'if (matchActive && !matchPaused && Input.touchCount > 0)' in input_hub and 'Native Touch' in input_hub, 'Gameplay IMGUI fallback must not compete with native finger ownership.'
           assert 'if (Application.isMobilePlatform &&\n                Input.touchCount > 0 &&' not in input_hub, 'Do not suppress the entire fallback because one native contact exists.'
           gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
           gui_fallback_end = input_hub.index('private void CreateGuiTextures()', gui_fallback_start)
