@@ -104,8 +104,8 @@ namespace PersiaWar.Unity2D5D
             movingShotCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // During Android gameplay use native Touch.fingerId only.
-            // Simulated mouse events can claim the same physical finger twice.
+            // Keep touch-to-mouse synthesis enabled as a fallback when the legacy
+            // Touch list is empty; native Touch.fingerId remains the preferred path.
             Input.simulateMouseWithTouches = true;
 #endif
             enabled = true;
@@ -217,8 +217,7 @@ namespace PersiaWar.Unity2D5D
         {
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Keep IMGUI compatible outside gameplay, but never synthesize mouse
-            // input while the native Android match dispatcher owns the fingers.
+            // Keep the IMGUI fallback available after Android focus/pause changes.
             Input.simulateMouseWithTouches = true;
 #endif
         }
@@ -234,11 +233,11 @@ namespace PersiaWar.Unity2D5D
                 return;
 
 #if UNITY_ANDROID
-            // Reassert native multi-touch and keep simulated mouse input disabled
-            // for the full duration of an active Android match.
+            // Reassert multi-touch, but do not disable mouse synthesis: the GUI
+            // fallback is required if this device reports Input.touchCount == 0.
             if (!Input.multiTouchEnabled)
                 Input.multiTouchEnabled = true;
-            if (Input.simulateMouseWithTouches)
+            if (!Input.simulateMouseWithTouches)
                 Input.simulateMouseWithTouches = true;
 #endif
 
