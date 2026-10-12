@@ -254,11 +254,11 @@ jobs:
           assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
           assert 'CoreMoveFireTestMode = false' in input_hub and 'private void HandleAndroidTouches()' in input_hub and 'Pass 1: update all already-owned contacts' in input_hub and 'Pass 2: assign each newly-begun contact once' in input_hub, 'Android must use the rebuilt two-pass native touch router.'
-          assert 'private void HandleCoreMoveFireTouches()' in input_hub and 'HandleCoreMoveFireTouches();' in input_hub, 'Core movement/fire touch dispatcher is missing.'
-          core_touch_start = input_hub.index('private void HandleCoreMoveFireTouches()')
-          core_touch_end = input_hub.index('private bool TryRebindCoreMovementPointer(', core_touch_start)
-          core_touch = input_hub[core_touch_start:core_touch_end]
-          assert 'player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)))' in core_touch and 'FireAtNearestTarget();' in core_touch and 'MobileMoveAndFireTouchConcurrent' in core_touch, 'Core touch dispatcher must independently update movement, fire, and concurrent-touch diagnostics.'
+          touch_router_start = input_hub.index('private void HandleAndroidTouches()')
+          touch_router_end = input_hub.index('private Vector2 ApplyDeadZone(', touch_router_start)
+          touch_router = input_hub[touch_router_start:touch_router_end]
+          assert 'Pass 1: update all already-owned contacts' in touch_router and 'Pass 2: assign each newly-begun contact once' in touch_router, 'Android touch router must separate updating owned contacts from assigning new ones.'
+          assert 'player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)))' in touch_router and 'FireAtNearestTarget();' in touch_router and 'MobileMoveAndFireTouchConcurrent' in touch_router, 'Touch router must update movement and fire independently and record concurrent contact.'
           assert (('M:' in input_hub and 'V:' in input_hub and 'F:' in input_hub and 'T:' in input_hub) or ('"M "' in input_hub and '"     V "' in input_hub and '"     F "' in input_hub and '"     T "' in input_hub) or ('"M id:"' in input_hub and '"\\nF id:"' in input_hub and '" T:"' in input_hub and '"\\nTouches: "' in input_hub)), 'Core test build must display live movement/fire/touch diagnostics.'
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android front-end IMGUI must retain synthesized touch support.'
           assert 'private void HandleAndroidPauseTouches()' in flow and 'MatchPausedByNativeTouch' in flow, 'Android pause/resume must use direct touch while gameplay mouse simulation is off.'
