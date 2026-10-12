@@ -106,7 +106,7 @@ namespace PersiaWar.Unity2D5D
             Input.multiTouchEnabled = true;
             // During Android gameplay use native Touch.fingerId only.
             // Simulated mouse events can claim the same physical finger twice.
-            Input.simulateMouseWithTouches = false;
+            Input.simulateMouseWithTouches = true;
 #endif
             enabled = true;
         }
@@ -129,7 +129,7 @@ namespace PersiaWar.Unity2D5D
                 ResetAllPointers();
 #if UNITY_ANDROID
             // Mouse synthesis is needed only for the pause/menu IMGUI path.
-            Input.simulateMouseWithTouches = paused;
+            Input.simulateMouseWithTouches = true;
 #endif
         }
 
@@ -219,7 +219,7 @@ namespace PersiaWar.Unity2D5D
             Input.multiTouchEnabled = true;
             // Keep IMGUI compatible outside gameplay, but never synthesize mouse
             // input while the native Android match dispatcher owns the fingers.
-            Input.simulateMouseWithTouches = !matchActive || matchPaused;
+            Input.simulateMouseWithTouches = true;
 #endif
         }
 
@@ -239,7 +239,7 @@ namespace PersiaWar.Unity2D5D
             if (!Input.multiTouchEnabled)
                 Input.multiTouchEnabled = true;
             if (Input.simulateMouseWithTouches)
-                Input.simulateMouseWithTouches = false;
+                Input.simulateMouseWithTouches = true;
 #endif
 
             if (player == null)
@@ -1722,11 +1722,10 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleGuiPointerFallback()
         {
-            // Android match gameplay is native Touch.fingerId only.
-            // Do not let IMGUI mouse events claim movement/fire or overwrite touch ownership.
-            // OnGUI still draws the controls; only its mouse-input fallback is disabled.
-            if (Application.isMobilePlatform && matchActive && !matchPaused)
-                return;
+            // Prefer native Touch.fingerId when Unity reports contacts, but keep the
+            // simulated-mouse fallback alive during Android gameplay. Some devices/builds
+            // report touchCount == 0 while IMGUI still receives touch-generated mouse events.
+            // The fallback has separate owners for movement and each action button.
 
             Event e = Event.current;
             if (e == null)
