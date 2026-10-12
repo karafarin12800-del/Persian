@@ -27,6 +27,7 @@ namespace PersiaWar.Unity2D5D
         private int meleePointerId = -1;
         private int grenadePointerId = -1;
         private int reloadPointerId = -1;
+        private int dashPointerId = -1;
         private float musicVolume = 0.75f;
         private int volumePointerId = -1;
         private float movePointerMissingSince = -1f;
@@ -329,13 +330,23 @@ namespace PersiaWar.Unity2D5D
                 if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
                     continue;
 
+                // Retain ownership of the dash contact so a missed Began phase
+                // cannot make the dash action trigger repeatedly on every frame.
+                if (dashPointerId == touch.fingerId)
+                {
+                    if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                        dashPointerId = -1;
+                    continue;
+                }
+
                 // Recover unowned live contacts even if the Began frame was missed.
                 // Captured contacts are handled below by their own independent finger IDs.
                 if (touch.fingerId == movePointerId ||
                     touch.fingerId == firePointerId ||
                     touch.fingerId == meleePointerId ||
                     touch.fingerId == grenadePointerId ||
-                    touch.fingerId == reloadPointerId)
+                    touch.fingerId == reloadPointerId ||
+                    touch.fingerId == dashPointerId)
                     continue;
 
                 if (volumeTouchRect.Contains(touchStartGui))
@@ -346,7 +357,14 @@ namespace PersiaWar.Unity2D5D
                     AudioListener.volume = musicVolume;
                     continue;
                 }
-                if (player != null && player.QuickDashCharges > 0 && Vector2.Distance(touchStartGui, dashGui) <= dashHit) { player.TryQuickDash(); continue; }
+                if (Vector2.Distance(touchStartGui, dashGui) <= dashHit)
+                {
+                    dashPointerId = touch.fingerId;
+                    MarkLateTouchRecovery(touch);
+                    if (player != null && player.QuickDashCharges > 0)
+                        player.TryQuickDash();
+                    continue;
+                }
 
                 if (meleePointerId == -1 &&
                     Vector2.Distance(touchStartGui, meleeGui) <= meleeHit)
@@ -715,6 +733,7 @@ namespace PersiaWar.Unity2D5D
 
             ReleasePointer(ref meleePointerId);
             ReleasePointer(ref grenadePointerId);
+            ReleasePointer(ref dashPointerId);
 
 #if UNITY_ANDROID
             if (!simultaneousTouchCheckpointWritten &&
@@ -955,6 +974,7 @@ namespace PersiaWar.Unity2D5D
             meleePointerId = -1;
             grenadePointerId = -1;
             reloadPointerId = -1;
+            dashPointerId = -1;
             guiMoveMouseButton = -1;
             guiFireMouseButton = -1;
             guiMeleeMouseButton = -1;
