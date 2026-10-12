@@ -96,6 +96,8 @@ jobs:
           assert "if (touch.phase != TouchPhase.Began) continue;" not in native_touch_dispatch, "A missed Began frame must not permanently lose a movement/fire pointer"
           assert "touch.fingerId == movePointerId" in native_touch_dispatch and "touch.fingerId == firePointerId" in native_touch_dispatch, "Late contact recovery must preserve independent movement/fire finger ownership"
           assert "MobileLateTouchRecoveredFromActivePhase" in hub, "Late contact recovery must leave a diagnostic breadcrumb"
+          assert "private int dashPointerId = -1;" in hub and "Retain ownership of the dash contact" in hub, "Late-discovered dash contacts must be captured once, not trigger a dash repeatedly every frame"
+          assert "ReleasePointer(ref dashPointerId);" in hub and "dashPointerId = -1;" in hub, "Dash pointer ownership must be released on lift and lifecycle reset"
           assert "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement continuity fallback must preserve the last joystick vector"
           assert "if (!Input.multiTouchEnabled)" in hub and "Input.multiTouchEnabled = true;" in hub, "Android multi-touch must be enforced during active touch dispatch"
           player_controller = (scripts / "Player/PlayerController.cs").read_text(encoding="utf-8")
