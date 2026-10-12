@@ -1590,15 +1590,12 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleGuiPointerFallback()
         {
-            // During an active mobile match, gameplay controls have exactly one
-            // owner: HandleAndroidTouches() and real Touch.fingerId values. Do not
-            // let synthesized touch-to-mouse events claim sentinel IDs (-1000...),
-            // because Update() does not process those sentinels as native contacts.
-            // Leave the event unconsumed so IMGUI pause/menu buttons can still work.
+            // Prefer independent Touch.fingerId pointers whenever Unity exposes
+            // live contacts. If the legacy touch list is empty on a device, allow
+            // synthesized IMGUI mouse events to recover the control instead of
+            // returning early for every mobile platform.
             Event e = Event.current;
             if (e == null)
-                return;
-            if (Application.isMobilePlatform && matchActive && !matchPaused)
                 return;
 
             if (CoreMoveFireTestMode)
