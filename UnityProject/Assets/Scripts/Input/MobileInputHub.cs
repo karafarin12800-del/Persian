@@ -1482,8 +1482,8 @@ namespace PersiaWar.Unity2D5D
                 "  moveId=" + movePointerId + "  fireId=" + firePointerId +
                 "  multi=" + Input.multiTouchEnabled +
                 "  mouseSim=" + Input.simulateMouseWithTouches +
-                "\\nFINGERS: " + contacts +
-                "\\nMOVE ROUTE: " + lastMovementTouchRoute;
+                "\nFINGERS: " + contacts +
+                "\nMOVE ROUTE: " + lastMovementTouchRoute;
             GUI.Label(new Rect(panel.x + 6f, panel.y + 4f, panel.width - 12f, panel.height - 8f),
                 summary, touchDiagnosticStyle);
             GUI.backgroundColor = oldBackground;
