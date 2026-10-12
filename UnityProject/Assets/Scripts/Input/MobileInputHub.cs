@@ -311,6 +311,9 @@ namespace PersiaWar.Unity2D5D
             {
                 Touch touch = Input.GetTouch(i);
                 Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                // rawPosition preserves the finger's origin if Android omits its one-frame Began phase.
+                Vector2 touchStartScreen = touch.rawPosition;
+                Vector2 touchStartGui = new Vector2(touchStartScreen.x, Screen.height - touchStartScreen.y);
                 Rect volumeTouchRect = new Rect(Screen.width * 0.5f - 116f * scale, 18f * scale, 232f * scale, 28f * scale);
                 if (volumePointerId == touch.fingerId)
                 {
@@ -322,8 +325,19 @@ namespace PersiaWar.Unity2D5D
                     if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled) volumePointerId = -1;
                     continue;
                 }
-                if (touch.phase != TouchPhase.Began) continue;
-                if (volumeTouchRect.Contains(gui))
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                    continue;
+
+                // Recover unowned live contacts even if the Began frame was missed.
+                // Captured contacts are handled below by their own independent finger IDs.
+                if (touch.fingerId == movePointerId ||
+                    touch.fingerId == firePointerId ||
+                    touch.fingerId == meleePointerId ||
+                    touch.fingerId == grenadePointerId ||
+                    touch.fingerId == reloadPointerId)
+                    continue;
+
+                if (volumeTouchRect.Contains(touchStartGui))
                 {
                     MarkLateTouchRecovery(touch);
                     volumePointerId = touch.fingerId;
@@ -399,25 +413,6 @@ namespace PersiaWar.Unity2D5D
                     movePointerId = touch.fingerId;
                         moveTouchOriginScreen = touchStartScreen;
                         moveStartScreen = ClampFloatingOrigin(touchStartScreen, radius);
-                        moveValue = Vector2.zero;
-                        if (!movementTouchCheckpointWritten)
-                        {
-                            movementTouchCheckpointWritten = true;
-                            StartupCheckpoint.Set("MobileMoveTouchAccepted");
-                        }
-                    }
-                }
-            }
-thing else on the left side becomes the floating movement
-                // stick. The origin follows the player's first touch.
-                if (touch.position.x <= Screen.width * 0.58f &&
-                    gui.y >= Screen.height * 0.10f)
-                {
-                    if (movePointerId == -1)
-                    {
-                        movePointerId = touch.fingerId;
-                        moveTouchOriginScreen = touch.position;
-                        moveStartScreen = ClampFloatingOrigin(touch.position, radius);
                         moveValue = Vector2.zero;
                         if (!movementTouchCheckpointWritten)
                         {
