@@ -594,14 +594,25 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < Input.touchCount; i++)
                 {
                     Touch candidate = Input.GetTouch(i);
+                    // Android devices do not always preserve rawPosition reliably
+                    // during a canceled/missing-pointer handoff. Accept the live contact
+                    // when either its original point OR its current point is in the
+                    // movement zone, but validate the CURRENT vertical position so an
+                    // unrelated top-bar touch is not captured as the joystick.
+                    bool candidateOriginatedLeft =
+                        candidate.rawPosition.x > 0f &&
+                        candidate.rawPosition.x <= Screen.width * 0.58f;
+                    bool candidateCurrentlyLeft =
+                        candidate.position.x <= Screen.width * 0.58f;
+
                     if (candidate.fingerId == firePointerId ||
                         candidate.fingerId == meleePointerId ||
                         candidate.fingerId == grenadePointerId ||
                         candidate.fingerId == reloadPointerId ||
                         candidate.fingerId == dashPointerId ||
                         candidate.fingerId == movePointerId ||
-                        candidate.rawPosition.x > Screen.width * 0.58f ||
-                        candidate.rawPosition.y < Screen.height * 0.10f ||
+                        (!candidateOriginatedLeft && !candidateCurrentlyLeft) ||
+                        candidate.position.y < Screen.height * 0.10f ||
                         candidate.phase == TouchPhase.Ended ||
                         candidate.phase == TouchPhase.Canceled)
                         continue;
