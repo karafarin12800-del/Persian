@@ -85,6 +85,8 @@ jobs:
           assert "else if (Input.touchCount > 0)" in hub and "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement must preserve the last joystick vector while Android reports another active contact"
           assert "MovePointerRecoveryGraceSeconds = 0.24f" in hub and "movePointerMissingSince" in hub, "A canceled/missing joystick pointer must use a recovery window instead of being immediately reset"
           assert "movementStillHeld" in hub and "FirePointerRecoveryGraceSeconds = 0.24f" in hub, "Movement and held-fire input must survive transient touch-ID gaps independently"
+          assert "movementRecoveryActive = true;" in hub and "if (fireStillHeld ||" in hub, "A canceled movement pointer must preserve the last vector while a separate fire touch remains held"
+          assert "MobileFirePointerReboundAfterCancel" in hub and "candidate.rawPosition.x < Screen.width * 0.58f" in hub, "A canceled fire pointer must search for a different live right-side finger before releasing"
           assert "Input.simulateMouseWithTouches = false;" in hub and "Input.simulateMouseWithTouches = !matchActive;" in hub, "Android gameplay must use native multi-touch while menu IMGUI retains mouse simulation"
           assert "MobileMoveAndFireTouchConcurrent" in hub and "MobileShotFiredWhileMoving" in hub, "One-shot breadcrumbs must record whether simultaneous touch and moving-fire paths were reached"
           native_touch_start = hub.index("private void HandleAndroidTouches()")
