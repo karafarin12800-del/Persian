@@ -57,6 +57,7 @@ namespace PersiaWar.Unity2D5D
         private bool simultaneousTouchCheckpointWritten;
         private bool movingShotCheckpointWritten;
         private bool lateTouchRecoveryCheckpointWritten;
+        private bool movementRecoveryActive;
 
         // IMGUI fallback maps concurrent touchscreen contacts to mouse buttons.
         // Keep a distinct owner per simulated button so movement cannot consume fire.
@@ -67,7 +68,7 @@ namespace PersiaWar.Unity2D5D
         private int guiReloadMouseButton = -1;
 
         public Vector2 MoveValue => moveValue;
-        public bool IsMovementTouchActive => movePointerId >= 0 || movePointerId == -1000;
+        public bool IsMovementTouchActive => movePointerId >= 0 || movePointerId == -1000 || movementRecoveryActive;
         public bool IsMatchActive => matchActive && !matchPaused;
 
         public void Configure(PlayerController target, Camera camera)
@@ -414,6 +415,8 @@ namespace PersiaWar.Unity2D5D
                         moveTouchOriginScreen = touchStartScreen;
                         moveStartScreen = ClampFloatingOrigin(touchStartScreen, radius);
                         moveValue = Vector2.zero;
+                        movePointerMissingSince = -1f;
+                        movementRecoveryActive = false;
                         if (!movementTouchCheckpointWritten)
                         {
                             movementTouchCheckpointWritten = true;
@@ -456,6 +459,7 @@ namespace PersiaWar.Unity2D5D
                             movePointerId = candidate.fingerId;
                             moveTouchOriginScreen = candidate.position - moveValue * Mathf.Max(1f, radius);
                             movePointerMissingSince = -1f;
+                            movementRecoveryActive = false;
                             player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                             rebound = true;
                             break;
@@ -463,11 +467,14 @@ namespace PersiaWar.Unity2D5D
 
                         if (!rebound)
                         {
-                            // Canceled is a terminal state for this finger. Never keep its
-                            // ID captured: Unity may retain the canceled Touch in the list,
-                            // preventing the joystick from acquiring the next real contact.
-                            // The next Update can capture a fresh left-side finger normally.
-                            ResetMovementPointer();
+                            // Do not keep the canceled ID, but preserve the last movement
+                            // vector while a second control (commonly FIRE) is still held.
+                            // movePointerId becomes free so a fresh left-side touch can
+                            // immediately take over and set a new direction.
+                            movePointerId = -1;
+                            movePointerMissingSince = Time.unscaledTime;
+                            movementRecoveryActive = true;
+                            guiMoveMouseButton = -1;
                         }
                     }
                     else
@@ -504,6 +511,7 @@ namespace PersiaWar.Unity2D5D
                         movePointerId = candidate.fingerId;
                         moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
                         movePointerMissingSince = -1f;
+                        movementRecoveryActive = false;
                         movementRebound = true;
                         break;
                     }
@@ -539,6 +547,24 @@ namespace PersiaWar.Unity2D5D
                     {
                         ResetMovementPointer();
                     }
+                }
+            }
+            else if (movementRecoveryActive)
+            {
+                bool fireStillHeld = firePointerId >= 0 &&
+                    TryGetTouch(firePointerId, out Touch heldFireTouch) &&
+                    heldFireTouch.phase != TouchPhase.Ended &&
+                    heldFireTouch.phase != TouchPhase.Canceled;
+
+                if (fireStillHeld ||
+                    Time.unscaledTime - movePointerMissingSince <= MovePointerRecoveryGraceSeconds)
+                {
+                    // Keep the last vector only during a genuine input hand-off.
+                    player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                }
+                else
+                {
+                    ResetMovementPointer();
                 }
             }
             else if (movePointerId != -1000)
@@ -875,6 +901,7 @@ namespace PersiaWar.Unity2D5D
         {
             movePointerId = -1;
             movePointerMissingSince = -1f;
+            movementRecoveryActive = false;
 
             guiMoveMouseButton = -1;
             moveStartScreen = Vector2.zero;
@@ -889,6 +916,7 @@ namespace PersiaWar.Unity2D5D
         {
             movePointerId = -1;
             movePointerMissingSince = -1f;
+            movementRecoveryActive = false;
 
             ReleaseFirePointer();
             meleePointerId = -1;
@@ -996,7 +1024,7 @@ namespace PersiaWar.Unity2D5D
 
             // Floating joystick: nothing is fixed on the screen. The control
             // appears at the exact touch origin and remains visible while held.
-            if (movePointerId >= 0 || movePointerId == -1000)
+            if (movePointerId >= 0 || movePointerId == -1000 || movementRecoveryActive)
             {
                 Vector2 basePos = new Vector2(
                     moveStartScreen.x,
