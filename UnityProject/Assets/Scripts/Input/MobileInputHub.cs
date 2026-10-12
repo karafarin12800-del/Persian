@@ -1311,10 +1311,11 @@ namespace PersiaWar.Unity2D5D
         private void HandleGuiPointerFallback()
         {
 #if UNITY_ANDROID
-            // Never route synthesized mouse events into gameplay. The native Touch
-            // dispatcher owns all gameplay fingers independently; IMGUI fallback is
-            // retained only for menu/pause interactions.
-            if (matchActive && !matchPaused)
+            // Prefer native Touch IDs whenever Android reports contacts. Some devices
+            // or Unity/OS combinations report zero native contacts while IMGUI still
+            // receives the touch-synthesized mouse event; in that case allow this
+            // fallback so controls never become completely unresponsive.
+            if (matchActive && !matchPaused && Input.touchCount > 0)
                 return;
 #endif
             Event e = Event.current;
