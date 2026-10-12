@@ -253,7 +253,7 @@ jobs:
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
           assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
-          assert ('CoreMoveFireTestMode = true' in input_hub) or ('CoreMoveFireTestMode = false' in input_hub and 'contact may claim only MOVE or FIRE' in input_hub and 'recovery must not depend on the fire state.' in input_hub), 'Android must use either the isolated touch diagnostic or the repaired full dispatcher with independent movement/fire recovery.'
+          assert 'CoreMoveFireTestMode = false' in input_hub and 'private void HandleAndroidTouches()' in input_hub and 'Pass 1: update all already-owned contacts' in input_hub and 'Pass 2: assign each newly-begun contact once' in input_hub, 'Android must use the rebuilt two-pass native touch router.'
           assert 'private void HandleCoreMoveFireTouches()' in input_hub and 'HandleCoreMoveFireTouches();' in input_hub, 'Core movement/fire touch dispatcher is missing.'
           core_touch_start = input_hub.index('private void HandleCoreMoveFireTouches()')
           core_touch_end = input_hub.index('private bool TryRebindCoreMovementPointer(', core_touch_start)
@@ -263,7 +263,7 @@ jobs:
           assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android front-end IMGUI must retain synthesized touch support.'
           assert 'private void HandleAndroidPauseTouches()' in flow and 'MatchPausedByNativeTouch' in flow, 'Android pause/resume must use direct touch while gameplay mouse simulation is off.'
           assert 'guiFallbackOwnsPointer' in gui_fallback and 'Input.touchCount > 0' in gui_fallback, 'Android IMGUI fallback must defer to live finger IDs but recover if legacy touch entries are missing.'
-          assert 'float fireHit = actionHitRadius * 1.02f;' in input_hub and 'float actionHitRadius = BaseActionHitRadius * scale * controlScale;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile action hit zones must use the tested radius independent from the movement stick and preserve firing priority.'
+          assert 'float actionRadius = BaseActionHitRadius * scale * controlScale;' in input_hub and 'bool fireZone' in input_hub and '!insideOtherButton' in input_hub, 'Mobile action hit zones must be separate from movement and auxiliary buttons.'
           assert 'Screen.width - 352f * scale' in input_hub and 'Screen.height - bottom - 236f * scale' in input_hub and 'Screen.height - bottom - 300f * scale' in input_hub, 'Mobile action-button hit-zones must be separated so fire cannot register as reload/grenade/melee.'
           assert 'private int guiMoveMouseButton = -1;' in input_hub and 'private int guiFireMouseButton = -1;' in input_hub, 'Fallback touchscreen contacts need independent movement and fire button ownership.'
           fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
@@ -278,7 +278,7 @@ jobs:
           touch_start = input_hub.index('private void HandleAndroidTouches()')
           touch_end = input_hub.index('private Vector2 ApplyDeadZone(', touch_start)
           touch_handler = input_hub[touch_start:touch_end]
-          assert 'movePointerId' in touch_handler and 'firePointerId' in touch_handler and 'TryGetTouch(movePointerId' in touch_handler and 'TryGetTouch(firePointerId' in touch_handler, 'Movement and fire must retain separate finger IDs.'
+          assert 'movePointerId' in touch_handler and 'firePointerId' in touch_handler and 'touch.fingerId == movePointerId' in touch_handler and 'touch.fingerId == firePointerId' in touch_handler and 'MobileMoveAndFireTouchConcurrent' in touch_handler, 'Movement and fire must retain independent finger IDs and log concurrent contact.'
           assert 'MobileMoveAndFireTouchConcurrent' in input_hub and 'MobileShotFiredWhileMoving' in input_hub, 'Native touch and shot-while-moving diagnostic checkpoints are missing.'
           assert 'DrawAimGuide(' not in input_hub and 'lineTexture' not in input_hub, 'Yellow target line is still drawn by mobile input HUD.'
           assert 'reloadHeldToSwap' in input_hub and 'player.Weapon?.CycleWeapon()' in input_hub, 'Mobile users have no weapon-change gesture.'
