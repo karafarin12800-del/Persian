@@ -50,6 +50,9 @@ namespace PersiaWar.Unity2D5D
         private Texture2D circleTexture;
         private GUIStyle buttonTextStyle;
         private GUIStyle smallButtonHintStyle;
+        // Temporary runtime telemetry for the reported missing second-touch joystick.
+        private GUIStyle touchDiagnosticStyle;
+        private string lastMovementTouchRoute = "not-yet-claimed";
 
         private bool minimapEnabled;
         private float minimapReadyAt;
@@ -757,6 +760,7 @@ namespace PersiaWar.Unity2D5D
                     gui.y >= Screen.height * 0.10f)
                 {
                     movePointerId = touch.fingerId;
+                    lastMovementTouchRoute = "native-began id=" + touch.fingerId + " phase=" + touch.phase;
                     moveTouchOriginScreen = touch.position;
                     moveStartScreen = ClampFloatingOrigin(touch.position, radius);
                     moveValue = Vector2.zero;
@@ -804,6 +808,7 @@ namespace PersiaWar.Unity2D5D
                         continue;
 
                     movePointerId = touch.fingerId;
+                    lastMovementTouchRoute = "native-recovered id=" + touch.fingerId + " phase=" + touch.phase;
                     moveTouchOriginScreen = touch.position;
                     moveStartScreen = ClampFloatingOrigin(touch.position, radius);
                     moveValue = Vector2.zero;
@@ -1381,6 +1386,8 @@ namespace PersiaWar.Unity2D5D
                     buttonTextStyle);
             }
 
+            DrawTouchDiagnosticOverlay(scale);
+
             if (CoreMoveFireTestMode)
             {
                 bool movementPointerActive = movePointerId >= 0 || movePointerId == -1000;
@@ -1427,6 +1434,62 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        // Temporary diagnostic-only overlay. It records the actual Unity touch list
+        // and pointer ownership without consuming or changing any input event.
+        private void DrawTouchDiagnosticOverlay(float scale)
+        {
+            if (!Application.isMobilePlatform || !matchActive || matchPaused)
+                return;
+
+            int count = Input.touchCount;
+            string contacts = "none";
+            for (int i = 0; i < count && i < 4; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                string owner = touch.fingerId == movePointerId ? "/MOVE"
+                    : touch.fingerId == firePointerId ? "/FIRE"
+                    : touch.fingerId == meleePointerId ? "/MELEE"
+                    : touch.fingerId == grenadePointerId ? "/GRENADE"
+                    : touch.fingerId == reloadPointerId ? "/RELOAD" : string.Empty;
+                string item = touch.fingerId + ":" + touch.phase + "(" +
+                    Mathf.RoundToInt(gui.x) + "," + Mathf.RoundToInt(gui.y) + ")" + owner;
+                contacts = i == 0 ? item : contacts + " | " + item;
+            }
+
+            if (touchDiagnosticStyle == null)
+            {
+                touchDiagnosticStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.UpperLeft,
+                    wordWrap = true,
+                    fontStyle = FontStyle.Bold,
+                    padding = new RectOffset(6, 6, 4, 4)
+                };
+            }
+            touchDiagnosticStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(14f * scale), 11, 18);
+            touchDiagnosticStyle.normal.textColor = Color.white;
+
+            float width = Mathf.Min(Screen.width - 24f, 690f * scale);
+            float height = 91f * scale;
+            Rect panel = new Rect((Screen.width - width) * 0.5f, 116f * scale, width, height);
+            Color oldBackground = GUI.backgroundColor;
+            Color oldContent = GUI.contentColor;
+            GUI.backgroundColor = new Color(0.02f, 0.035f, 0.055f, 0.97f);
+            GUI.contentColor = Color.white;
+            GUI.Box(panel, GUIContent.none);
+            string summary = "TOUCH DIAG  native=" + count +
+                "  moveId=" + movePointerId + "  fireId=" + firePointerId +
+                "  multi=" + Input.multiTouchEnabled +
+                "  mouseSim=" + Input.simulateMouseWithTouches +
+                "\\nFINGERS: " + contacts +
+                "\\nMOVE ROUTE: " + lastMovementTouchRoute;
+            GUI.Label(new Rect(panel.x + 6f, panel.y + 4f, panel.width - 12f, panel.height - 8f),
+                summary, touchDiagnosticStyle);
+            GUI.backgroundColor = oldBackground;
+            GUI.contentColor = oldContent;
+        }
+
         private void HandleCoreGuiPointerFallback(Event e)
         {
             if (Application.isMobilePlatform &&
@@ -1471,6 +1534,7 @@ namespace PersiaWar.Unity2D5D
                     gui.y >= Screen.height * 0.10f)
                 {
                     movePointerId = -1000;
+                    lastMovementTouchRoute = "imgui-mousedown button=" + mouseButton;
                     guiMoveMouseButton = mouseButton;
                     moveTouchOriginScreen = new Vector2(gui.x, Screen.height - gui.y);
                     moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
