@@ -597,11 +597,21 @@ namespace PersiaWar.Unity2D5D
 
                 if (touch.fingerId == movePointerId)
                 {
-                    sawMove = !ended;
-                    if (ended)
+                    if (touch.phase == TouchPhase.Ended)
+                    {
                         ResetMovementPointer();
+                    }
+                    else if (touch.phase == TouchPhase.Canceled)
+                    {
+                        // A second Android contact can cancel/omit the joystick ID for
+                        // a frame. Keep the movement intent briefly so it can rebind to
+                        // another live left-side contact instead of instantly stopping.
+                        if (movePointerMissingSince < 0f)
+                            movePointerMissingSince = Time.unscaledTime;
+                    }
                     else
                     {
+                        sawMove = true;
                         Vector2 delta = touch.position - moveTouchOriginScreen;
                         moveValue = Vector2.ClampMagnitude(delta / radius, 1f);
                         player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
@@ -612,11 +622,22 @@ namespace PersiaWar.Unity2D5D
 
                 if (touch.fingerId == firePointerId)
                 {
-                    sawFire = !ended;
-                    if (ended)
+                    if (touch.phase == TouchPhase.Ended)
+                    {
                         ReleaseFirePointer();
+                    }
+                    else if (touch.phase == TouchPhase.Canceled)
+                    {
+                        // Do not treat Android's transient Canceled phase as a normal
+                        // finger-up; the recovery window below can rebind the held action.
+                        if (firePointerMissingSince < 0f)
+                            firePointerMissingSince = Time.unscaledTime;
+                    }
                     else
+                    {
+                        sawFire = true;
                         FireAtNearestTarget();
+                    }
                     continue;
                 }
 
@@ -671,15 +692,36 @@ namespace PersiaWar.Unity2D5D
             {
                 if (movePointerMissingSince < 0f)
                     movePointerMissingSince = Time.unscaledTime;
-                if (Time.unscaledTime - movePointerMissingSince > MovePointerRecoveryGraceSeconds)
+
+                bool reboundMove = TryRebindCoreMovementPointer(radius);
+                if (reboundMove)
+                {
+                    sawMove = true;
+                    movePointerMissingSince = -1f;
+                    player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                    lastMovementTouchRoute = "native-rebound-after-cancel id=" + movePointerId;
+                }
+                else if (Time.unscaledTime - movePointerMissingSince > MovePointerRecoveryGraceSeconds)
+                {
                     ResetMovementPointer();
+                }
             }
             if (firePointerId >= 0 && !sawFire)
             {
                 if (firePointerMissingSince < 0f)
                     firePointerMissingSince = Time.unscaledTime;
-                if (Time.unscaledTime - firePointerMissingSince > FirePointerRecoveryGraceSeconds)
+
+                bool reboundFire = TryRebindCoreFirePointer(scale);
+                if (reboundFire)
+                {
+                    sawFire = true;
+                    firePointerMissingSince = -1f;
+                    FireAtNearestTarget();
+                }
+                else if (Time.unscaledTime - firePointerMissingSince > FirePointerRecoveryGraceSeconds)
+                {
                     ReleaseFirePointer();
+                }
             }
             if (volumePointerId >= 0 && !sawVolume && Input.touchCount == 0)
                 volumePointerId = -1;
