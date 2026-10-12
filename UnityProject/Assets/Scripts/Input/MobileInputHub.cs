@@ -769,6 +769,13 @@ namespace PersiaWar.Unity2D5D
                     }
                 }
             }
+
+            if (movePointerId >= 0 && firePointerId >= 0 &&
+                !simultaneousTouchCheckpointWritten)
+            {
+                simultaneousTouchCheckpointWritten = true;
+                StartupCheckpoint.Set("MobileMoveAndFireTouchConcurrent");
+            }
         }
 
         private Vector2 ApplyDeadZone(Vector2 inputValue)
