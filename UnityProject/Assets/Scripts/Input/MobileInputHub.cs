@@ -1599,7 +1599,7 @@ namespace PersiaWar.Unity2D5D
             touchDiagnosticStyle.normal.textColor = Color.white;
 
             float width = Mathf.Min(Screen.width - 24f, 690f * scale);
-            float height = 91f * scale;
+            float height = 105f * scale;
             Rect panel = new Rect((Screen.width - width) * 0.5f, 116f * scale, width, height);
             Color oldBackground = GUI.backgroundColor;
             Color oldContent = GUI.contentColor;
@@ -1610,6 +1610,9 @@ namespace PersiaWar.Unity2D5D
                 "  moveId=" + movePointerId + "  fireId=" + firePointerId +
                 "  multi=" + Input.multiTouchEnabled +
                 "  mouseSim=" + Input.simulateMouseWithTouches +
+                "\nDEVICE: touchSupported=" + Input.touchSupported +
+                "  mousePresent=" + Input.mousePresent +
+                "  mobile=" + Application.isMobilePlatform +
                 "\nUPDATE=" + touchDiagnosticUpdateFrame + "  lastCount=" + touchDiagnosticLastCount +
                 "  player=" + (player != null ? player.name : "NULL") +
                 "  active=" + matchActive + "  enabled=" + enabled +
