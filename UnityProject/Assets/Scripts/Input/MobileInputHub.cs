@@ -1554,7 +1554,17 @@ namespace PersiaWar.Unity2D5D
                 Input.touchCount > 0 &&
                 !guiFallbackOwnsPointer)
             {
-                return;
+                // If a native contact (for example, the held action-button finger)
+                // is visible but the second finger is only surfaced as a synthesized
+                // IMGUI mouse event, do not discard a left-zone movement MouseDown.
+                // All other GUI fallback events still yield to native Touch IDs.
+                bool isUnclaimedLeftMoveDown =
+                    e.type == EventType.MouseDown &&
+                    movePointerId == -1 &&
+                    e.mousePosition.x <= Screen.width * 0.58f &&
+                    e.mousePosition.y >= Screen.height * 0.10f;
+                if (!isUnclaimedLeftMoveDown)
+                    return;
             }
 
             if (e.type != EventType.MouseDown &&
