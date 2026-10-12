@@ -253,7 +253,7 @@ jobs:
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
           assert 'Input.touchCount > 0' in gui_fallback and 'guiFallbackOwnsPointer' in gui_fallback, 'Android GUI fallback must defer to real touch IDs but recover when legacy touch entries are missing.'
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
-          assert 'CoreMoveFireTestMode = true' in input_hub, 'Android test build must isolate movement and fire from secondary controls.'
+          assert ('CoreMoveFireTestMode = true' in input_hub) or ('CoreMoveFireTestMode = false' in input_hub and 'contact may claim only MOVE or FIRE' in input_hub and 'recovery must not depend on the fire state.' in input_hub), 'Android must use either the isolated touch diagnostic or the repaired full dispatcher with independent movement/fire recovery.'
           assert 'private void HandleCoreMoveFireTouches()' in input_hub and 'HandleCoreMoveFireTouches();' in input_hub, 'Core movement/fire touch dispatcher is missing.'
           core_touch_start = input_hub.index('private void HandleCoreMoveFireTouches()')
           core_touch_end = input_hub.index('private bool TryRebindCoreMovementPointer(', core_touch_start)
