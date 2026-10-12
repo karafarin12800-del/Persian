@@ -56,6 +56,7 @@ namespace PersiaWar.Unity2D5D
         private bool fireTouchCheckpointWritten;
         private bool simultaneousTouchCheckpointWritten;
         private bool movingShotCheckpointWritten;
+        private bool lateTouchRecoveryCheckpointWritten;
 
         // IMGUI fallback maps concurrent touchscreen contacts to mouse buttons.
         // Keep a distinct owner per simulated button so movement cannot consume fire.
@@ -94,6 +95,7 @@ namespace PersiaWar.Unity2D5D
             fireTouchCheckpointWritten = false;
             simultaneousTouchCheckpointWritten = false;
             movingShotCheckpointWritten = false;
+            lateTouchRecoveryCheckpointWritten = false;
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
             // The match uses independent Touch.fingerId contacts only. Synthesized
@@ -323,33 +325,37 @@ namespace PersiaWar.Unity2D5D
                 if (touch.phase != TouchPhase.Began) continue;
                 if (volumeTouchRect.Contains(gui))
                 {
+                    MarkLateTouchRecovery(touch);
                     volumePointerId = touch.fingerId;
                     musicVolume = Mathf.Clamp01((gui.x - (volumeTouchRect.x + 62f * scale)) / (104f * scale));
                     AudioListener.volume = musicVolume;
                     continue;
                 }
-                if (player != null && player.QuickDashCharges > 0 && Vector2.Distance(gui, dashGui) <= dashHit) { player.TryQuickDash(); continue; }
+                if (player != null && player.QuickDashCharges > 0 && Vector2.Distance(touchStartGui, dashGui) <= dashHit) { player.TryQuickDash(); continue; }
 
                 if (meleePointerId == -1 &&
-                    Vector2.Distance(gui, meleeGui) <= meleeHit)
+                    Vector2.Distance(touchStartGui, meleeGui) <= meleeHit)
                 {
+                    MarkLateTouchRecovery(touch);
                     meleePointerId = touch.fingerId;
                     player.Weapon?.TryMelee();
                     continue;
                 }
 
                 if (grenadePointerId == -1 &&
-                    Vector2.Distance(gui, grenadeGui) <= grenadeHit)
+                    Vector2.Distance(touchStartGui, grenadeGui) <= grenadeHit)
                 {
+                    MarkLateTouchRecovery(touch);
                     grenadePointerId = touch.fingerId;
                     ThrowGrenadeAtTarget();
                     continue;
                 }
 
                 if (reloadPointerId == -1 &&
-                    Vector2.Distance(gui, reloadGui) <= reloadHit)
+                    Vector2.Distance(touchStartGui, reloadGui) <= reloadHit)
                 {
                     // Tap to reload; hold for 0.55 seconds to cycle weapon profile.
+                    MarkLateTouchRecovery(touch);
                     reloadPointerId = touch.fingerId;
                     reloadPressedAt = Time.time;
                     reloadHeldToSwap = false;
@@ -360,17 +366,18 @@ namespace PersiaWar.Unity2D5D
                 // cannot steal those controls. The lower-right backup region tolerates
                 // screen-density and safe-area differences on Android.
                 bool insideOtherActionZone =
-                    Vector2.Distance(gui, meleeGui) <= meleeHit ||
-                    Vector2.Distance(gui, grenadeGui) <= grenadeHit ||
-                    Vector2.Distance(gui, reloadGui) <= reloadHit;
+                    Vector2.Distance(touchStartGui, meleeGui) <= meleeHit ||
+                    Vector2.Distance(touchStartGui, grenadeGui) <= grenadeHit ||
+                    Vector2.Distance(touchStartGui, reloadGui) <= reloadHit;
                 bool broadFireZone =
-                    gui.x >= Screen.width * 0.70f &&
-                    gui.y >= Screen.height * 0.48f;
+                    touchStartGui.x >= Screen.width * 0.70f &&
+                    touchStartGui.y >= Screen.height * 0.48f;
 
                 if (firePointerId == -1 &&
                     !insideOtherActionZone &&
-                    (Vector2.Distance(gui, fireGui) <= fireHit || broadFireZone))
+                    (Vector2.Distance(touchStartGui, fireGui) <= fireHit || broadFireZone))
                 {
+                    MarkLateTouchRecovery(touch);
                     firePointerId = touch.fingerId;
                     firePointerMissingSince = -1f;
                     if (!fireTouchCheckpointWritten)
@@ -382,6 +389,26 @@ namespace PersiaWar.Unity2D5D
                 }
 
                 // Everything else on the left side becomes the floating movement
+                // stick. The origin follows the player's first touch.
+                if (touchStartScreen.x <= Screen.width * 0.58f &&
+                    touchStartGui.y >= Screen.height * 0.10f)
+                {
+                    if (movePointerId == -1)
+                    {
+                        MarkLateTouchRecovery(touch);
+                    movePointerId = touch.fingerId;
+                        moveTouchOriginScreen = touchStartScreen;
+                        moveStartScreen = ClampFloatingOrigin(touchStartScreen, radius);
+                        moveValue = Vector2.zero;
+                        if (!movementTouchCheckpointWritten)
+                        {
+                            movementTouchCheckpointWritten = true;
+                            StartupCheckpoint.Set("MobileMoveTouchAccepted");
+                        }
+                    }
+                }
+            }
+thing else on the left side becomes the floating movement
                 // stick. The origin follows the player's first touch.
                 if (touch.position.x <= Screen.width * 0.58f &&
                     gui.y >= Screen.height * 0.10f)
@@ -645,6 +672,15 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("MobileMoveAndFireTouchConcurrent");
             }
 #endif
+        }
+
+        private void MarkLateTouchRecovery(Touch touch)
+        {
+            if (touch.phase == TouchPhase.Began || lateTouchRecoveryCheckpointWritten)
+                return;
+
+            lateTouchRecoveryCheckpointWritten = true;
+            StartupCheckpoint.Set("MobileLateTouchRecoveredFromActivePhase");
         }
 
         private Vector2 ApplyDeadZone(Vector2 inputValue)
