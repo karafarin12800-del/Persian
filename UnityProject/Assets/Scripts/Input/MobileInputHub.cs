@@ -410,7 +410,7 @@ namespace PersiaWar.Unity2D5D
                     if (movePointerId == -1)
                     {
                         MarkLateTouchRecovery(touch);
-                    movePointerId = touch.fingerId;
+                        movePointerId = touch.fingerId;
                         moveTouchOriginScreen = touchStartScreen;
                         moveStartScreen = ClampFloatingOrigin(touchStartScreen, radius);
                         moveValue = Vector2.zero;
