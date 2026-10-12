@@ -53,6 +53,8 @@ namespace PersiaWar.Unity2D5D
         // Temporary runtime telemetry for the reported missing second-touch joystick.
         private GUIStyle touchDiagnosticStyle;
         private string lastMovementTouchRoute = "not-yet-claimed";
+        private int touchDiagnosticUpdateFrame;
+        private int touchDiagnosticLastCount;
 
         private bool minimapEnabled;
         private float minimapReadyAt;
@@ -223,6 +225,11 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            // Runtime heartbeat distinguishes a frozen/disabled input component from
+            // a live component whose Android legacy Touch list is empty.
+            touchDiagnosticUpdateFrame++;
+            touchDiagnosticLastCount = Input.touchCount;
+
             if (!matchActive || matchPaused)
                 return;
 
@@ -1562,6 +1569,9 @@ namespace PersiaWar.Unity2D5D
                 "  moveId=" + movePointerId + "  fireId=" + firePointerId +
                 "  multi=" + Input.multiTouchEnabled +
                 "  mouseSim=" + Input.simulateMouseWithTouches +
+                "\nUPDATE=" + touchDiagnosticUpdateFrame + "  lastCount=" + touchDiagnosticLastCount +
+                "  player=" + (player != null ? player.name : "NULL") +
+                "  active=" + matchActive + "  enabled=" + enabled +
                 "\nFINGERS: " + contacts +
                 "\nMOVE ROUTE: " + lastMovementTouchRoute;
             GUI.Label(new Rect(panel.x + 6f, panel.y + 4f, panel.width - 12f, panel.height - 8f),
