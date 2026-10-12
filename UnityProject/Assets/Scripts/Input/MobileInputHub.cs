@@ -451,17 +451,14 @@ namespace PersiaWar.Unity2D5D
             {
                 if (TryGetTouch(movePointerId, out Touch movementTouch))
                 {
-                    if (movementTouch.phase == TouchPhase.Ended)
+                    if (movementTouch.phase == TouchPhase.Ended ||
+                        movementTouch.phase == TouchPhase.Canceled)
                     {
-                        // A normal lift is definitive: stop immediately.
-                        ResetMovementPointer();
-                    }
-                    else if (movementTouch.phase == TouchPhase.Canceled)
-                    {
-                        // Some Android builds keep a Canceled Touch in the touch list
-                        // for more than one frame. Rebind to a different active LEFT
-                        // finger immediately; otherwise the joystick remains attached
-                        // to a dead finger and movement+fire cannot coexist.
+                        // Android/Unity may invalidate the captured movement ID during
+                        // a multi-touch transition. Before dropping the joystick, look
+                        // for another live left-side contact and transfer ownership.
+                        // Use BOTH rawPosition (touch origin) and position (current point):
+                        // either may be unreliable on a frame where the contact is rebound.
                         bool rebound = false;
                         for (int j = 0; j < Input.touchCount; j++)
                         {
@@ -471,31 +468,46 @@ namespace PersiaWar.Unity2D5D
                                 candidate.fingerId == meleePointerId ||
                                 candidate.fingerId == grenadePointerId ||
                                 candidate.fingerId == reloadPointerId ||
-                                candidate.position.x > Screen.width * 0.58f ||
-                                candidate.position.y < Screen.height * 0.10f ||
+                                candidate.fingerId == dashPointerId ||
                                 candidate.phase == TouchPhase.Ended ||
                                 candidate.phase == TouchPhase.Canceled)
                                 continue;
 
+                            bool originatedLeft = candidate.rawPosition.x <= Screen.width * 0.58f;
+                            bool currentlyLeft = candidate.position.x <= Screen.width * 0.58f;
+                            if (!originatedLeft && !currentlyLeft)
+                                continue;
+                            if (candidate.position.y < Screen.height * 0.10f)
+                                continue;
+
                             movePointerId = candidate.fingerId;
-                            moveTouchOriginScreen = candidate.position - moveValue * Mathf.Max(1f, radius);
+                            moveTouchOriginScreen = candidate.position -
+                                moveValue * Mathf.Max(1f, radius);
+                            moveStartScreen = ClampFloatingOrigin(
+                                moveTouchOriginScreen, Mathf.Max(1f, radius));
                             movePointerMissingSince = -1f;
                             movementRecoveryActive = false;
                             player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                             rebound = true;
+                            StartupCheckpoint.Set("MobileMovePointerTransferredAfterTouchEndOrCancel");
                             break;
                         }
 
                         if (!rebound)
                         {
-                            // Do not keep the canceled ID, but preserve the last movement
-                            // vector while a second control (commonly FIRE) is still held.
-                            // movePointerId becomes free so a fresh left-side touch can
-                            // immediately take over and set a new direction.
-                            movePointerId = -1;
-                            movePointerMissingSince = Time.unscaledTime;
-                            movementRecoveryActive = true;
-                            guiMoveMouseButton = -1;
+                            if (movementTouch.phase == TouchPhase.Ended)
+                            {
+                                // A true lift with no other live left-side finger releases
+                                // movement normally. Canceled contacts enter recovery below.
+                                ResetMovementPointer();
+                            }
+                            else
+                            {
+                                movePointerId = -1;
+                                movePointerMissingSince = Time.unscaledTime;
+                                movementRecoveryActive = true;
+                                guiMoveMouseButton = -1;
+                            }
                         }
                     }
                     else
