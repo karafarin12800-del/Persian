@@ -572,20 +572,59 @@ namespace PersiaWar.Unity2D5D
             }
             else if (movementRecoveryActive)
             {
-                bool fireStillHeld = firePointerId >= 0 &&
-                    TryGetTouch(firePointerId, out Touch heldFireTouch) &&
-                    heldFireTouch.phase != TouchPhase.Ended &&
-                    heldFireTouch.phase != TouchPhase.Canceled;
+                // A canceled/missing movement finger must be rebound to the still-held
+                // LEFT contact as soon as Unity reports it again. Previously this branch
+                // only latched the last vector while FIRE was held; it never reacquired
+                // the movement finger, so lifting FIRE then stopped the player even if
+                // the movement thumb was still down.
+                bool movementRebound = false;
+                float touchRadius = Mathf.Max(1f, radius);
+                for (int i = 0; i < Input.touchCount; i++)
+                {
+                    Touch candidate = Input.GetTouch(i);
+                    if (candidate.fingerId == firePointerId ||
+                        candidate.fingerId == meleePointerId ||
+                        candidate.fingerId == grenadePointerId ||
+                        candidate.fingerId == reloadPointerId ||
+                        candidate.fingerId == dashPointerId ||
+                        candidate.fingerId == movePointerId ||
+                        candidate.rawPosition.x > Screen.width * 0.58f ||
+                        candidate.rawPosition.y < Screen.height * 0.10f ||
+                        candidate.phase == TouchPhase.Ended ||
+                        candidate.phase == TouchPhase.Canceled)
+                        continue;
 
-                if (fireStillHeld ||
-                    Time.unscaledTime - movePointerMissingSince <= MovePointerRecoveryGraceSeconds)
-                {
-                    // Keep the last vector only during a genuine input hand-off.
+                    movePointerId = candidate.fingerId;
+                    // Preserve the current stick vector through rebinding. This makes
+                    // the current contact's position the equivalent point on the stick,
+                    // so the next movement update is continuous rather than snapping.
+                    moveTouchOriginScreen = candidate.position - moveValue * touchRadius;
+                    moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
+                    movePointerMissingSince = -1f;
+                    movementRecoveryActive = false;
                     player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                    movementRebound = true;
+                    StartupCheckpoint.Set("MobileMovePointerReboundWhileFireOrTouchHandoff");
+                    break;
                 }
-                else
+
+                if (!movementRebound)
                 {
-                    ResetMovementPointer();
+                    bool fireStillHeld = firePointerId >= 0 &&
+                        TryGetTouch(firePointerId, out Touch heldFireTouch) &&
+                        heldFireTouch.phase != TouchPhase.Ended &&
+                        heldFireTouch.phase != TouchPhase.Canceled;
+
+                    if (fireStillHeld ||
+                        Time.unscaledTime - movePointerMissingSince <= MovePointerRecoveryGraceSeconds)
+                    {
+                        // Keep the last vector only during a genuine input hand-off.
+                        player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
+                    }
+                    else
+                    {
+                        ResetMovementPointer();
+                    }
                 }
             }
             else if (movePointerId != -1000)
