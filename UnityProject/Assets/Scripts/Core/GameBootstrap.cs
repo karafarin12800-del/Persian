@@ -1133,7 +1133,7 @@ namespace PersiaWar.Unity2D5D
             // House entrances face the negative-Z side. Put the captive outside the
             // entrance, in front of the blue beam inside the house, not in the room.
             float halfDepth = selected < androidBuildingHalfExtents.Count
-                ? androidBuildingHalfExtents[selected].z
+                ? androidBuildingHalfExtents[selected].y
                 : 3.5f;
             float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
             captiveVillageGirlPosition = new Vector3(
@@ -1162,7 +1162,7 @@ namespace PersiaWar.Unity2D5D
                 captiveVillageGirlBeaconPosition = new Vector3(
                     house.x, CalculateAndroidTerrainHeight(house.x, house.z) + 0.08f, house.z);
                 float halfDepth = houseIndex < androidBuildingHalfExtents.Count
-                    ? androidBuildingHalfExtents[houseIndex].z
+                    ? androidBuildingHalfExtents[houseIndex].y
                     : 3.5f;
                 float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
                 captiveVillageGirlPosition = new Vector3(
