@@ -205,7 +205,7 @@ namespace PersiaWar.Unity2D5D
                 GameSession.Instance.SetWave(wave);
 
             SpawnWaveReward();
-            spawning = false;
+            if (stageTwoArena) spawning = false;
 #endif
         }
 
