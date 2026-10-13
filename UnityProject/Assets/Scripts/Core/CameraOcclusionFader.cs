@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float targetHeight = 1.05f;
 
         private Transform target;
+        private bool stageTwoOcclusionMode;
         private Camera viewCamera;
         private Shader fadeShader;
         private readonly Dictionary<Renderer, Entry> entries = new Dictionary<Renderer, Entry>();
@@ -50,6 +51,11 @@ namespace PersiaWar.Unity2D5D
             if (viewCamera == null) viewCamera = GetComponent<Camera>();
         }
 
+        public void SetStageTwoMode(bool enabledForStageTwo)
+        {
+            stageTwoOcclusionMode = enabledForStageTwo;
+        }
+
         private void LateUpdate()
         {
             if (target == null || viewCamera == null || fadeShader == null) return;
@@ -66,6 +72,11 @@ namespace PersiaWar.Unity2D5D
                     hits, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
                 for (int i = 0; i < count; i++)
                 {
+                    // A contact almost at the target is not a camera occluder. This
+                    // also prevents a nearby wall the player is touching from fading.
+                    if (stageTwoOcclusionMode && hits[i].distance >= distance - 0.85f)
+                        continue;
+
                     Collider col = hits[i].collider;
                     if (col == null || col.transform == target || col.transform.IsChildOf(target)) continue;
                     AddBlockedRenderers(col);
@@ -106,6 +117,13 @@ namespace PersiaWar.Unity2D5D
                 blocked.Add(direct);
                 return;
             }
+
+            // In stage two, colliders without their own renderer belong to scenery
+            // that was not split into independently fadeable pieces. Never walk up to
+            // the house root and fade every child renderer because one collider hit.
+            // Stage-two wall/facade segments now carry their own colliders/renderers.
+            if (stageTwoOcclusionMode)
+                return;
 
             Transform root = FindBuildingOrTreeRoot(col.transform);
             if (root == null) return;
