@@ -544,7 +544,7 @@ namespace PersiaWar.Unity2D5D
                     new Color(0.20f, 0.95f, 1f, 1f));
             }
 
-            if (ExtractionBeacon.IsActive)
+            if (stageNumber < 2 && ExtractionBeacon.IsActive)
             {
                 Vector3 extractionWorld = ExtractionBeacon.WorldPosition;
                 Vector2 extractionPoint = WorldToMap(
@@ -604,7 +604,7 @@ namespace PersiaWar.Unity2D5D
                     "TOP 3\\n" + arenaManager.GetLeaderboardText(), smallStyle);
             }
 
-            if (ExtractionBeacon.IsActive)
+            if (stageNumber < 2 && ExtractionBeacon.IsActive)
             {
                 float objectiveWidth = 360f * scale;
                 Rect objective = new Rect(
