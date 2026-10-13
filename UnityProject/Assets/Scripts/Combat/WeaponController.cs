@@ -39,6 +39,9 @@ namespace PersiaWar.Unity2D5D
         private Transform gunRoot;
         private Transform axeRoot;
         private Transform swordRoot;
+        private Renderer[] gunRenderers;
+        private Material[] baseGunMaterials;
+        private Material voidRifleMaterial;
         private Vector3 swordRestLocalPosition;
         private Quaternion swordRestLocalRotation;
         private float swordSwingTimer;
@@ -350,10 +353,16 @@ namespace PersiaWar.Unity2D5D
 
             if (voidRifle)
             {
-                Material energy = RuntimeMaterialFactory.Create("VoidRifleEnergy", new Color(0.08f, 0.72f, 0.98f));
-                Renderer[] gunRenderers = gunRoot.GetComponentsInChildren<Renderer>(true);
-                for (int i = 0; i < gunRenderers.Length; i++)
-                    if (gunRenderers[i] != null) gunRenderers[i].sharedMaterial = energy;
+                if (voidRifleMaterial == null)
+                    voidRifleMaterial = RuntimeMaterialFactory.Create("VoidRifleEnergy", new Color(0.08f, 0.72f, 0.98f));
+                if (gunRenderers != null)
+                    for (int i = 0; i < gunRenderers.Length; i++)
+                        if (gunRenderers[i] != null) gunRenderers[i].sharedMaterial = voidRifleMaterial;
+            }
+            else if (gunRenderers != null && baseGunMaterials != null)
+            {
+                for (int i = 0; i < gunRenderers.Length && i < baseGunMaterials.Length; i++)
+                    if (gunRenderers[i] != null) gunRenderers[i].sharedMaterial = baseGunMaterials[i];
             }
         }
 
@@ -600,6 +609,10 @@ namespace PersiaWar.Unity2D5D
             // Start with the pistol-only parts hidden until the active profile is applied.
             gunRoot.Find("PistolSlide").gameObject.SetActive(false);
             gunRoot.Find("PistolGrip").gameObject.SetActive(false);
+            gunRenderers = gunRoot.GetComponentsInChildren<Renderer>(true);
+            baseGunMaterials = new Material[gunRenderers.Length];
+            for (int i = 0; i < gunRenderers.Length; i++)
+                baseGunMaterials[i] = gunRenderers[i] != null ? gunRenderers[i].sharedMaterial : null;
 
             // A separate, lightweight axe model is shown only while the axe is equipped.
             axeRoot = new GameObject("PlayerAxe").transform;
