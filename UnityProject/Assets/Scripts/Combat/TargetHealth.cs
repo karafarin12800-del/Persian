@@ -55,74 +55,124 @@ namespace PersiaWar.Unity2D5D
 
         private void BeginEnemyDeathSequence(EnemyChase enemy)
         {
-            // Keep the enemy body for a short fall-and-fade beat instead of deleting it instantly.
+            Vector3 deathPosition = enemy != null ? enemy.transform.position : transform.position;
             if (enemy != null)
             {
+                // Disable combat and collision, but keep the rendered body visible while it falls.
                 enemy.enabled = false;
                 Collider[] colliders = enemy.GetComponentsInChildren<Collider>();
                 for (int i = 0; i < colliders.Length; i++)
                     if (colliders[i] != null) colliders[i].enabled = false;
+
                 MonoBehaviour[] behaviours = enemy.GetComponentsInChildren<MonoBehaviour>();
                 for (int i = 0; i < behaviours.Length; i++)
                     if (behaviours[i] != null && behaviours[i] != this) behaviours[i].enabled = false;
-                StartCoroutine(FallAndFadeEnemy(enemy.transform));
+
+                StartCoroutine(FallAndRemoveEnemy(enemy.transform));
             }
-            SpawnBloodEffect(transform.position + Vector3.up * 0.35f);
+
+            SpawnBloodEffect(deathPosition);
         }
 
-        private System.Collections.IEnumerator FallAndFadeEnemy(Transform body)
+        private System.Collections.IEnumerator FallAndRemoveEnemy(Transform body)
         {
             if (body == null) yield break;
+
             Vector3 startPosition = body.position;
             Quaternion startRotation = body.rotation;
+            const float fallDuration = 0.22f;
             float elapsed = 0f;
-            const float fallDuration = 0.55f;
+
+            // Tip the enemy forward onto the ground, then leave the body visible until
+            // 1.5 seconds have elapsed from the hit. No fade/scale shrink during that time.
             while (elapsed < fallDuration && body != null)
             {
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / fallDuration);
-                body.position = startPosition + Vector3.down * (0.45f * t);
-                body.rotation = startRotation * Quaternion.Euler(75f * t, 0f, 18f * t);
+                body.position = startPosition + Vector3.down * (0.04f * t);
+                body.rotation = startRotation * Quaternion.Euler(88f * t, 0f, 0f);
                 yield return null;
             }
+
             if (body == null) yield break;
-            Renderer[] renderers = body.GetComponentsInChildren<Renderer>();
-            float fadeElapsed = 0f;
-            const float fadeDuration = 1.35f;
-            while (fadeElapsed < fadeDuration && body != null)
-            {
-                fadeElapsed += Time.deltaTime;
-                float scale = Mathf.Lerp(1f, 0.08f, fadeElapsed / fadeDuration);
-                body.localScale = Vector3.one * scale;
-                yield return null;
-            }
-            if (body != null) Destroy(body.gameObject);
+            body.rotation = startRotation * Quaternion.Euler(88f, 0f, 0f);
+            float remaining = Mathf.Max(0f, 1.5f - fallDuration);
+            if (remaining > 0f)
+                yield return new WaitForSeconds(remaining);
+
+            if (body != null)
+                Destroy(body.gameObject);
         }
 
         private static void SpawnBloodEffect(Vector3 position)
         {
-            GameObject blood = new GameObject("EnemyDefeatBloodEffect");
-            blood.transform.position = position;
+            // A wider, irregular blood pool spreads across the ground and remains for four seconds.
+            GameObject stain = new GameObject("EnemyBloodStain");
+            stain.transform.position = new Vector3(position.x, 0.055f, position.z);
+            Material stainMaterial = RuntimeMaterialFactory.Create(
+                "EnemyBloodStainMaterial", new Color(0.30f, 0.008f, 0.018f));
+
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(0f, 0f, 0f), new Vector3(1.15f, 0.018f, 0.78f), 0f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(0.38f, 0.002f, 0.18f), new Vector3(0.68f, 0.016f, 0.44f), 24f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(-0.36f, 0.003f, -0.22f), new Vector3(0.62f, 0.015f, 0.40f), -31f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(0.58f, 0.001f, -0.34f), new Vector3(0.44f, 0.014f, 0.27f), 48f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(-0.62f, 0.001f, 0.30f), new Vector3(0.40f, 0.014f, 0.25f), -52f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(0.05f, 0.001f, 0.57f), new Vector3(0.38f, 0.014f, 0.24f), 12f);
+            Destroy(stain, 4f);
+
+            // Short impact spray supplements the persistent ground stain.
+            GameObject blood = new GameObject("EnemyDefeatBloodParticles");
+            blood.transform.position = position + Vector3.up * 0.35f;
             ParticleSystem particles = blood.AddComponent<ParticleSystem>();
             var main = particles.main;
-            main.duration = 0.55f;
+            main.duration = 0.45f;
             main.loop = false;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.65f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, 2.0f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.07f, 0.16f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.20f, 0.55f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.7f, 1.6f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.13f);
             main.startColor = new Color(0.62f, 0.025f, 0.035f, 0.9f);
-            main.maxParticles = 28;
+            main.maxParticles = 22;
             var emission = particles.emission;
             emission.rateOverTime = 0f;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 22) });
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 18) });
             var shape = particles.shape;
             shape.shapeType = ParticleSystemShapeType.Cone;
             shape.angle = 42f;
             shape.radius = 0.12f;
-            var renderer = particles.GetComponent<ParticleSystemRenderer>();
-            renderer.material = RuntimeMaterialFactory.Create("EnemyBloodEffectMaterial", new Color(0.62f, 0.025f, 0.035f));
+            var particleRenderer = particles.GetComponent<ParticleSystemRenderer>();
+            particleRenderer.material = RuntimeMaterialFactory.Create(
+                "EnemyBloodEffectMaterial", new Color(0.62f, 0.025f, 0.035f));
             particles.Play();
-            Destroy(blood, 1.6f);
+            Destroy(blood, 1.2f);
+        }
+
+        private static void CreateBloodStainBlob(
+            Transform parent, Material material, Vector3 localPosition, Vector3 localScale, float rotationY)
+        {
+            GameObject blob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            blob.name = "BloodStainBlob";
+            blob.transform.SetParent(parent, false);
+            blob.transform.localPosition = localPosition;
+            blob.transform.localScale = localScale;
+            blob.transform.localRotation = Quaternion.Euler(0f, rotationY, 0f);
+
+            Collider collider = blob.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            Renderer blobRenderer = blob.GetComponent<Renderer>();
+            if (blobRenderer != null)
+            {
+                blobRenderer.sharedMaterial = material;
+                blobRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                blobRenderer.receiveShadows = false;
+            }
         }
 
         private void SpawnDroppedWeapon(EnemyChase enemy)

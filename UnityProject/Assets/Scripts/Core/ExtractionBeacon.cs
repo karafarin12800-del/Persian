@@ -4,8 +4,8 @@ using UnityEngine.Rendering;
 namespace PersiaWar.Unity2D5D
 {
     /// <summary>
-    /// Creates a nearby blue extraction beam only after the final wave is cleared.
-    /// The player must enter the beam to finish the mission.
+    /// Creates a distant blue extraction beam only after the final wave is cleared.
+    /// The player must search the map and enter the beam to finish the mission.
     /// </summary>
     public sealed class ExtractionBeacon : MonoBehaviour
     {
@@ -14,6 +14,9 @@ namespace PersiaWar.Unity2D5D
         private Transform player;
         private Vector3 groundPosition;
         private const float ExtractionRadius = 3.2f;
+        private const float MinimumPlayerDistance = 40f;
+        private const float MaximumSearchDistance = 75f;
+        private const float WorldLimit = 104f;
         private bool beamCreated;
         private bool completed;
 
@@ -65,30 +68,90 @@ namespace PersiaWar.Unity2D5D
                 forward = Vector3.forward;
             forward.Normalize();
 
-            // Search a short radius in front of the player first, then around them.
-            // This avoids asking the player to cross the whole map to find extraction.
-            for (float distance = 8f; distance <= 17f; distance += 3f)
+            // Keep the extraction point at least 40 world units (approximately metres)
+            // away. Search farther rings and more directions so the player must explore.
+            Vector3 farthestValidCandidate = origin;
+            float farthestDistanceSqr = -1f;
+
+            for (float distance = MinimumPlayerDistance;
+                 distance <= MaximumSearchDistance;
+                 distance += 5f)
             {
-                for (int directionIndex = 0; directionIndex < 8; directionIndex++)
+                for (int directionIndex = 0; directionIndex < 16; directionIndex++)
                 {
-                    Vector3 direction = Quaternion.Euler(0f, directionIndex * 45f, 0f) * forward;
+                    Vector3 direction = Quaternion.Euler(
+                        0f, directionIndex * 22.5f, 0f) * forward;
                     Vector3 candidate = origin + direction * distance;
-                    candidate.x = Mathf.Clamp(candidate.x, -88f, 88f);
-                    candidate.z = Mathf.Clamp(candidate.z, -88f, 88f);
+                    candidate.x = Mathf.Clamp(candidate.x, -WorldLimit, WorldLimit);
+                    candidate.z = Mathf.Clamp(candidate.z, -WorldLimit, WorldLimit);
                     candidate.y = 0f;
 
+                    float actualDistanceSqr = HorizontalDistanceSqr(origin, candidate);
+                    // Clamping near the edge of the map can shorten a candidate;
+                    // reject it unless the actual distance is still at least 40.
+                    if (actualDistanceSqr < MinimumPlayerDistance * MinimumPlayerDistance)
+                        continue;
+
+                    if (actualDistanceSqr > farthestDistanceSqr)
+                    {
+                        farthestDistanceSqr = actualDistanceSqr;
+                        farthestValidCandidate = candidate;
+                    }
+
                     if (IsClearGround(candidate, playerTransform))
+                    {
+                        Debug.Log("PERSIA_EXTRACTION: selected beacon distance " +
+                                  Mathf.Sqrt(actualDistanceSqr).ToString("F1") + "m from player.");
                         return candidate;
+                    }
                 }
             }
 
-            // The player controller's own movement remains available even if a
-            // crowded scene leaves no completely clear candidate.
-            Vector3 fallback = origin + forward * 7f;
-            fallback.x = Mathf.Clamp(fallback.x, -88f, 88f);
-            fallback.z = Mathf.Clamp(fallback.z, -88f, 88f);
-            fallback.y = 0f;
-            return fallback;
+            // If the usual search rings are obstructed, scan the rest of the map
+            // before falling back. Never intentionally place the beacon within 40 units.
+            for (float distance = MaximumSearchDistance + 5f;
+                 distance <= WorldLimit * 1.8f;
+                 distance += 5f)
+            {
+                for (int directionIndex = 0; directionIndex < 32; directionIndex++)
+                {
+                    Vector3 direction = Quaternion.Euler(
+                        0f, directionIndex * 11.25f, 0f) * forward;
+                    Vector3 candidate = origin + direction * distance;
+                    candidate.x = Mathf.Clamp(candidate.x, -WorldLimit, WorldLimit);
+                    candidate.z = Mathf.Clamp(candidate.z, -WorldLimit, WorldLimit);
+                    candidate.y = 0f;
+
+                    float actualDistanceSqr = HorizontalDistanceSqr(origin, candidate);
+                    if (actualDistanceSqr < MinimumPlayerDistance * MinimumPlayerDistance)
+                        continue;
+
+                    if (actualDistanceSqr > farthestDistanceSqr)
+                    {
+                        farthestDistanceSqr = actualDistanceSqr;
+                        farthestValidCandidate = candidate;
+                    }
+
+                    if (IsClearGround(candidate, playerTransform))
+                    {
+                        Debug.Log("PERSIA_EXTRACTION: selected distant fallback beacon " +
+                                  Mathf.Sqrt(actualDistanceSqr).ToString("F1") + "m from player.");
+                        return candidate;
+                    }
+                }
+            }
+
+            // Extremely crowded map fallback: distance is prioritized over perfect clearance.
+            Debug.LogWarning("PERSIA_EXTRACTION: no clear beacon site found; using farthest valid site at " +
+                             Mathf.Sqrt(Mathf.Max(0f, farthestDistanceSqr)).ToString("F1") + "m.");
+            return farthestValidCandidate;
+        }
+
+        private static float HorizontalDistanceSqr(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return dx * dx + dz * dz;
         }
 
         private static bool IsClearGround(Vector3 position, Transform playerTransform)
