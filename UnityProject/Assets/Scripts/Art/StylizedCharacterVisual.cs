@@ -43,6 +43,7 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobileVisor;
         private Renderer mobileFemaleHairLeft;
         private Renderer mobileFemaleHairRight;
+        private Renderer mobileFemaleHairCap;
 
         public Transform Muzzle => muzzle;
         public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;
@@ -90,11 +91,11 @@ namespace PersiaWar.Unity2D5D
             Color[] variants =
             {
                 new Color(1.00f, 1.00f, 1.00f, 1.00f),
+                new Color(1.00f, 0.87f, 0.95f, 1.00f),
                 new Color(0.86f, 0.95f, 1.00f, 1.00f),
                 new Color(0.86f, 1.00f, 0.90f, 1.00f),
                 new Color(1.00f, 0.89f, 0.93f, 1.00f),
-                new Color(1.00f, 0.96f, 0.84f, 1.00f),
-                new Color(1.00f, 0.87f, 0.95f, 1.00f)
+                new Color(1.00f, 0.96f, 0.84f, 1.00f)
             };
 
             if (sprite != null)
@@ -247,15 +248,18 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(-0.25f, 1.16f, -0.06f), new Vector3(0.14f, 0.32f, 0.16f));
                 mobileFemaleHairRight = CreateMobilePrimitive(PrimitiveType.Capsule, "AnahitaLongHairRight", mobileModelRoot,
                     new Vector3(0.25f, 1.16f, -0.06f), new Vector3(0.14f, 0.32f, 0.16f));
+                mobileFemaleHairCap = CreateMobilePrimitive(PrimitiveType.Sphere, "AnahitaHairCap", mobileModelRoot,
+                    new Vector3(0f, 1.60f, -0.015f), new Vector3(0.37f, 0.23f, 0.34f));
                 mobileFemaleHairLeft.enabled = false;
                 mobileFemaleHairRight.enabled = false;
+                mobileFemaleHairCap.enabled = false;
             }
 
             Renderer[] parts =
             {
                 mobileHead, mobileBody, mobileShirt, mobilePants, mobileShoes, mobileHair,
                 mobileArmor, mobileLeftArm, mobileRightArm, mobilePack, mobileHelmet, mobileVisor,
-                mobileFemaleHairLeft, mobileFemaleHairRight
+                mobileFemaleHairLeft, mobileFemaleHairRight, mobileFemaleHairCap
             };
             for (int i = 0; i < parts.Length; i++)
             {
@@ -309,22 +313,45 @@ namespace PersiaWar.Unity2D5D
 
         private void ApplyMobilePlayerColors(int heroIndex)
         {
-            bool isAnahita = heroIndex == 5;
+            bool isAnahita = heroIndex == 1;
             Color shirtColor = isAnahita ? new Color(0.82f, 0.22f, 0.50f)
                 : heroIndex == 0 ? new Color(0.08f, 0.26f, 0.52f)
-                : heroIndex == 1 ? new Color(0.10f, 0.42f, 0.52f)
-                : heroIndex == 2 ? new Color(0.16f, 0.46f, 0.24f)
-                : heroIndex == 3 ? new Color(0.42f, 0.16f, 0.46f)
+                : heroIndex == 2 ? new Color(0.10f, 0.42f, 0.52f)
+                : heroIndex == 3 ? new Color(0.16f, 0.46f, 0.24f)
+                : heroIndex == 4 ? new Color(0.42f, 0.16f, 0.46f)
                 : new Color(0.48f, 0.32f, 0.08f);
 
             Color hairColor = heroIndex == 0
                 ? new Color(0.56f, 0.20f, 0.08f)
                 : new Color(0.10f, 0.055f, 0.035f);
 
+            // Restore the common base measurements first; selecting another hero
+            // after Anahita must not leave the smaller silhouette or dress behind.
+            if (mobileHead != null)
+                mobileHead.transform.localScale = new Vector3(0.62f, 0.62f, 0.62f);
+            if (mobileBody != null)
+                mobileBody.transform.localScale = new Vector3(0.72f, 0.82f, 0.52f);
+            if (mobileShirt != null)
+                mobileShirt.transform.localScale = new Vector3(0.78f, 0.42f, 0.56f);
+            if (mobileLeftArm != null)
+            {
+                mobileLeftArm.transform.localPosition = new Vector3(-0.47f, 0.76f, 0.03f);
+                mobileLeftArm.transform.localScale = new Vector3(0.20f, 0.50f, 0.20f);
+            }
+            if (mobileRightArm != null)
+            {
+                mobileRightArm.transform.localPosition = new Vector3(0.47f, 0.76f, 0.03f);
+                mobileRightArm.transform.localScale = new Vector3(0.20f, 0.50f, 0.20f);
+            }
+            if (mobileHair != null)
+                mobileHair.transform.localScale = new Vector3(0.48f, 0.16f, 0.48f);
+            if (mobileModelRoot != null)
+                mobileModelRoot.localScale = isAnahita ? Vector3.one * 0.82f : Vector3.one;
+
             SetRendererColor(mobileHead, new Color(0.78f, 0.53f, 0.34f));
             SetRendererColor(mobileBody, shirtColor * 0.85f);
             SetRendererColor(mobileShirt, shirtColor);
-            SetRendererColor(mobilePants, isAnahita ? new Color(0.58f, 0.13f, 0.38f) : new Color(0.08f, 0.12f, 0.20f));
+            SetRendererColor(mobilePants, isAnahita ? new Color(0.70f, 0.17f, 0.43f) : new Color(0.08f, 0.12f, 0.20f));
             SetRendererColor(mobileShoes, new Color(0.10f, 0.11f, 0.13f));
             SetRendererColor(mobileHair, hairColor);
             SetRendererColor(mobileArmor, Color.Lerp(shirtColor, Color.white, 0.16f));
@@ -334,15 +361,34 @@ namespace PersiaWar.Unity2D5D
             SetRendererColor(mobileHelmet, new Color(0.13f, 0.16f, 0.19f));
             SetRendererColor(mobileVisor, new Color(0.18f, 0.48f, 0.58f));
 
-            // Anahita is the rescued civilian hero: long dark hair and a dress,
-            // without the military helmet, visor, armor, or backpack.
+            if (isAnahita)
+            {
+                // Smaller shoulders, a narrower torso, a slightly smaller head and a
+                // skirt-shaped lower garment give her a more feminine silhouette.
+                if (mobileHead != null)
+                    mobileHead.transform.localScale = new Vector3(0.56f, 0.58f, 0.55f);
+                if (mobileBody != null)
+                    mobileBody.transform.localScale = new Vector3(0.62f, 0.75f, 0.46f);
+                if (mobileShirt != null)
+                {
+                    mobileShirt.transform.localPosition = new Vector3(0f, 0.79f, 0f);
+                    mobileShirt.transform.localScale = new Vector3(0.65f, 0.40f, 0.48f);
+                }
+                if (mobileLeftArm != null)
+                    mobileLeftArm.transform.localScale = new Vector3(0.16f, 0.43f, 0.17f);
+                if (mobileRightArm != null)
+                    mobileRightArm.transform.localScale = new Vector3(0.16f, 0.43f, 0.17f);
+                if (mobileHair != null)
+                    mobileHair.transform.localScale = new Vector3(0.52f, 0.18f, 0.52f);
+            }
+
             if (mobilePants != null)
             {
                 mobilePants.transform.localPosition = isAnahita
-                    ? new Vector3(0f, 0.34f, 0f)
+                    ? new Vector3(0f, 0.37f, 0f)
                     : new Vector3(0f, 0.28f, 0f);
                 mobilePants.transform.localScale = isAnahita
-                    ? new Vector3(0.68f, 0.43f, 0.54f)
+                    ? new Vector3(0.66f, 0.38f, 0.52f)
                     : new Vector3(0.62f, 0.28f, 0.48f);
             }
             if (mobileHelmet != null) mobileHelmet.enabled = !isAnahita;
@@ -358,6 +404,11 @@ namespace PersiaWar.Unity2D5D
             {
                 mobileFemaleHairRight.enabled = isAnahita;
                 SetRendererColor(mobileFemaleHairRight, hairColor);
+            }
+            if (mobileFemaleHairCap != null)
+            {
+                mobileFemaleHairCap.enabled = isAnahita;
+                SetRendererColor(mobileFemaleHairCap, hairColor);
             }
         }
 
