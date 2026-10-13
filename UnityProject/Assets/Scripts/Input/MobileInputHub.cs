@@ -48,6 +48,10 @@ namespace PersiaWar.Unity2D5D
         private Texture2D circleTexture;
         private GUIStyle buttonTextStyle;
         private GUIStyle smallButtonHintStyle;
+        private GUIStyle touchDiagnosticStyle;
+        private int touchDiagnosticUpdateFrame;
+        private int touchDiagnosticLastCount;
+        private string lastTouchOwnershipEvent = "no gameplay touch captured";
 
         private bool minimapEnabled;
         private float minimapReadyAt;
@@ -225,6 +229,8 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            touchDiagnosticUpdateFrame++;
+            touchDiagnosticLastCount = Input.touchCount;
             if (!matchActive || matchPaused)
                 return;
 
@@ -418,6 +424,7 @@ namespace PersiaWar.Unity2D5D
                     MarkLateTouchRecovery(touch);
                     firePointerId = touch.fingerId;
                     firePointerMissingSince = -1f;
+                    lastTouchOwnershipEvent = "NATIVE FIRE captured id=" + touch.fingerId + " phase=" + touch.phase;
                     if (!fireTouchCheckpointWritten)
                     {
                         fireTouchCheckpointWritten = true;
@@ -435,6 +442,7 @@ namespace PersiaWar.Unity2D5D
                     {
                         MarkLateTouchRecovery(touch);
                         movePointerId = touch.fingerId;
+                        lastTouchOwnershipEvent = "NATIVE MOVE captured id=" + touch.fingerId + " phase=" + touch.phase;
                         moveTouchOriginScreen = touchStartScreen;
                         moveStartScreen = ClampFloatingOrigin(touchStartScreen, radius);
                         moveValue = Vector2.zero;
@@ -456,6 +464,7 @@ namespace PersiaWar.Unity2D5D
                     if (movementTouch.phase == TouchPhase.Ended ||
                         movementTouch.phase == TouchPhase.Canceled)
                     {
+                        lastTouchOwnershipEvent = "MOVE " + movementTouch.phase + " id=" + movePointerId;
                         // Android/Unity may invalidate the captured movement ID during
                         // a multi-touch transition. Before dropping the joystick, look
                         // for another live left-side contact and transfer ownership.
@@ -489,6 +498,7 @@ namespace PersiaWar.Unity2D5D
                                 moveTouchOriginScreen, Mathf.Max(1f, radius));
                             movePointerMissingSince = -1f;
                             movementRecoveryActive = false;
+                            lastTouchOwnershipEvent = "MOVE REBOUND to id=" + candidate.fingerId;
                             player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                             rebound = true;
                             StartupCheckpoint.Set("MobileMovePointerTransferredAfterTouchEndOrCancel");
@@ -620,6 +630,7 @@ namespace PersiaWar.Unity2D5D
                         continue;
 
                     movePointerId = candidate.fingerId;
+                    lastTouchOwnershipEvent = "MOVE REBOUND to id=" + candidate.fingerId;
                     // Preserve the current stick vector through rebinding. This makes
                     // the current contact's position the equivalent point on the stick,
                     // so the next movement update is continuous rather than snapping.
@@ -627,6 +638,7 @@ namespace PersiaWar.Unity2D5D
                     moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
                     movePointerMissingSince = -1f;
                     movementRecoveryActive = false;
+                    lastTouchOwnershipEvent = "MOVE RECOVERY id=" + candidate.fingerId;
                     player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));
                     movementRebound = true;
                     StartupCheckpoint.Set("MobileMovePointerReboundWhileFireOrTouchHandoff");
@@ -1370,6 +1382,66 @@ namespace PersiaWar.Unity2D5D
                     "MAP",
                     buttonTextStyle);
             }
+
+            DrawTouchDiagnosticOverlay(scale);
+        }
+
+        // Read-only runtime telemetry: it deliberately does not consume touches or
+        // change pointer ownership, so it can reveal what Android actually reports.
+        private void DrawTouchDiagnosticOverlay(float scale)
+        {
+            if (!Application.isMobilePlatform || !matchActive)
+                return;
+
+            string contacts = "none";
+            int count = Input.touchCount;
+            for (int i = 0; i < count && i < 4; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                string owner = touch.fingerId == movePointerId ? "/MOVE"
+                    : touch.fingerId == firePointerId ? "/FIRE"
+                    : touch.fingerId == meleePointerId ? "/MELEE"
+                    : touch.fingerId == grenadePointerId ? "/GRENADE"
+                    : touch.fingerId == reloadPointerId ? "/RELOAD" : string.Empty;
+                string item = touch.fingerId + ":" + touch.phase + "(" +
+                    Mathf.RoundToInt(gui.x) + "," + Mathf.RoundToInt(gui.y) + ")" + owner;
+                contacts = i == 0 ? item : contacts + " | " + item;
+            }
+
+            if (touchDiagnosticStyle == null)
+            {
+                touchDiagnosticStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.UpperLeft,
+                    wordWrap = true,
+                    fontStyle = FontStyle.Bold,
+                    padding = new RectOffset(6, 6, 4, 4)
+                };
+            }
+            touchDiagnosticStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(13f * scale), 10, 16);
+            touchDiagnosticStyle.normal.textColor = Color.white;
+
+            float width = Mathf.Min(Screen.width - 20f, 720f * scale);
+            float height = 96f * scale;
+            Rect panel = new Rect((Screen.width - width) * 0.5f, 112f * scale, width, height);
+            Color oldBackground = GUI.backgroundColor;
+            Color oldContent = GUI.contentColor;
+            GUI.backgroundColor = new Color(0.015f, 0.025f, 0.045f, 0.96f);
+            GUI.contentColor = Color.white;
+            GUI.Box(panel, GUIContent.none);
+            string summary =
+                "INPUT DIAG  native=" + count + " last=" + touchDiagnosticLastCount +
+                " multi=" + Input.multiTouchEnabled + " mouseSim=" + Input.simulateMouseWithTouches +
+                " touch=" + Input.touchSupported + " mouse=" + Input.mousePresent +
+                "\nMOVE id=" + movePointerId + " v=" + moveValue.x.ToString("F1") + "," + moveValue.y.ToString("F1") +
+                " recovery=" + movementRecoveryActive + " | FIRE id=" + firePointerId +
+                "\nFINGERS: " + contacts +
+                "\nLAST: " + lastTouchOwnershipEvent + " | frame=" + touchDiagnosticUpdateFrame;
+            GUI.Label(new Rect(panel.x + 6f, panel.y + 4f, panel.width - 12f, panel.height - 8f),
+                summary, touchDiagnosticStyle);
+            GUI.backgroundColor = oldBackground;
+            GUI.contentColor = oldContent;
         }
 
         private void HandleGuiPointerFallback()
@@ -1419,6 +1491,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     firePointerId = -1001;
                     guiFireMouseButton = mouseButton;
+                    lastTouchOwnershipEvent = "IMGUI FIRE down button=" + mouseButton;
                     FireAtNearestTarget();
                     e.Use();
                     return;
@@ -1465,6 +1538,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     movePointerId = -1000;
                     guiMoveMouseButton = mouseButton;
+                    lastTouchOwnershipEvent = "IMGUI MOVE down button=" + mouseButton;
                     moveTouchOriginScreen = new Vector2(gui.x, Screen.height - gui.y);
                     moveStartScreen = ClampFloatingOrigin(moveTouchOriginScreen, radius);
                     moveValue = Vector2.zero;
