@@ -2366,7 +2366,10 @@ namespace PersiaWar.Unity2D5D
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
                     ? (stageNumber >= 2
-                        ? "Arena cleared. Your kill ranking determines rewards."
+                        ? "Arena cleared. Final rank: #" +
+                            (GetComponent<StageTwoArenaManager>() != null
+                                ? GetComponent<StageTwoArenaManager>().LastLocalRank.ToString()
+                                : "?") + ". Check the store for rewards."
                         : "Extraction reached. Mission complete.")
                     : "Your fighter was defeated.",
                 bodyStyle);
