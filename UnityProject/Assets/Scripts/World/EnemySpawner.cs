@@ -113,6 +113,7 @@ namespace PersiaWar.Unity2D5D
                 if (wave >= 5 && enemies.Length == 0)
                 {
                     PlayerController activePlayer = player != null ? player.GetComponent<PlayerController>() : null;
+                    StageTwoArenaManager.Instance?.FinishArena();
                     GameSession.Instance?.EndMission(activePlayer != null && !activePlayer.IsDefeated);
                     enabled = false;
                     return;
