@@ -14,6 +14,13 @@ namespace PersiaWar.Unity2D5D
         // Stage two is opt-in; the existing first-stage city remains the default path.
         private bool stageTwoRequested;
         private int stageTwoLayoutVariant;
+        private GameObject captiveVillageGirlRoot;
+        private Vector3 captiveVillageGirlPosition;
+        // Keep the blue beam at the house interior while Anahita waits just outside
+        // its front entrance, so the player can free her before stepping into the beam.
+        private Vector3 captiveVillageGirlBeaconPosition;
+
+        public bool VillageGirlRescued { get; private set; }
 
         public bool IsWorldReady { get; private set; }
         public bool IsWorldPreparing { get; private set; }
@@ -47,6 +54,9 @@ namespace PersiaWar.Unity2D5D
 
         private readonly Dictionary<Material, AndroidBoxBatch> androidBoxBatches =
             new Dictionary<Material, AndroidBoxBatch>();
+        private readonly Dictionary<int, Material> stageTwoLitMaterialCache =
+            new Dictionary<int, Material>();
+        private Shader stageTwoLitShader;
         // Each Android house owns its own batched renderers so the camera can fade
         // only the building that actually blocks the player, not every house at once.
         private Transform androidCurrentBuildingRoot;
@@ -240,7 +250,9 @@ namespace PersiaWar.Unity2D5D
 
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
-            roadMaterial = MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
+            roadMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("Road", new Color(0.52f, 0.54f, 0.57f))
+                : MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
@@ -248,13 +260,27 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
-            Material groundMaterial = MakeMaterial("AndroidGround3D", stageTwoRequested ? new Color(0.43f, 0.34f, 0.23f) : new Color(0.12f, 0.46f, 0.08f));
-            buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
-            roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
-            accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
-            androidWindowMaterial = MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
-            androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
-            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
+            Material groundMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidGround3D", new Color(0.43f, 0.34f, 0.23f))
+                : MakeMaterial("AndroidGround3D", new Color(0.12f, 0.46f, 0.08f));
+            buildingMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f))
+                : MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
+            roofMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f))
+                : MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
+            accentMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f))
+                : MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
+            androidWindowMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f))
+                : MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
+            androidShadowMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f))
+                : MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
+            androidSidewalkMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f))
+                : MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
             // stays below the lowest terrain vertices, preventing black pinholes
@@ -381,6 +407,11 @@ namespace PersiaWar.Unity2D5D
             filter.sharedMesh = mesh;
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
+            if (stageTwoRequested)
+            {
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = true;
+            }
 
             MeshCollider collider = obj.AddComponent<MeshCollider>();
             collider.sharedMesh = mesh;
@@ -514,10 +545,20 @@ namespace PersiaWar.Unity2D5D
             RemoveAnyExtractionBeacon();
             extractionBeaconShown = true;
 
-            // Random road intersection chosen only at victory; no blue beam is visible during the match.
+            // Stage 1: when the final opponent is eliminated, light the house holding
+            // Anahita. Re-select a residential house at that moment if needed so it is
+            // at least 50 metres from the player. Stage 2 keeps its previous road beacon.
             float[] roads = { -67f, -43f, -19f, 5f, 29f, 53f, 77f };
             float beaconX = roads[Random.Range(0, roads.Length)];
             float beaconZ = roads[Random.Range(0, roads.Length)];
+            if (!stageTwoRequested && !VillageGirlRescued && captiveVillageGirlRoot != null)
+            {
+                PlayerController currentPlayer = FindFirstObjectByType<PlayerController>();
+                if (currentPlayer != null)
+                    MoveCaptiveGirlAtLeast50mFrom(currentPlayer.transform.position);
+                beaconX = captiveVillageGirlBeaconPosition.x;
+                beaconZ = captiveVillageGirlBeaconPosition.z;
+            }
             Vector3 ground = new Vector3(beaconX, CalculateAndroidTerrainHeight(beaconX, beaconZ) + 0.08f, beaconZ);
 
             CreateAndroidSkyGuideCylinder("BlueSkyGuideBeamOuter", ground + Vector3.up * 19f,
@@ -543,22 +584,58 @@ namespace PersiaWar.Unity2D5D
         {
             if (androidBuildingCenters.Count == 0) return;
 
-            // Never carry first-stage floor drops into the village. Rebuild the pickup
-            // field from scratch so the stage-two supply distribution is deterministic in count.
-            if (stageTwoRequested)
+            // Stage one intentionally preserves the exact original loot behavior:
+            // 8 of each item type, placed INSIDE generated houses. No stage-two
+            // cleanup, counts, or courtyard placement rules are allowed on this path.
+            if (!stageTwoRequested)
             {
-                PickupItem[] oldPickups = FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-                for (int i = 0; i < oldPickups.Length; i++)
+                const int stageOneCountPerType = 8;
+                for (int i = 0; i < stageOneCountPerType * 4; i++)
                 {
-                    if (oldPickups[i] != null)
-                        Destroy(oldPickups[i].gameObject);
+                    int houseIndex = Random.Range(0, androidBuildingCenters.Count);
+                    Vector3 center = androidBuildingCenters[houseIndex];
+                    Vector2 half = androidBuildingHalfExtents[houseIndex];
+                    float x = center.x + Random.Range(-half.x * 0.42f, half.x * 0.42f);
+                    float z = center.z + Random.Range(-half.y * 0.42f, half.y * 0.42f);
+                    float y = CalculateAndroidTerrainHeight(x, z) + 0.38f;
+                    PickupItem.PickupType type = i < stageOneCountPerType ? PickupItem.PickupType.Weapon
+                        : (i < stageOneCountPerType * 2 ? PickupItem.PickupType.Shield
+                        : (i < stageOneCountPerType * 3 ? PickupItem.PickupType.Grenade : PickupItem.PickupType.QuickDash));
+                    Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
+                        : (type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
+                        : (type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f) : new Color(0.94f, 0.08f, 0.92f)));
+                    GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube : (type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad : PrimitiveType.Sphere));
+                    item.name = "HouseLoot_" + type + "_" + i;
+                    item.transform.SetParent(worldRoot, true);
+                    item.transform.position = new Vector3(x, y, z);
+                    item.transform.localScale = type == PickupItem.PickupType.Weapon ? new Vector3(0.72f, 0.18f, 0.24f) : (type == PickupItem.PickupType.QuickDash ? new Vector3(0.72f, 0.72f, 1f) : Vector3.one * 0.48f);
+                    if (type == PickupItem.PickupType.QuickDash) { MeshFilter mf = item.GetComponent<MeshFilter>(); if (mf != null) { Mesh triangle = new Mesh { name = "QuickDashTriangle" }; triangle.vertices = new[] { new Vector3(0f, 0.58f, 0f), new Vector3(-0.5f, -0.34f, 0f), new Vector3(0.5f, -0.34f, 0f) }; triangle.triangles = new[] { 0, 1, 2 }; triangle.RecalculateNormals(); mf.sharedMesh = triangle; } item.transform.rotation = Quaternion.Euler(90f, 0f, 0f); }
+                    Renderer renderer = item.GetComponent<Renderer>();
+                    if (renderer != null) renderer.sharedMaterial = MakeMaterial("HouseLootMaterial_" + type + "_" + i, color);
+                    Collider collider = item.GetComponent<Collider>();
+                    if (collider != null) collider.isTrigger = true;
+                    Rigidbody body = item.AddComponent<Rigidbody>();
+                    body.isKinematic = true;
+                    body.useGravity = false;
+                    PickupItem pickup = item.AddComponent<PickupItem>();
+                    if (type == PickupItem.PickupType.Weapon)
+                        pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
+                    else
+                        pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
                 }
+                Debug.Log("PERSIA_LOOT: spawned 8 weapons, 8 shields, 8 grenades and 8 magenta triangular quick-dash pickups inside houses");
+                return;
             }
 
-            // Thirteen pairs of each firearm/supply category, randomized around
-            // homes and yard entrances rather than hidden only inside buildings.
-            const int pairsPerType = 13;
-            const int countPerType = pairsPerType * 2;
+            // Stage two starts with a clean loot field so no first-stage drops remain.
+            PickupItem[] oldPickups = FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < oldPickups.Length; i++)
+                if (oldPickups[i] != null)
+                    Destroy(oldPickups[i].gameObject);
+
+            // Six of each useful pickup type is intentionally sparse. Place them around
+            // house footprints/courtyard lanes, never carpet the ground with loot.
+            const int countPerType = 6;
             const int supplyTypeCount = 6;
             for (int i = 0; i < countPerType * supplyTypeCount; i++)
             {
@@ -567,65 +644,140 @@ namespace PersiaWar.Unity2D5D
                 Vector3 center = androidBuildingCenters[houseIndex];
                 Vector2 half = androidBuildingHalfExtents[houseIndex];
                 float angle = Random.Range(0f, Mathf.PI * 2f);
-                float radius = Random.Range(3.0f, 9.0f);
-                float x = Mathf.Clamp(center.x + Mathf.Cos(angle) * radius + Random.Range(-1.5f, 1.5f), -91f, 91f);
-                float z = Mathf.Clamp(center.z + Mathf.Sin(angle) * radius + Random.Range(-1.5f, 1.5f), -91f, 91f);
-                float y = CalculateAndroidTerrainHeight(x, z) + 0.38f;
+                float radius = Mathf.Max(half.x, half.y) + Random.Range(1.8f, 5.0f);
+                float x = Mathf.Clamp(center.x + Mathf.Cos(angle) * radius, -91f, 91f);
+                float z = Mathf.Clamp(center.z + Mathf.Sin(angle) * radius, -91f, 91f);
+                Vector3 position = new Vector3(x, CalculateAndroidTerrainHeight(x, z) + 0.16f, z);
                 PickupItem.PickupType type = typeIndex == 0 ? PickupItem.PickupType.Weapon
                     : typeIndex == 1 ? PickupItem.PickupType.Shield
                     : typeIndex == 2 ? PickupItem.PickupType.Grenade
                     : typeIndex == 3 ? PickupItem.PickupType.QuickDash
                     : typeIndex == 4 ? PickupItem.PickupType.Ammo
                     : PickupItem.PickupType.Medkit;
-                Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
-                    : type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
-                    : type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f)
-                    : type == PickupItem.PickupType.QuickDash ? new Color(0.94f, 0.08f, 0.92f)
-                    : type == PickupItem.PickupType.Ammo ? new Color(0.88f, 0.78f, 0.25f)
-                    : new Color(0.18f, 0.78f, 0.32f);
-                GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube
-                    : type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad : PrimitiveType.Sphere);
-                item.name = "VillageLoot_" + type + "_" + i;
+
+                GameObject item = new GameObject("StageTwoLoot_" + type + "_" + i);
                 item.transform.SetParent(worldRoot, true);
-                item.transform.position = new Vector3(x, y, z);
-                item.transform.localScale = type == PickupItem.PickupType.Weapon ? new Vector3(0.82f, 0.18f, 0.28f)
-                    : type == PickupItem.PickupType.QuickDash ? new Vector3(0.72f, 0.72f, 1f) : Vector3.one * 0.48f;
-                if (type == PickupItem.PickupType.QuickDash)
+                item.transform.position = position;
+                item.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+                if (type == PickupItem.PickupType.Weapon)
                 {
-                    MeshFilter mf = item.GetComponent<MeshFilter>();
-                    if (mf != null)
-                    {
-                        Mesh triangle = new Mesh { name = "QuickDashTriangle" };
-                        triangle.vertices = new[] { new Vector3(0f, 0.58f, 0f), new Vector3(-0.5f, -0.34f, 0f), new Vector3(0.5f, -0.34f, 0f) };
-                        triangle.triangles = new[] { 0, 1, 2 };
-                        triangle.RecalculateNormals();
-                        mf.sharedMesh = triangle;
-                    }
-                    item.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                    WeaponController.WeaponKind kind = (WeaponController.WeaponKind)Random.Range(0, 3);
+                    CreateVillageWeaponPickupModel(item.transform, kind);
+                    Rigidbody weaponBody = item.AddComponent<Rigidbody>();
+                    weaponBody.isKinematic = true;
+                    weaponBody.useGravity = false;
+                    PickupItem weaponPickup = item.AddComponent<PickupItem>();
+                    weaponPickup.ConfigureWeapon(kind, 30);
+                    continue;
                 }
-                Renderer renderer = item.GetComponent<Renderer>();
-                if (renderer != null) renderer.sharedMaterial = MakeMaterial("VillageLootMaterial_" + type, color);
-                Collider collider = item.GetComponent<Collider>();
-                if (collider != null) collider.isTrigger = true;
+
+                switch (type)
+                {
+                    case PickupItem.PickupType.Grenade:
+                        CreateVillagePickupPart(item.transform, "GrenadeBody", PrimitiveType.Capsule,
+                            new Vector3(0f, 0.16f, 0f), new Vector3(0.24f, 0.31f, 0.24f), new Color(0.22f, 0.30f, 0.18f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "GrenadeCap", PrimitiveType.Cylinder,
+                            new Vector3(0f, 0.34f, 0f), new Vector3(0.13f, 0.055f, 0.13f), new Color(0.48f, 0.50f, 0.44f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "GrenadePin", PrimitiveType.Cube,
+                            new Vector3(0.10f, 0.37f, 0f), new Vector3(0.13f, 0.035f, 0.07f), new Color(0.58f, 0.60f, 0.54f), new Vector3(0f, 0f, 25f));
+                        break;
+                    case PickupItem.PickupType.Shield:
+                        CreateVillagePickupPart(item.transform, "ShieldDisc", PrimitiveType.Cylinder,
+                            new Vector3(0f, 0.075f, 0f), new Vector3(0.46f, 0.075f, 0.46f), new Color(0.12f, 0.48f, 0.87f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "ShieldCenter", PrimitiveType.Cylinder,
+                            new Vector3(0f, 0.12f, 0f), new Vector3(0.17f, 0.025f, 0.17f), new Color(0.76f, 0.68f, 0.28f), Vector3.zero);
+                        break;
+                    case PickupItem.PickupType.Ammo:
+                        CreateVillagePickupPart(item.transform, "AmmoCrate", PrimitiveType.Cube,
+                            new Vector3(0f, 0.12f, 0f), new Vector3(0.38f, 0.24f, 0.32f), new Color(0.38f, 0.34f, 0.18f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "AmmoCrateBand", PrimitiveType.Cube,
+                            new Vector3(0f, 0.13f, 0f), new Vector3(0.40f, 0.06f, 0.34f), new Color(0.87f, 0.70f, 0.22f), Vector3.zero);
+                        break;
+                    case PickupItem.PickupType.Medkit:
+                        CreateVillagePickupPart(item.transform, "MedkitBox", PrimitiveType.Cube,
+                            new Vector3(0f, 0.13f, 0f), new Vector3(0.34f, 0.25f, 0.32f), new Color(0.88f, 0.86f, 0.78f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "MedkitCrossVertical", PrimitiveType.Cube,
+                            new Vector3(0f, 0.265f, 0f), new Vector3(0.075f, 0.025f, 0.24f), new Color(0.80f, 0.10f, 0.09f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "MedkitCrossHorizontal", PrimitiveType.Cube,
+                            new Vector3(0f, 0.267f, 0f), new Vector3(0.22f, 0.026f, 0.075f), new Color(0.80f, 0.10f, 0.09f), Vector3.zero);
+                        break;
+                    case PickupItem.PickupType.QuickDash:
+                        CreateVillagePickupPart(item.transform, "DashCrystal", PrimitiveType.Cube,
+                            new Vector3(0f, 0.22f, 0f), new Vector3(0.22f, 0.30f, 0.22f), new Color(0.18f, 0.69f, 0.76f), new Vector3(0f, 0f, 45f));
+                        CreateVillagePickupPart(item.transform, "DashCrystalCore", PrimitiveType.Cube,
+                            new Vector3(0f, 0.22f, 0f), new Vector3(0.09f, 0.20f, 0.09f), new Color(0.86f, 0.91f, 0.94f), new Vector3(0f, 0f, 45f));
+                        break;
+                }
+
                 Rigidbody body = item.AddComponent<Rigidbody>();
                 body.isKinematic = true;
                 body.useGravity = false;
                 PickupItem pickup = item.AddComponent<PickupItem>();
-                if (type == PickupItem.PickupType.Weapon)
-                    pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
-                else
-                    pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35
-                        : type == PickupItem.PickupType.Medkit ? 30
-                        : type == PickupItem.PickupType.Ammo ? 45 : 2);
+                int amount = type == PickupItem.PickupType.Shield ? 35
+                    : type == PickupItem.PickupType.Medkit ? 30
+                    : type == PickupItem.PickupType.Ammo ? 45 : 2;
+                pickup.Configure(type, amount);
             }
-            if (stageTwoRequested) SpawnVillageAxePickups(26);
-            Debug.Log("PERSIA_LOOT: stage-two village spawned 26 each of firearms, shields, grenades, quick-dash, ammo, medkits and axes");
+
+            SpawnVillageAxePickups(6);
+            Debug.Log("PERSIA_LOOT: stage two has six pickups per supply category and six axes; stage-one loot rules preserved");
+        }
+
+        private void CreateVillageWeaponPickupModel(Transform parent, WeaponController.WeaponKind kind)
+        {
+            bool pistol = kind == WeaponController.WeaponKind.LightPistol;
+            bool heavy = kind == WeaponController.WeaponKind.HeavyMachineGun;
+            Color steel = new Color(0.14f, 0.16f, 0.17f);
+            Color metal = new Color(0.32f, 0.35f, 0.36f);
+            Color stock = new Color(0.28f, 0.17f, 0.09f);
+            float bodyLength = pistol ? 0.34f : (heavy ? 0.78f : 0.62f);
+            CreateVillagePickupPart(parent, "WeaponReceiver", PrimitiveType.Cube,
+                new Vector3(0f, 0.10f, 0f), new Vector3(0.17f, 0.13f, bodyLength), steel, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponBarrel", PrimitiveType.Cube,
+                new Vector3(0f, 0.12f, bodyLength * 0.5f + 0.17f), new Vector3(0.055f, 0.055f, pistol ? 0.20f : (heavy ? 0.38f : 0.30f)), metal, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponStock", PrimitiveType.Cube,
+                new Vector3(0f, 0.10f, -bodyLength * 0.5f - 0.12f), new Vector3(pistol ? 0.09f : 0.14f, 0.10f, pistol ? 0.10f : 0.28f), stock, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponMagazine", PrimitiveType.Cube,
+                new Vector3(0f, -0.035f, -0.02f), new Vector3(0.10f, 0.19f, 0.15f), metal, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponGrip", PrimitiveType.Cube,
+                new Vector3(0f, -0.06f, -bodyLength * 0.12f), new Vector3(0.08f, 0.15f, 0.09f), stock, new Vector3(15f, 0f, 0f), true);
+            if (heavy)
+                CreateVillagePickupPart(parent, "WeaponForeGrip", PrimitiveType.Cube,
+                    new Vector3(0f, -0.04f, bodyLength * 0.25f), new Vector3(0.09f, 0.15f, 0.10f), stock, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponSight", PrimitiveType.Cube,
+                new Vector3(0f, 0.185f, -0.02f), new Vector3(0.07f, 0.045f, 0.10f), metal, Vector3.zero, true);
+        }
+
+        private GameObject CreateVillagePickupPart(
+            Transform parent,
+            string partName,
+            PrimitiveType primitive,
+            Vector3 localPosition,
+            Vector3 localScale,
+            Color color,
+            Vector3 localEuler,
+            bool preScaledForWeapon = false)
+        {
+            GameObject part = GameObject.CreatePrimitive(primitive);
+            part.name = partName;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localRotation = Quaternion.Euler(localEuler);
+            part.transform.localScale = preScaledForWeapon ? localScale * 0.5f : localScale;
+            Renderer renderer = part.GetComponent<Renderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = MakeStageTwoLitMaterial("StageTwoPickup_" + partName, color);
+            Collider collider = part.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+            return part;
         }
 
         private void SpawnVillageAxePickups(int count)
         {
-            Material wood = MakeMaterial("VillageAxePickupWood", new Color(0.30f, 0.17f, 0.08f));
-            Material steel = MakeMaterial("VillageAxePickupSteel", new Color(0.55f, 0.60f, 0.63f));
+            Material wood = MakeStageTwoLitMaterial("VillageAxePickupWood", new Color(0.30f, 0.17f, 0.08f));
+            Material steel = MakeStageTwoLitMaterial("VillageAxePickupSteel", new Color(0.55f, 0.60f, 0.63f));
             for (int i = 0; i < count; i++)
             {
                 int houseIndex = Random.Range(0, androidBuildingCenters.Count);
@@ -720,8 +872,10 @@ namespace PersiaWar.Unity2D5D
             if (renderer != null)
             {
                 renderer.sharedMaterial = material;
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = false;
+                renderer.shadowCastingMode = stageTwoRequested
+                    ? UnityEngine.Rendering.ShadowCastingMode.On
+                    : UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = stageTwoRequested;
             }
         }
 
@@ -865,7 +1019,251 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_START");
             BuildAndroidAlleysAndVehicles();
             StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_DONE");
+            // This rescue encounter belongs only to the original city/Stage 1.
+            // It is intentionally not created in the second-stage village rebuild.
+            if (!stageTwoRequested)
+                CreateAndroidCaptiveVillageGirl();
+
             StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
+        }
+
+        public bool TryRescueVillageGirl(Vector3 playerPosition)
+        {
+            if (stageTwoRequested || VillageGirlRescued || captiveVillageGirlRoot == null)
+                return false;
+
+            Vector2 playerXZ = new Vector2(playerPosition.x, playerPosition.z);
+            Vector2 girlXZ = new Vector2(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z);
+            // The trigger is deliberately inside the chosen house, not on the street:
+            // this only fires after the player reaches the interior.
+            if (Vector2.Distance(playerXZ, girlXZ) > 3.35f)
+                return false;
+
+            VillageGirlRescued = true;
+            captiveVillageGirlRoot.SetActive(false);
+            StartupCheckpoint.Set("VillageGirlRescuedInsideHouse");
+            Debug.Log("PERSIA_RESCUE: Anahita rescued inside the Stage 1 house");
+            return true;
+        }
+
+        private bool IsStageOneResidentialHouseIndex(int index)
+        {
+            // These four footprints were authored as warehouses, not homes.
+            return index >= 0 && index < androidBuildingCenters.Count &&
+                index != 4 && index != 9 && index != 11 && index != 16;
+        }
+
+        private int ChooseRandomResidentialHouseIndex()
+        {
+            List<int> candidates = new List<int>();
+            for (int i = 0; i < androidBuildingCenters.Count; i++)
+                if (IsStageOneResidentialHouseIndex(i))
+                    candidates.Add(i);
+            return candidates.Count > 0 ? candidates[Random.Range(0, candidates.Count)] : -1;
+        }
+
+        public bool RequiresStageOneGirlRescue =>
+            !stageTwoRequested && !VillageGirlRescued && captiveVillageGirlRoot != null;
+
+        public bool TryGetStageOneGirlBeacon(Vector3 playerPosition, out Vector3 beaconPosition)
+        {
+            beaconPosition = Vector3.zero;
+            if (!RequiresStageOneGirlRescue)
+                return false;
+
+            MoveCaptiveGirlAtLeast50mFrom(playerPosition);
+            Vector2 playerXZ = new Vector2(playerPosition.x, playerPosition.z);
+            Vector2 girlXZ = new Vector2(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z);
+            float distance = Vector2.Distance(playerXZ, girlXZ);
+            if (distance < 50f)
+            {
+                Debug.LogWarning("PERSIA_RESCUE: unable to guarantee the 50m captive distance; using normal extraction point.");
+                return false;
+            }
+
+            beaconPosition = captiveVillageGirlBeaconPosition;
+            Debug.Log("PERSIA_RESCUE: extraction beam placed on Anahita's house " +
+                distance.ToString("F1") + "m from player when final enemy was eliminated.");
+            return true;
+        }
+
+        private void MoveCaptiveGirlAtLeast50mFrom(Vector3 playerPosition)
+        {
+            if (stageTwoRequested || VillageGirlRescued || captiveVillageGirlRoot == null ||
+                androidBuildingCenters.Count == 0)
+                return;
+
+            List<int> candidates = new List<int>();
+            int farthestIndex = -1;
+            float farthestDistanceSq = -1f;
+            const float minimumDistanceSq = 58f * 58f;
+
+            for (int i = 0; i < androidBuildingCenters.Count; i++)
+            {
+                if (!IsStageOneResidentialHouseIndex(i))
+                    continue;
+
+                Vector3 house = androidBuildingCenters[i];
+                float dx = house.x - playerPosition.x;
+                float dz = house.z - playerPosition.z;
+                float distanceSq = dx * dx + dz * dz;
+                if (distanceSq > farthestDistanceSq)
+                {
+                    farthestDistanceSq = distanceSq;
+                    farthestIndex = i;
+                }
+                if (distanceSq >= minimumDistanceSq)
+                    candidates.Add(i);
+            }
+
+            // The map has enough spread for this constraint under normal play. If an
+            // unusual spawn puts every house within 50m, choose the farthest home.
+            int selected = candidates.Count > 0
+                ? candidates[Random.Range(0, candidates.Count)]
+                : farthestIndex;
+            if (selected < 0)
+                return;
+
+            Vector3 targetHouse = androidBuildingCenters[selected];
+            captiveVillageGirlBeaconPosition = new Vector3(
+                targetHouse.x,
+                CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z) + 0.08f,
+                targetHouse.z);
+
+            // House entrances face the negative-Z side. Put the captive outside the
+            // entrance, in front of the blue beam inside the house, not in the room.
+            float halfDepth = selected < androidBuildingHalfExtents.Count
+                ? androidBuildingHalfExtents[selected].y
+                : 3.5f;
+            float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
+            captiveVillageGirlPosition = new Vector3(
+                targetHouse.x,
+                CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z - frontOffset),
+                targetHouse.z - frontOffset);
+            captiveVillageGirlRoot.transform.position = captiveVillageGirlPosition;
+            captiveVillageGirlRoot.SetActive(true);
+            float actualDistance = Vector2.Distance(
+                new Vector2(playerPosition.x, playerPosition.z),
+                new Vector2(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z));
+            Debug.Log("PERSIA_RESCUE: captive house selected " + selected +
+                ", distance from player at final elimination=" + actualDistance.ToString("F1") + "m");
+        }
+
+        private void CreateAndroidCaptiveVillageGirl()
+        {
+            VillageGirlRescued = false;
+
+            // Pick a random existing residential house. Do not alter the city layout
+            // or create extra houses; the captive's visual stays inside that house.
+            int houseIndex = ChooseRandomResidentialHouseIndex();
+            if (houseIndex >= 0 && houseIndex < androidBuildingCenters.Count)
+            {
+                Vector3 house = androidBuildingCenters[houseIndex];
+                captiveVillageGirlBeaconPosition = new Vector3(
+                    house.x, CalculateAndroidTerrainHeight(house.x, house.z) + 0.08f, house.z);
+                float halfDepth = houseIndex < androidBuildingHalfExtents.Count
+                    ? androidBuildingHalfExtents[houseIndex].y
+                    : 3.5f;
+                float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
+                captiveVillageGirlPosition = new Vector3(
+                    house.x,
+                    CalculateAndroidTerrainHeight(house.x, house.z - frontOffset),
+                    house.z - frontOffset);
+            }
+            else
+            {
+                captiveVillageGirlBeaconPosition = new Vector3(
+                    -7f, CalculateAndroidTerrainHeight(-7f, 17f) + 0.08f, 17f);
+                captiveVillageGirlPosition = new Vector3(
+                    -7f, CalculateAndroidTerrainHeight(-7f, 9f), 9f);
+            }
+
+            captiveVillageGirlRoot = new GameObject("CaptiveVillageGirl_Anahita");
+            captiveVillageGirlRoot.transform.SetParent(worldRoot, true);
+            captiveVillageGirlRoot.transform.position = captiveVillageGirlPosition;
+
+            Material skin = MakeMaterial("RescueGirlSkin", new Color(0.78f, 0.54f, 0.39f));
+            Material hair = MakeMaterial("RescueGirlHair", new Color(0.10f, 0.055f, 0.035f));
+            Material dress = MakeMaterial("RescueGirlDress", new Color(0.72f, 0.20f, 0.48f));
+            Material sash = MakeMaterial("RescueGirlSash", new Color(0.95f, 0.70f, 0.22f));
+            Material shoes = MakeMaterial("RescueGirlShoes", new Color(0.16f, 0.12f, 0.10f));
+            Material bars = MakeMaterial("RescueGirlCageBars", new Color(0.30f, 0.31f, 0.29f));
+            Material sparkle = MakeMaterial("RescueGirlRescueMarker", new Color(1f, 0.78f, 0.18f));
+
+            // A readable low-poly girl silhouette: long dark hair, a dress, a sash
+            // and a face. All pieces are visual-only; the encounter is distance-triggered.
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "Dress", PrimitiveType.Cylinder,
+                new Vector3(0f, 0.64f, 0f), new Vector3(0.39f, 0.43f, 0.31f), dress, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "UpperBody", PrimitiveType.Capsule,
+                new Vector3(0f, 1.12f, 0f), new Vector3(0.27f, 0.29f, 0.23f), dress, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "WaistSash", PrimitiveType.Cube,
+                new Vector3(0f, 0.88f, 0.02f), new Vector3(0.43f, 0.075f, 0.32f), sash, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "Head", PrimitiveType.Sphere,
+                new Vector3(0f, 1.54f, 0.025f), new Vector3(0.35f, 0.37f, 0.32f), skin, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "HairCap", PrimitiveType.Sphere,
+                new Vector3(0f, 1.72f, -0.015f), new Vector3(0.39f, 0.24f, 0.35f), hair, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LongHairLeft", PrimitiveType.Capsule,
+                new Vector3(-0.25f, 1.38f, -0.06f), new Vector3(0.13f, 0.31f, 0.14f), hair, new Vector3(0f, 0f, -8f));
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LongHairRight", PrimitiveType.Capsule,
+                new Vector3(0.25f, 1.38f, -0.06f), new Vector3(0.13f, 0.31f, 0.14f), hair, new Vector3(0f, 0f, 8f));
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LegLeft", PrimitiveType.Capsule,
+                new Vector3(-0.12f, 0.20f, 0f), new Vector3(0.11f, 0.25f, 0.12f), shoes, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LegRight", PrimitiveType.Capsule,
+                new Vector3(0.12f, 0.20f, 0f), new Vector3(0.11f, 0.25f, 0.12f), shoes, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "EyeLeft", PrimitiveType.Sphere,
+                new Vector3(-0.085f, 1.57f, 0.177f), new Vector3(0.035f, 0.045f, 0.025f), hair, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "EyeRight", PrimitiveType.Sphere,
+                new Vector3(0.085f, 1.57f, 0.177f), new Vector3(0.035f, 0.045f, 0.025f), hair, Vector3.zero);
+
+            // A small iron cage makes the captive state clear but does not block
+            // movement or bullets; rescue is intentionally tied to entering the room.
+            for (int i = 0; i < 4; i++)
+            {
+                float x = -0.54f + i * 0.36f;
+                CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageFrontBar_" + i,
+                    PrimitiveType.Cube, new Vector3(x, 0.92f, -0.48f),
+                    new Vector3(0.035f, 1.55f, 0.035f), bars, Vector3.zero);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                float x = i == 0 ? -0.61f : 0.61f;
+                CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageSideBar_" + i,
+                    PrimitiveType.Cube, new Vector3(x, 0.92f, 0f),
+                    new Vector3(0.035f, 1.55f, 1.0f), bars, Vector3.zero);
+            }
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageTop",
+                PrimitiveType.Cube, new Vector3(0f, 1.72f, -0.02f),
+                new Vector3(1.25f, 0.045f, 1.0f), bars, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageBottom",
+                PrimitiveType.Cube, new Vector3(0f, 0.15f, -0.02f),
+                new Vector3(1.25f, 0.045f, 1.0f), bars, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "RescueMarker",
+                PrimitiveType.Sphere, new Vector3(0f, 2.10f, 0f),
+                new Vector3(0.18f, 0.18f, 0.18f), sparkle, Vector3.zero);
+
+            Debug.Log("PERSIA_RESCUE: Anahita captive placed inside Stage 1 house (-7, 17)");
+        }
+
+        private void CreateRescueGirlPart(
+            Transform parent, string partName, PrimitiveType primitive,
+            Vector3 localPosition, Vector3 localScale, Material material, Vector3 localEuler)
+        {
+            GameObject part = GameObject.CreatePrimitive(primitive);
+            part.name = partName;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+            part.transform.localRotation = Quaternion.Euler(localEuler);
+            Renderer renderer = part.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+            Collider collider = part.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
         }
 
         private readonly List<Vector3> androidBuildingCenters = new List<Vector3>();
@@ -1113,6 +1511,8 @@ namespace PersiaWar.Unity2D5D
             Mesh mesh = new Mesh { name = objectName + "Mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0, true);
+            if (stageTwoRequested)
+                mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             mesh.UploadMeshData(true);
 
@@ -1120,7 +1520,63 @@ namespace PersiaWar.Unity2D5D
             filter.sharedMesh = mesh;
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
+            if (stageTwoRequested)
+            {
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = true;
+            }
             return obj;
+        }
+
+        private void AddAndroidOrientedTerrainPath(
+            List<Vector3> vertices,
+            List<int> triangles,
+            Vector3 start,
+            Vector3 end,
+            float width,
+            float heightOffset)
+        {
+            Vector2 delta = new Vector2(end.x - start.x, end.z - start.z);
+            float length = delta.magnitude;
+            if (length < 0.1f || width <= 0f)
+                return;
+
+            Vector2 perpendicular = new Vector2(-delta.y, delta.x) / length * (width * 0.5f);
+            int segments = Mathf.Max(1, Mathf.CeilToInt(length / 4f));
+            int baseVertex = vertices.Count;
+
+            for (int i = 0; i <= segments; i++)
+            {
+                float t = i / (float)segments;
+                float x = Mathf.Lerp(start.x, end.x, t);
+                float z = Mathf.Lerp(start.z, end.z, t);
+
+                float leftX = x + perpendicular.x;
+                float leftZ = z + perpendicular.y;
+                float rightX = x - perpendicular.x;
+                float rightZ = z - perpendicular.y;
+                vertices.Add(new Vector3(leftX,
+                    CalculateAndroidTerrainHeight(leftX, leftZ) + heightOffset, leftZ));
+                vertices.Add(new Vector3(rightX,
+                    CalculateAndroidTerrainHeight(rightX, rightZ) + heightOffset, rightZ));
+            }
+
+            // Each lane segment is a non-overlapping strip. Adjacent strips meet at
+            // endpoints instead of using wide overlapping axis-aligned rectangles,
+            // preventing the black z-fighting bands on the village ground.
+            for (int i = 0; i < segments; i++)
+            {
+                int leftA = baseVertex + i * 2;
+                int rightA = leftA + 1;
+                int leftB = leftA + 2;
+                int rightB = leftA + 3;
+                triangles.Add(leftA);
+                triangles.Add(leftB);
+                triangles.Add(rightA);
+                triangles.Add(rightA);
+                triangles.Add(leftB);
+                triangles.Add(rightB);
+            }
         }
 
         private void BuildAndroidVillagePaths()
@@ -1140,10 +1596,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Vector3 a = pathCenters[i];
                 Vector3 b = pathCenters[i + 1];
-                Vector3 delta = b - a;
-                Vector3 midpoint = (a + b) * 0.5f;
-                AddAndroidTerrainFollowingQuad(vertices, triangles, midpoint,
-                    new Vector2(6.2f, delta.magnitude + 4f), 0.045f);
+                AddAndroidOrientedTerrainPath(vertices, triangles, a, b, 6.2f, 0.045f);
             }
 
             // Two cross-lanes link house clusters and leave playable open courtyards.
@@ -1157,12 +1610,11 @@ namespace PersiaWar.Unity2D5D
             {
                 Vector3 a = crossCenters[i];
                 Vector3 b = crossCenters[i + 1];
-                AddAndroidTerrainFollowingQuad(vertices, triangles, (a + b) * 0.5f,
-                    new Vector2(5.2f, Vector3.Distance(a, b) + 2f), 0.047f);
+                AddAndroidOrientedTerrainPath(vertices, triangles, a, b, 5.2f, 0.047f);
             }
 
             CreateAndroidQuadBatch("StageTwoVillageDirtLanes", vertices, triangles,
-                MakeMaterial("VillageDirtPath", new Color(0.43f, 0.34f, 0.23f)));
+                MakeStageTwoLitMaterial("VillageDirtPath", new Color(0.43f, 0.34f, 0.23f)));
         }
 
         private void BuildAndroidVillagePresentation()
@@ -1187,14 +1639,14 @@ namespace PersiaWar.Unity2D5D
 
             Material[] wallMaterials =
             {
-                MakeMaterial("VillageCourtyardWall_Sand", new Color(0.62f, 0.47f, 0.32f)),
-                MakeMaterial("VillageCourtyardWall_LightAdobe", new Color(0.70f, 0.54f, 0.38f)),
-                MakeMaterial("VillageCourtyardWall_DarkAdobe", new Color(0.53f, 0.39f, 0.27f))
+                MakeStageTwoLitMaterial("VillageCourtyardWall_Sand", new Color(0.62f, 0.47f, 0.32f)),
+                MakeStageTwoLitMaterial("VillageCourtyardWall_LightAdobe", new Color(0.70f, 0.54f, 0.38f)),
+                MakeStageTwoLitMaterial("VillageCourtyardWall_DarkAdobe", new Color(0.53f, 0.39f, 0.27f))
             };
-            Material gateMaterial = MakeMaterial("VillageWoodGate", new Color(0.22f, 0.13f, 0.07f));
-            Material gardenMaterial = MakeMaterial("VillageGardenGreen", new Color(0.19f, 0.39f, 0.13f));
-            Material hedgeMaterial = MakeMaterial("VillageDenseBoxwood", new Color(0.12f, 0.29f, 0.10f));
-            Material bareSoilMaterial = MakeMaterial("VillageGardenSoil", new Color(0.30f, 0.23f, 0.15f));
+            Material gateMaterial = MakeStageTwoLitMaterial("VillageWoodGate", new Color(0.22f, 0.13f, 0.07f));
+            Material gardenMaterial = MakeStageTwoLitMaterial("VillageGardenGreen", new Color(0.19f, 0.39f, 0.13f));
+            Material hedgeMaterial = MakeStageTwoLitMaterial("VillageDenseBoxwood", new Color(0.12f, 0.29f, 0.10f));
+            Material bareSoilMaterial = MakeStageTwoLitMaterial("VillageGardenSoil", new Color(0.30f, 0.23f, 0.15f));
 
             int windcatchers = 0;
             for (int i = 0; i < plots.Length; i++)
@@ -1212,49 +1664,80 @@ namespace PersiaWar.Unity2D5D
                 int style = i % 4; // front yard, central garden, corner house, side garden
                 float wallHeight = 1.42f + (i % 3) * 0.12f;
                 float wallThickness = 0.38f;
-                float lotWidth = style == 1 ? 14.6f : 13.2f;
-                float lotDepth = style == 1 ? 14.6f : 13.2f;
+                // Closely adjoining plots give the village a compact lived-in texture.
+                float lotWidth = 12.8f;
+                float lotDepth = 12.8f;
                 Material adobeWall = wallMaterials[i % wallMaterials.Length];
 
                 androidCurrentBuildingRoot = new GameObject("Building_VillageHouse_" + (i + 1)).transform;
                 androidCurrentBuildingRoot.SetParent(worldRoot, true);
 
-                // Every courtyard has its own planting bed and a small bare-soil patch.
-                // House/garden proportions and positions differ from plot to plot.
+                // Every courtyard has its own planting bed and bare-soil patch.
+                // The south-side houses put the garden toward the village center;
+                // the north-side houses reverse that order so the house comes first.
                 Vector3 house;
                 float footprint;
                 float depth;
                 float houseHeight = i % 7 == 0 ? 4.4f : 3.35f;
-                if (style == 0)
+
+                if (style == 1)
                 {
-                    house = plot + new Vector3(0f, 0f, northPlot ? -2.55f : 2.55f);
-                    footprint = 7.4f + (i % 3) * 0.55f;
-                    depth = 5.2f + (i % 2) * 0.65f;
-                }
-                else if (style == 1)
-                {
-                    // Central courtyard: house wings enclose a garden on three sides.
-                    house = plot + new Vector3(northPlot ? 3.1f : -3.1f, 0f, 0f);
-                    footprint = 5.4f;
-                    depth = 8.0f;
-                }
-                else if (style == 2)
-                {
-                    // Corner house leaves a broad L-shaped usable yard.
-                    house = plot + new Vector3(-3.2f, 0f, northPlot ? -3.0f : 3.0f);
-                    footprint = 6.3f;
-                    depth = 6.0f;
+                    // A real central-courtyard compound: two side wings and a rear
+                    // wing form a U around a garden, instead of a single box beside it.
+                    const float wingWidth = 4.0f;
+                    const float wingDepth = 6.8f;
+                    const float wingOffsetX = 4.0f;
+                    Vector3 leftWing = plot + new Vector3(-wingOffsetX, 0f, 0f);
+                    Vector3 rightWing = plot + new Vector3(wingOffsetX, 0f, 0f);
+                    // Gate entry is on the south side for every plot; the rear wing
+                    // always sits north of the courtyard so it cannot seal the entrance.
+                    Vector3 rearWing = plot + new Vector3(0f, 0f, 4.15f);
+
+                    androidBuildingCenters.Add(leftWing);
+                    androidBuildingHalfExtents.Add(new Vector2(wingWidth * 0.5f, wingDepth * 0.5f));
+                    CreateAndroidBuilding(leftWing, wingWidth, houseHeight, wingDepth,
+                        i * 3, false, false);
+
+                    androidBuildingCenters.Add(rightWing);
+                    androidBuildingHalfExtents.Add(new Vector2(wingWidth * 0.5f, wingDepth * 0.5f));
+                    CreateAndroidBuilding(rightWing, wingWidth, houseHeight, wingDepth,
+                        i * 3 + 1, false, false);
+
+                    footprint = 4.6f;
+                    depth = 3.0f;
+                    house = rearWing;
+                    androidBuildingCenters.Add(rearWing);
+                    androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
+                    CreateAndroidBuilding(rearWing, footprint, houseHeight, depth,
+                        i * 3 + 2, false, false);
                 }
                 else
                 {
-                    house = plot + new Vector3(0f, 0f, northPlot ? -2.7f : 2.7f);
-                    footprint = 8.2f;
-                    depth = 5.4f;
-                }
+                    if (style == 0)
+                    {
+                        house = plot + new Vector3(0f, 0f, northPlot ? -2.35f : 2.35f);
+                        footprint = 6.8f + (i % 3) * 0.32f;
+                        depth = 4.9f + (i % 2) * 0.38f;
+                    }
+                    else if (style == 2)
+                    {
+                        // Corner plot: offset house leaves an L-shaped yard.
+                        house = plot + new Vector3(-2.25f, 0f, northPlot ? -2.55f : 2.55f);
+                        footprint = 5.9f;
+                        depth = 5.3f;
+                    }
+                    else
+                    {
+                        // Long side-facing house with a garden strip along one edge.
+                        house = plot + new Vector3(0f, 0f, northPlot ? -2.35f : 2.35f);
+                        footprint = 7.2f;
+                        depth = 5.1f;
+                    }
 
-                androidBuildingCenters.Add(house);
-                androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
-                CreateAndroidBuilding(house, footprint, houseHeight, depth, i, false, false);
+                    androidBuildingCenters.Add(house);
+                    androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
+                    CreateAndroidBuilding(house, footprint, houseHeight, depth, i, false, false);
+                }
 
                 if (i == 0 || i == 13 || i == 24)
                 {
@@ -1262,57 +1745,47 @@ namespace PersiaWar.Unity2D5D
                     windcatchers++;
                 }
 
-                // Different wall arrangements prevent every house from looking identical.
-                float left = -lotWidth * 0.5f;
-                float right = lotWidth * 0.5f;
-                float front = northPlot ? 2.0f : -lotDepth * 0.5f;
-                float rear = northPlot ? lotDepth * 0.5f : 2.0f;
-                float gateZ = northPlot ? lotDepth * 0.5f : -lotDepth * 0.5f;
-                QueueAndroidBox("VillageCourtyardLeftWall", plot + new Vector3(left, wallHeight * 0.5f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall);
-                QueueAndroidBox("VillageCourtyardRightWall", plot + new Vector3(right, wallHeight * 0.5f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall);
+                // Fully close every yard on three sides and add a single real gate
+                // opening on the side facing the village lane. This also applies to
+                // central-garden plots; none of them should have wide, unexplained gaps.
+                float left = -lotWidth * 0.5f + wallThickness * 0.5f;
+                float right = lotWidth * 0.5f - wallThickness * 0.5f;
+                float gateZ = -lotDepth * 0.5f;
+                float backZ = lotDepth * 0.5f;
+                const float gateOpening = 2.6f;
+                float gateSideWidth = Mathf.Max(0.5f, (lotWidth - gateOpening) * 0.5f);
 
-                if (style == 1)
-                {
-                    // Open central garden ring: short rear and front wall segments leave access gaps.
-                    QueueAndroidBox("VillageCourtyardRearWallLeft", plot + new Vector3(-4.6f, wallHeight * 0.5f, rear),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardRearWallRight", plot + new Vector3(4.6f, wallHeight * 0.5f, rear),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardFrontWall", plot + new Vector3(0f, wallHeight * 0.5f, front),
-                        new Vector3(6.2f, wallHeight, wallThickness), adobeWall);
-                }
-                else
-                {
-                    QueueAndroidBox("VillageCourtyardRearWall", plot + new Vector3(0f, wallHeight * 0.5f, rear),
-                        new Vector3(lotWidth, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardGateSideLeft", plot + new Vector3(-4.1f, wallHeight * 0.5f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardGateSideRight", plot + new Vector3(4.1f, wallHeight * 0.5f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageWoodGate", plot + new Vector3(0f, 0.72f, gateZ),
-                        new Vector3(2.2f, 1.42f, 0.16f), gateMaterial);
-                }
-
-                // Colliders mirror the courtyard walls and leave a walkable gate opening.
-                CreateAndroidCollider("VillageCourtyardLeftCollider", plot + new Vector3(left, 0f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth));
-                CreateAndroidCollider("VillageCourtyardRightCollider", plot + new Vector3(right, 0f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth));
-                CreateAndroidCollider("VillageCourtyardRearCollider", plot + new Vector3(0f, 0f, rear),
-                    new Vector3(lotWidth, wallHeight, wallThickness));
-                if (style != 1)
-                {
-                    CreateAndroidCollider("VillageCourtyardGateSideCollider", plot + new Vector3(-4.1f, 0f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness));
-                    CreateAndroidCollider("VillageCourtyardGateSideCollider", plot + new Vector3(4.1f, 0f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness));
-                }
+                CreateAndroidBox("VillageCourtyardLeftWall",
+                    plot + new Vector3(left, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardRightWall",
+                    plot + new Vector3(right, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardBackWall",
+                    plot + new Vector3(0f, wallHeight * 0.5f, backZ),
+                    new Vector3(lotWidth, wallHeight, wallThickness), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardGateSideLeft",
+                    plot + new Vector3(-(gateOpening * 0.5f + gateSideWidth * 0.5f),
+                        wallHeight * 0.5f, gateZ),
+                    new Vector3(gateSideWidth, wallHeight, wallThickness), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardGateSideRight",
+                    plot + new Vector3(gateOpening * 0.5f + gateSideWidth * 0.5f,
+                        wallHeight * 0.5f, gateZ),
+                    new Vector3(gateSideWidth, wallHeight, wallThickness), adobeWall, true);
+                // Gate panels are hinged open to the sides, leaving the full
+                // central opening visually and physically traversable.
+                GameObject leftGateLeaf = CreateAndroidBox("VillageWoodGate_LeftOpen",
+                    plot + new Vector3(-gateOpening * 0.5f + 0.18f, wallHeight * 0.46f, gateZ + 0.22f),
+                    new Vector3(0.82f, wallHeight * 0.92f, 0.14f), gateMaterial, false);
+                leftGateLeaf.transform.rotation = Quaternion.Euler(0f, -72f, 0f);
+                GameObject rightGateLeaf = CreateAndroidBox("VillageWoodGate_RightOpen",
+                    plot + new Vector3(gateOpening * 0.5f - 0.18f, wallHeight * 0.46f, gateZ + 0.22f),
+                    new Vector3(0.82f, wallHeight * 0.92f, 0.14f), gateMaterial, false);
+                rightGateLeaf.transform.rotation = Quaternion.Euler(0f, 72f, 0f);
 
                 // Green vegetable beds occupy only part of each yard; most exposed ground stays dusty.
-                float gardenX = style == 2 ? 2.8f : (i % 2 == 0 ? -2.2f : 2.2f);
-                float gardenZ = northPlot ? 4.2f : -4.2f;
+                float gardenX = style == 1 ? 0f : (style == 2 ? 2.8f : (i % 2 == 0 ? -2.2f : 2.2f));
+                float gardenZ = style == 1 ? 0f : (northPlot ? 4.0f : -4.0f);
                 QueueAndroidBox("VillageGardenBed", plot + new Vector3(gardenX, 0.10f, gardenZ),
                     new Vector3(style == 1 ? 4.2f : 3.6f, 0.16f, style == 2 ? 2.8f : 3.0f), gardenMaterial);
                 QueueAndroidBox("VillageBareSoilBed", plot + new Vector3(-gardenX * 0.55f, 0.055f, gardenZ * 0.55f),
@@ -1321,7 +1794,7 @@ namespace PersiaWar.Unity2D5D
                 // Boxwood hedges partition shared yards and village lanes without sealing paths.
                 if (i % 2 == 0)
                 {
-                    float hedgeZ = northPlot ? 0.8f : -0.8f;
+                    float hedgeZ = 0.8f;
                     QueueAndroidBox("VillageBoxwoodDivider", plot + new Vector3(0f, 0.42f, hedgeZ),
                         new Vector3(4.2f + (i % 3), 0.84f, 0.72f), hedgeMaterial);
                 }
@@ -1365,8 +1838,8 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateAndroidVillageWindcatcher(Vector3 house, float footprint, float bodyHeight, float depth, int index)
         {
-            Material adobe = MakeMaterial("VillageWindcatcherAdobe_" + index, new Color(0.68f, 0.52f, 0.35f));
-            Material shadow = MakeMaterial("VillageWindcatcherOpening_" + index, new Color(0.22f, 0.25f, 0.23f));
+            Material adobe = MakeStageTwoLitMaterial("VillageWindcatcherAdobe_" + index, new Color(0.68f, 0.52f, 0.35f));
+            Material shadow = MakeStageTwoLitMaterial("VillageWindcatcherOpening_" + index, new Color(0.22f, 0.25f, 0.23f));
             float x = Mathf.Max(1.0f, footprint * 0.20f);
             float z = Mathf.Max(1.0f, depth * 0.20f);
             float h = 2.6f;
@@ -1420,27 +1893,38 @@ namespace PersiaWar.Unity2D5D
                     new Color(0.63f, 0.70f, 0.58f)
                 };
             int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
-            Material facade = MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
-            Material trim = MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
+            Material facade = stageTwoRequested ? MakeStageTwoLitMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]) : MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
+            Material trim = stageTwoRequested ? MakeStageTwoLitMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f)) : MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
             Material darkWindow = androidWindowMaterial != null
                 ? androidWindowMaterial
-                : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f));
-            Material door = MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
-            Material rooftop = MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
-            Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
-            Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
+                : (stageTwoRequested ? MakeStageTwoLitMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f)) : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f)));
+            Material door = stageTwoRequested ? MakeStageTwoLitMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f)) : MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
+            Material rooftop = stageTwoRequested ? MakeStageTwoLitMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f)) : MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
+            Material planter = stageTwoRequested ? MakeStageTwoLitMaterial("Planter", new Color(0.25f, 0.20f, 0.13f)) : MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
+            Material hedge = stageTwoRequested ? MakeStageTwoLitMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f)) : MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
 
             float doorWidth = isWarehouse
                 ? Mathf.Min(3.4f, footprint * 0.32f)
-                : Mathf.Min(1.35f, footprint * 0.18f);
+                : (stageTwoRequested
+                    ? Mathf.Min(1.90f, footprint * 0.30f)
+                    : Mathf.Min(1.35f, footprint * 0.18f));
             float doorHeight = isWarehouse ? 2.35f : 2.15f;
-            QueueAndroidBuildingFacade(position, footprint, bodyHeight, depth, doorWidth, doorHeight, facade);
-
-            // Split solid collision around the same visible doorway. Windows and all
-            // other wall sections remain blocked by solid colliders.
-            float collisionHeight = bodyHeight + (isPitchedRoof ? 1.6f : 0.65f);
-            CreateAndroidBuildingColliders(
-                position, footprint, depth, collisionHeight, doorWidth, doorHeight);
+            if (stageTwoRequested)
+            {
+                // Stage two uses one collider + one renderer for each physical wall
+                // section. The camera can fade only the wall actually between it and
+                // the player; the roof and rest of the house stay opaque.
+                CreateAndroidBuildingFacadeParts(position, footprint, bodyHeight, depth,
+                    doorWidth, doorHeight, facade);
+            }
+            else
+            {
+                // Keep stage one's original batched facade/collider path unchanged.
+                QueueAndroidBuildingFacade(position, footprint, bodyHeight, depth, doorWidth, doorHeight, facade);
+                float collisionHeight = bodyHeight + (isPitchedRoof ? 1.6f : 0.65f);
+                CreateAndroidBuildingColliders(
+                    position, footprint, depth, collisionHeight, doorWidth, doorHeight);
+            }
 
             if (isPitchedRoof)
             {
@@ -1448,11 +1932,18 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
-                QueueAndroidBox(
-                    "CityRoof",
-                    position + Vector3.up * (bodyHeight + 0.22f),
-                    new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
-                    trim);
+                if (stageTwoRequested)
+                    CreateAndroidBox(
+                        "VillageFadeableFlatRoof",
+                        position + Vector3.up * (bodyHeight + 0.22f),
+                        new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
+                        trim, true);
+                else
+                    QueueAndroidBox(
+                        "CityRoof",
+                        position + Vector3.up * (bodyHeight + 0.22f),
+                        new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
+                        trim);
             }
 
             int facadeBandCount = bodyHeight >= 5.0f && !isWarehouse ? 2 : 1;
@@ -1494,11 +1985,26 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            QueueAndroidBox(
-                isWarehouse ? "WarehouseLoadingDoor" : "Door",
-                position + new Vector3(0f, 1.12f, -depth * 0.54f),
-                new Vector3(doorWidth, isWarehouse ? 2.35f : 2.15f, 0.14f),
-                door);
+            if (stageTwoRequested && !isWarehouse)
+            {
+                // The village doors are shown ajar so the entrance reads as walkable.
+                // There is no door collider; collision is owned by the wall sections,
+                // which leave a 1.9m opening for the player.
+                QueueAndroidBox(
+                    "VillageOpenDoorLeaf",
+                    position + new Vector3(-doorWidth * 0.43f, doorHeight * 0.50f,
+                        -depth * 0.5f - doorWidth * 0.22f),
+                    new Vector3(0.13f, doorHeight, doorWidth * 0.68f),
+                    door);
+            }
+            else
+            {
+                QueueAndroidBox(
+                    isWarehouse ? "WarehouseLoadingDoor" : "Door",
+                    position + new Vector3(0f, 1.12f, -depth * 0.54f),
+                    new Vector3(doorWidth, isWarehouse ? 2.35f : 2.15f, 0.14f),
+                    door);
+            }
 
             if (isWarehouse)
             {
@@ -1571,7 +2077,7 @@ namespace PersiaWar.Unity2D5D
                 position + new Vector3(-span * 0.25f, bodyHeight + rise * 0.5f, 0f),
                 new Vector3(slopedLength, 0.20f, roofDepth),
                 roofMaterial,
-                false);
+                stageTwoRequested);
             leftPanel.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
             GameObject rightPanel = CreateAndroidBox(
@@ -1579,7 +2085,7 @@ namespace PersiaWar.Unity2D5D
                 position + new Vector3(span * 0.25f, bodyHeight + rise * 0.5f, 0f),
                 new Vector3(slopedLength, 0.20f, roofDepth),
                 roofMaterial,
-                false);
+                stageTwoRequested);
             rightPanel.transform.rotation = Quaternion.Euler(0f, 0f, -angle);
         }
 
@@ -1595,9 +2101,13 @@ namespace PersiaWar.Unity2D5D
         {
             position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             if (androidTreeTrunkMaterial == null)
-                androidTreeTrunkMaterial = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+                androidTreeTrunkMaterial = stageTwoRequested
+                    ? MakeStageTwoLitMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f))
+                    : MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
             if (androidTreeCrownMaterial == null)
-                androidTreeCrownMaterial = MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
+                androidTreeCrownMaterial = stageTwoRequested
+                    ? MakeStageTwoLitMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f))
+                    : MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
 
             CreateAndroidBox(
                 "TreeTrunk",
@@ -1756,6 +2266,42 @@ namespace PersiaWar.Unity2D5D
             QueueAndroidBox("CityBuildingDoorHeader",
                 position + new Vector3(0f, doorHeight + headerHeight * 0.5f, frontZ),
                 new Vector3(doorWidth, headerHeight, thickness), facade);
+        }
+
+        private void CreateAndroidBuildingFacadeParts(
+            Vector3 position,
+            float footprint,
+            float bodyHeight,
+            float depth,
+            float doorWidth,
+            float doorHeight,
+            Material facade)
+        {
+            float thickness = Mathf.Clamp(Mathf.Min(footprint, depth) * 0.08f, 0.35f, 0.60f);
+            float frontZ = -depth * 0.5f + thickness * 0.5f;
+            float backZ = depth * 0.5f - thickness * 0.5f;
+            float sideWidth = Mathf.Max(0.35f, (footprint - doorWidth) * 0.5f);
+
+            CreateAndroidBox("VillageFadeableHouseWall_Left",
+                position + new Vector3(-footprint * 0.5f + thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_Right",
+                position + new Vector3(footprint * 0.5f - thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_Rear",
+                position + new Vector3(0f, bodyHeight * 0.5f, backZ),
+                new Vector3(footprint, bodyHeight, thickness), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_FrontLeft",
+                position + new Vector3(-doorWidth * 0.5f - sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_FrontRight",
+                position + new Vector3(doorWidth * 0.5f + sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade, true);
+
+            float headerHeight = Mathf.Max(0.1f, bodyHeight - doorHeight);
+            CreateAndroidBox("VillageFadeableHouseWall_DoorHeader",
+                position + new Vector3(0f, doorHeight + headerHeight * 0.5f, frontZ),
+                new Vector3(doorWidth, headerHeight, thickness), facade, true);
         }
 
         private void CreateAndroidBuildingColliders(
@@ -1990,6 +2536,54 @@ namespace PersiaWar.Unity2D5D
                 if (c != null) Destroy(c);
             }
             return obj;
+        }
+
+        private Material MakeStageTwoLitMaterial(string name, Color color)
+        {
+            Shader shader = stageTwoLitShader;
+            if (shader == null || !shader.isSupported)
+            {
+                shader = Resources.Load<Shader>("PersiaWarLit");
+                if (shader == null || !shader.isSupported)
+                    shader = Shader.Find("PersiaWar/Lit");
+                if (shader == null || !shader.isSupported)
+                    shader = Shader.Find("Standard");
+
+                // Never keep an unsupported shader: Unity displays those materials pink.
+                if (shader == null || !shader.isSupported)
+                    shader = Resources.Load<Shader>("PersiaWarAndroidFlat");
+                if (shader == null || !shader.isSupported)
+                    shader = RuntimeMaterialFactory.GetShader();
+                stageTwoLitShader = shader;
+            }
+            if (shader == null || !shader.isSupported)
+                return MakeMaterial(name, color);
+
+            unchecked
+            {
+                int key = shader.GetInstanceID();
+                key = key * 31 + Mathf.RoundToInt(color.r * 255f);
+                key = key * 31 + Mathf.RoundToInt(color.g * 255f);
+                key = key * 31 + Mathf.RoundToInt(color.b * 255f);
+                key = key * 31 + Mathf.RoundToInt(color.a * 255f);
+                if (stageTwoLitMaterialCache.TryGetValue(key, out Material cached) && cached != null)
+                    return cached;
+
+                Material material = new Material(shader)
+                {
+                    name = name,
+                    color = color,
+                    enableInstancing = true
+                };
+                if (material.HasProperty("_Color")) material.SetColor("_Color", color);
+                if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
+                if (material.HasProperty("_MainTex") && material.mainTexture == null)
+                    material.mainTexture = Texture2D.whiteTexture;
+                if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0f);
+                if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0.08f);
+                stageTwoLitMaterialCache[key] = material;
+                return material;
+            }
         }
 
         private Material MakeMaterial(string name, Color color)

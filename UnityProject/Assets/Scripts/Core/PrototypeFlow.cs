@@ -35,6 +35,9 @@ namespace PersiaWar.Unity2D5D
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
+        private int stageTwoOriginalHero;
+        private bool stageTwoShopOpen;
+        private float girlRescueNoticeUntil;
         private int stageNumber = 1;
         // 0 = random landing, 1 = manual map landing.
         private int stageTwoLandingMode;
@@ -58,6 +61,13 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle bodyStyle;
         private GUIStyle buttonStyle;
         private GUIStyle smallStyle;
+        private GUIStyle menuTitleStyle;
+        private GUIStyle menuHeaderStyle;
+        private GUIStyle menuBodyStyle;
+        private GUIStyle menuSmallStyle;
+        private GUIStyle menuButtonStyle;
+        private int menuStyleScreenHeight = -1;
+        private int suppressMenuButtonClicksFrame = -1;
 
         // These X/Z centers mirror GameBootstrap.BuildAndroidCityPresentation exactly.
         // Keep the minimap's house marks tied to the actual Android city layout.
@@ -83,6 +93,7 @@ namespace PersiaWar.Unity2D5D
         private static readonly string[] HeroNames =
         {
             "KING ARDESHIR",
+            "ANAHITA",
             "PARS GUARD",
             "ROYAL SCOUT",
             "SILK WARRIOR",
@@ -189,6 +200,7 @@ namespace PersiaWar.Unity2D5D
             // path that can advance the menu if touch-to-mouse synthesis is missing.
             if (mode == ScreenMode.Match)
             {
+                CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
                 return;
             }
@@ -248,13 +260,17 @@ namespace PersiaWar.Unity2D5D
 #if UNITY_ANDROID
                 DrawAndroidPresentationHUD();
                 DrawAndroidPauseControl();
+                DrawGirlRescueNotice();
 
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                 {
                     if (resultOverlayStartTime < 0f)
                     {
                         resultOverlayStartTime = Time.unscaledTime;
-                        if (GameSession.Instance.PlayerWon && gameBootstrap != null)
+                        // Stage 1's ExtractionBeacon is already attached to Anahita's
+                        // randomized house and is shown when the final wave is eliminated.
+                        // Do not draw a second, unrelated beam after mission completion.
+                        if (GameSession.Instance.PlayerWon && gameBootstrap != null && stageNumber >= 2)
                             gameBootstrap.ShowRandomExtractionBeacon();
                     }
                     DrawAndroidResultOverlay();
@@ -285,8 +301,10 @@ namespace PersiaWar.Unity2D5D
             }
             if (mode == ScreenMode.HeroSelect)
             {
-                DrawPreviousRunDiagnostic();
-                DrawHeroSelect();
+                if (stageNumber >= 2 && stageTwoShopOpen)
+                    DrawCharacterShop();
+                else
+                    DrawHeroSelect();
             }
             else
                 DrawDropMap();
@@ -593,8 +611,8 @@ namespace PersiaWar.Unity2D5D
             }
             Rect topBar = new Rect(0f, 0f, Screen.width, Mathf.Min(110f, Screen.height * 0.16f));
             Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.48f));
-            GUI.Label(new Rect(28f, 18f, Screen.width * 0.55f, 48f), "♛  PERSIA WAR", titleStyle);
-            GUI.Label(new Rect(30f, 62f, Screen.width * 0.60f, 30f), "CLASSIC BATTLE ROYALE", smallStyle);
+            GUI.Label(new Rect(28f, 12f, Screen.width * 0.62f, 56f), "♛  PERSIA WAR", menuTitleStyle);
+            GUI.Label(new Rect(30f, 64f, Screen.width * 0.60f, 32f), "CLASSIC BATTLE ROYALE", menuSmallStyle);
         }
 
         private void HandleHeroSelectTouches()
@@ -609,9 +627,20 @@ namespace PersiaWar.Unity2D5D
                     continue;
 
                 Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (stageNumber >= 2 && stageTwoShopOpen)
+                {
+                    Rect shopBack = new Rect(Screen.width * 0.5f - 160f, Screen.height - 104f, 320f, 62f);
+                    if (shopBack.Contains(gui))
+                    {
+                        stageTwoShopOpen = false;
+                        suppressMenuButtonClicksFrame = Time.frameCount;
+                    }
+                    return;
+                }
+
                 float gap = 14f;
-                float totalWidth = Mathf.Min(Screen.width - 44f, 980f);
-                float cardWidth = (totalWidth - gap * 4f) / 5f;
+                float totalWidth = Mathf.Min(Screen.width - 44f, 1120f);
+                float cardWidth = (totalWidth - gap * (HeroNames.Length - 1)) / HeroNames.Length;
                 float startX = (Screen.width - totalWidth) * 0.5f;
                 float top = 230f;
                 float cardHeight = Mathf.Min(310f, Screen.height - 360f);
@@ -622,29 +651,69 @@ namespace PersiaWar.Unity2D5D
                     if (!card.Contains(gui))
                         continue;
 
-                    selectedHero = hero;
-                    StartupCheckpoint.Set("HeroSelectedByTouch");
+                    if (IsHeroUnlocked(hero))
+                    {
+                        selectedHero = hero;
+                        StartupCheckpoint.Set("HeroSelectedByTouch");
+                    }
+                    else
+                    {
+                        StartupCheckpoint.Set("LockedHeroTouchIgnored_" + hero);
+                    }
                     return;
                 }
 
-                Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
-                if (continueRect.Contains(gui))
+                if (stageNumber >= 2)
                 {
-                    EnterDropMap();
-                    StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
-                    return;
+                    float gapButtons = 12f;
+                    float shopWidth = Mathf.Clamp(Screen.width * 0.16f, 150f, 230f);
+                    float continueWidth = Mathf.Min(420f, Screen.width - 64f - shopWidth - gapButtons);
+                    float groupWidth = continueWidth + gapButtons + shopWidth;
+                    float left = (Screen.width - groupWidth) * 0.5f;
+                    Rect continueRect = new Rect(left, Screen.height - 112f, continueWidth, 62f);
+                    Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
+                    if (continueRect.Contains(gui))
+                    {
+                        suppressMenuButtonClicksFrame = Time.frameCount;
+                        EnterDropMap();
+                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        return;
+                    }
+                    if (shopRect.Contains(gui))
+                    {
+                        suppressMenuButtonClicksFrame = Time.frameCount;
+                        stageTwoShopOpen = true;
+                        StartupCheckpoint.Set("StageTwoCharacterShopOpened");
+                        return;
+                    }
+                }
+                else
+                {
+                    Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
+                    if (continueRect.Contains(gui))
+                    {
+                        suppressMenuButtonClicksFrame = Time.frameCount;
+                        EnterDropMap();
+                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        return;
+                    }
                 }
             }
         }
 
         private void DrawHeroSelect()
         {
-            GUI.Label(new Rect(0f, 125f, Screen.width, 52f), stageNumber >= 2 ? "CHOOSE YOUR HERO • STAGE 2" : "CHOOSE YOUR HERO", headerStyle);
-            GUI.Label(new Rect(0f, 174f, Screen.width, 34f), "KEEP YOUR HERO OR SELECT ANOTHER FREE CHARACTER", smallStyle);
+            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
+            string heroHint = stageNumber >= 2
+                ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
+                    ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
+                    : "RESCUE ANAHITA IN STAGE 1 TO UNLOCK HER  •  OTHERS LOCKED")
+                : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
+            GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), heroHint, menuSmallStyle);
 
             float gap = 14f;
-            float totalWidth = Mathf.Min(Screen.width - 44f, 980f);
-            float cardWidth = (totalWidth - gap * 4f) / 5f;
+            float totalWidth = Mathf.Min(Screen.width - 44f, 1120f);
+            float cardWidth = (totalWidth - gap * (HeroNames.Length - 1)) / HeroNames.Length;
             float startX = (Screen.width - totalWidth) * 0.5f;
             float top = 230f;
             float cardHeight = Mathf.Min(310f, Screen.height - 360f);
@@ -652,40 +721,137 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < HeroNames.Length; i++)
             {
                 Rect card = new Rect(startX + i * (cardWidth + gap), top, cardWidth, cardHeight);
-                DrawHeroCard(card, i, i == selectedHero);
-                if (GUI.Button(card, GUIContent.none, GUIStyle.none))
-                {
+                bool unlocked = IsHeroUnlocked(i);
+                DrawHeroCard(card, i, i == selectedHero, unlocked);
+                if (GUI.Button(card, GUIContent.none, GUIStyle.none) && unlocked)
                     selectedHero = i;
-                }
             }
 
-            Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
-            if (GUI.Button(continueRect, stageNumber >= 2 ? "CONTINUE TO LANDING" : "SELECT SPAWN POINT", buttonStyle))
-                EnterDropMap();
+            string continueLabel = stageNumber >= 2
+                ? (selectedHero == stageTwoOriginalHero
+                    ? "KEEP CURRENT HERO  •  CONTINUE"
+                    : "USE SELECTED HERO  •  CONTINUE")
+                : "SELECT SPAWN POINT";
+
+            if (stageNumber >= 2)
+            {
+                float gapButtons = 12f;
+                float shopWidth = Mathf.Clamp(Screen.width * 0.16f, 150f, 230f);
+                float continueWidth = Mathf.Min(420f, Screen.width - 64f - shopWidth - gapButtons);
+                float groupWidth = continueWidth + gapButtons + shopWidth;
+                float left = (Screen.width - groupWidth) * 0.5f;
+                Rect continueRect = new Rect(left, Screen.height - 112f, continueWidth, 62f);
+                Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
+                if (DrawFantasyButton(continueRect, continueLabel, true))
+                    EnterDropMap();
+                if (DrawFantasyButton(shopRect, "HERO SHOP  ✦", false))
+                    stageTwoShopOpen = true;
+            }
+            else
+            {
+                Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
+                if (DrawFantasyButton(continueRect, continueLabel, true))
+                    EnterDropMap();
+            }
         }
 
-        private void DrawHeroCard(Rect rect, int index, bool selected)
+        private void DrawCharacterShop()
         {
-            Color panel = selected ? new Color(0.22f, 0.46f, 0.68f, 0.98f) : new Color(0.08f, 0.12f, 0.17f, 0.94f);
-            Fill(rect, panel);
-            Fill(new Rect(rect.x, rect.y, rect.width, 8f), selected ? new Color(0.95f, 0.68f, 0.18f) : new Color(0.20f, 0.28f, 0.36f));
+            Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.01f, 0.025f, 0.05f, 0.86f));
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float width = Mathf.Min(Screen.width - 48f, 780f);
+            float height = Mathf.Min(Screen.height - 56f, 430f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Fill(panel, new Color(0.04f, 0.07f, 0.11f, 0.98f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 6f * scale), new Color(0.96f, 0.70f, 0.20f, 1f));
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 24f, panel.width - 40f, 58f),
+                "✦  HERO ARMORY  ✦", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 30f, panel.y + 102f, panel.width - 60f, 68f),
+                "Premium characters will appear here.", menuBodyStyle);
+            GUI.Label(new Rect(panel.x + 30f, panel.y + 174f, panel.width - 60f, 94f),
+                "PURCHASES ARE NOT CONNECTED IN THIS BUILD\nNo payment will be attempted and no character will be charged or unlocked.", menuSmallStyle);
+            Fill(new Rect(panel.x + 28f, panel.y + height - 88f, panel.width - 56f, 1.5f * scale),
+                new Color(0.86f, 0.68f, 0.30f, 0.72f));
+            Rect back = new Rect(Screen.width * 0.5f - 160f, Screen.height - 104f, 320f, 62f);
+            if (DrawFantasyButton(back, "BACK TO HERO SELECTION", true))
+                stageTwoShopOpen = false;
+        }
+
+        private bool IsHeroUnlocked(int index)
+        {
+            if (index == 0)
+                return true;
+
+            // Anahita is deliberately the second card from the left.
+            return index == 1 && stageNumber >= 2 &&
+                gameBootstrap != null && gameBootstrap.VillageGirlRescued;
+        }
+
+        private void CheckStageOneGirlRescue()
+        {
+            if (stageNumber != 1 || player == null || gameBootstrap == null ||
+                gameBootstrap.VillageGirlRescued || player.IsDefeated)
+                return;
+
+            if (gameBootstrap.TryRescueVillageGirl(player.transform.position))
+            {
+                girlRescueNoticeUntil = Time.unscaledTime + 4.5f;
+
+            }
+        }
+
+        private void DrawGirlRescueNotice()
+        {
+            if (Time.unscaledTime >= girlRescueNoticeUntil)
+                return;
+
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float width = Mathf.Min(Screen.width - 36f, 720f);
+            float height = 86f * scale;
+            Rect notice = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.28f, width, height);
+            Fill(notice, new Color(0.025f, 0.045f, 0.065f, 0.94f));
+            Fill(new Rect(notice.x, notice.y, notice.width, 4f * scale), new Color(0.98f, 0.72f, 0.22f, 1f));
+            GUI.Label(new Rect(notice.x + 12f, notice.y + 5f * scale, notice.width - 24f, 38f * scale),
+                "ANAHITA RESCUED!", menuButtonStyle);
+            GUI.Label(new Rect(notice.x + 12f, notice.y + 45f * scale, notice.width - 24f, 31f * scale),
+                "SHE WILL BE AVAILABLE FOR STAGE 2", menuSmallStyle);
+        }
+
+        private void DrawHeroCard(Rect rect, int index, bool selected, bool unlocked)
+        {
+            Color panel = selected ? new Color(0.18f, 0.31f, 0.40f, 0.98f) : new Color(0.035f, 0.065f, 0.10f, 0.96f);
+            Fill(rect, selected ? new Color(1f, 0.75f, 0.22f, 1f) : new Color(0.30f, 0.35f, 0.42f, 1f));
+            Fill(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, rect.height - 6f), panel);
+            Fill(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, 5f), selected ? new Color(0.98f, 0.70f, 0.16f) : new Color(0.20f, 0.28f, 0.36f));
 
             Rect figure = new Rect(rect.x + rect.width * 0.18f, rect.y + 34f, rect.width * 0.64f, rect.height * 0.52f);
             DrawChibiFigure(figure, index);
 
-            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 78f, rect.width - 16f, 30f), HeroNames[index], smallStyle);
-            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), selected ? "SELECTED" : "TAP TO SELECT", smallStyle);
+            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 82f, rect.width - 16f, 34f), HeroNames[index], menuSmallStyle);
+            string state = selected && unlocked ? "✦ SELECTED ✦" : (unlocked ? "TAP TO SELECT" : "LOCKED");
+            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), state, menuSmallStyle);
+
+            if (!unlocked)
+            {
+                Fill(rect, new Color(0.015f, 0.025f, 0.04f, 0.58f));
+                GUI.Label(new Rect(rect.x + 6f, rect.center.y - 12f, rect.width - 12f, 34f),
+                    "LOCKED", menuButtonStyle);
+                string hint = index == 5 ? "RESCUE IN STAGE 1" : "COMING SOON";
+                GUI.Label(new Rect(rect.x + 6f, rect.center.y + 21f, rect.width - 12f, 34f),
+                    hint, menuSmallStyle);
+            }
         }
 
         private void DrawChibiFigure(Rect rect, int index)
         {
             Color[] bodyColors =
             {
-                new Color(0.45f, 0.17f, 0.10f),
-                new Color(0.08f, 0.37f, 0.48f),
-                new Color(0.16f, 0.39f, 0.24f),
-                new Color(0.35f, 0.15f, 0.42f),
-                new Color(0.39f, 0.28f, 0.08f)
+                new Color(0.45f, 0.17f, 0.10f), // Ardeshir
+                new Color(0.78f, 0.20f, 0.48f), // Anahita
+                new Color(0.08f, 0.37f, 0.48f), // Pars Guard
+                new Color(0.16f, 0.39f, 0.24f), // Royal Scout
+                new Color(0.35f, 0.15f, 0.42f), // Silk Warrior
+                new Color(0.39f, 0.28f, 0.08f)  // Desert Knight
             };
 
             Vector2 center = new Vector2(rect.center.x, rect.y + rect.height * 0.55f);
@@ -702,9 +868,18 @@ namespace PersiaWar.Unity2D5D
                 Fill(new Rect(center.x - 4f, center.y - head * 1.86f, 8f, head * 0.40f), new Color(0.92f, 0.66f, 0.14f));
                 Fill(new Rect(center.x - head * 0.44f, center.y - head * 0.28f, head * 0.88f, head * 0.47f), new Color(0.08f, 0.055f, 0.04f));
             }
-            else if (index == 3)
+            else if (index == 4)
             {
                 Fill(new Rect(center.x - head * 0.82f, center.y - head * 1.45f, head * 1.64f, head * 0.18f), new Color(0.90f, 0.22f, 0.12f));
+            }
+            else if (index == 1)
+            {
+                // Feminine silhouette, long dark hair and pink dress for Anahita.
+                Fill(new Rect(center.x - head * 0.78f, center.y - head * 1.36f, head * 1.56f, head * 0.36f), new Color(0.10f, 0.055f, 0.035f));
+                Fill(new Rect(center.x - head * 0.82f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
+                Fill(new Rect(center.x + head * 0.52f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
+                Fill(new Rect(center.x - body * 0.34f, center.y + body * 0.65f, body * 0.68f, body * 0.62f), new Color(0.80f, 0.22f, 0.50f));
+                Fill(new Rect(center.x - body * 0.48f, center.y + body * 0.59f, body * 0.96f, body * 0.12f), new Color(0.95f, 0.72f, 0.24f));
             }
         }
         private void DrawDropMap()
@@ -714,8 +889,8 @@ namespace PersiaWar.Unity2D5D
                 DrawStageTwoDropMap();
                 return;
             }
-            GUI.Label(new Rect(0f, 125f, Screen.width, 52f), "DROP INTO THE CITY", headerStyle);
-            GUI.Label(new Rect(0f, 174f, Screen.width, 34f), "TAP ANY OPEN LOCATION TO CHOOSE WHERE YOU START", smallStyle);
+            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), "DROP INTO THE CITY", menuHeaderStyle);
+            GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), "TAP ANY OPEN LOCATION TO CHOOSE WHERE YOU START", menuSmallStyle);
 
             float size = Mathf.Min(Screen.width - 70f, Screen.height - 330f);
             Rect mapRect = new Rect((Screen.width - size) * 0.5f, 220f, size, size);
@@ -741,11 +916,11 @@ namespace PersiaWar.Unity2D5D
             }
 
             Rect hint = new Rect(24f, Screen.height - 100f, Screen.width - 48f, 34f);
-            GUI.Label(hint, spawnChosen ? "Spawn point locked. Press START MATCH." : "Tip: avoid the ruined quarter for the safest start.", smallStyle);
+            GUI.Label(hint, spawnChosen ? "SPAWN POINT LOCKED  •  PRESS START MATCH" : "CHOOSE AN OPEN LOCATION TO START", menuSmallStyle);
 
             Rect start = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
             GUI.enabled = spawnChosen;
-            if (GUI.Button(start, "START MATCH", buttonStyle))
+            if (DrawFantasyButton(start, "START MATCH  ⚔", true))
                 StartMatch();
             GUI.enabled = true;
         }
@@ -838,7 +1013,7 @@ namespace PersiaWar.Unity2D5D
 
             // Handle START MATCH through real touch coordinates as well as IMGUI.
             // Some Android configurations do not synthesize MouseUp for GUI.Button.
-            Rect startRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+            Rect startRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 66f, 420f, 54f);
             if (spawnChosen && startRect.Contains(screen))
             {
                 StartMatch();
@@ -857,12 +1032,15 @@ namespace PersiaWar.Unity2D5D
         private void BeginStageTwoSelection()
         {
             stageNumber = 2;
+            stageTwoOriginalHero = selectedHero;
+            stageTwoShopOpen = false;
             mode = ScreenMode.HeroSelect;
             spawnChosen = false;
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
-            stageTwoLandingMode = 0;
+            stageTwoLandingMode = 1; // Stage 2 always uses the single fixed village map.
+            stageTwoLayoutVariant = 0;
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             GateGameplay(false);
@@ -875,8 +1053,11 @@ namespace PersiaWar.Unity2D5D
             mode = ScreenMode.DropMap;
             if (stageNumber >= 2)
             {
-                stageTwoLandingMode = 0;
-                ChooseRandomStageTwoSpawn();
+                // Keep the village layout fixed. The player chooses only a landing
+                // point on this one map; no random landing or alternate layouts.
+                stageTwoLayoutVariant = 0;
+                stageTwoLandingMode = 1;
+                spawnChosen = false;
             }
             else
             {
@@ -906,62 +1087,97 @@ namespace PersiaWar.Unity2D5D
             Debug.Log("PERSIA_STAGE2: random safe landing selected " + spawnWorld);
         }
 
+        private Rect GetStageTwoMapRect()
+        {
+            float top = Mathf.Clamp(Screen.height * 0.23f, 130f, 165f);
+            float size = Mathf.Min(Screen.height - top - 68f, Screen.width * 0.48f);
+            size = Mathf.Clamp(size, 180f, 520f);
+            return new Rect(18f, top, size, size);
+        }
+
+        private Rect GetStageTwoControlPanel()
+        {
+            Rect map = GetStageTwoMapRect();
+            float x = map.xMax + 26f;
+            float width = Mathf.Max(140f, Screen.width - x - 18f);
+            return new Rect(x, map.y, width, Screen.height - map.y - 10f);
+        }
+
+        private Rect GetStageTwoModeButtonRect(int index)
+        {
+            Rect panel = GetStageTwoControlPanel();
+            return new Rect(panel.x, panel.y + 42f + index * 64f, panel.width, 56f);
+        }
+
+        private Rect GetStageTwoLayoutButtonRect(int index)
+        {
+            Rect panel = GetStageTwoControlPanel();
+            const float gap = 10f;
+            float width = (panel.width - gap * 2f) / 3f;
+            return new Rect(panel.x + index * (width + gap), panel.y + 202f, width, 48f);
+        }
+
+        private Rect GetStageTwoStartRect()
+        {
+            Rect panel = GetStageTwoControlPanel();
+            return new Rect(panel.x, Screen.height - 68f, panel.width, 54f);
+        }
+
         private void DrawStageTwoDropMap()
         {
-            GUI.Label(new Rect(0f, 105f, Screen.width, 48f), "STAGE 2 • OLD IRANIAN VILLAGE", headerStyle);
-            GUI.Label(new Rect(0f, 150f, Screen.width, 30f), "CHOOSE HOW TO ENTER THE VILLAGE", smallStyle);
+            GUI.Label(new Rect(0f, 76f, Screen.width, 48f),
+                "STAGE 2  •  OLD IRANIAN VILLAGE", menuHeaderStyle);
+            GUI.Label(new Rect(24f, 120f, Screen.width - 48f, 30f),
+                "CHOOSE YOUR LANDING POINT", menuSmallStyle);
 
-            float buttonGap = 10f;
-            float buttonWidth = (Screen.width - 52f - buttonGap) * 0.5f;
-            Rect randomRect = new Rect(20f, 184f, buttonWidth, 46f);
-            Rect manualRect = new Rect(20f + buttonWidth + buttonGap, 184f, buttonWidth, 46f);
-            if (GUI.Button(randomRect, "RANDOM LANDING", stageTwoLandingMode == 0 ? buttonStyle : smallStyle))
-            {
-                stageTwoLandingMode = 0;
-                ChooseRandomStageTwoSpawn();
-            }
-            if (GUI.Button(manualRect, "CHOOSE ON MAP", stageTwoLandingMode == 1 ? buttonStyle : smallStyle))
-            {
-                stageTwoLandingMode = 1;
-                spawnChosen = false;
-            }
+            Rect mapRect = GetStageTwoMapRect();
+            Rect panel = GetStageTwoControlPanel();
 
-            float layoutGap = 8f;
-            float layoutWidth = (Screen.width - 52f - layoutGap * 2f) / 3f;
-            string[] layoutNames = { "CLUSTER", "GREEN", "SCATTERED" };
-            for (int i = 0; i < layoutNames.Length; i++)
-            {
-                Rect layoutRect = new Rect(20f + i * (layoutWidth + layoutGap), 236f, layoutWidth, 36f);
-                if (GUI.Button(layoutRect, layoutNames[i] + (stageTwoLayoutVariant == i ? " ✓" : ""), GUI.skin.button))
-                    stageTwoLayoutVariant = i;
-            }
+            Fill(panel, new Color(0.02f, 0.045f, 0.07f, 0.46f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 4f),
+                new Color(0.98f, 0.72f, 0.22f, 0.92f));
+            GUI.Label(new Rect(panel.x + 10f, panel.y + 8f, panel.width - 20f, 36f),
+                "LANDING POINT", menuButtonStyle);
+            GUI.Label(new Rect(panel.x + 10f, panel.y + 48f, panel.width - 20f, 74f),
+                "Tap an open area on the map. The village houses, trees and paths stay in the same places.",
+                menuSmallStyle);
 
-            float mapSize = Mathf.Max(150f, Mathf.Min(Screen.width - 64f, Screen.height - 440f));
-            Rect mapRect = new Rect((Screen.width - mapSize) * 0.5f, 282f, mapSize, mapSize);
             DrawStageTwoVillageMap(mapRect);
             if (spawnChosen)
             {
                 Vector2 point = WorldToMap(spawnWorld, mapRect);
-                DrawCircle(point, 13f, new Color(1f, 0.83f, 0.16f, 0.98f));
-                GUI.Label(new Rect(point.x - 65f, point.y + 14f, 130f, 24f), "LANDING POINT", smallStyle);
+                point.x = Mathf.Clamp(point.x, mapRect.x + 44f, mapRect.xMax - 44f);
+                point.y = Mathf.Clamp(point.y, mapRect.y + 45f, mapRect.yMax - 45f);
+                DrawCircle(point, 15f, new Color(1f, 0.83f, 0.16f, 0.98f));
+                Rect markerLabel = new Rect(
+                    Mathf.Clamp(point.x - 74f, mapRect.x + 4f, mapRect.xMax - 152f),
+                    Mathf.Clamp(point.y + 18f, mapRect.y + 32f, mapRect.yMax - 34f),
+                    148f, 26f);
+                Fill(markerLabel, new Color(0.02f, 0.035f, 0.045f, 0.88f));
+                GUI.Label(markerLabel, "LANDING POINT", menuSmallStyle);
             }
 
-            GUI.Label(new Rect(18f, Screen.height - 100f, Screen.width - 36f, 30f),
-                stageTwoLandingMode == 0 ? "A safe landing point is selected at random." : "Tap an open area on the map to set your landing point.", smallStyle);
-            Rect start = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+            Rect hint = new Rect(panel.x + 8f, Screen.height - 119f, panel.width - 16f, 30f);
+            GUI.Label(hint,
+                spawnChosen ? "LANDING POINT SELECTED" : "TAP THE MAP TO CHOOSE",
+                menuSmallStyle);
+
             GUI.enabled = spawnChosen;
-            if (GUI.Button(start, "START STAGE 2", buttonStyle))
+            if (DrawFantasyButton(GetStageTwoStartRect(), "ENTER VILLAGE  ⚔", true))
                 StartMatch();
             GUI.enabled = true;
         }
 
         private void HandleStageTwoDropTouches()
         {
-            if (!Application.isMobilePlatform && !Input.GetMouseButtonDown(0)) return;
+            if (!Application.isMobilePlatform && !Input.GetMouseButtonDown(0))
+                return;
+
             Vector2 screen;
             if (Application.isMobilePlatform)
             {
-                if (Input.touchCount == 0 || Input.GetTouch(0).phase != TouchPhase.Began) return;
+                if (Input.touchCount == 0 || Input.GetTouch(0).phase != TouchPhase.Began)
+                    return;
                 screen = Input.GetTouch(0).position;
             }
             else
@@ -970,46 +1186,22 @@ namespace PersiaWar.Unity2D5D
             }
             screen.y = Screen.height - screen.y;
 
-            float buttonGap = 10f;
-            float buttonWidth = (Screen.width - 52f - buttonGap) * 0.5f;
-            Rect randomRect = new Rect(20f, 184f, buttonWidth, 46f);
-            Rect manualRect = new Rect(20f + buttonWidth + buttonGap, 184f, buttonWidth, 46f);
-            if (randomRect.Contains(screen))
-            {
-                stageTwoLandingMode = 0;
-                ChooseRandomStageTwoSpawn();
-                return;
-            }
-            if (manualRect.Contains(screen))
-            {
-                stageTwoLandingMode = 1;
-                spawnChosen = false;
-                return;
-            }
-
-            float layoutGap = 8f;
-            float layoutWidth = (Screen.width - 52f - layoutGap * 2f) / 3f;
-            for (int i = 0; i < 3; i++)
-            {
-                Rect layoutRect = new Rect(20f + i * (layoutWidth + layoutGap), 236f, layoutWidth, 36f);
-                if (layoutRect.Contains(screen))
-                {
-                    stageTwoLayoutVariant = i;
-                    return;
-                }
-            }
-
-            Rect startRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+            Rect startRect = GetStageTwoStartRect();
             if (spawnChosen && startRect.Contains(screen))
             {
+                suppressMenuButtonClicksFrame = Time.frameCount;
                 StartMatch();
                 return;
             }
 
-            float mapSize = Mathf.Max(150f, Mathf.Min(Screen.width - 64f, Screen.height - 440f));
-            Rect mapRect = new Rect((Screen.width - mapSize) * 0.5f, 282f, mapSize, mapSize);
-            if (stageTwoLandingMode == 1 && mapRect.Contains(screen))
+            Rect mapRect = GetStageTwoMapRect();
+            if (mapRect.Contains(screen))
             {
+                suppressMenuButtonClicksFrame = Time.frameCount;
+                // Ignore taps on the decorative map title; all other map taps pick
+                // the actual spawn point. Stage 2 has one immutable world layout.
+                if (screen.y < mapRect.y + 36f)
+                    return;
                 spawnWorld = MapPointToWorld(screen, mapRect);
                 spawnChosen = true;
             }
@@ -1041,8 +1233,6 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < houses.Length; i++)
             {
                 Vector2 center = houses[i];
-                if (stageTwoLayoutVariant == 1) center.x = -center.x;
-                else if (stageTwoLayoutVariant == 2) center = new Vector2(center.y, -center.x);
                 Vector2 p = WorldToMap(center, rect);
                 float w = rect.width * 0.045f;
                 float h = rect.height * 0.038f;
@@ -1051,7 +1241,7 @@ namespace PersiaWar.Unity2D5D
                 if (i == 0 || i == 13 || i == 20)
                     Fill(new Rect(p.x - 2f, p.y - h * 0.5f - 4f, 4f, 6f), new Color(0.85f, 0.76f, 0.54f, 1f));
             }
-            GUI.Label(new Rect(rect.x + 7f, rect.y + 6f, rect.width - 14f, 24f), "VILLAGE • COURTYARDS • GARDENS", smallStyle);
+            GUI.Label(new Rect(rect.x + 7f, rect.y + 6f, rect.width - 14f, 30f), "VILLAGE • COURTYARDS • GARDENS", menuSmallStyle);
         }
 
         private void StartMatch()
@@ -1216,6 +1406,10 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
+            // Axe is a stage-two-only weapon. Stage one's weapon cycle and loot
+            // remain the original three firearm profiles.
+            player.Weapon?.SetAxeEnabledForMatch(stageNumber >= 2);
+
             StartupCheckpoint.Set("PlayerPreparedForMatch");
 
             StartupCheckpoint.Set("MobileInputActivationDeferred");
@@ -1337,7 +1531,10 @@ namespace PersiaWar.Unity2D5D
             if (cameraOcclusionFader == null)
                 cameraOcclusionFader = androidRuntimeCamera.GetComponent<CameraOcclusionFader>();
             if (cameraOcclusionFader != null)
+            {
                 cameraOcclusionFader.SetTarget(player.transform);
+                cameraOcclusionFader.SetStageTwoMode(stageNumber >= 2);
+            }
 
             Quaternion orbit = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
             Vector3 desired = player.transform.position + orbit * Vector3.back * AndroidCameraDistance;
@@ -1683,12 +1880,14 @@ namespace PersiaWar.Unity2D5D
                     Fill(new Rect(beamX - beamWidth * 0.55f, 0f, beamWidth * 1.1f, Screen.height), new Color(0.18f, 0.58f, 1f, 0.24f * pulse));
                     Fill(new Rect(beamX - beamWidth * 0.12f, 0f, beamWidth * 0.24f, Screen.height), new Color(0.72f, 0.91f, 1f, 0.52f * pulse));
                     DrawCircle(new Vector2(beamX, Screen.height * 0.82f), Screen.width * (0.08f + 0.02f * pulse), new Color(0.14f, 0.60f, 1f, 0.75f * pulse));
-                    GUI.Label(new Rect(0f, Screen.height * 0.22f, Screen.width, 64f), "BLUE EXTRACTION GATE", headerStyle);
-                    GUI.Label(new Rect(0f, Screen.height * 0.31f, Screen.width, 38f), "PREPARING NEXT STAGE...", bodyStyle);
+                    GUI.Label(new Rect(0f, Screen.height * 0.20f, Screen.width, 70f), "✦  BLUE EXTRACTION GATE  ✦", menuHeaderStyle);
+                    GUI.Label(new Rect(0f, Screen.height * 0.30f, Screen.width, 42f), "PREPARING NEXT STAGE...", menuBodyStyle);
                     return;
                 }
                 if (stageNumber == 1)
                 {
+                    // The mission only becomes a win after the player enters the
+                    // captive-house extraction beam, which has already rescued Anahita.
                     BeginStageTwoSelection();
                     return;
                 }
@@ -1772,6 +1971,8 @@ namespace PersiaWar.Unity2D5D
                 CreateTextures();
             if (titleStyle == null)
                 BuildStyles();
+            if (menuTitleStyle == null || menuStyleScreenHeight != Screen.height)
+                BuildMenuStyles();
         }
 
         private void CreateTextures()
@@ -1789,6 +1990,85 @@ namespace PersiaWar.Unity2D5D
             bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
             smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        }
+
+        private void BuildMenuStyles()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            menuStyleScreenHeight = Screen.height;
+
+            menuTitleStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.RoundToInt(44f * scale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft,
+                wordWrap = false
+            };
+            menuTitleStyle.normal.textColor = new Color(1f, 0.84f, 0.42f, 1f);
+
+            menuHeaderStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.RoundToInt(42f * scale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+            menuHeaderStyle.normal.textColor = new Color(1f, 0.88f, 0.58f, 1f);
+
+            menuBodyStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.RoundToInt(25f * scale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+            menuBodyStyle.normal.textColor = Color.white;
+
+            menuSmallStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.RoundToInt(24f * scale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+            menuSmallStyle.normal.textColor = new Color(0.91f, 0.94f, 0.98f, 1f);
+
+            menuButtonStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.RoundToInt(30f * scale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true,
+                padding = new RectOffset(8, 8, 4, 4)
+            };
+            menuButtonStyle.normal.textColor = new Color(1f, 0.92f, 0.72f, 1f);
+        }
+
+        private bool DrawFantasyButton(Rect rect, string label, bool selected = false)
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            bool hovered = Event.current != null && rect.Contains(Event.current.mousePosition);
+            Color gold = selected || hovered
+                ? new Color(1f, 0.78f, 0.25f, 1f)
+                : new Color(0.61f, 0.43f, 0.17f, 1f);
+
+            Fill(rect, gold);
+            float inset = Mathf.Max(2f, 2.5f * scale);
+            Rect inner = new Rect(rect.x + inset, rect.y + inset,
+                Mathf.Max(0f, rect.width - inset * 2f), Mathf.Max(0f, rect.height - inset * 2f));
+            Fill(inner, new Color(0.035f, 0.065f, 0.105f, 0.97f));
+            Fill(new Rect(inner.x + 4f * scale, inner.y + 2f * scale,
+                Mathf.Max(0f, inner.width - 8f * scale), Mathf.Max(1f, 1.5f * scale)),
+                new Color(1f, 0.76f, 0.28f, selected || hovered ? 0.95f : 0.50f));
+
+            bool clicked = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+            GUI.Label(rect, label, menuButtonStyle);
+            // Native Android menu touch handling can change screens in Update before
+            // the synthesized IMGUI mouse event is processed. Suppress that same-frame
+            // click so the new screen cannot accidentally activate a second button.
+            if (Time.frameCount == suppressMenuButtonClicksFrame)
+                return false;
+            return clicked;
         }
 
         private void Fill(Rect rect, Color color)

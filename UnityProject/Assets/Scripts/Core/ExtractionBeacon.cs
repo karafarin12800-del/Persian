@@ -12,6 +12,7 @@ namespace PersiaWar.Unity2D5D
         private static ExtractionBeacon instance;
 
         private Transform player;
+        private GameBootstrap gameBootstrap;
         private Vector3 groundPosition;
         private const float ExtractionRadius = 3.2f;
         private const float MinimumPlayerDistance = 40f;
@@ -50,7 +51,21 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             player = playerController.transform;
-            groundPosition = FindClearGroundNearPlayer(player);
+            gameBootstrap = FindFirstObjectByType<GameBootstrap>();
+
+            // Stage 1's blue extraction beacon doubles as the rescue marker. The
+            // bootstrap selects a random occupied house at least 50m from the player
+            // at the final-elimination moment. Stage 2 keeps its normal beacon search.
+            if (gameBootstrap != null &&
+                gameBootstrap.TryGetStageOneGirlBeacon(player.position, out Vector3 captiveHouseBeacon))
+            {
+                groundPosition = captiveHouseBeacon;
+            }
+            else
+            {
+                groundPosition = FindClearGroundNearPlayer(player);
+            }
+
             BuildBeam();
             beamCreated = true;
 
@@ -281,6 +296,15 @@ namespace PersiaWar.Unity2D5D
             Vector2 beaconXZ = new Vector2(groundPosition.x, groundPosition.z);
             if ((playerXZ - beaconXZ).sqrMagnitude > ExtractionRadius * ExtractionRadius)
                 return;
+
+            // In Stage 1 the beam is on Anahita's house. Do not complete the mission
+            // until entering it actually rescues her; this also makes the encounter
+            // reliable even if the beam and inner-house rescue radii differ slightly.
+            if (gameBootstrap != null && gameBootstrap.RequiresStageOneGirlRescue)
+            {
+                if (!gameBootstrap.TryRescueVillageGirl(player.position))
+                    return;
+            }
 
             completed = true;
             Debug.Log("PERSIA_EXTRACTION: player entered blue beam; mission complete.");
