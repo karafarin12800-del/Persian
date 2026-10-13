@@ -11,12 +11,28 @@ namespace PersiaWar.Unity2D5D
     {
         private enum ScreenMode
         {
+            MainMenu,
+            Profile,
+            Store,
+            Settings,
             HeroSelect,
             DropMap,
             Match
         }
 
-        private ScreenMode mode = ScreenMode.HeroSelect;
+        private ScreenMode mode = ScreenMode.MainMenu;
+        private string profileNameInput = string.Empty;
+        private string playerId = string.Empty;
+        private int storeCoins;
+        private int selectedProfileCosmetic;
+        private bool soundEnabled = true;
+        private static readonly string[] StoreCosmeticNames =
+        {
+            "ROYAL PROFILE FRAME",
+            "GOLD NAMEPLATE",
+            "AZURE BANNER"
+        };
+        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350 };
         private PlayerController player;
         private EnemySpawner enemySpawner;
         private MobileInputHub mobileInput;
@@ -148,6 +164,7 @@ namespace PersiaWar.Unity2D5D
             // GameRoot remains dormant until START MATCH so Android can finish scene
             // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
+            InitializeLocalProfile();
 #if UNITY_ANDROID
             // Android production path: keep the real front-end interactive.
             // Do NOT auto-start the match. The previous isolation build skipped the
@@ -156,7 +173,7 @@ namespace PersiaWar.Unity2D5D
             selectedHero = 0;
             spawnWorld = new Vector2(0f, -4f);
             spawnChosen = false;
-            mode = ScreenMode.HeroSelect;
+            mode = ScreenMode.MainMenu;
             StartupCheckpoint.Set("PrototypeFlowMenuReady");
             Debug.Log("PERSIA_FLOW: Android menu ready; waiting for player selection");
             yield break;
@@ -202,6 +219,12 @@ namespace PersiaWar.Unity2D5D
             {
                 CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
+                return;
+            }
+            if (mode == ScreenMode.MainMenu || mode == ScreenMode.Profile ||
+                mode == ScreenMode.Store || mode == ScreenMode.Settings)
+            {
+                HandleLobbyTouches();
                 return;
             }
             if (mode == ScreenMode.HeroSelect)
@@ -299,15 +322,30 @@ namespace PersiaWar.Unity2D5D
                 GUI.Label(new Rect(panel.x + 18f, panel.y + 116f, panel.width - 36f, 28f), "Preparing battlefield...", smallStyle);
                 return;
             }
-            if (mode == ScreenMode.HeroSelect)
+            switch (mode)
             {
-                if (stageNumber >= 2 && stageTwoShopOpen)
-                    DrawCharacterShop();
-                else
-                    DrawHeroSelect();
+                case ScreenMode.MainMenu:
+                    DrawMainMenu();
+                    break;
+                case ScreenMode.Profile:
+                    DrawProfileScreen();
+                    break;
+                case ScreenMode.Store:
+                    DrawStoreScreen();
+                    break;
+                case ScreenMode.Settings:
+                    DrawSettingsScreen();
+                    break;
+                case ScreenMode.HeroSelect:
+                    if (stageNumber >= 2 && stageTwoShopOpen)
+                        DrawCharacterShop();
+                    else
+                        DrawHeroSelect();
+                    break;
+                default:
+                    DrawDropMap();
+                    break;
             }
-            else
-                DrawDropMap();
         }
 
         private void DrawAndroidPresentationHUD()
@@ -613,6 +651,256 @@ namespace PersiaWar.Unity2D5D
             Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.48f));
             GUI.Label(new Rect(28f, 12f, Screen.width * 0.62f, 56f), "♛  PERSIA WAR", menuTitleStyle);
             GUI.Label(new Rect(30f, 64f, Screen.width * 0.60f, 32f), "CLASSIC BATTLE ROYALE", menuSmallStyle);
+        }
+
+        private void InitializeLocalProfile()
+        {
+            playerId = PlayerPrefs.GetString("PW.PlayerId", string.Empty);
+            if (string.IsNullOrEmpty(playerId))
+            {
+                playerId = System.Guid.NewGuid().ToString("N").Substring(0, 12).ToUpperInvariant();
+                PlayerPrefs.SetString("PW.PlayerId", playerId);
+            }
+
+            profileNameInput = PlayerPrefs.GetString("PW.PlayerName", string.Empty);
+            if (string.IsNullOrWhiteSpace(profileNameInput))
+                profileNameInput = "Persian Warrior";
+
+            storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
+            selectedProfileCosmetic = PlayerPrefs.GetInt("PW.ProfileCosmetic", 0);
+            soundEnabled = PlayerPrefs.GetInt("PW.SoundEnabled", 1) != 0;
+            AudioListener.volume = soundEnabled ? 1f : 0f;
+            if (!PlayerPrefs.HasKey("PW.CosmeticOwned.0"))
+                PlayerPrefs.SetInt("PW.CosmeticOwned.0", 1);
+            PlayerPrefs.Save();
+        }
+
+        private Rect GetLobbyButtonRect(int index)
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
+            float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
+            float height = 58f * scale;
+            float gap = 14f * scale;
+            float totalHeight = height * 4f + gap * 3f;
+            float top = Mathf.Max(145f * scale, (Screen.height - totalHeight) * 0.48f);
+            float left = Mathf.Max(Screen.width * 0.52f, Screen.width - width - 28f);
+            left = Mathf.Min(left, Screen.width - width - 18f);
+            return new Rect(left, top + index * (height + gap), width, height);
+        }
+
+        private Rect GetLobbyBackRect()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
+            float width = Mathf.Min(300f * scale, Screen.width - 36f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height - 86f * scale, width, 54f * scale);
+        }
+
+        private void HandleLobbyTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (mode == ScreenMode.MainMenu)
+                {
+                    for (int button = 0; button < 4; button++)
+                    {
+                        if (!GetLobbyButtonRect(button).Contains(point)) continue;
+                        suppressMenuButtonClicksFrame = Time.frameCount;
+                        if (button == 0) mode = ScreenMode.HeroSelect;
+                        else if (button == 1) mode = ScreenMode.Profile;
+                        else if (button == 2) mode = ScreenMode.Store;
+                        else mode = ScreenMode.Settings;
+                        StartupCheckpoint.Set("LobbyNavigation_" + mode);
+                        return;
+                    }
+                }
+                else if (GetLobbyBackRect().Contains(point))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    if (mode == ScreenMode.Profile)
+                    {
+                        string cleanName = string.IsNullOrWhiteSpace(profileNameInput)
+                            ? "Persian Warrior" : profileNameInput.Trim();
+                        profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
+                        PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
+                        PlayerPrefs.Save();
+                    }
+                    mode = ScreenMode.MainMenu;
+                    return;
+                }
+
+                if (mode == ScreenMode.Store)
+                {
+                    for (int item = 0; item < StoreCosmeticNames.Length; item++)
+                    {
+                        if (!GetStoreActionRect(item).Contains(point)) continue;
+                        suppressMenuButtonClicksFrame = Time.frameCount;
+                        PurchaseOrEquipCosmetic(item);
+                        return;
+                    }
+                }
+                else if (mode == ScreenMode.Settings && GetSettingsSoundRect().Contains(point))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    soundEnabled = !soundEnabled;
+                    PlayerPrefs.SetInt("PW.SoundEnabled", soundEnabled ? 1 : 0);
+                    AudioListener.volume = soundEnabled ? 1f : 0f;
+                    PlayerPrefs.Save();
+                    return;
+                }
+            }
+        }
+
+        private void DrawMainMenu()
+        {
+            string displayName = PlayerPrefs.GetString("PW.PlayerName", "Persian Warrior");
+            int coins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
+            Rect card = new Rect(Screen.width * 0.07f, Screen.height * 0.19f,
+                Screen.width * 0.28f, Screen.height * 0.60f);
+            Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.88f));
+            Fill(new Rect(card.x, card.y, 6f, card.height), new Color(0.95f, 0.69f, 0.20f, 1f));
+            GUI.Label(new Rect(card.x + 18f, card.y + 18f, card.width - 36f, 42f), "PLAYER", menuHeaderStyle);
+            GUI.Label(new Rect(card.x + 18f, card.y + 76f, card.width - 36f, 48f), displayName, menuBodyStyle);
+            GUI.Label(new Rect(card.x + 18f, card.y + 132f, card.width - 36f, 32f), "ID  " + playerId, menuSmallStyle);
+            GUI.Label(new Rect(card.x + 18f, card.y + 184f, card.width - 36f, 38f), "TEST COINS  " + coins, menuBodyStyle);
+            GUI.Label(new Rect(card.x + 18f, card.y + card.height - 68f, card.width - 36f, 48f),
+                "OFFLINE PROFILE", menuSmallStyle);
+
+            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height * 0.15f, Screen.width * 0.54f, 54f),
+                "YOUR NEXT BATTLE BEGINS HERE", menuBodyStyle);
+            string[] labels = { "PLAY", "PLAYER PROFILE", "STORE", "SETTINGS" };
+            for (int i = 0; i < labels.Length; i++)
+            {
+                Rect button = GetLobbyButtonRect(i);
+                if (DrawFantasyButton(button, labels[i], i == 0))
+                {
+                    if (i == 0) mode = ScreenMode.HeroSelect;
+                    else if (i == 1) mode = ScreenMode.Profile;
+                    else if (i == 2) mode = ScreenMode.Store;
+                    else mode = ScreenMode.Settings;
+                    StartupCheckpoint.Set("LobbyNavigation_" + mode);
+                }
+            }
+            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height - 54f, Screen.width * 0.54f, 28f),
+                "PERSIA WAR  •  UNITY EDITION", menuSmallStyle);
+        }
+
+        private void DrawProfileScreen()
+        {
+            float width = Mathf.Min(Screen.width - 64f, 760f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.19f, width, Screen.height * 0.58f);
+            Fill(panel, new Color(0.025f, 0.055f, 0.085f, 0.94f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 6f), new Color(0.95f, 0.69f, 0.20f, 1f));
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f), "PLAYER PROFILE", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 32f, panel.y + 88f, panel.width - 64f, 36f), "DISPLAY NAME (MAX 20 CHARACTERS)", menuSmallStyle);
+            profileNameInput = GUI.TextField(new Rect(panel.x + 40f, panel.y + 132f, panel.width - 80f, 58f),
+                profileNameInput, 20);
+            GUI.Label(new Rect(panel.x + 32f, panel.y + 208f, panel.width - 64f, 34f), "PLAYER ID  " + playerId, menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 32f, panel.y + 250f, panel.width - 64f, 34f),
+                "PROFILE COSMETIC  " + StoreCosmeticNames[Mathf.Clamp(selectedProfileCosmetic, 0, StoreCosmeticNames.Length - 1)],
+                menuSmallStyle);
+            if (DrawFantasyButton(GetLobbyBackRect(), "SAVE & BACK"))
+            {
+                string cleanName = string.IsNullOrWhiteSpace(profileNameInput) ? "Persian Warrior" : profileNameInput.Trim();
+                profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
+                PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
+                PlayerPrefs.Save();
+                mode = ScreenMode.MainMenu;
+            }
+        }
+
+        private Rect GetStoreItemRect(int index)
+        {
+            float gap = 18f;
+            float totalWidth = Mathf.Min(Screen.width - 60f, 1050f);
+            float cardWidth = (totalWidth - gap * 2f) / 3f;
+            float cardHeight = Mathf.Min(330f, Screen.height * 0.48f);
+            float left = (Screen.width - totalWidth) * 0.5f;
+            return new Rect(left + index * (cardWidth + gap), Screen.height * 0.30f, cardWidth, cardHeight);
+        }
+
+        private Rect GetStoreActionRect(int index)
+        {
+            Rect card = GetStoreItemRect(index);
+            return new Rect(card.x + 14f, card.yMax - 62f, card.width - 28f, 48f);
+        }
+
+        private void PurchaseOrEquipCosmetic(int index)
+        {
+            string ownedKey = "PW.CosmeticOwned." + index;
+            bool owned = PlayerPrefs.GetInt(ownedKey, index == 0 ? 1 : 0) != 0;
+            if (!owned)
+            {
+                int price = StoreCosmeticPrices[index];
+                if (storeCoins < price) return;
+                storeCoins -= price;
+                PlayerPrefs.SetInt("PW.StoreCoins", storeCoins);
+                PlayerPrefs.SetInt(ownedKey, 1);
+            }
+            selectedProfileCosmetic = index;
+            PlayerPrefs.SetInt("PW.ProfileCosmetic", index);
+            PlayerPrefs.Save();
+        }
+
+        private void DrawStoreScreen()
+        {
+            storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
+            GUI.Label(new Rect(0f, 118f, Screen.width, 54f), "PERSIA STORE", menuHeaderStyle);
+            GUI.Label(new Rect(0f, 166f, Screen.width, 36f), "OFFLINE DEMO STORE  •  NO REAL-MONEY PAYMENTS", menuSmallStyle);
+            GUI.Label(new Rect(Screen.width - 300f, 24f, 270f, 42f), "COINS  " + storeCoins, menuBodyStyle);
+
+            for (int i = 0; i < StoreCosmeticNames.Length; i++)
+            {
+                Rect card = GetStoreItemRect(i);
+                bool owned = PlayerPrefs.GetInt("PW.CosmeticOwned." + i, i == 0 ? 1 : 0) != 0;
+                Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.92f));
+                Fill(new Rect(card.x, card.y, card.width, 5f), i == selectedProfileCosmetic
+                    ? new Color(1f, 0.78f, 0.25f, 1f) : new Color(0.38f, 0.50f, 0.60f, 1f));
+                Rect emblem = new Rect(card.center.x - 42f, card.y + 34f, 84f, 84f);
+                Color emblemColor = i == 0 ? new Color(0.83f, 0.57f, 0.16f)
+                    : i == 1 ? new Color(0.89f, 0.73f, 0.25f) : new Color(0.14f, 0.52f, 0.79f);
+                Fill(emblem, emblemColor);
+                GUI.Label(new Rect(card.x + 8f, card.y + 136f, card.width - 16f, 54f), StoreCosmeticNames[i], menuSmallStyle);
+                GUI.Label(new Rect(card.x + 8f, card.y + 192f, card.width - 16f, 38f),
+                    owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
+                    menuBodyStyle);
+                Rect action = GetStoreActionRect(i);
+                if (DrawFantasyButton(action, owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "EQUIP") : "UNLOCK"))
+                    PurchaseOrEquipCosmetic(i);
+            }
+            if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
+        }
+
+        private Rect GetSettingsSoundRect()
+        {
+            float width = Mathf.Min(Screen.width - 64f, 640f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.42f, width, 62f);
+        }
+
+        private void DrawSettingsScreen()
+        {
+            float width = Mathf.Min(Screen.width - 64f, 700f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.23f, width, Screen.height * 0.48f);
+            Fill(panel, new Color(0.025f, 0.055f, 0.085f, 0.94f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 6f), new Color(0.95f, 0.69f, 0.20f, 1f));
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f), "SETTINGS", menuHeaderStyle);
+            if (DrawFantasyButton(GetSettingsSoundRect(), soundEnabled ? "SOUND  •  ON" : "SOUND  •  OFF", soundEnabled))
+            {
+                soundEnabled = !soundEnabled;
+                AudioListener.volume = soundEnabled ? 1f : 0f;
+                PlayerPrefs.SetInt("PW.SoundEnabled", soundEnabled ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+            GUI.Label(new Rect(panel.x + 24f, panel.y + panel.height - 72f, panel.width - 48f, 42f),
+                "PROFILE AND STORE DATA ARE SAVED ON THIS DEVICE", menuSmallStyle);
+            if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
         }
 
         private void HandleHeroSelectTouches()
