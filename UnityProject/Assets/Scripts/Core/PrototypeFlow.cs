@@ -36,6 +36,7 @@ namespace PersiaWar.Unity2D5D
         private bool spawnChosen;
         private int selectedHero;
         private int stageTwoOriginalHero;
+        private bool stageTwoShopOpen;
         private int stageNumber = 1;
         // 0 = random landing, 1 = manual map landing.
         private int stageTwoLandingMode;
@@ -292,7 +293,10 @@ namespace PersiaWar.Unity2D5D
             }
             if (mode == ScreenMode.HeroSelect)
             {
-                DrawHeroSelect();
+                if (stageNumber >= 2 && stageTwoShopOpen)
+                    DrawCharacterShop();
+                else
+                    DrawHeroSelect();
             }
             else
                 DrawDropMap();
@@ -615,6 +619,14 @@ namespace PersiaWar.Unity2D5D
                     continue;
 
                 Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (stageNumber >= 2 && stageTwoShopOpen)
+                {
+                    Rect shopBack = new Rect(Screen.width * 0.5f - 160f, Screen.height - 104f, 320f, 62f);
+                    if (shopBack.Contains(gui))
+                        stageTwoShopOpen = false;
+                    return;
+                }
+
                 float gap = 14f;
                 float totalWidth = Mathf.Min(Screen.width - 44f, 980f);
                 float cardWidth = (totalWidth - gap * 4f) / 5f;
@@ -667,14 +679,54 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            Rect continueRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 112f, 420f, 62f);
             string continueLabel = stageNumber >= 2
                 ? (selectedHero == stageTwoOriginalHero
                     ? "KEEP CURRENT HERO  •  CONTINUE"
                     : "USE SELECTED HERO  •  CONTINUE")
                 : "SELECT SPAWN POINT";
-            if (DrawFantasyButton(continueRect, continueLabel, true))
-                EnterDropMap();
+
+            if (stageNumber >= 2)
+            {
+                float gapButtons = 12f;
+                float shopWidth = Mathf.Clamp(Screen.width * 0.16f, 150f, 230f);
+                float continueWidth = Mathf.Min(420f, Screen.width - 64f - shopWidth - gapButtons);
+                float groupWidth = continueWidth + gapButtons + shopWidth;
+                float left = (Screen.width - groupWidth) * 0.5f;
+                Rect continueRect = new Rect(left, Screen.height - 112f, continueWidth, 62f);
+                Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
+                if (DrawFantasyButton(continueRect, continueLabel, true))
+                    EnterDropMap();
+                if (DrawFantasyButton(shopRect, "HERO SHOP  ✦", false))
+                    stageTwoShopOpen = true;
+            }
+            else
+            {
+                Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
+                if (DrawFantasyButton(continueRect, continueLabel, true))
+                    EnterDropMap();
+            }
+        }
+
+        private void DrawCharacterShop()
+        {
+            Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.01f, 0.025f, 0.05f, 0.86f));
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float width = Mathf.Min(Screen.width - 48f, 780f);
+            float height = Mathf.Min(Screen.height - 56f, 430f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Fill(panel, new Color(0.04f, 0.07f, 0.11f, 0.98f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 6f * scale), new Color(0.96f, 0.70f, 0.20f, 1f));
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 24f, panel.width - 40f, 58f),
+                "✦  HERO ARMORY  ✦", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 30f, panel.y + 102f, panel.width - 60f, 68f),
+                "Premium characters will appear here.", menuBodyStyle);
+            GUI.Label(new Rect(panel.x + 30f, panel.y + 174f, panel.width - 60f, 94f),
+                "PURCHASES ARE NOT CONNECTED IN THIS BUILD\nNo payment will be attempted and no character will be charged or unlocked.", menuSmallStyle);
+            Fill(new Rect(panel.x + 28f, panel.y + height - 88f, panel.width - 56f, 1.5f * scale),
+                new Color(0.86f, 0.68f, 0.30f, 0.72f));
+            Rect back = new Rect(Screen.width * 0.5f - 160f, Screen.height - 104f, 320f, 62f);
+            if (DrawFantasyButton(back, "BACK TO HERO SELECTION", true))
+                stageTwoShopOpen = false;
         }
 
         private void DrawHeroCard(Rect rect, int index, bool selected)
@@ -872,6 +924,7 @@ namespace PersiaWar.Unity2D5D
         {
             stageNumber = 2;
             stageTwoOriginalHero = selectedHero;
+            stageTwoShopOpen = false;
             mode = ScreenMode.HeroSelect;
             spawnChosen = false;
             startingMatch = false;
