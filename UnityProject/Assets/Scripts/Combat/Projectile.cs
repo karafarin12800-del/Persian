@@ -92,7 +92,7 @@ namespace PersiaWar.Unity2D5D
                 TargetHealth target = collider.GetComponentInParent<TargetHealth>();
                 if (target != null && target.GetComponentInParent<EnemyChase>() != null)
                 {
-                    target.ApplyDamage(damage);
+                    target.ApplyDamage(damage, owner);
                     Destroy(gameObject);
                     return true;
                 }
@@ -120,7 +120,7 @@ namespace PersiaWar.Unity2D5D
 
             TargetHealth target = other.GetComponentInParent<TargetHealth>();
             if (target != null && target.GetComponentInParent<EnemyChase>() != null)
-                target.ApplyDamage(damage);
+                target.ApplyDamage(damage, owner);
 
             Destroy(gameObject);
         }
