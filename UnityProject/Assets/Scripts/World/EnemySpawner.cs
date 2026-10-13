@@ -20,6 +20,7 @@ namespace PersiaWar.Unity2D5D
 #endif
 
         private int wave = 1;
+        private bool stageTwoArena;
         private bool spawning;
         private float nextEnemyCheckTime;
         private int failedSpawnAttempts;
@@ -28,6 +29,24 @@ namespace PersiaWar.Unity2D5D
         private const int MaxFailedSpawnAttempts = 2;
 
         public int CurrentWave => wave;
+        public bool IsStageTwoArena => stageTwoArena;
+        public int EnemiesSpawnedForArena { get; private set; }
+
+        public void ConfigureStageTwoArena(Transform playerTransform)
+        {
+            stageTwoArena = true;
+            player = playerTransform;
+            startingCount = 100;
+            maxPerWave = 20;
+            victoryWave = 5;
+            wave = 1;
+            EnemiesSpawnedForArena = 0;
+            failedSpawnAttempts = 0;
+            spawning = false;
+            initialWavePending = false;
+            initialWaveComplete = false;
+            nextWaveCheckTime = 0f;
+        }
 
         public void Configure(Transform playerTransform, int enemyCount, float radius, float unusedSpeed)
         {
@@ -89,6 +108,26 @@ namespace PersiaWar.Unity2D5D
             nextEnemyCheckTime = Time.unscaledTime + enemyCheckInterval;
 
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+            if (stageTwoArena)
+            {
+                if (wave >= 5 && enemies.Length == 0)
+                {
+                    PlayerController activePlayer = player != null ? player.GetComponent<PlayerController>() : null;
+                    GameSession.Instance?.EndMission(activePlayer != null && !activePlayer.IsDefeated);
+                    enabled = false;
+                    return;
+                }
+
+                // Five 20-alien waves; begin the next drop as soon as six or fewer
+                // aliens remain on the ground. Stage one retains its original logic.
+                if (wave < 5 && enemies.Length <= 6 && !spawning)
+                {
+                    spawning = true;
+                    Invoke(nameof(SpawnNextWave), 1f);
+                }
+                return;
+            }
+
             if (enemies.Length == 0)
             {
                 if (wave >= Mathf.Max(1, victoryWave))
@@ -129,7 +168,7 @@ namespace PersiaWar.Unity2D5D
         {
             // Four sequential combat waves: six enemies per wave when the match is configured for 24.
             // The next wave is not spawned until Update confirms every enemy in this wave is gone.
-            int count = Mathf.Clamp(Mathf.CeilToInt(startingCount / 4f), 1, maxPerWave);
+            int count = Mathf.Clamp(Mathf.CeilToInt(startingCount / (stageTwoArena ? 5f : 4f)), 1, maxPerWave);
 #if UNITY_ANDROID
             count = Mathf.Min(count, 24);
 #endif
@@ -165,6 +204,7 @@ namespace PersiaWar.Unity2D5D
                 GameSession.Instance.SetWave(wave);
 
             SpawnWaveReward();
+            spawning = false;
 #endif
         }
 
@@ -222,6 +262,7 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("AndroidEnemySpawnAttempt");
                 SpawnEnemy(position, spawned, currentWave);
                 spawned++;
+                if (stageTwoArena) EnemiesSpawnedForArena++;
                 StartupCheckpoint.Set("AndroidEnemySpawnComplete");
                 yield return null;
 
@@ -239,10 +280,13 @@ namespace PersiaWar.Unity2D5D
         private void SpawnEnemy(Vector3 position, int index, int currentWave)
         {
             StartupCheckpoint.Set("AndroidEnemyObjectConstructionStarted");
-            int archetype = index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1);
+            int archetype = stageTwoArena ? (index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1))
+                : (index % 7 == 0 ? 3 : (index % 3 == 0 ? 2 : 1));
+            Vector3 groundPosition = position;
+            Vector3 spawnPosition = stageTwoArena ? groundPosition + Vector3.up * 13f : groundPosition;
 #if UNITY_ANDROID
-            GameObject enemy = new GameObject($"Enemy_W{currentWave}_{index}");
-            enemy.transform.position = position;
+            GameObject enemy = new GameObject(stageTwoArena ? $"Alien_W{currentWave}_{index}" : $"Enemy_W{currentWave}_{index}");
+            enemy.transform.position = spawnPosition;
             enemy.transform.localScale = new Vector3(0.9f, 0.9f, 0.9f);
 
             CapsuleCollider capsule = enemy.AddComponent<CapsuleCollider>();
@@ -255,17 +299,21 @@ namespace PersiaWar.Unity2D5D
             enemy.AddComponent<EnemyHealthBar>();
 
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
+            if (stageTwoArena) chase.enabled = false;
             chase.Configure(player, archetype);
+            if (stageTwoArena) StartCoroutine(AnimateAlienLanding(enemy.transform, chase, groundPosition));
 #else
             GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            enemy.name = $"Enemy_W{currentWave}_{index}";
-            enemy.transform.position = position;
+            enemy.name = stageTwoArena ? $"Alien_W{currentWave}_{index}" : $"Enemy_W{currentWave}_{index}";
+            enemy.transform.position = spawnPosition;
             enemy.transform.localScale = new Vector3(0.9f, 1f, 0.9f);
 
             Renderer renderer = enemy.GetComponent<Renderer>();
             if (renderer != null)
             {
-                Color color = archetype == 3 ? new Color(0.28f, 0.06f, 0.05f) : (archetype == 2 ? new Color(0.40f, 0.12f, 0.08f) : new Color(0.48f, 0.18f, 0.12f));
+                Color color = stageTwoArena
+                    ? (archetype == 3 ? new Color(0.12f, 0.58f, 0.20f) : (archetype == 2 ? new Color(0.18f, 0.78f, 0.25f) : new Color(0.28f, 0.92f, 0.34f)))
+                    : (archetype == 3 ? new Color(0.28f, 0.06f, 0.05f) : (archetype == 2 ? new Color(0.40f, 0.12f, 0.08f) : new Color(0.48f, 0.18f, 0.12f));
                 renderer.sharedMaterial = RuntimeMaterialFactory.Create(enemy.name + "Material", color);
             }
 
@@ -274,9 +322,49 @@ namespace PersiaWar.Unity2D5D
             enemy.AddComponent<EnemyHealthBar>();
 
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
+            if (stageTwoArena) chase.enabled = false;
             chase.Configure(player, archetype);
+            if (stageTwoArena) StartCoroutine(AnimateAlienLanding(enemy.transform, chase, groundPosition));
 #endif
+            if (stageTwoArena) EnemiesSpawnedForArena++;
             StartupCheckpoint.Set("AndroidEnemyObjectConstructionComplete");
+        }
+
+        private IEnumerator AnimateAlienLanding(Transform alien, EnemyChase chase, Vector3 groundPosition)
+        {
+            if (alien == null) yield break;
+            GameObject beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            beam.name = "AlienGreenLandingBeam";
+            beam.transform.position = new Vector3(groundPosition.x, 7f, groundPosition.z);
+            beam.transform.localScale = new Vector3(0.42f, 7f, 0.42f);
+            Collider beamCollider = beam.GetComponent<Collider>();
+            if (beamCollider != null) Destroy(beamCollider);
+            Renderer beamRenderer = beam.GetComponent<Renderer>();
+            if (beamRenderer != null)
+            {
+                Material beamMaterial = RuntimeMaterialFactory.Create("AlienGreenLandingBeamMaterial", new Color(0.15f, 1f, 0.22f));
+                beamRenderer.sharedMaterial = beamMaterial;
+                beamRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                beamRenderer.receiveShadows = false;
+            }
+
+            Vector3 start = groundPosition + Vector3.up * 13f;
+            float duration = 0.9f;
+            float elapsed = 0f;
+            while (elapsed < duration && alien != null)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                alien.position = Vector3.Lerp(start, groundPosition, t * t);
+                yield return null;
+            }
+
+            if (alien != null)
+            {
+                alien.position = groundPosition;
+                if (chase != null) chase.enabled = true;
+            }
+            if (beam != null) Destroy(beam, 0.12f);
         }
 
         private void SpawnWaveReward()
