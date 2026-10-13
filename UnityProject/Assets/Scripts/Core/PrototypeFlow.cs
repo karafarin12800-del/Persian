@@ -1648,16 +1648,16 @@ namespace PersiaWar.Unity2D5D
             Fill(shade, new Color(0.015f, 0.025f, 0.045f, 0.72f));
 
             float width = Mathf.Min(Screen.width - 44f, 660f);
-            float height = Mathf.Min(Screen.height - 60f, 390f);
+            float height = Mathf.Min(Screen.height - 40f, 430f);
             Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             Fill(new Rect(panel.x + 5f, panel.y + 8f, panel.width, panel.height), new Color(0f, 0f, 0f, 0.40f));
-            Fill(panel, new Color(0.035f, 0.075f, 0.12f, 0.94f));
+            Fill(panel, new Color(0.035f, 0.075f, 0.12f, 0.91f));
             Fill(new Rect(panel.x, panel.y, panel.width, 5f), new Color(0.25f, 0.92f, 0.45f, 0.95f));
-            GUI.Label(new Rect(panel.x + 18f, panel.y + 26f, panel.width - 36f, 54f), "STAGE 2  •  ARENA LOBBY", menuHeaderStyle);
-            GUI.Label(new Rect(panel.x + 18f, panel.y + 92f, panel.width - 36f, 42f),
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 18f, panel.width - 36f, 54f), "STAGE 2  •  ARENA LOBBY", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 74f, panel.width - 36f, 42f),
                 "COMPETITORS  " + stageTwoLobbyPlayers + " / 10", menuBodyStyle);
 
-            Rect track = new Rect(panel.x + 42f, panel.y + 150f, panel.width - 84f, 18f);
+            Rect track = new Rect(panel.x + 42f, panel.y + 119f, panel.width - 84f, 16f);
             Fill(track, new Color(0.10f, 0.16f, 0.20f, 0.95f));
             Fill(new Rect(track.x, track.y, track.width * (stageTwoLobbyPlayers / 10f), track.height),
                 new Color(0.20f, 0.92f, 0.42f, 0.95f));
@@ -1666,11 +1666,29 @@ namespace PersiaWar.Unity2D5D
             string status = elapsed < 7f
                 ? "WAITING FOR PLAYERS  •  " + Mathf.CeilToInt(7f - elapsed) + "s"
                 : "FILLING REMAINING SLOTS WITH LOCAL AI  •  +1 / SECOND";
-            GUI.Label(new Rect(panel.x + 18f, panel.y + 190f, panel.width - 36f, 46f), status, menuSmallStyle);
-            GUI.Label(new Rect(panel.x + 24f, panel.y + 244f, panel.width - 48f, 58f),
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 143f, panel.width - 36f, 36f), status, menuSmallStyle);
+
+            float slotGap = 6f;
+            float slotWidth = (panel.width - 48f - slotGap * 4f) / 5f;
+            for (int slot = 0; slot < 10; slot++)
+            {
+                int column = slot % 5;
+                int row = slot / 5;
+                Rect slotRect = new Rect(panel.x + 24f + column * (slotWidth + slotGap),
+                    panel.y + 183f + row * 42f, slotWidth, 34f);
+                bool present = slot < stageTwoLobbyPlayers;
+                Fill(slotRect, present ? new Color(0.08f, 0.32f, 0.22f, 0.86f) : new Color(0.08f, 0.12f, 0.16f, 0.72f));
+                Fill(new Rect(slotRect.x, slotRect.y, 3f, slotRect.height),
+                    present ? new Color(0.25f, 0.92f, 0.45f, 0.95f) : new Color(0.38f, 0.45f, 0.50f, 0.55f));
+                string slotName = present ? (slot == 0 ? "YOU" : "AI-" + slot.ToString("00")) : "WAITING";
+                GUI.Label(new Rect(slotRect.x + 4f, slotRect.y, slotRect.width - 8f, slotRect.height),
+                    slotName, menuSmallStyle);
+            }
+
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 274f, panel.width - 36f, 38f),
                 "100 ALIENS  •  5 WAVES  •  NEXT WAVE AT 6 REMAINING", menuSmallStyle);
-            GUI.Label(new Rect(panel.x + 24f, panel.y + panel.height - 54f, panel.width - 48f, 30f),
-                "ONLINE MULTIPLAYER NEEDS A SERVER; THIS BUILD USES LOCAL AI FILL", menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 18f, panel.y + panel.height - 42f, panel.width - 36f, 28f),
+                "OFFLINE TEST: AI FILLS THE LOBBY; ONLINE SERVER NOT CONNECTED", menuSmallStyle);
         }
 
         private void DrawAndroidPauseControl()
