@@ -1153,6 +1153,8 @@ namespace PersiaWar.Unity2D5D
                 Vector3 house = plot + new Vector3(0f, 0f, 2.4f);
                 float footprint = i % 5 == 0 ? 8.4f : Mathf.Lerp(5.8f, 7.2f, Mathf.Abs(Mathf.Sin(i * 2.37f)));
                 float depth = i % 5 == 0 ? 7.8f : Mathf.Lerp(5.3f, 6.5f, Mathf.Abs(Mathf.Cos(i * 1.71f)));
+                androidBuildingCenters.Add(house);
+                androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
                 bool landmark = i == 0 || i == 13 || i == 20;
                 CreateAndroidBuilding(house, footprint, landmark ? 4.4f : 3.35f, depth, i,
                     false, false);
