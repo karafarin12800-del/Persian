@@ -18,6 +18,7 @@ namespace PersiaWar.Unity2D5D
         private bool finished;
 
         public int LocalKills => kills.TryGetValue("YOU", out int value) ? value : 0;
+        public int LastLocalRank { get; private set; }
 
         private void Awake()
         {
@@ -35,6 +36,7 @@ namespace PersiaWar.Unity2D5D
             ClearBots();
             kills.Clear();
             finished = false;
+            LastLocalRank = 0;
             localPlayer = player;
             kills["YOU"] = 0;
             botCount = Mathf.Clamp(botCount, 0, 9);
@@ -126,6 +128,7 @@ namespace PersiaWar.Unity2D5D
         public string GetLeaderboardText()
         {
             return string.Join("\n", kills.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key == "YOU" ? 0 : 1)
                 .ThenBy(pair => pair.Key, System.StringComparer.Ordinal)
                 .Take(3)
                 .Select((pair, index) => (index + 1) + ". " +
@@ -139,6 +142,7 @@ namespace PersiaWar.Unity2D5D
             List<KeyValuePair<string, int>> ranking = kills.OrderByDescending(pair => pair.Value)
                 .ThenBy(pair => pair.Key, System.StringComparer.Ordinal).ToList();
             int rank = ranking.FindIndex(pair => pair.Key == "YOU") + 1;
+            LastLocalRank = rank;
 
             if (rank == 1)
             {
