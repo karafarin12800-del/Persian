@@ -1077,63 +1077,125 @@ namespace PersiaWar.Unity2D5D
             Debug.Log("PERSIA_STAGE2: random safe landing selected " + spawnWorld);
         }
 
+        private Rect GetStageTwoMapRect()
+        {
+            float top = Mathf.Clamp(Screen.height * 0.23f, 130f, 165f);
+            float size = Mathf.Min(Screen.height - top - 68f, Screen.width * 0.48f);
+            size = Mathf.Clamp(size, 180f, 520f);
+            return new Rect(18f, top, size, size);
+        }
+
+        private Rect GetStageTwoControlPanel()
+        {
+            Rect map = GetStageTwoMapRect();
+            float x = map.xMax + 26f;
+            float width = Mathf.Max(140f, Screen.width - x - 18f);
+            return new Rect(x, map.y, width, map.height);
+        }
+
+        private Rect GetStageTwoModeButtonRect(int index)
+        {
+            Rect panel = GetStageTwoControlPanel();
+            return new Rect(panel.x, panel.y + 42f + index * 64f, panel.width, 56f);
+        }
+
+        private Rect GetStageTwoLayoutButtonRect(int index)
+        {
+            Rect panel = GetStageTwoControlPanel();
+            const float gap = 10f;
+            float width = (panel.width - gap * 2f) / 3f;
+            return new Rect(panel.x + index * (width + gap), panel.y + 202f, width, 48f);
+        }
+
+        private Rect GetStageTwoStartRect()
+        {
+            Rect panel = GetStageTwoControlPanel();
+            return new Rect(panel.x, Screen.height - 68f, panel.width, 54f);
+        }
+
         private void DrawStageTwoDropMap()
         {
-            GUI.Label(new Rect(0f, 100f, Screen.width, 56f), "STAGE 2  •  OLD IRANIAN VILLAGE", menuHeaderStyle);
-            GUI.Label(new Rect(24f, 154f, Screen.width - 48f, 34f), "CHOOSE YOUR LANDING", menuSmallStyle);
+            GUI.Label(new Rect(0f, 76f, Screen.width, 48f),
+                "STAGE 2  •  OLD IRANIAN VILLAGE", menuHeaderStyle);
+            GUI.Label(new Rect(24f, 120f, Screen.width - 48f, 30f),
+                "CHOOSE HOW TO ENTER THE VILLAGE", menuSmallStyle);
 
-            float buttonGap = 10f;
-            float buttonWidth = (Screen.width - 52f - buttonGap) * 0.5f;
-            Rect randomRect = new Rect(20f, 184f, buttonWidth, 46f);
-            Rect manualRect = new Rect(20f + buttonWidth + buttonGap, 184f, buttonWidth, 46f);
-            if (DrawFantasyButton(randomRect, "RANDOM LANDING", stageTwoLandingMode == 0))
+            Rect mapRect = GetStageTwoMapRect();
+            Rect panel = GetStageTwoControlPanel();
+
+            // Keep the map on the left and group all landing controls on the right.
+            Fill(panel, new Color(0.02f, 0.045f, 0.07f, 0.46f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 4f),
+                new Color(0.98f, 0.72f, 0.22f, 0.92f));
+            GUI.Label(new Rect(panel.x + 10f, panel.y + 5f, panel.width - 20f, 30f),
+                "LANDING METHOD", menuSmallStyle);
+
+            if (DrawFantasyButton(GetStageTwoModeButtonRect(0),
+                "RANDOM LANDING", stageTwoLandingMode == 0))
             {
                 stageTwoLandingMode = 0;
                 ChooseRandomStageTwoSpawn();
             }
-            if (DrawFantasyButton(manualRect, "CHOOSE ON MAP", stageTwoLandingMode == 1))
+            if (DrawFantasyButton(GetStageTwoModeButtonRect(1),
+                "CHOOSE ON MAP", stageTwoLandingMode == 1))
             {
                 stageTwoLandingMode = 1;
                 spawnChosen = false;
             }
 
-            float layoutGap = 8f;
-            float layoutWidth = (Screen.width - 52f - layoutGap * 2f) / 3f;
+            GUI.Label(new Rect(panel.x + 10f, panel.y + 166f, panel.width - 20f, 32f),
+                "VILLAGE LAYOUT", menuSmallStyle);
             string[] layoutNames = { "CLUSTER", "GREEN", "SCATTERED" };
             for (int i = 0; i < layoutNames.Length; i++)
             {
-                Rect layoutRect = new Rect(20f + i * (layoutWidth + layoutGap), 236f, layoutWidth, 36f);
-                if (DrawFantasyButton(layoutRect, layoutNames[i] + (stageTwoLayoutVariant == i ? "  ✦" : ""), stageTwoLayoutVariant == i))
+                if (DrawFantasyButton(GetStageTwoLayoutButtonRect(i),
+                    layoutNames[i] + (stageTwoLayoutVariant == i ? "  ✦" : ""),
+                    stageTwoLayoutVariant == i))
+                {
                     stageTwoLayoutVariant = i;
+                    if (stageTwoLandingMode == 0)
+                        ChooseRandomStageTwoSpawn();
+                }
             }
 
-            float mapSize = Mathf.Max(150f, Mathf.Min(Screen.width - 64f, Screen.height - 440f));
-            Rect mapRect = new Rect((Screen.width - mapSize) * 0.5f, 282f, mapSize, mapSize);
             DrawStageTwoVillageMap(mapRect);
             if (spawnChosen)
             {
                 Vector2 point = WorldToMap(spawnWorld, mapRect);
-                DrawCircle(point, 13f, new Color(1f, 0.83f, 0.16f, 0.98f));
-                GUI.Label(new Rect(point.x - 65f, point.y + 14f, 130f, 24f), "LANDING POINT", smallStyle);
+                point.x = Mathf.Clamp(point.x, mapRect.x + 44f, mapRect.xMax - 44f);
+                point.y = Mathf.Clamp(point.y, mapRect.y + 45f, mapRect.yMax - 45f);
+                DrawCircle(point, 15f, new Color(1f, 0.83f, 0.16f, 0.98f));
+                Rect markerLabel = new Rect(
+                    Mathf.Clamp(point.x - 74f, mapRect.x + 4f, mapRect.xMax - 152f),
+                    Mathf.Clamp(point.y + 18f, mapRect.y + 32f, mapRect.yMax - 34f),
+                    148f, 26f);
+                Fill(markerLabel, new Color(0.02f, 0.035f, 0.045f, 0.88f));
+                GUI.Label(markerLabel, "LANDING POINT", menuSmallStyle);
             }
 
-            GUI.Label(new Rect(18f, Screen.height - 100f, Screen.width - 36f, 30f),
-                stageTwoLandingMode == 0 ? "SAFE RANDOM LANDING SELECTED" : "TAP AN OPEN AREA ON THE MAP",
+            Rect hint = new Rect(panel.x + 8f, Screen.height - 119f, panel.width - 16f, 30f);
+            GUI.Label(hint,
+                stageTwoLandingMode == 0
+                    ? "SAFE RANDOM LANDING SELECTED"
+                    : (spawnChosen ? "LANDING POINT SELECTED" : "TAP AN OPEN AREA ON THE MAP"),
                 menuSmallStyle);
-            Rect start = new Rect(Screen.width * 0.5f - 210f, Screen.height - 66f, 420f, 54f);
+
             GUI.enabled = spawnChosen;
-            if (DrawFantasyButton(start, "ENTER VILLAGE  ⚔", true))
+            if (DrawFantasyButton(GetStageTwoStartRect(), "ENTER VILLAGE  ⚔", true))
                 StartMatch();
             GUI.enabled = true;
         }
 
         private void HandleStageTwoDropTouches()
         {
-            if (!Application.isMobilePlatform && !Input.GetMouseButtonDown(0)) return;
+            if (!Application.isMobilePlatform && !Input.GetMouseButtonDown(0))
+                return;
+
             Vector2 screen;
             if (Application.isMobilePlatform)
             {
-                if (Input.touchCount == 0 || Input.GetTouch(0).phase != TouchPhase.Began) return;
+                if (Input.touchCount == 0 || Input.GetTouch(0).phase != TouchPhase.Began)
+                    return;
                 screen = Input.GetTouch(0).position;
             }
             else
@@ -1142,44 +1204,42 @@ namespace PersiaWar.Unity2D5D
             }
             screen.y = Screen.height - screen.y;
 
-            float buttonGap = 10f;
-            float buttonWidth = (Screen.width - 52f - buttonGap) * 0.5f;
-            Rect randomRect = new Rect(20f, 184f, buttonWidth, 46f);
-            Rect manualRect = new Rect(20f + buttonWidth + buttonGap, 184f, buttonWidth, 46f);
-            if (randomRect.Contains(screen))
+            if (GetStageTwoModeButtonRect(0).Contains(screen))
             {
+                suppressMenuButtonClicksFrame = Time.frameCount;
                 stageTwoLandingMode = 0;
                 ChooseRandomStageTwoSpawn();
                 return;
             }
-            if (manualRect.Contains(screen))
+            if (GetStageTwoModeButtonRect(1).Contains(screen))
             {
+                suppressMenuButtonClicksFrame = Time.frameCount;
                 stageTwoLandingMode = 1;
                 spawnChosen = false;
                 return;
             }
 
-            float layoutGap = 8f;
-            float layoutWidth = (Screen.width - 52f - layoutGap * 2f) / 3f;
             for (int i = 0; i < 3; i++)
             {
-                Rect layoutRect = new Rect(20f + i * (layoutWidth + layoutGap), 236f, layoutWidth, 36f);
-                if (layoutRect.Contains(screen))
-                {
-                    stageTwoLayoutVariant = i;
-                    return;
-                }
+                if (!GetStageTwoLayoutButtonRect(i).Contains(screen))
+                    continue;
+
+                suppressMenuButtonClicksFrame = Time.frameCount;
+                stageTwoLayoutVariant = i;
+                if (stageTwoLandingMode == 0)
+                    ChooseRandomStageTwoSpawn();
+                return;
             }
 
-            Rect startRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+            Rect startRect = GetStageTwoStartRect();
             if (spawnChosen && startRect.Contains(screen))
             {
+                suppressMenuButtonClicksFrame = Time.frameCount;
                 StartMatch();
                 return;
             }
 
-            float mapSize = Mathf.Max(150f, Mathf.Min(Screen.width - 64f, Screen.height - 440f));
-            Rect mapRect = new Rect((Screen.width - mapSize) * 0.5f, 282f, mapSize, mapSize);
+            Rect mapRect = GetStageTwoMapRect();
             if (stageTwoLandingMode == 1 && mapRect.Contains(screen))
             {
                 spawnWorld = MapPointToWorld(screen, mapRect);
