@@ -9,6 +9,7 @@ namespace PersiaWar.Unity2D5D
         private float nextThinkTime;
         private float nextAttackTime;
         private Vector3 roamDirection;
+        private EnemyChase currentTarget;
         private int number;
 
         public string CompetitorId => "AI-" + number.ToString("00");
@@ -29,10 +30,10 @@ namespace PersiaWar.Unity2D5D
 
             if (Time.time >= nextThinkTime)
             {
-                nextThinkTime = Time.time + Random.Range(0.25f, 0.55f);
+                nextThinkTime = Time.time + Random.Range(0.28f, 0.48f);
                 EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
-                EnemyChase nearest = null;
                 float nearestDistance = float.MaxValue;
+                currentTarget = null;
                 for (int i = 0; i < enemies.Length; i++)
                 {
                     EnemyChase candidate = enemies[i];
@@ -41,42 +42,41 @@ namespace PersiaWar.Unity2D5D
                     if (distance < nearestDistance)
                     {
                         nearestDistance = distance;
-                        nearest = candidate;
+                        currentTarget = candidate;
                     }
                 }
+            }
 
-                if (nearest != null)
+            if (currentTarget == null)
+            {
+                roamDirection = Quaternion.Euler(0f, Random.Range(-45f, 45f) * Time.deltaTime, 0f) * roamDirection;
+                transform.position += roamDirection * (1.2f * Time.deltaTime);
+                return;
+            }
+
+            Vector3 delta = currentTarget.transform.position - transform.position;
+            delta.y = 0f;
+            float distanceToTarget = delta.magnitude;
+            if (distanceToTarget > 2.4f)
+            {
+                Vector3 direction = delta.normalized;
+                // Prefer a side-step when a wall blocks the direct approach.
+                if (Physics.SphereCast(transform.position + Vector3.up * 0.8f, 0.32f,
+                    direction, out RaycastHit hit, 1.2f, ~0, QueryTriggerInteraction.Ignore))
                 {
-                    Vector3 delta = nearest.transform.position - transform.position;
-                    delta.y = 0f;
-                    float distance = delta.magnitude;
-                    if (distance > 2.4f)
-                    {
-                        Vector3 direction = delta.normalized;
-                        // Prefer a side-step when a wall blocks the direct approach.
-                        if (Physics.SphereCast(transform.position + Vector3.up * 0.8f, 0.32f,
-                            direction, out RaycastHit hit, 1.2f, ~0, QueryTriggerInteraction.Ignore))
-                        {
-                            Vector3 side = Vector3.Cross(Vector3.up, direction) * (number % 2 == 0 ? 1f : -1f);
-                            direction = (side + direction * 0.22f).normalized;
-                        }
-                        transform.position += direction * Mathf.Min(3.2f * Time.deltaTime, Mathf.Max(0f, distance - 1.9f));
-                        transform.rotation = Quaternion.Slerp(transform.rotation,
-                            Quaternion.LookRotation(delta.normalized, Vector3.up),
-                            1f - Mathf.Exp(-10f * Time.deltaTime));
-                    }
-                    else if (Time.time >= nextAttackTime)
-                    {
-                        nextAttackTime = Time.time + Random.Range(0.55f, 0.9f);
-                        TargetHealth health = nearest.GetComponent<TargetHealth>();
-                        if (health != null) health.ApplyDamage(Random.Range(18, 29), transform);
-                    }
+                    Vector3 side = Vector3.Cross(Vector3.up, direction) * (number % 2 == 0 ? 1f : -1f);
+                    direction = (side + direction * 0.22f).normalized;
                 }
-                else
-                {
-                    roamDirection = Quaternion.Euler(0f, Random.Range(-90f, 90f), 0f) * roamDirection;
-                    transform.position += roamDirection * (1.4f * Time.deltaTime);
-                }
+                transform.position += direction * 3.2f * Time.deltaTime;
+                transform.rotation = Quaternion.Slerp(transform.rotation,
+                    Quaternion.LookRotation(direction, Vector3.up),
+                    1f - Mathf.Exp(-10f * Time.deltaTime));
+            }
+            else if (Time.time >= nextAttackTime)
+            {
+                nextAttackTime = Time.time + Random.Range(0.55f, 0.9f);
+                TargetHealth health = currentTarget.GetComponent<TargetHealth>();
+                if (health != null) health.ApplyDamage(Random.Range(18, 29), transform);
             }
         }
     }
