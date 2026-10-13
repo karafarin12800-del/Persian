@@ -543,22 +543,58 @@ namespace PersiaWar.Unity2D5D
         {
             if (androidBuildingCenters.Count == 0) return;
 
-            // Never carry first-stage floor drops into the village. Rebuild the pickup
-            // field from scratch so the stage-two supply distribution is deterministic in count.
-            if (stageTwoRequested)
+            // Stage one intentionally preserves the exact original loot behavior:
+            // 8 of each item type, placed INSIDE generated houses. No stage-two
+            // cleanup, counts, or courtyard placement rules are allowed on this path.
+            if (!stageTwoRequested)
             {
-                PickupItem[] oldPickups = FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-                for (int i = 0; i < oldPickups.Length; i++)
+                const int countPerType = 8;
+                for (int i = 0; i < countPerType * 4; i++)
                 {
-                    if (oldPickups[i] != null)
-                        Destroy(oldPickups[i].gameObject);
+                    int houseIndex = Random.Range(0, androidBuildingCenters.Count);
+                    Vector3 center = androidBuildingCenters[houseIndex];
+                    Vector2 half = androidBuildingHalfExtents[houseIndex];
+                    float x = center.x + Random.Range(-half.x * 0.42f, half.x * 0.42f);
+                    float z = center.z + Random.Range(-half.y * 0.42f, half.y * 0.42f);
+                    float y = CalculateAndroidTerrainHeight(x, z) + 0.38f;
+                    PickupItem.PickupType type = i < countPerType ? PickupItem.PickupType.Weapon
+                        : (i < countPerType * 2 ? PickupItem.PickupType.Shield
+                        : (i < countPerType * 3 ? PickupItem.PickupType.Grenade : PickupItem.PickupType.QuickDash));
+                    Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
+                        : (type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
+                        : (type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f) : new Color(0.94f, 0.08f, 0.92f)));
+                    GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube : (type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad : PrimitiveType.Sphere));
+                    item.name = "HouseLoot_" + type + "_" + i;
+                    item.transform.SetParent(worldRoot, true);
+                    item.transform.position = new Vector3(x, y, z);
+                    item.transform.localScale = type == PickupItem.PickupType.Weapon ? new Vector3(0.72f, 0.18f, 0.24f) : (type == PickupItem.PickupType.QuickDash ? new Vector3(0.72f, 0.72f, 1f) : Vector3.one * 0.48f);
+                    if (type == PickupItem.PickupType.QuickDash) { MeshFilter mf = item.GetComponent<MeshFilter>(); if (mf != null) { Mesh triangle = new Mesh { name = "QuickDashTriangle" }; triangle.vertices = new[] { new Vector3(0f, 0.58f, 0f), new Vector3(-0.5f, -0.34f, 0f), new Vector3(0.5f, -0.34f, 0f) }; triangle.triangles = new[] { 0, 1, 2 }; triangle.RecalculateNormals(); mf.sharedMesh = triangle; } item.transform.rotation = Quaternion.Euler(90f, 0f, 0f); }
+                    Renderer renderer = item.GetComponent<Renderer>();
+                    if (renderer != null) renderer.sharedMaterial = MakeMaterial("HouseLootMaterial_" + type + "_" + i, color);
+                    Collider collider = item.GetComponent<Collider>();
+                    if (collider != null) collider.isTrigger = true;
+                    Rigidbody body = item.AddComponent<Rigidbody>();
+                    body.isKinematic = true;
+                    body.useGravity = false;
+                    PickupItem pickup = item.AddComponent<PickupItem>();
+                    if (type == PickupItem.PickupType.Weapon)
+                        pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
+                    else
+                        pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
                 }
+                Debug.Log("PERSIA_LOOT: spawned 8 weapons, 8 shields, 8 grenades and 8 magenta triangular quick-dash pickups inside houses");
+                return;
             }
 
-            // Thirteen pairs of each firearm/supply category, randomized around
-            // homes and yard entrances rather than hidden only inside buildings.
-            const int pairsPerType = 3; // six of each supply type: readable, not carpeted across the map.
-            const int countPerType = pairsPerType * 2;
+            // Stage two starts with a clean loot field so no first-stage drops remain.
+            PickupItem[] oldPickups = FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < oldPickups.Length; i++)
+                if (oldPickups[i] != null)
+                    Destroy(oldPickups[i].gameObject);
+
+            // Six of each useful pickup type is intentionally sparse. Place them around
+            // house footprints/courtyard lanes, never carpet the ground with loot.
+            const int countPerType = 6;
             const int supplyTypeCount = 6;
             for (int i = 0; i < countPerType * supplyTypeCount; i++)
             {
@@ -567,78 +603,134 @@ namespace PersiaWar.Unity2D5D
                 Vector3 center = androidBuildingCenters[houseIndex];
                 Vector2 half = androidBuildingHalfExtents[houseIndex];
                 float angle = Random.Range(0f, Mathf.PI * 2f);
-                float radius = Random.Range(3.0f, 9.0f);
-                float x = Mathf.Clamp(center.x + Mathf.Cos(angle) * radius + Random.Range(-1.5f, 1.5f), -91f, 91f);
-                float z = Mathf.Clamp(center.z + Mathf.Sin(angle) * radius + Random.Range(-1.5f, 1.5f), -91f, 91f);
-                float y = CalculateAndroidTerrainHeight(x, z) + 0.38f;
+                float radius = Mathf.Max(half.x, half.y) + Random.Range(1.8f, 5.0f);
+                float x = Mathf.Clamp(center.x + Mathf.Cos(angle) * radius, -91f, 91f);
+                float z = Mathf.Clamp(center.z + Mathf.Sin(angle) * radius, -91f, 91f);
+                Vector3 position = new Vector3(x, CalculateAndroidTerrainHeight(x, z) + 0.16f, z);
                 PickupItem.PickupType type = typeIndex == 0 ? PickupItem.PickupType.Weapon
                     : typeIndex == 1 ? PickupItem.PickupType.Shield
                     : typeIndex == 2 ? PickupItem.PickupType.Grenade
                     : typeIndex == 3 ? PickupItem.PickupType.QuickDash
                     : typeIndex == 4 ? PickupItem.PickupType.Ammo
                     : PickupItem.PickupType.Medkit;
-                Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
-                    : type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
-                    : type == PickupItem.PickupType.Grenade ? new Color(0.20f, 0.28f, 0.18f)
-                    : type == PickupItem.PickupType.QuickDash ? new Color(0.18f, 0.68f, 0.72f)
-                    : type == PickupItem.PickupType.Ammo ? new Color(0.88f, 0.78f, 0.25f)
-                    : new Color(0.18f, 0.78f, 0.32f);
-                GameObject item = GameObject.CreatePrimitive(
-                    type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube
-                    : type == PickupItem.PickupType.Grenade ? PrimitiveType.Cylinder
-                    : type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad
-                    : type == PickupItem.PickupType.Ammo ? PrimitiveType.Cube
-                    : PrimitiveType.Sphere);
-                item.name = "VillageLoot_" + type + "_" + i;
+
+                GameObject item = new GameObject("StageTwoLoot_" + type + "_" + i);
                 item.transform.SetParent(worldRoot, true);
-                item.transform.position = new Vector3(x, y, z);
-                item.transform.localScale = type == PickupItem.PickupType.Weapon ? new Vector3(0.82f, 0.18f, 0.28f)
-                    : type == PickupItem.PickupType.Grenade ? new Vector3(0.25f, 0.32f, 0.25f)
-                    : type == PickupItem.PickupType.Ammo ? new Vector3(0.28f, 0.22f, 0.34f)
-                    : type == PickupItem.PickupType.QuickDash ? new Vector3(0.72f, 0.72f, 1f)
-                    : Vector3.one * 0.40f;
-                if (type == PickupItem.PickupType.Grenade)
+                item.transform.position = position;
+                item.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+                if (type == PickupItem.PickupType.Weapon)
                 {
-                    // A compact olive grenade body with a visible metal cap, not a red sphere.
-                    GameObject cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    cap.name = "GrenadeMetalCap";
-                    cap.transform.SetParent(item.transform, false);
-                    cap.transform.localPosition = new Vector3(0f, 0.48f, 0f);
-                    cap.transform.localScale = new Vector3(0.42f, 0.18f, 0.42f);
-                    cap.GetComponent<Renderer>().sharedMaterial = MakeMaterial("VillageGrenadeCap", new Color(0.42f, 0.44f, 0.40f));
-                    Collider capCollider = cap.GetComponent<Collider>();
-                    if (capCollider != null) Destroy(capCollider);
+                    WeaponController.WeaponKind kind = (WeaponController.WeaponKind)Random.Range(0, 3);
+                    CreateVillageWeaponPickupModel(item.transform, kind);
+                    Rigidbody weaponBody = item.AddComponent<Rigidbody>();
+                    weaponBody.isKinematic = true;
+                    weaponBody.useGravity = false;
+                    PickupItem weaponPickup = item.AddComponent<PickupItem>();
+                    weaponPickup.ConfigureWeapon(kind, 30);
+                    continue;
                 }
-                if (type == PickupItem.PickupType.QuickDash)
+
+                switch (type)
                 {
-                    MeshFilter mf = item.GetComponent<MeshFilter>();
-                    if (mf != null)
-                    {
-                        Mesh triangle = new Mesh { name = "QuickDashTriangle" };
-                        triangle.vertices = new[] { new Vector3(0f, 0.58f, 0f), new Vector3(-0.5f, -0.34f, 0f), new Vector3(0.5f, -0.34f, 0f) };
-                        triangle.triangles = new[] { 0, 1, 2 };
-                        triangle.RecalculateNormals();
-                        mf.sharedMesh = triangle;
-                    }
-                    item.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                    case PickupItem.PickupType.Grenade:
+                        CreateVillagePickupPart(item.transform, "GrenadeBody", PrimitiveType.Capsule,
+                            new Vector3(0f, 0.16f, 0f), new Vector3(0.24f, 0.31f, 0.24f), new Color(0.22f, 0.30f, 0.18f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "GrenadeCap", PrimitiveType.Cylinder,
+                            new Vector3(0f, 0.34f, 0f), new Vector3(0.13f, 0.055f, 0.13f), new Color(0.48f, 0.50f, 0.44f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "GrenadePin", PrimitiveType.Cube,
+                            new Vector3(0.10f, 0.37f, 0f), new Vector3(0.13f, 0.035f, 0.07f), new Color(0.58f, 0.60f, 0.54f), new Vector3(0f, 0f, 25f));
+                        break;
+                    case PickupItem.PickupType.Shield:
+                        CreateVillagePickupPart(item.transform, "ShieldDisc", PrimitiveType.Cylinder,
+                            new Vector3(0f, 0.075f, 0f), new Vector3(0.46f, 0.075f, 0.46f), new Color(0.12f, 0.48f, 0.87f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "ShieldCenter", PrimitiveType.Cylinder,
+                            new Vector3(0f, 0.12f, 0f), new Vector3(0.17f, 0.025f, 0.17f), new Color(0.76f, 0.68f, 0.28f), Vector3.zero);
+                        break;
+                    case PickupItem.PickupType.Ammo:
+                        CreateVillagePickupPart(item.transform, "AmmoCrate", PrimitiveType.Cube,
+                            new Vector3(0f, 0.12f, 0f), new Vector3(0.38f, 0.24f, 0.32f), new Color(0.38f, 0.34f, 0.18f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "AmmoCrateBand", PrimitiveType.Cube,
+                            new Vector3(0f, 0.13f, 0f), new Vector3(0.40f, 0.06f, 0.34f), new Color(0.87f, 0.70f, 0.22f), Vector3.zero);
+                        break;
+                    case PickupItem.PickupType.Medkit:
+                        CreateVillagePickupPart(item.transform, "MedkitBox", PrimitiveType.Cube,
+                            new Vector3(0f, 0.13f, 0f), new Vector3(0.34f, 0.25f, 0.32f), new Color(0.88f, 0.86f, 0.78f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "MedkitCrossVertical", PrimitiveType.Cube,
+                            new Vector3(0f, 0.265f, 0f), new Vector3(0.075f, 0.025f, 0.24f), new Color(0.80f, 0.10f, 0.09f), Vector3.zero);
+                        CreateVillagePickupPart(item.transform, "MedkitCrossHorizontal", PrimitiveType.Cube,
+                            new Vector3(0f, 0.267f, 0f), new Vector3(0.22f, 0.026f, 0.075f), new Color(0.80f, 0.10f, 0.09f), Vector3.zero);
+                        break;
+                    case PickupItem.PickupType.QuickDash:
+                        CreateVillagePickupPart(item.transform, "DashCrystal", PrimitiveType.Cube,
+                            new Vector3(0f, 0.22f, 0f), new Vector3(0.22f, 0.30f, 0.22f), new Color(0.18f, 0.69f, 0.76f), new Vector3(0f, 0f, 45f));
+                        CreateVillagePickupPart(item.transform, "DashCrystalCore", PrimitiveType.Cube,
+                            new Vector3(0f, 0.22f, 0f), new Vector3(0.09f, 0.20f, 0.09f), new Color(0.86f, 0.91f, 0.94f), new Vector3(0f, 0f, 45f));
+                        break;
                 }
-                Renderer renderer = item.GetComponent<Renderer>();
-                if (renderer != null) renderer.sharedMaterial = MakeMaterial("VillageLootMaterial_" + type, color);
-                Collider collider = item.GetComponent<Collider>();
-                if (collider != null) collider.isTrigger = true;
+
                 Rigidbody body = item.AddComponent<Rigidbody>();
                 body.isKinematic = true;
                 body.useGravity = false;
                 PickupItem pickup = item.AddComponent<PickupItem>();
-                if (type == PickupItem.PickupType.Weapon)
-                    pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
-                else
-                    pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35
-                        : type == PickupItem.PickupType.Medkit ? 30
-                        : type == PickupItem.PickupType.Ammo ? 45 : 2);
+                int amount = type == PickupItem.PickupType.Shield ? 35
+                    : type == PickupItem.PickupType.Medkit ? 30
+                    : type == PickupItem.PickupType.Ammo ? 45 : 2;
+                pickup.Configure(type, amount);
             }
-            if (stageTwoRequested) SpawnVillageAxePickups(6);
-            Debug.Log("PERSIA_LOOT: stage-two village spawned six of each supply category plus six axes; placement randomized");
+
+            SpawnVillageAxePickups(6);
+            Debug.Log("PERSIA_LOOT: stage two has six pickups per supply category and six axes; stage-one loot rules preserved");
+        }
+
+        private void CreateVillageWeaponPickupModel(Transform parent, WeaponController.WeaponKind kind)
+        {
+            bool pistol = kind == WeaponController.WeaponKind.LightPistol;
+            bool heavy = kind == WeaponController.WeaponKind.HeavyMachineGun;
+            Color steel = new Color(0.14f, 0.16f, 0.17f);
+            Color metal = new Color(0.32f, 0.35f, 0.36f);
+            Color stock = new Color(0.28f, 0.17f, 0.09f);
+            float bodyLength = pistol ? 0.34f : (heavy ? 0.78f : 0.62f);
+            CreateVillagePickupPart(parent, "WeaponReceiver", PrimitiveType.Cube,
+                new Vector3(0f, 0.10f, 0f), new Vector3(0.17f, 0.13f, bodyLength), steel, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponBarrel", PrimitiveType.Cube,
+                new Vector3(0f, 0.12f, bodyLength * 0.5f + 0.17f), new Vector3(0.055f, 0.055f, pistol ? 0.20f : (heavy ? 0.38f : 0.30f)), metal, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponStock", PrimitiveType.Cube,
+                new Vector3(0f, 0.10f, -bodyLength * 0.5f - 0.12f), new Vector3(pistol ? 0.09f : 0.14f, 0.10f, pistol ? 0.10f : 0.28f), stock, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponMagazine", PrimitiveType.Cube,
+                new Vector3(0f, -0.035f, -0.02f), new Vector3(0.10f, 0.19f, 0.15f), metal, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponGrip", PrimitiveType.Cube,
+                new Vector3(0f, -0.06f, -bodyLength * 0.12f), new Vector3(0.08f, 0.15f, 0.09f), stock, new Vector3(15f, 0f, 0f), true);
+            if (heavy)
+                CreateVillagePickupPart(parent, "WeaponForeGrip", PrimitiveType.Cube,
+                    new Vector3(0f, -0.04f, bodyLength * 0.25f), new Vector3(0.09f, 0.15f, 0.10f), stock, Vector3.zero, true);
+            CreateVillagePickupPart(parent, "WeaponSight", PrimitiveType.Cube,
+                new Vector3(0f, 0.185f, -0.02f), new Vector3(0.07f, 0.045f, 0.10f), metal, Vector3.zero, true);
+        }
+
+        private GameObject CreateVillagePickupPart(
+            Transform parent,
+            string partName,
+            PrimitiveType primitive,
+            Vector3 localPosition,
+            Vector3 localScale,
+            Color color,
+            Vector3 localEuler,
+            bool preScaledForWeapon = false)
+        {
+            GameObject part = GameObject.CreatePrimitive(primitive);
+            part.name = partName;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localRotation = Quaternion.Euler(localEuler);
+            part.transform.localScale = preScaledForWeapon ? localScale * 0.5f : localScale;
+            Renderer renderer = part.GetComponent<Renderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = MakeMaterial("StageTwoPickup_" + partName, color);
+            Collider collider = part.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+            return part;
         }
 
         private void SpawnVillageAxePickups(int count)
