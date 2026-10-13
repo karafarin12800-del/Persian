@@ -701,13 +701,16 @@ namespace PersiaWar.Unity2D5D
         private void DrawHeroSelect()
         {
             GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
-            GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f),
-                stageNumber >= 2 ? "CURRENT HERO IS PRESELECTED  •  FREE CHARACTERS BELOW" : "KEEP YOUR HERO OR SELECT ANOTHER FREE CHARACTER",
-                menuSmallStyle);
+            string heroHint = stageNumber >= 2
+                ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
+                    ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
+                    : "RESCUE ANAHITA IN STAGE 1 TO UNLOCK HER  •  OTHERS LOCKED")
+                : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
+            GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), heroHint, menuSmallStyle);
 
             float gap = 14f;
-            float totalWidth = Mathf.Min(Screen.width - 44f, 980f);
-            float cardWidth = (totalWidth - gap * 4f) / 5f;
+            float totalWidth = Mathf.Min(Screen.width - 44f, 1120f);
+            float cardWidth = (totalWidth - gap * (HeroNames.Length - 1)) / HeroNames.Length;
             float startX = (Screen.width - totalWidth) * 0.5f;
             float top = 230f;
             float cardHeight = Mathf.Min(310f, Screen.height - 360f);
@@ -715,11 +718,10 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < HeroNames.Length; i++)
             {
                 Rect card = new Rect(startX + i * (cardWidth + gap), top, cardWidth, cardHeight);
-                DrawHeroCard(card, i, i == selectedHero);
-                if (GUI.Button(card, GUIContent.none, GUIStyle.none))
-                {
+                bool unlocked = IsHeroUnlocked(i);
+                DrawHeroCard(card, i, i == selectedHero, unlocked);
+                if (GUI.Button(card, GUIContent.none, GUIStyle.none) && unlocked)
                     selectedHero = i;
-                }
             }
 
             string continueLabel = stageNumber >= 2
@@ -772,7 +774,45 @@ namespace PersiaWar.Unity2D5D
                 stageTwoShopOpen = false;
         }
 
-        private void DrawHeroCard(Rect rect, int index, bool selected)
+        private bool IsHeroUnlocked(int index)
+        {
+            if (index == 0)
+                return true;
+
+            // Anahita becomes selectable only after she is rescued in Stage 1,
+            // and only for the Stage 2 hero-selection screen.
+            return index == 5 && stageNumber >= 2 &&
+                gameBootstrap != null && gameBootstrap.VillageGirlRescued;
+        }
+
+        private void CheckStageOneGirlRescue()
+        {
+            if (stageNumber != 1 || player == null || gameBootstrap == null ||
+                gameBootstrap.VillageGirlRescued || player.IsDefeated)
+                return;
+
+            if (gameBootstrap.TryRescueVillageGirl(player.transform.position))
+                girlRescueNoticeUntil = Time.unscaledTime + 4.5f;
+        }
+
+        private void DrawGirlRescueNotice()
+        {
+            if (Time.unscaledTime >= girlRescueNoticeUntil)
+                return;
+
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float width = Mathf.Min(Screen.width - 36f, 720f);
+            float height = 76f * scale;
+            Rect notice = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.28f, width, height);
+            Fill(notice, new Color(0.025f, 0.045f, 0.065f, 0.94f));
+            Fill(new Rect(notice.x, notice.y, notice.width, 4f * scale), new Color(0.98f, 0.72f, 0.22f, 1f));
+            GUI.Label(new Rect(notice.x + 12f, notice.y + 7f * scale, notice.width - 24f, 31f * scale),
+                "ANAHITA RESCUED!", menuHeaderStyle);
+            GUI.Label(new Rect(notice.x + 12f, notice.y + 39f * scale, notice.width - 24f, 27f * scale),
+                "SHE WILL BE AVAILABLE FOR STAGE 2", menuSmallStyle);
+        }
+
+        private void DrawHeroCard(Rect rect, int index, bool selected, bool unlocked)
         {
             Color panel = selected ? new Color(0.18f, 0.31f, 0.40f, 0.98f) : new Color(0.035f, 0.065f, 0.10f, 0.96f);
             Fill(rect, selected ? new Color(1f, 0.75f, 0.22f, 1f) : new Color(0.30f, 0.35f, 0.42f, 1f));
@@ -783,7 +823,18 @@ namespace PersiaWar.Unity2D5D
             DrawChibiFigure(figure, index);
 
             GUI.Label(new Rect(rect.x + 8f, rect.yMax - 82f, rect.width - 16f, 34f), HeroNames[index], menuSmallStyle);
-            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), selected ? "✦ SELECTED ✦" : "TAP TO SELECT", menuSmallStyle);
+            string state = selected && unlocked ? "✦ SELECTED ✦" : (unlocked ? "TAP TO SELECT" : "LOCKED");
+            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), state, menuSmallStyle);
+
+            if (!unlocked)
+            {
+                Fill(rect, new Color(0.015f, 0.025f, 0.04f, 0.58f));
+                GUI.Label(new Rect(rect.x + 6f, rect.center.y - 12f, rect.width - 12f, 34f),
+                    "LOCKED", menuButtonStyle);
+                string hint = index == 5 ? "RESCUE IN STAGE 1" : "COMING SOON";
+                GUI.Label(new Rect(rect.x + 6f, rect.center.y + 21f, rect.width - 12f, 34f),
+                    hint, menuSmallStyle);
+            }
         }
 
         private void DrawChibiFigure(Rect rect, int index)
@@ -794,7 +845,8 @@ namespace PersiaWar.Unity2D5D
                 new Color(0.08f, 0.37f, 0.48f),
                 new Color(0.16f, 0.39f, 0.24f),
                 new Color(0.35f, 0.15f, 0.42f),
-                new Color(0.39f, 0.28f, 0.08f)
+                new Color(0.39f, 0.28f, 0.08f),
+                new Color(0.78f, 0.20f, 0.48f)
             };
 
             Vector2 center = new Vector2(rect.center.x, rect.y + rect.height * 0.55f);
@@ -814,6 +866,14 @@ namespace PersiaWar.Unity2D5D
             else if (index == 3)
             {
                 Fill(new Rect(center.x - head * 0.82f, center.y - head * 1.45f, head * 1.64f, head * 0.18f), new Color(0.90f, 0.22f, 0.12f));
+            }
+            else if (index == 5)
+            {
+                Fill(new Rect(center.x - head * 0.78f, center.y - head * 1.36f, head * 1.56f, head * 0.36f), new Color(0.10f, 0.055f, 0.035f));
+                Fill(new Rect(center.x - head * 0.82f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
+                Fill(new Rect(center.x + head * 0.52f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
+                Fill(new Rect(center.x - body * 0.34f, center.y + body * 0.65f, body * 0.68f, body * 0.62f), new Color(0.80f, 0.22f, 0.50f));
+                Fill(new Rect(center.x - body * 0.48f, center.y + body * 0.59f, body * 0.96f, body * 0.12f), new Color(0.95f, 0.72f, 0.24f));
             }
         }
         private void DrawDropMap()
