@@ -31,6 +31,8 @@ namespace PersiaWar.Unity2D5D
         private float nextMeleeTime;
         private int magazine;
         private int reserve;
+        private bool axeEnabledForMatch;
+        private bool axeProfileApplied;
         private PlayerController player;
         private Transform gunRoot;
         private Transform axeRoot;
@@ -139,10 +141,15 @@ namespace PersiaWar.Unity2D5D
         {
             int oldMagazineSize = Mathf.Max(1, magazineSize);
             float oldAmmoRatio = preserveAmmo ? magazine / (float)oldMagazineSize : 1f;
-            // Restore standard melee-button tuning before applying a weapon-specific profile.
-            meleeDamage = 45;
-            meleeRange = 3.1f;
-            meleeCooldown = 0.32f;
+            // Only restore the original melee tuning after leaving the stage-two axe.
+            // Normal stage-one firearm switches keep their original serialized values.
+            if (axeProfileApplied && weaponKind != WeaponKind.Axe)
+            {
+                meleeDamage = 45;
+                meleeRange = 3.1f;
+                meleeCooldown = 0.32f;
+                axeProfileApplied = false;
+            }
 
             switch (weaponKind)
             {
@@ -171,6 +178,7 @@ namespace PersiaWar.Unity2D5D
                     meleeDamage = 72;
                     meleeRange = 3.2f;
                     meleeCooldown = 0.42f;
+                    axeProfileApplied = true;
                     break;
 
                 default:
