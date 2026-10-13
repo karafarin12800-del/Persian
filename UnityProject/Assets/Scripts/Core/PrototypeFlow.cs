@@ -93,11 +93,11 @@ namespace PersiaWar.Unity2D5D
         private static readonly string[] HeroNames =
         {
             "KING ARDESHIR",
+            "ANAHITA",
             "PARS GUARD",
             "ROYAL SCOUT",
             "SILK WARRIOR",
-            "DESERT KNIGHT",
-            "ANAHITA"
+            "DESERT KNIGHT"
         };
 
         private void Awake()
@@ -779,9 +779,8 @@ namespace PersiaWar.Unity2D5D
             if (index == 0)
                 return true;
 
-            // Anahita becomes selectable only after she is rescued in Stage 1,
-            // and only for the Stage 2 hero-selection screen.
-            return index == 5 && stageNumber >= 2 &&
+            // Anahita is deliberately the second card from the left.
+            return index == 1 && stageNumber >= 2 &&
                 gameBootstrap != null && gameBootstrap.VillageGirlRescued;
         }
 
@@ -841,12 +840,12 @@ namespace PersiaWar.Unity2D5D
         {
             Color[] bodyColors =
             {
-                new Color(0.45f, 0.17f, 0.10f),
-                new Color(0.08f, 0.37f, 0.48f),
-                new Color(0.16f, 0.39f, 0.24f),
-                new Color(0.35f, 0.15f, 0.42f),
-                new Color(0.39f, 0.28f, 0.08f),
-                new Color(0.78f, 0.20f, 0.48f)
+                new Color(0.45f, 0.17f, 0.10f), // Ardeshir
+                new Color(0.78f, 0.20f, 0.48f), // Anahita
+                new Color(0.08f, 0.37f, 0.48f), // Pars Guard
+                new Color(0.16f, 0.39f, 0.24f), // Royal Scout
+                new Color(0.35f, 0.15f, 0.42f), // Silk Warrior
+                new Color(0.39f, 0.28f, 0.08f)  // Desert Knight
             };
 
             Vector2 center = new Vector2(rect.center.x, rect.y + rect.height * 0.55f);
@@ -863,12 +862,13 @@ namespace PersiaWar.Unity2D5D
                 Fill(new Rect(center.x - 4f, center.y - head * 1.86f, 8f, head * 0.40f), new Color(0.92f, 0.66f, 0.14f));
                 Fill(new Rect(center.x - head * 0.44f, center.y - head * 0.28f, head * 0.88f, head * 0.47f), new Color(0.08f, 0.055f, 0.04f));
             }
-            else if (index == 3)
+            else if (index == 4)
             {
                 Fill(new Rect(center.x - head * 0.82f, center.y - head * 1.45f, head * 1.64f, head * 0.18f), new Color(0.90f, 0.22f, 0.12f));
             }
-            else if (index == 5)
+            else if (index == 1)
             {
+                // Feminine silhouette, long dark hair and pink dress for Anahita.
                 Fill(new Rect(center.x - head * 0.78f, center.y - head * 1.36f, head * 1.56f, head * 0.36f), new Color(0.10f, 0.055f, 0.035f));
                 Fill(new Rect(center.x - head * 0.82f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
                 Fill(new Rect(center.x + head * 0.52f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
