@@ -14,6 +14,10 @@ namespace PersiaWar.Unity2D5D
         // Stage two is opt-in; the existing first-stage city remains the default path.
         private bool stageTwoRequested;
         private int stageTwoLayoutVariant;
+        private GameObject captiveVillageGirlRoot;
+        private Vector3 captiveVillageGirlPosition;
+
+        public bool VillageGirlRescued { get; private set; }
 
         public bool IsWorldReady { get; private set; }
         public bool IsWorldPreparing { get; private set; }
@@ -997,7 +1001,127 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_START");
             BuildAndroidAlleysAndVehicles();
             StartupCheckpoint.Set("CITY_ALLEYS_VEHICLES_DONE");
+            // This rescue encounter belongs only to the original city/Stage 1.
+            // It is intentionally not created in the second-stage village rebuild.
+            if (!stageTwoRequested)
+                CreateAndroidCaptiveVillageGirl();
+
             StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
+        }
+
+        public bool TryRescueVillageGirl(Vector3 playerPosition)
+        {
+            if (stageTwoRequested || VillageGirlRescued || captiveVillageGirlRoot == null)
+                return false;
+
+            Vector2 playerXZ = new Vector2(playerPosition.x, playerPosition.z);
+            Vector2 girlXZ = new Vector2(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z);
+            // The trigger is deliberately inside the chosen house, not on the street:
+            // this only fires after the player reaches the interior.
+            if (Vector2.Distance(playerXZ, girlXZ) > 3.35f)
+                return false;
+
+            VillageGirlRescued = true;
+            captiveVillageGirlRoot.SetActive(false);
+            StartupCheckpoint.Set("VillageGirlRescuedInsideHouse");
+            Debug.Log("PERSIA_RESCUE: Anahita rescued inside the Stage 1 house");
+            return true;
+        }
+
+        private void CreateAndroidCaptiveVillageGirl()
+        {
+            VillageGirlRescued = false;
+            // This is the existing Stage 1 house at (-7, 17), so no city roads,
+            // building placement, loot spawning or player controls are modified.
+            captiveVillageGirlPosition = new Vector3(
+                -7f, CalculateAndroidTerrainHeight(-7f, 17f), 17f);
+
+            captiveVillageGirlRoot = new GameObject("CaptiveVillageGirl_Anahita");
+            captiveVillageGirlRoot.transform.SetParent(worldRoot, true);
+            captiveVillageGirlRoot.transform.position = captiveVillageGirlPosition;
+
+            Material skin = MakeMaterial("RescueGirlSkin", new Color(0.78f, 0.54f, 0.39f));
+            Material hair = MakeMaterial("RescueGirlHair", new Color(0.10f, 0.055f, 0.035f));
+            Material dress = MakeMaterial("RescueGirlDress", new Color(0.72f, 0.20f, 0.48f));
+            Material sash = MakeMaterial("RescueGirlSash", new Color(0.95f, 0.70f, 0.22f));
+            Material shoes = MakeMaterial("RescueGirlShoes", new Color(0.16f, 0.12f, 0.10f));
+            Material bars = MakeMaterial("RescueGirlCageBars", new Color(0.30f, 0.31f, 0.29f));
+            Material sparkle = MakeMaterial("RescueGirlRescueMarker", new Color(1f, 0.78f, 0.18f));
+
+            // A readable low-poly girl silhouette: long dark hair, a dress, a sash
+            // and a face. All pieces are visual-only; the encounter is distance-triggered.
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "Dress", PrimitiveType.Cylinder,
+                new Vector3(0f, 0.64f, 0f), new Vector3(0.39f, 0.43f, 0.31f), dress, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "UpperBody", PrimitiveType.Capsule,
+                new Vector3(0f, 1.12f, 0f), new Vector3(0.27f, 0.29f, 0.23f), dress, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "WaistSash", PrimitiveType.Cube,
+                new Vector3(0f, 0.88f, 0.02f), new Vector3(0.43f, 0.075f, 0.32f), sash, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "Head", PrimitiveType.Sphere,
+                new Vector3(0f, 1.54f, 0.025f), new Vector3(0.35f, 0.37f, 0.32f), skin, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "HairCap", PrimitiveType.Sphere,
+                new Vector3(0f, 1.72f, -0.015f), new Vector3(0.39f, 0.24f, 0.35f), hair, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LongHairLeft", PrimitiveType.Capsule,
+                new Vector3(-0.25f, 1.38f, -0.06f), new Vector3(0.13f, 0.31f, 0.14f), hair, new Vector3(0f, 0f, -8f));
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LongHairRight", PrimitiveType.Capsule,
+                new Vector3(0.25f, 1.38f, -0.06f), new Vector3(0.13f, 0.31f, 0.14f), hair, new Vector3(0f, 0f, 8f));
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LegLeft", PrimitiveType.Capsule,
+                new Vector3(-0.12f, 0.20f, 0f), new Vector3(0.11f, 0.25f, 0.12f), shoes, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LegRight", PrimitiveType.Capsule,
+                new Vector3(0.12f, 0.20f, 0f), new Vector3(0.11f, 0.25f, 0.12f), shoes, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "EyeLeft", PrimitiveType.Sphere,
+                new Vector3(-0.085f, 1.57f, 0.177f), new Vector3(0.035f, 0.045f, 0.025f), hair, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "EyeRight", PrimitiveType.Sphere,
+                new Vector3(0.085f, 1.57f, 0.177f), new Vector3(0.035f, 0.045f, 0.025f), hair, Vector3.zero);
+
+            // A small iron cage makes the captive state clear but does not block
+            // movement or bullets; rescue is intentionally tied to entering the room.
+            for (int i = 0; i < 4; i++)
+            {
+                float x = -0.54f + i * 0.36f;
+                CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageFrontBar_" + i,
+                    PrimitiveType.Cube, new Vector3(x, 0.92f, -0.48f),
+                    new Vector3(0.035f, 1.55f, 0.035f), bars, Vector3.zero);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                float x = i == 0 ? -0.61f : 0.61f;
+                CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageSideBar_" + i,
+                    PrimitiveType.Cube, new Vector3(x, 0.92f, 0f),
+                    new Vector3(0.035f, 1.55f, 1.0f), bars, Vector3.zero);
+            }
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageTop",
+                PrimitiveType.Cube, new Vector3(0f, 1.72f, -0.02f),
+                new Vector3(1.25f, 0.045f, 1.0f), bars, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "CageBottom",
+                PrimitiveType.Cube, new Vector3(0f, 0.15f, -0.02f),
+                new Vector3(1.25f, 0.045f, 1.0f), bars, Vector3.zero);
+            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "RescueMarker",
+                PrimitiveType.Sphere, new Vector3(0f, 2.10f, 0f),
+                new Vector3(0.18f, 0.18f, 0.18f), sparkle, Vector3.zero);
+
+            Debug.Log("PERSIA_RESCUE: Anahita captive placed inside Stage 1 house (-7, 17)");
+        }
+
+        private void CreateRescueGirlPart(
+            Transform parent, string partName, PrimitiveType primitive,
+            Vector3 localPosition, Vector3 localScale, Material material, Vector3 localEuler)
+        {
+            GameObject part = GameObject.CreatePrimitive(primitive);
+            part.name = partName;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+            part.transform.localRotation = Quaternion.Euler(localEuler);
+            Renderer renderer = part.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+            Collider collider = part.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
         }
 
         private readonly List<Vector3> androidBuildingCenters = new List<Vector3>();
