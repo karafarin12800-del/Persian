@@ -2055,6 +2055,9 @@ namespace PersiaWar.Unity2D5D
                 if (stageNumber >= 2)
                     enemySpawner.ConfigureStageTwoArena(player.transform);
                 else
+                    if (stageNumber >= 2)
+                    enemySpawner.ConfigureStageTwoArena(player.transform);
+                else
                     enemySpawner.Configure(player.transform, 24, 84f, 0f);
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
@@ -2408,18 +2411,28 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
             bool hovered = Event.current != null && rect.Contains(Event.current.mousePosition);
-            Color gold = selected || hovered
-                ? new Color(1f, 0.78f, 0.25f, 1f)
-                : new Color(0.61f, 0.43f, 0.17f, 1f);
+            Color edge = selected || hovered
+                ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
+                : new Color(0.35f, 0.66f, 0.78f, 0.68f);
 
-            Fill(rect, gold);
+            // Layered translucent glass with a lower shadow and top bevel gives
+            // menu controls a raised, readable appearance without changing layout.
+            Fill(new Rect(rect.x + 3f * scale, rect.y + 5f * scale, rect.width, rect.height),
+                new Color(0f, 0f, 0f, 0.36f));
+            Fill(rect, edge);
             float inset = Mathf.Max(2f, 2.5f * scale);
             Rect inner = new Rect(rect.x + inset, rect.y + inset,
                 Mathf.Max(0f, rect.width - inset * 2f), Mathf.Max(0f, rect.height - inset * 2f));
-            Fill(inner, new Color(0.035f, 0.065f, 0.105f, 0.97f));
-            Fill(new Rect(inner.x + 4f * scale, inner.y + 2f * scale,
-                Mathf.Max(0f, inner.width - 8f * scale), Mathf.Max(1f, 1.5f * scale)),
-                new Color(1f, 0.76f, 0.28f, selected || hovered ? 0.95f : 0.50f));
+            Fill(inner, new Color(0.025f, 0.075f, 0.12f, 0.78f));
+            Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
+                Mathf.Max(0f, inner.width - 4f * scale), Mathf.Max(1f, rect.height * 0.20f)),
+                new Color(0.52f, 0.86f, 0.98f, selected || hovered ? 0.25f : 0.13f));
+            Fill(new Rect(inner.x + 2f * scale, inner.yMax - 3f * scale,
+                Mathf.Max(0f, inner.width - 4f * scale), 2f * scale),
+                new Color(0f, 0f, 0f, 0.30f));
+            Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
+                2f * scale, Mathf.Max(0f, inner.height - 4f * scale)),
+                new Color(0.65f, 0.94f, 1f, 0.34f));
 
             bool clicked = GUI.Button(rect, GUIContent.none, GUIStyle.none);
             GUI.Label(rect, label, menuButtonStyle);
