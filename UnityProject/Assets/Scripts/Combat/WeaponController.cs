@@ -87,9 +87,22 @@ namespace PersiaWar.Unity2D5D
             RefreshWeaponVisual();
         }
 
+        public void SetAxeEnabledForMatch(bool enabledForStageTwo)
+        {
+            axeEnabledForMatch = enabledForStageTwo;
+            if (!axeEnabledForMatch && weaponKind == WeaponKind.Axe)
+            {
+                weaponKind = WeaponKind.AssaultRifle;
+                ApplyWeaponProfile(false);
+                RefreshWeaponVisual();
+                UpdateRangeIndicator();
+            }
+        }
+
         public void CycleWeapon()
         {
-            weaponKind = (WeaponKind)(((int)weaponKind + 1) % 4);
+            int weaponCount = axeEnabledForMatch ? 4 : 3;
+            weaponKind = (WeaponKind)(((int)weaponKind + 1) % weaponCount);
             ApplyWeaponProfile(true);
             RefreshWeaponVisual();
             UpdateRangeIndicator();
@@ -98,6 +111,9 @@ namespace PersiaWar.Unity2D5D
 
         public void SelectWeapon(WeaponKind selectedWeapon)
         {
+            if (selectedWeapon == WeaponKind.Axe && !axeEnabledForMatch)
+                selectedWeapon = WeaponKind.AssaultRifle;
+
             bool changed = weaponKind != selectedWeapon;
             weaponKind = selectedWeapon;
 
