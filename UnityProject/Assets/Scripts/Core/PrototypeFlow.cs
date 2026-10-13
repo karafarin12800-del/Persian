@@ -60,6 +60,10 @@ namespace PersiaWar.Unity2D5D
         // 0 = village cluster, 1 = mirrored village, 2 = rotated village.
         private int stageTwoLayoutVariant;
         private bool startingMatch;
+        private bool stageTwoLobbyRunning;
+        private bool stageTwoLobbyReady;
+        private int stageTwoLobbyPlayers = 1;
+        private float stageTwoLobbyStartedAt;
         private bool matchInputArmed;
         private bool matchPaused;
         private float resultOverlayStartTime = -1f;
@@ -293,8 +297,6 @@ namespace PersiaWar.Unity2D5D
                         // Stage 1's ExtractionBeacon is already attached to Anahita's
                         // randomized house and is shown when the final wave is eliminated.
                         // Do not draw a second, unrelated beam after mission completion.
-                        if (GameSession.Instance.PlayerWon && gameBootstrap != null && stageNumber >= 2)
-                            gameBootstrap.ShowRandomExtractionBeacon();
                     }
                     DrawAndroidResultOverlay();
                 }
@@ -302,6 +304,12 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
             DrawBackdrop();
+
+            if (stageTwoLobbyRunning)
+            {
+                DrawStageTwoLobbyOverlay();
+                return;
+            }
 
             if (startingMatch)
             {
@@ -1534,12 +1542,73 @@ namespace PersiaWar.Unity2D5D
 
         private void StartMatch()
         {
-            if (!spawnChosen || startingMatch)
+            if (!spawnChosen || startingMatch || stageTwoLobbyRunning)
                 return;
 
             matchPaused = false;
             Time.timeScale = 1f;
+            if (stageNumber >= 2 && !stageTwoLobbyReady)
+            {
+                StartCoroutine(RunStageTwoLobby());
+                return;
+            }
             StartCoroutine(BeginMatchSafely());
+        }
+
+        private IEnumerator RunStageTwoLobby()
+        {
+            stageTwoLobbyRunning = true;
+            stageTwoLobbyPlayers = 1;
+            stageTwoLobbyStartedAt = Time.unscaledTime;
+            StartupCheckpoint.Set("StageTwoLobbyStarted");
+
+            // This project has no online-session backend yet. Be explicit: the first
+            // slot is the local player and remaining slots are local AI competitors.
+            // A real human online count requires a server/networking service.
+            yield return new WaitForSecondsRealtime(7f);
+            while (stageTwoLobbyPlayers < 10)
+            {
+                stageTwoLobbyPlayers++;
+                StartupCheckpoint.Set("StageTwoLobbyRoster_" + stageTwoLobbyPlayers);
+                yield return new WaitForSecondsRealtime(1f);
+            }
+
+            stageTwoLobbyReady = true;
+            stageTwoLobbyRunning = false;
+            StartupCheckpoint.Set("StageTwoLobbyReady");
+            StartMatch();
+        }
+
+        private void DrawStageTwoLobbyOverlay()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.2f);
+            Rect shade = new Rect(0f, 0f, Screen.width, Screen.height);
+            Fill(shade, new Color(0.015f, 0.025f, 0.045f, 0.72f));
+
+            float width = Mathf.Min(Screen.width - 44f, 660f);
+            float height = Mathf.Min(Screen.height - 60f, 390f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Fill(new Rect(panel.x + 5f, panel.y + 8f, panel.width, panel.height), new Color(0f, 0f, 0f, 0.40f));
+            Fill(panel, new Color(0.035f, 0.075f, 0.12f, 0.94f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 5f), new Color(0.25f, 0.92f, 0.45f, 0.95f));
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 26f, panel.width - 36f, 54f), "STAGE 2  •  ARENA LOBBY", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 92f, panel.width - 36f, 42f),
+                "COMPETITORS  " + stageTwoLobbyPlayers + " / 10", menuBodyStyle);
+
+            Rect track = new Rect(panel.x + 42f, panel.y + 150f, panel.width - 84f, 18f);
+            Fill(track, new Color(0.10f, 0.16f, 0.20f, 0.95f));
+            Fill(new Rect(track.x, track.y, track.width * (stageTwoLobbyPlayers / 10f), track.height),
+                new Color(0.20f, 0.92f, 0.42f, 0.95f));
+
+            float elapsed = Time.unscaledTime - stageTwoLobbyStartedAt;
+            string status = elapsed < 7f
+                ? "SEARCHING FOR ONLINE PLAYERS  •  " + Mathf.CeilToInt(7f - elapsed) + "s"
+                : "FILLING REMAINING SLOTS WITH LOCAL AI  •  +1 / SECOND";
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 190f, panel.width - 36f, 46f), status, menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 24f, panel.y + 244f, panel.width - 48f, 58f),
+                "100 ALIENS  •  5 WAVES  •  NEXT WAVE AT 6 REMAINING", menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 24f, panel.y + panel.height - 54f, panel.width - 48f, 30f),
+                "ONLINE MULTIPLAYER NEEDS A SERVER; THIS BUILD USES LOCAL AI FILL", menuSmallStyle);
         }
 
         private void DrawAndroidPauseControl()
@@ -1983,7 +2052,10 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                if (stageNumber >= 2)
+                    enemySpawner.ConfigureStageTwoArena(player.transform);
+                else
+                    enemySpawner.Configure(player.transform, 24, 84f, 0f);
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
@@ -2156,7 +2228,7 @@ namespace PersiaWar.Unity2D5D
                 return;
             // The blue extraction gate is reserved for a win after the final opponent
             // is eliminated. A player defeat skips the transition and shows GAME OVER.
-            if (session.PlayerWon)
+            if (session.PlayerWon && stageNumber == 1)
             {
                 float elapsed = Mathf.Max(0f, Time.unscaledTime - resultOverlayStartTime);
                 if (elapsed < 1.65f)
