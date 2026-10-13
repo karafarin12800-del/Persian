@@ -19,7 +19,7 @@ namespace PersiaWar.Unity2D5D
             CurrentHealth = maxHealth;
         }
 
-        public void ApplyDamage(int amount)
+        public void ApplyDamage(int amount, Transform attacker = null)
         {
             if (CurrentHealth <= 0) return;
             amount = Mathf.Max(0, amount);
@@ -39,6 +39,8 @@ namespace PersiaWar.Unity2D5D
             if (enemy != null)
             {
                 int scoreBonus = Mathf.Max(0, enemy.ScoreValue - 10);
+                if (StageTwoArenaManager.Instance != null)
+                    StageTwoArenaManager.Instance.RegisterKill(attacker);
                 if (GameSession.Instance != null)
                 {
                     GameSession.Instance.RegisterEnemyDefeated();
