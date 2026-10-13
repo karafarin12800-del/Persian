@@ -263,7 +263,6 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("AndroidEnemySpawnAttempt");
                 SpawnEnemy(position, spawned, currentWave);
                 spawned++;
-                if (stageTwoArena) EnemiesSpawnedForArena++;
                 StartupCheckpoint.Set("AndroidEnemySpawnComplete");
                 yield return null;
 
@@ -319,7 +318,7 @@ namespace PersiaWar.Unity2D5D
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
             if (stageTwoArena) chase.enabled = false;
             chase.Configure(player, archetype);
-            if (stageTwoArena) StartCoroutine(AnimateAlienLanding(enemy.transform, chase, groundPosition));
+            if (stageTwoArena) StartCoroutine(AnimateAlienLanding(enemy.transform, chase, groundPosition, archetype));
 #else
             GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             enemy.name = stageTwoArena ? $"Alien_W{currentWave}_{index}" : $"Enemy_W{currentWave}_{index}";
@@ -342,13 +341,18 @@ namespace PersiaWar.Unity2D5D
             EnemyChase chase = enemy.AddComponent<EnemyChase>();
             if (stageTwoArena) chase.enabled = false;
             chase.Configure(player, archetype);
-            if (stageTwoArena) StartCoroutine(AnimateAlienLanding(enemy.transform, chase, groundPosition));
+            if (stageTwoArena) StartCoroutine(AnimateAlienLanding(enemy.transform, chase, groundPosition, archetype));
 #endif
-            if (stageTwoArena) EnemiesSpawnedForArena++;
+            if (stageTwoArena)
+            {
+                CreateAlienEye(enemy.transform, new Vector3(-0.15f, 0.24f, 0.39f), "L_" + currentWave + "_" + index);
+                CreateAlienEye(enemy.transform, new Vector3(0.15f, 0.24f, 0.39f), "R_" + currentWave + "_" + index);
+                EnemiesSpawnedForArena++;
+            }
             StartupCheckpoint.Set("AndroidEnemyObjectConstructionComplete");
         }
 
-        private IEnumerator AnimateAlienLanding(Transform alien, EnemyChase chase, Vector3 groundPosition)
+        private IEnumerator AnimateAlienLanding(Transform alien, EnemyChase chase, Vector3 groundPosition, int archetype)
         {
             if (alien == null) yield break;
             GameObject beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -381,8 +385,29 @@ namespace PersiaWar.Unity2D5D
             {
                 alien.position = groundPosition;
                 if (chase != null) chase.enabled = true;
+                StageTwoAlienTactics tactics = alien.GetComponent<StageTwoAlienTactics>();
+                if (tactics == null) tactics = alien.gameObject.AddComponent<StageTwoAlienTactics>();
+                tactics.Configure(player, archetype);
             }
             if (beam != null) Destroy(beam, 0.12f);
+        }
+
+        private void CreateAlienEye(Transform parent, Vector3 localPosition, string suffix)
+        {
+            GameObject eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            eye.name = "AlienGreenEye_" + suffix;
+            eye.transform.SetParent(parent, false);
+            eye.transform.localPosition = localPosition;
+            eye.transform.localScale = new Vector3(0.10f, 0.075f, 0.06f);
+            Collider eyeCollider = eye.GetComponent<Collider>();
+            if (eyeCollider != null) Destroy(eyeCollider);
+            Renderer eyeRenderer = eye.GetComponent<Renderer>();
+            if (eyeRenderer != null)
+            {
+                eyeRenderer.sharedMaterial = RuntimeMaterialFactory.Create("AlienEyeGlow", new Color(0.45f, 1f, 0.22f));
+                eyeRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                eyeRenderer.receiveShadows = false;
+            }
         }
 
         private void SpawnWaveReward()
