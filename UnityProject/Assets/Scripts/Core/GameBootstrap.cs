@@ -1936,11 +1936,26 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            QueueAndroidBox(
-                isWarehouse ? "WarehouseLoadingDoor" : "Door",
-                position + new Vector3(0f, 1.12f, -depth * 0.54f),
-                new Vector3(doorWidth, isWarehouse ? 2.35f : 2.15f, 0.14f),
-                door);
+            if (stageTwoRequested && !isWarehouse)
+            {
+                // The village doors are shown ajar so the entrance reads as walkable.
+                // There is no door collider; collision is owned by the wall sections,
+                // which leave a 1.9m opening for the player.
+                QueueAndroidBox(
+                    "VillageOpenDoorLeaf",
+                    position + new Vector3(-doorWidth * 0.43f, doorHeight * 0.50f,
+                        -depth * 0.5f - doorWidth * 0.22f),
+                    new Vector3(0.13f, doorHeight, doorWidth * 0.68f),
+                    door);
+            }
+            else
+            {
+                QueueAndroidBox(
+                    isWarehouse ? "WarehouseLoadingDoor" : "Door",
+                    position + new Vector3(0f, 1.12f, -depth * 0.54f),
+                    new Vector3(doorWidth, isWarehouse ? 2.35f : 2.15f, 0.14f),
+                    door);
+            }
 
             if (isWarehouse)
             {
