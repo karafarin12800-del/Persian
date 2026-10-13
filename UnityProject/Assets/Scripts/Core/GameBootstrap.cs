@@ -16,6 +16,9 @@ namespace PersiaWar.Unity2D5D
         private int stageTwoLayoutVariant;
         private GameObject captiveVillageGirlRoot;
         private Vector3 captiveVillageGirlPosition;
+        // Keep the blue beam at the house interior while Anahita waits just outside
+        // its front entrance, so the player can free her before stepping into the beam.
+        private Vector3 captiveVillageGirlBeaconPosition;
 
         public bool VillageGirlRescued { get; private set; }
 
@@ -553,8 +556,8 @@ namespace PersiaWar.Unity2D5D
                 PlayerController currentPlayer = FindFirstObjectByType<PlayerController>();
                 if (currentPlayer != null)
                     MoveCaptiveGirlAtLeast50mFrom(currentPlayer.transform.position);
-                beaconX = captiveVillageGirlPosition.x;
-                beaconZ = captiveVillageGirlPosition.z;
+                beaconX = captiveVillageGirlBeaconPosition.x;
+                beaconZ = captiveVillageGirlBeaconPosition.z;
             }
             Vector3 ground = new Vector3(beaconX, CalculateAndroidTerrainHeight(beaconX, beaconZ) + 0.08f, beaconZ);
 
@@ -1078,10 +1081,7 @@ namespace PersiaWar.Unity2D5D
                 return false;
             }
 
-            beaconPosition = new Vector3(
-                captiveVillageGirlPosition.x,
-                CalculateAndroidTerrainHeight(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z) + 0.08f,
-                captiveVillageGirlPosition.z);
+            beaconPosition = captiveVillageGirlBeaconPosition;
             Debug.Log("PERSIA_RESCUE: extraction beam placed on Anahita's house " +
                 distance.ToString("F1") + "m from player when final enemy was eliminated.");
             return true;
@@ -1125,10 +1125,21 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             Vector3 targetHouse = androidBuildingCenters[selected];
+            captiveVillageGirlBeaconPosition = new Vector3(
+                targetHouse.x,
+                CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z) + 0.08f,
+                targetHouse.z);
+
+            // House entrances face the negative-Z side. Put the captive outside the
+            // entrance, in front of the blue beam inside the house, not in the room.
+            float halfDepth = selected < androidBuildingHalfExtents.Count
+                ? androidBuildingHalfExtents[selected].z
+                : 3.5f;
+            float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
             captiveVillageGirlPosition = new Vector3(
                 targetHouse.x,
-                CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z),
-                targetHouse.z);
+                CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z - frontOffset),
+                targetHouse.z - frontOffset);
             captiveVillageGirlRoot.transform.position = captiveVillageGirlPosition;
             captiveVillageGirlRoot.SetActive(true);
             float actualDistance = Vector2.Distance(
@@ -1148,13 +1159,23 @@ namespace PersiaWar.Unity2D5D
             if (houseIndex >= 0 && houseIndex < androidBuildingCenters.Count)
             {
                 Vector3 house = androidBuildingCenters[houseIndex];
+                captiveVillageGirlBeaconPosition = new Vector3(
+                    house.x, CalculateAndroidTerrainHeight(house.x, house.z) + 0.08f, house.z);
+                float halfDepth = houseIndex < androidBuildingHalfExtents.Count
+                    ? androidBuildingHalfExtents[houseIndex].z
+                    : 3.5f;
+                float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
                 captiveVillageGirlPosition = new Vector3(
-                    house.x, CalculateAndroidTerrainHeight(house.x, house.z), house.z);
+                    house.x,
+                    CalculateAndroidTerrainHeight(house.x, house.z - frontOffset),
+                    house.z - frontOffset);
             }
             else
             {
+                captiveVillageGirlBeaconPosition = new Vector3(
+                    -7f, CalculateAndroidTerrainHeight(-7f, 17f) + 0.08f, 17f);
                 captiveVillageGirlPosition = new Vector3(
-                    -7f, CalculateAndroidTerrainHeight(-7f, 17f), 17f);
+                    -7f, CalculateAndroidTerrainHeight(-7f, 9f), 9f);
             }
 
             captiveVillageGirlRoot = new GameObject("CaptiveVillageGirl_Anahita");
