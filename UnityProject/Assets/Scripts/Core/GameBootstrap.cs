@@ -404,6 +404,11 @@ namespace PersiaWar.Unity2D5D
             filter.sharedMesh = mesh;
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
+            if (stageTwoRequested)
+            {
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = true;
+            }
 
             MeshCollider collider = obj.AddComponent<MeshCollider>();
             collider.sharedMesh = mesh;
@@ -537,10 +542,20 @@ namespace PersiaWar.Unity2D5D
             RemoveAnyExtractionBeacon();
             extractionBeaconShown = true;
 
-            // Random road intersection chosen only at victory; no blue beam is visible during the match.
+            // Stage 1: when the final opponent is eliminated, light the house holding
+            // Anahita. Re-select a residential house at that moment if needed so it is
+            // at least 50 metres from the player. Stage 2 keeps its previous road beacon.
             float[] roads = { -67f, -43f, -19f, 5f, 29f, 53f, 77f };
             float beaconX = roads[Random.Range(0, roads.Length)];
             float beaconZ = roads[Random.Range(0, roads.Length)];
+            if (!stageTwoRequested && !VillageGirlRescued && captiveVillageGirlRoot != null)
+            {
+                PlayerController currentPlayer = FindFirstObjectByType<PlayerController>();
+                if (currentPlayer != null)
+                    MoveCaptiveGirlAtLeast50mFrom(currentPlayer.transform.position);
+                beaconX = captiveVillageGirlPosition.x;
+                beaconZ = captiveVillageGirlPosition.z;
+            }
             Vector3 ground = new Vector3(beaconX, CalculateAndroidTerrainHeight(beaconX, beaconZ) + 0.08f, beaconZ);
 
             CreateAndroidSkyGuideCylinder("BlueSkyGuideBeamOuter", ground + Vector3.up * 19f,
@@ -1028,13 +1043,91 @@ namespace PersiaWar.Unity2D5D
             return true;
         }
 
+        private bool IsStageOneResidentialHouseIndex(int index)
+        {
+            // These four footprints were authored as warehouses, not homes.
+            return index >= 0 && index < androidBuildingCenters.Count &&
+                index != 4 && index != 9 && index != 11 && index != 16;
+        }
+
+        private int ChooseRandomResidentialHouseIndex()
+        {
+            List<int> candidates = new List<int>();
+            for (int i = 0; i < androidBuildingCenters.Count; i++)
+                if (IsStageOneResidentialHouseIndex(i))
+                    candidates.Add(i);
+            return candidates.Count > 0 ? candidates[Random.Range(0, candidates.Count)] : -1;
+        }
+
+        private void MoveCaptiveGirlAtLeast50mFrom(Vector3 playerPosition)
+        {
+            if (stageTwoRequested || VillageGirlRescued || captiveVillageGirlRoot == null ||
+                androidBuildingCenters.Count == 0)
+                return;
+
+            List<int> candidates = new List<int>();
+            int farthestIndex = -1;
+            float farthestDistanceSq = -1f;
+            const float minimumDistanceSq = 50f * 50f;
+
+            for (int i = 0; i < androidBuildingCenters.Count; i++)
+            {
+                if (!IsStageOneResidentialHouseIndex(i))
+                    continue;
+
+                Vector3 house = androidBuildingCenters[i];
+                float dx = house.x - playerPosition.x;
+                float dz = house.z - playerPosition.z;
+                float distanceSq = dx * dx + dz * dz;
+                if (distanceSq > farthestDistanceSq)
+                {
+                    farthestDistanceSq = distanceSq;
+                    farthestIndex = i;
+                }
+                if (distanceSq >= minimumDistanceSq)
+                    candidates.Add(i);
+            }
+
+            // The map has enough spread for this constraint under normal play. If an
+            // unusual spawn puts every house within 50m, choose the farthest home.
+            int selected = candidates.Count > 0
+                ? candidates[Random.Range(0, candidates.Count)]
+                : farthestIndex;
+            if (selected < 0)
+                return;
+
+            Vector3 targetHouse = androidBuildingCenters[selected];
+            captiveVillageGirlPosition = new Vector3(
+                targetHouse.x,
+                CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z),
+                targetHouse.z);
+            captiveVillageGirlRoot.transform.position = captiveVillageGirlPosition;
+            captiveVillageGirlRoot.SetActive(true);
+            float actualDistance = Vector2.Distance(
+                new Vector2(playerPosition.x, playerPosition.z),
+                new Vector2(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z));
+            Debug.Log("PERSIA_RESCUE: captive house selected " + selected +
+                ", distance from player at final elimination=" + actualDistance.ToString("F1") + "m");
+        }
+
         private void CreateAndroidCaptiveVillageGirl()
         {
             VillageGirlRescued = false;
-            // This is the existing Stage 1 house at (-7, 17), so no city roads,
-            // building placement, loot spawning or player controls are modified.
-            captiveVillageGirlPosition = new Vector3(
-                -7f, CalculateAndroidTerrainHeight(-7f, 17f), 17f);
+
+            // Pick a random existing residential house. Do not alter the city layout
+            // or create extra houses; the captive's visual stays inside that house.
+            int houseIndex = ChooseRandomResidentialHouseIndex();
+            if (houseIndex >= 0 && houseIndex < androidBuildingCenters.Count)
+            {
+                Vector3 house = androidBuildingCenters[houseIndex];
+                captiveVillageGirlPosition = new Vector3(
+                    house.x, CalculateAndroidTerrainHeight(house.x, house.z), house.z);
+            }
+            else
+            {
+                captiveVillageGirlPosition = new Vector3(
+                    -7f, CalculateAndroidTerrainHeight(-7f, 17f), 17f);
+            }
 
             captiveVillageGirlRoot = new GameObject("CaptiveVillageGirl_Anahita");
             captiveVillageGirlRoot.transform.SetParent(worldRoot, true);
@@ -1369,6 +1462,8 @@ namespace PersiaWar.Unity2D5D
             Mesh mesh = new Mesh { name = objectName + "Mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0, true);
+            if (stageTwoRequested)
+                mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             mesh.UploadMeshData(true);
 
@@ -1376,6 +1471,11 @@ namespace PersiaWar.Unity2D5D
             filter.sharedMesh = mesh;
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
+            if (stageTwoRequested)
+            {
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = true;
+            }
             return obj;
         }
 
@@ -1469,8 +1569,8 @@ namespace PersiaWar.Unity2D5D
                 float wallHeight = 1.42f + (i % 3) * 0.12f;
                 float wallThickness = 0.38f;
                 // Closely adjoining plots give the village a compact lived-in texture.
-                float lotWidth = style == 1 ? 15.2f : 14.8f;
-                float lotDepth = style == 1 ? 15.2f : 14.8f;
+                float lotWidth = 12.8f;
+                float lotDepth = 12.8f;
                 Material adobeWall = wallMaterials[i % wallMaterials.Length];
 
                 androidCurrentBuildingRoot = new GameObject("Building_VillageHouse_" + (i + 1)).transform;
@@ -1488,12 +1588,14 @@ namespace PersiaWar.Unity2D5D
                 {
                     // A real central-courtyard compound: two side wings and a rear
                     // wing form a U around a garden, instead of a single box beside it.
-                    const float wingWidth = 4.8f;
-                    const float wingDepth = 8.8f;
-                    const float wingOffsetX = 4.9f;
+                    const float wingWidth = 4.0f;
+                    const float wingDepth = 6.8f;
+                    const float wingOffsetX = 4.25f;
                     Vector3 leftWing = plot + new Vector3(-wingOffsetX, 0f, 0f);
                     Vector3 rightWing = plot + new Vector3(wingOffsetX, 0f, 0f);
-                    Vector3 rearWing = plot + new Vector3(0f, 0f, northPlot ? 4.8f : -4.8f);
+                    // Gate entry is on the south side for every plot; the rear wing
+                    // always sits north of the courtyard so it cannot seal the entrance.
+                    Vector3 rearWing = plot + new Vector3(0f, 0f, 4.15f);
 
                     androidBuildingCenters.Add(leftWing);
                     androidBuildingHalfExtents.Add(new Vector2(wingWidth * 0.5f, wingDepth * 0.5f));
@@ -1505,8 +1607,8 @@ namespace PersiaWar.Unity2D5D
                     CreateAndroidBuilding(rightWing, wingWidth, houseHeight, wingDepth,
                         i * 3 + 1, false, false);
 
-                    footprint = 5.4f;
-                    depth = 3.8f;
+                    footprint = 4.6f;
+                    depth = 3.0f;
                     house = rearWing;
                     androidBuildingCenters.Add(rearWing);
                     androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
@@ -1517,23 +1619,23 @@ namespace PersiaWar.Unity2D5D
                 {
                     if (style == 0)
                     {
-                        house = plot + new Vector3(0f, 0f, -2.55f);
-                        footprint = 7.4f + (i % 3) * 0.55f;
-                        depth = 5.2f + (i % 2) * 0.65f;
+                        house = plot + new Vector3(0f, 0f, northPlot ? -2.35f : 2.35f);
+                        footprint = 6.8f + (i % 3) * 0.32f;
+                        depth = 4.9f + (i % 2) * 0.38f;
                     }
                     else if (style == 2)
                     {
                         // Corner plot: offset house leaves an L-shaped yard.
-                        house = plot + new Vector3(-3.2f, 0f, -3.0f);
-                        footprint = 6.3f;
-                        depth = 6.0f;
+                        house = plot + new Vector3(-2.25f, 0f, northPlot ? -2.55f : 2.55f);
+                        footprint = 5.9f;
+                        depth = 5.3f;
                     }
                     else
                     {
                         // Long side-facing house with a garden strip along one edge.
-                        house = plot + new Vector3(0f, 0f, -2.7f);
-                        footprint = 8.2f;
-                        depth = 5.4f;
+                        house = plot + new Vector3(0f, 0f, northPlot ? -2.35f : 2.35f);
+                        footprint = 7.2f;
+                        depth = 5.1f;
                     }
 
                     androidBuildingCenters.Add(house);
@@ -1550,11 +1652,11 @@ namespace PersiaWar.Unity2D5D
                 // Fully close every yard on three sides and add a single real gate
                 // opening on the side facing the village lane. This also applies to
                 // central-garden plots; none of them should have wide, unexplained gaps.
-                float left = -lotWidth * 0.5f;
-                float right = lotWidth * 0.5f;
-                float gateZ = northPlot ? -lotDepth * 0.5f : lotDepth * 0.5f;
-                float backZ = -gateZ;
-                const float gateOpening = 2.2f;
+                float left = -lotWidth * 0.5f + wallThickness * 0.5f;
+                float right = lotWidth * 0.5f - wallThickness * 0.5f;
+                float gateZ = -lotDepth * 0.5f;
+                float backZ = lotDepth * 0.5f;
+                const float gateOpening = 2.6f;
                 float gateSideWidth = Mathf.Max(0.5f, (lotWidth - gateOpening) * 0.5f);
 
                 CreateAndroidBox("VillageCourtyardLeftWall",
@@ -1574,13 +1676,20 @@ namespace PersiaWar.Unity2D5D
                     plot + new Vector3(gateOpening * 0.5f + gateSideWidth * 0.5f,
                         wallHeight * 0.5f, gateZ),
                     new Vector3(gateSideWidth, wallHeight, wallThickness), adobeWall, true);
-                CreateAndroidBox("VillageWoodGate",
-                    plot + new Vector3(0f, wallHeight * 0.5f, gateZ),
-                    new Vector3(gateOpening, wallHeight * 0.92f, 0.16f), gateMaterial, false);
+                // Gate panels are hinged open to the sides, leaving the full
+                // central opening visually and physically traversable.
+                GameObject leftGateLeaf = CreateAndroidBox("VillageWoodGate_LeftOpen",
+                    plot + new Vector3(-gateOpening * 0.5f + 0.18f, wallHeight * 0.46f, gateZ + 0.22f),
+                    new Vector3(0.82f, wallHeight * 0.92f, 0.14f), gateMaterial, false);
+                leftGateLeaf.transform.rotation = Quaternion.Euler(0f, -72f, 0f);
+                GameObject rightGateLeaf = CreateAndroidBox("VillageWoodGate_RightOpen",
+                    plot + new Vector3(gateOpening * 0.5f - 0.18f, wallHeight * 0.46f, gateZ + 0.22f),
+                    new Vector3(0.82f, wallHeight * 0.92f, 0.14f), gateMaterial, false);
+                rightGateLeaf.transform.rotation = Quaternion.Euler(0f, 72f, 0f);
 
                 // Green vegetable beds occupy only part of each yard; most exposed ground stays dusty.
                 float gardenX = style == 1 ? 0f : (style == 2 ? 2.8f : (i % 2 == 0 ? -2.2f : 2.2f));
-                float gardenZ = style == 1 ? 0f : 4.2f;
+                float gardenZ = style == 1 ? 0f : (northPlot ? 4.0f : -4.0f);
                 QueueAndroidBox("VillageGardenBed", plot + new Vector3(gardenX, 0.10f, gardenZ),
                     new Vector3(style == 1 ? 4.2f : 3.6f, 0.16f, style == 2 ? 2.8f : 3.0f), gardenMaterial);
                 QueueAndroidBox("VillageBareSoilBed", plot + new Vector3(-gardenX * 0.55f, 0.055f, gardenZ * 0.55f),
@@ -1700,7 +1809,9 @@ namespace PersiaWar.Unity2D5D
 
             float doorWidth = isWarehouse
                 ? Mathf.Min(3.4f, footprint * 0.32f)
-                : Mathf.Min(1.35f, footprint * 0.18f);
+                : (stageTwoRequested
+                    ? Mathf.Min(1.90f, footprint * 0.30f)
+                    : Mathf.Min(1.35f, footprint * 0.18f));
             float doorHeight = isWarehouse ? 2.35f : 2.15f;
             if (stageTwoRequested)
             {
@@ -1725,11 +1836,18 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
-                QueueAndroidBox(
-                    "CityRoof",
-                    position + Vector3.up * (bodyHeight + 0.22f),
-                    new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
-                    trim);
+                if (stageTwoRequested)
+                    CreateAndroidBox(
+                        "VillageFadeableFlatRoof",
+                        position + Vector3.up * (bodyHeight + 0.22f),
+                        new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
+                        trim, true);
+                else
+                    QueueAndroidBox(
+                        "CityRoof",
+                        position + Vector3.up * (bodyHeight + 0.22f),
+                        new Vector3(footprint + 0.55f, 0.45f, depth + 0.55f),
+                        trim);
             }
 
             int facadeBandCount = bodyHeight >= 5.0f && !isWarehouse ? 2 : 1;
@@ -1848,7 +1966,7 @@ namespace PersiaWar.Unity2D5D
                 position + new Vector3(-span * 0.25f, bodyHeight + rise * 0.5f, 0f),
                 new Vector3(slopedLength, 0.20f, roofDepth),
                 roofMaterial,
-                false);
+                stageTwoRequested);
             leftPanel.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
             GameObject rightPanel = CreateAndroidBox(
@@ -1856,7 +1974,7 @@ namespace PersiaWar.Unity2D5D
                 position + new Vector3(span * 0.25f, bodyHeight + rise * 0.5f, 0f),
                 new Vector3(slopedLength, 0.20f, roofDepth),
                 roofMaterial,
-                false);
+                stageTwoRequested);
             rightPanel.transform.rotation = Quaternion.Euler(0f, 0f, -angle);
         }
 
@@ -2312,14 +2430,22 @@ namespace PersiaWar.Unity2D5D
         private Material MakeStageTwoLitMaterial(string name, Color color)
         {
             Shader shader = stageTwoLitShader;
-            if (shader == null)
+            if (shader == null || !shader.isSupported)
             {
                 shader = Resources.Load<Shader>("PersiaWarLit");
-                if (shader == null) shader = Shader.Find("PersiaWar/Lit");
-                if (shader == null) shader = Shader.Find("Standard");
+                if (shader == null || !shader.isSupported)
+                    shader = Shader.Find("PersiaWar/Lit");
+                if (shader == null || !shader.isSupported)
+                    shader = Shader.Find("Standard");
+
+                // Never keep an unsupported shader: Unity displays those materials pink.
+                if (shader == null || !shader.isSupported)
+                    shader = Resources.Load<Shader>("PersiaWarAndroidFlat");
+                if (shader == null || !shader.isSupported)
+                    shader = RuntimeMaterialFactory.GetShader();
                 stageTwoLitShader = shader;
             }
-            if (shader == null)
+            if (shader == null || !shader.isSupported)
                 return MakeMaterial(name, color);
 
             unchecked
