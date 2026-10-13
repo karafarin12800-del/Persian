@@ -87,8 +87,14 @@ jobs:
           assert "movementStillHeld" in hub and "FirePointerRecoveryGraceSeconds = 0.24f" in hub, "Movement and held-fire input must survive transient touch-ID gaps independently"
           assert "movementRecoveryActive = true;" in hub and "if (fireStillHeld ||" in hub, "A canceled movement pointer must preserve the last vector while a separate fire touch remains held"
           assert "MobileFirePointerReboundAfterCancel" in hub and "candidate.rawPosition.x < Screen.width * 0.58f" in hub, "A canceled fire pointer must search for a different live right-side finger before releasing"
-          assert hub.count("Input.simulateMouseWithTouches = !matchActive;") >= 2, "Touch-to-mouse synthesis must stay disabled for the full active match across pause/focus lifecycle transitions"
-          assert "Input.simulateMouseWithTouches = true;" in hub, "Touch-to-mouse synthesis must still be restored after match deactivation for menus"
+          assert hub.count("Input.simulateMouseWithTouches = !matchActive;") >= 5, "Every lifecycle entry/exit must obey exclusive touch-vs-mouse ownership"
+          deactivate_start = hub.index("public void DeactivateMatch()")
+          deactivate_end = hub.index("public void SetPaused(", deactivate_start)
+          deactivate = hub[deactivate_start:deactivate_end]
+          assert deactivate.index("matchActive = false;") < deactivate.index("Input.simulateMouseWithTouches = !matchActive;"), "Mouse synthesis may be restored only after match ownership is released"
+          disable_start = hub.index("private void OnDisable()")
+          disable_end = hub.index("private void OnApplicationPause(", disable_start)
+          assert "Input.simulateMouseWithTouches = !matchActive;" in hub[disable_start:disable_end], "Disabling the input component must not enable a competing path during a match"
           assert "if (matchActive && !matchPaused && Input.touchCount > 0)" in hub and "Native Touch" in hub, "Gameplay IMGUI fallback must not compete with native finger ownership"
           assert "if (Application.isMobilePlatform &&\n                Input.touchCount > 0 &&" not in hub, "Do not suppress the entire fallback because one native contact exists"
           assert "MobileMoveAndFireTouchConcurrent" in hub and "MobileShotFiredWhileMoving" in hub, "One-shot breadcrumbs must record whether simultaneous touch and moving-fire paths were reached"
