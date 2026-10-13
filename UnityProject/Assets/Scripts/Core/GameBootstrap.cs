@@ -1479,6 +1479,57 @@ namespace PersiaWar.Unity2D5D
             return obj;
         }
 
+        private void AddAndroidOrientedTerrainPath(
+            List<Vector3> vertices,
+            List<int> triangles,
+            Vector3 start,
+            Vector3 end,
+            float width,
+            float heightOffset)
+        {
+            Vector2 delta = new Vector2(end.x - start.x, end.z - start.z);
+            float length = delta.magnitude;
+            if (length < 0.1f || width <= 0f)
+                return;
+
+            Vector2 perpendicular = new Vector2(-delta.y, delta.x) / length * (width * 0.5f);
+            int segments = Mathf.Max(1, Mathf.CeilToInt(length / 4f));
+            int baseVertex = vertices.Count;
+
+            for (int i = 0; i <= segments; i++)
+            {
+                float t = i / (float)segments;
+                float x = Mathf.Lerp(start.x, end.x, t);
+                float z = Mathf.Lerp(start.z, end.z, t);
+
+                float leftX = x + perpendicular.x;
+                float leftZ = z + perpendicular.y;
+                float rightX = x - perpendicular.x;
+                float rightZ = z - perpendicular.y;
+                vertices.Add(new Vector3(leftX,
+                    CalculateAndroidTerrainHeight(leftX, leftZ) + heightOffset, leftZ));
+                vertices.Add(new Vector3(rightX,
+                    CalculateAndroidTerrainHeight(rightX, rightZ) + heightOffset, rightZ));
+            }
+
+            // Each lane segment is a non-overlapping strip. Adjacent strips meet at
+            // endpoints instead of using wide overlapping axis-aligned rectangles,
+            // preventing the black z-fighting bands on the village ground.
+            for (int i = 0; i < segments; i++)
+            {
+                int leftA = baseVertex + i * 2;
+                int rightA = leftA + 1;
+                int leftB = leftA + 2;
+                int rightB = leftA + 3;
+                triangles.Add(leftA);
+                triangles.Add(leftB);
+                triangles.Add(rightA);
+                triangles.Add(rightA);
+                triangles.Add(leftB);
+                triangles.Add(rightB);
+            }
+        }
+
         private void BuildAndroidVillagePaths()
         {
             // Stage-two paths are deliberately irregular, with short connectors and
@@ -1498,8 +1549,7 @@ namespace PersiaWar.Unity2D5D
                 Vector3 b = pathCenters[i + 1];
                 Vector3 delta = b - a;
                 Vector3 midpoint = (a + b) * 0.5f;
-                AddAndroidTerrainFollowingQuad(vertices, triangles, midpoint,
-                    new Vector2(6.2f, delta.magnitude + 4f), 0.045f);
+                AddAndroidOrientedTerrainPath(vertices, triangles, a, b, 6.2f, 0.045f);
             }
 
             // Two cross-lanes link house clusters and leave playable open courtyards.
@@ -1513,8 +1563,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Vector3 a = crossCenters[i];
                 Vector3 b = crossCenters[i + 1];
-                AddAndroidTerrainFollowingQuad(vertices, triangles, (a + b) * 0.5f,
-                    new Vector2(5.2f, Vector3.Distance(a, b) + 2f), 0.047f);
+                AddAndroidOrientedTerrainPath(vertices, triangles, a, b, 5.2f, 0.047f);
             }
 
             CreateAndroidQuadBatch("StageTwoVillageDirtLanes", vertices, triangles,
@@ -1590,7 +1639,7 @@ namespace PersiaWar.Unity2D5D
                     // wing form a U around a garden, instead of a single box beside it.
                     const float wingWidth = 4.0f;
                     const float wingDepth = 6.8f;
-                    const float wingOffsetX = 4.25f;
+                    const float wingOffsetX = 4.0f;
                     Vector3 leftWing = plot + new Vector3(-wingOffsetX, 0f, 0f);
                     Vector3 rightWing = plot + new Vector3(wingOffsetX, 0f, 0f);
                     // Gate entry is on the south side for every plot; the rear wing
