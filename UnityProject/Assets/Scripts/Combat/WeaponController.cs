@@ -123,6 +123,10 @@ namespace PersiaWar.Unity2D5D
         {
             int oldMagazineSize = Mathf.Max(1, magazineSize);
             float oldAmmoRatio = preserveAmmo ? magazine / (float)oldMagazineSize : 1f;
+            // Restore standard melee-button tuning before applying a weapon-specific profile.
+            meleeDamage = 45;
+            meleeRange = 3.1f;
+            meleeCooldown = 0.32f;
 
             switch (weaponKind)
             {
