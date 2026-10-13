@@ -125,9 +125,10 @@ namespace PersiaWar.Unity2D5D
             if (paused)
                 ResetAllPointers();
 #if UNITY_ANDROID
-            // Preserve IMGUI fallback support while paused; PrototypeFlow's native
-            // pause touch handler remains primary on Android.
-            Input.simulateMouseWithTouches = true;
+            // PrototypeFlow uses native Touch IDs for pause/resume on Android.
+            // Keep touch-to-mouse synthesis disabled for the entire active match,
+            // so a lifecycle transition cannot create a second owner for held fingers.
+            Input.simulateMouseWithTouches = !matchActive;
 #endif
         }
 
@@ -215,9 +216,9 @@ namespace PersiaWar.Unity2D5D
         {
 #if UNITY_ANDROID
             Input.multiTouchEnabled = true;
-            // Keep mouse synthesis enabled as a compatibility fallback. The gameplay
-            // fallback dispatcher ignores synthesized events while native touches exist.
-            Input.simulateMouseWithTouches = true;
+            // Keep ownership exclusive: menu screens may use touch-to-mouse synthesis,
+            // but a live match must never switch back to it during focus/app lifecycle events.
+            Input.simulateMouseWithTouches = !matchActive;
 #endif
         }
 
