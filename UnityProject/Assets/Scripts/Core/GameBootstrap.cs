@@ -611,7 +611,56 @@ namespace PersiaWar.Unity2D5D
                 else
                     pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
             }
-            Debug.Log("PERSIA_LOOT: stage-two village spawned 26 each of weapons, shields, grenades and quick-dash supplies");
+            if (stageTwoRequested) SpawnVillageAxePickups(26);
+            Debug.Log("PERSIA_LOOT: stage-two village spawned 26 each of firearms, shields, grenades, quick-dash supplies and axes");
+        }
+
+        private void SpawnVillageAxePickups(int count)
+        {
+            Material wood = MakeMaterial("VillageAxePickupWood", new Color(0.30f, 0.17f, 0.08f));
+            Material steel = MakeMaterial("VillageAxePickupSteel", new Color(0.55f, 0.60f, 0.63f));
+            for (int i = 0; i < count; i++)
+            {
+                int houseIndex = Random.Range(0, androidBuildingCenters.Count);
+                Vector3 center = androidBuildingCenters[houseIndex];
+                float angle = Random.Range(0f, Mathf.PI * 2f);
+                float radius = Random.Range(3.5f, 9.5f);
+                float x = Mathf.Clamp(center.x + Mathf.Cos(angle) * radius, -91f, 91f);
+                float z = Mathf.Clamp(center.z + Mathf.Sin(angle) * radius, -91f, 91f);
+                float y = CalculateAndroidTerrainHeight(x, z) + 0.24f;
+
+                GameObject pickupRoot = new GameObject("VillageLoot_Axe_" + i);
+                pickupRoot.transform.SetParent(worldRoot, true);
+                pickupRoot.transform.position = new Vector3(x, y, z);
+                pickupRoot.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+                GameObject handle = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                handle.name = "AxeWoodHandle";
+                handle.transform.SetParent(pickupRoot.transform, false);
+                handle.transform.localPosition = Vector3.zero;
+                handle.transform.localScale = new Vector3(0.10f, 0.10f, 0.80f);
+                handle.GetComponent<Renderer>().sharedMaterial = wood;
+                Collider handleCollider = handle.GetComponent<Collider>();
+                if (handleCollider != null) Destroy(handleCollider);
+
+                GameObject head = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                head.name = "AxeSteelHead";
+                head.transform.SetParent(pickupRoot.transform, false);
+                head.transform.localPosition = new Vector3(0f, 0.13f, 0.28f);
+                head.transform.localScale = new Vector3(0.16f, 0.34f, 0.26f);
+                head.GetComponent<Renderer>().sharedMaterial = steel;
+                Collider headCollider = head.GetComponent<Collider>();
+                if (headCollider != null) Destroy(headCollider);
+
+                SphereCollider trigger = pickupRoot.AddComponent<SphereCollider>();
+                trigger.isTrigger = true;
+                trigger.radius = 0.85f;
+                Rigidbody body = pickupRoot.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
+                PickupItem pickup = pickupRoot.AddComponent<PickupItem>();
+                pickup.ConfigureWeapon(WeaponController.WeaponKind.Axe, 0);
+            }
         }
 
         private void CreateAndroidSkyGuideCylinder(
