@@ -791,7 +791,15 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             if (gameBootstrap.TryRescueVillageGirl(player.transform.position))
+            {
                 girlRescueNoticeUntil = Time.unscaledTime + 4.5f;
+
+                // If the last opponent has already been eliminated, give the player
+                // the normal 1.65-second blue-gate transition only after the rescue.
+                if (stageNumber == 1 && GameSession.Instance != null &&
+                    GameSession.Instance.IsFinished && GameSession.Instance.PlayerWon)
+                    resultOverlayStartTime = Time.unscaledTime;
+            }
         }
 
         private void DrawGirlRescueNotice()
@@ -1928,6 +1936,31 @@ namespace PersiaWar.Unity2D5D
                 }
                 if (stageNumber == 1)
                 {
+                    if (gameBootstrap == null || !gameBootstrap.VillageGirlRescued)
+                    {
+                        // Leave movement available after the final elimination. The
+                        // victory gate marks the captive's randomized house, and Stage 2
+                        // will not start until the player reaches and frees her inside it.
+                        float rescueWidth = Mathf.Min(Screen.width - 36f, 700f);
+                        float rescueHeight = 104f;
+                        Rect rescuePanel = new Rect(
+                            (Screen.width - rescueWidth) * 0.5f,
+                            Screen.height * 0.22f,
+                            rescueWidth,
+                            rescueHeight);
+                        Fill(rescuePanel, new Color(0.025f, 0.045f, 0.065f, 0.91f));
+                        Fill(new Rect(rescuePanel.x, rescuePanel.y, rescuePanel.width, 4f),
+                            new Color(0.14f, 0.60f, 1f, 1f));
+                        GUI.Label(new Rect(rescuePanel.x + 12f, rescuePanel.y + 10f,
+                            rescuePanel.width - 24f, 37f),
+                            "ANAHITA IS STILL CAPTIVE", menuButtonStyle);
+                        GUI.Label(new Rect(rescuePanel.x + 12f, rescuePanel.y + 52f,
+                            rescuePanel.width - 24f, 40f),
+                            "FOLLOW THE BLUE BEAM • ENTER THE HOUSE TO RESCUE HER",
+                            menuSmallStyle);
+                        return;
+                    }
+
                     BeginStageTwoSelection();
                     return;
                 }
