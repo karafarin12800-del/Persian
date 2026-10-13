@@ -164,6 +164,7 @@ namespace PersiaWar.Unity2D5D
             // GameRoot remains dormant until START MATCH so Android can finish scene
             // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
+            InitializeLocalProfile();
 #if UNITY_ANDROID
             // Android production path: keep the real front-end interactive.
             // Do NOT auto-start the match. The previous isolation build skipped the
@@ -172,7 +173,6 @@ namespace PersiaWar.Unity2D5D
             selectedHero = 0;
             spawnWorld = new Vector2(0f, -4f);
             spawnChosen = false;
-            InitializeLocalProfile();
             mode = ScreenMode.MainMenu;
             StartupCheckpoint.Set("PrototypeFlowMenuReady");
             Debug.Log("PERSIA_FLOW: Android menu ready; waiting for player selection");
@@ -678,12 +678,14 @@ namespace PersiaWar.Unity2D5D
         private Rect GetLobbyButtonRect(int index)
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
-            float width = Mathf.Min(Screen.width * 0.46f, 520f * scale);
+            float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
             float height = 58f * scale;
             float gap = 14f * scale;
             float totalHeight = height * 4f + gap * 3f;
             float top = Mathf.Max(145f * scale, (Screen.height - totalHeight) * 0.48f);
-            return new Rect((Screen.width - width) * 0.5f, top + index * (height + gap), width, height);
+            float left = Mathf.Max(Screen.width * 0.52f, Screen.width - width - 28f);
+            left = Mathf.Min(left, Screen.width - width - 18f);
+            return new Rect(left, top + index * (height + gap), width, height);
         }
 
         private Rect GetLobbyBackRect()
@@ -738,7 +740,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     for (int item = 0; item < StoreCosmeticNames.Length; item++)
                     {
-                        if (!GetStoreItemRect(item).Contains(point)) continue;
+                        if (!GetStoreActionRect(item).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
                         PurchaseOrEquipCosmetic(item);
                         return;
@@ -824,6 +826,12 @@ namespace PersiaWar.Unity2D5D
             return new Rect(left + index * (cardWidth + gap), Screen.height * 0.30f, cardWidth, cardHeight);
         }
 
+        private Rect GetStoreActionRect(int index)
+        {
+            Rect card = GetStoreItemRect(index);
+            return new Rect(card.x + 14f, card.yMax - 62f, card.width - 28f, 48f);
+        }
+
         private void PurchaseOrEquipCosmetic(int index)
         {
             string ownedKey = "PW.CosmeticOwned." + index;
@@ -863,7 +871,7 @@ namespace PersiaWar.Unity2D5D
                 GUI.Label(new Rect(card.x + 8f, card.y + 192f, card.width - 16f, 38f),
                     owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
                     menuBodyStyle);
-                Rect action = new Rect(card.x + 14f, card.yMax - 62f, card.width - 28f, 48f);
+                Rect action = GetStoreActionRect(i);
                 if (DrawFantasyButton(action, owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "EQUIP") : "UNLOCK"))
                     PurchaseOrEquipCosmetic(i);
             }
