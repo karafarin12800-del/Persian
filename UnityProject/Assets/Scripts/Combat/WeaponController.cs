@@ -8,7 +8,8 @@ namespace PersiaWar.Unity2D5D
         {
             LightPistol = 0,
             AssaultRifle = 1,
-            HeavyMachineGun = 2
+            HeavyMachineGun = 2,
+            Axe = 3
         }
 
         [SerializeField] private Projectile projectilePrefab;
@@ -32,6 +33,7 @@ namespace PersiaWar.Unity2D5D
         private int reserve;
         private PlayerController player;
         private Transform gunRoot;
+        private Transform axeRoot;
         private Vector3 gunRestLocalPosition;
         private float recoilAmount;
         private LineRenderer rangeRing;
@@ -46,6 +48,7 @@ namespace PersiaWar.Unity2D5D
             {
                 case WeaponKind.LightPistol: return LightPistolRange;
                 case WeaponKind.HeavyMachineGun: return HeavyMachineGunRange;
+                case WeaponKind.Axe: return 3.1f;
                 default: return AssaultRifleRange;
             }
         }
@@ -54,11 +57,11 @@ namespace PersiaWar.Unity2D5D
         public WeaponKind CurrentWeapon => weaponKind;
         public string CurrentWeaponName => weaponKind == WeaponKind.LightPistol
             ? "PISTOL"
-            : (weaponKind == WeaponKind.HeavyMachineGun ? "HEAVY" : "RIFLE");
+            : (weaponKind == WeaponKind.HeavyMachineGun ? "HEAVY" : (weaponKind == WeaponKind.Axe ? "AXE" : "RIFLE"));
         public float EffectiveRange => Mathf.Max(1f, weaponRange);
         public float MoveSpeedMultiplier => weaponKind == WeaponKind.LightPistol
             ? 1.20f
-            : (weaponKind == WeaponKind.HeavyMachineGun ? 0.78f : 1f);
+            : (weaponKind == WeaponKind.HeavyMachineGun ? 0.78f : (weaponKind == WeaponKind.Axe ? 0.92f : 1f));
         public int Magazine => magazine;
         public int Reserve => reserve;
         public int MagazineSize => magazineSize;
@@ -86,7 +89,7 @@ namespace PersiaWar.Unity2D5D
 
         public void CycleWeapon()
         {
-            weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
+            weaponKind = (WeaponKind)(((int)weaponKind + 1) % 4);
             ApplyWeaponProfile(true);
             RefreshWeaponVisual();
             UpdateRangeIndicator();
@@ -120,6 +123,10 @@ namespace PersiaWar.Unity2D5D
         {
             int oldMagazineSize = Mathf.Max(1, magazineSize);
             float oldAmmoRatio = preserveAmmo ? magazine / (float)oldMagazineSize : 1f;
+            // Restore standard melee-button tuning before applying a weapon-specific profile.
+            meleeDamage = 45;
+            meleeRange = 3.1f;
+            meleeCooldown = 0.32f;
 
             switch (weaponKind)
             {
@@ -137,6 +144,17 @@ namespace PersiaWar.Unity2D5D
                     projectileDamage = 34;
                     fireCooldown = 0.31f;
                     magazineSize = 36;
+                    break;
+
+                case WeaponKind.Axe:
+                    projectileSpeed = 1f;
+                    weaponRange = 3.1f;
+                    projectileDamage = 0;
+                    fireCooldown = 0.55f;
+                    magazineSize = 1;
+                    meleeDamage = 72;
+                    meleeRange = 3.2f;
+                    meleeCooldown = 0.42f;
                     break;
 
                 default:
@@ -193,10 +211,13 @@ namespace PersiaWar.Unity2D5D
 
             bool pistol = weaponKind == WeaponKind.LightPistol;
             bool heavy = weaponKind == WeaponKind.HeavyMachineGun;
+            bool axe = weaponKind == WeaponKind.Axe;
 
             // Keep the pistol compact by changing its actual silhouette rather than
             // merely shrinking a rifle. The heavy profile uses a thicker receiver,
             // larger magazine, long barrel, stock and foregrip.
+            gunRoot.gameObject.SetActive(!axe);
+            if (axeRoot != null) axeRoot.gameObject.SetActive(axe);
             gunRoot.localScale = Vector3.one * (heavy ? 1.08f : 1f);
             gunRestLocalPosition = pistol
                 ? new Vector3(0.24f, 0.93f, 0.33f)
@@ -324,6 +345,7 @@ namespace PersiaWar.Unity2D5D
 
         public bool TryFire(Vector3 targetWorldPosition)
         {
+            if (weaponKind == WeaponKind.Axe) return false;
             IsMelee = false;
             if (Time.time < nextFireTime) return false;
             if (magazine <= 0)
@@ -360,6 +382,7 @@ namespace PersiaWar.Unity2D5D
 
         public bool TryFireDirection(Vector3 worldDirection)
         {
+            if (weaponKind == WeaponKind.Axe) return false;
             IsMelee = false;
 
             if (Time.time < nextFireTime) return false;
@@ -450,6 +473,24 @@ namespace PersiaWar.Unity2D5D
             // Start with the pistol-only parts hidden until the active profile is applied.
             gunRoot.Find("PistolSlide").gameObject.SetActive(false);
             gunRoot.Find("PistolGrip").gameObject.SetActive(false);
+
+            // A separate, lightweight axe model is shown only while the melee weapon is equipped.
+            axeRoot = new GameObject("PlayerAxe").transform;
+            axeRoot.SetParent(transform, false);
+            axeRoot.localPosition = new Vector3(0.30f, 0.90f, 0.40f);
+            axeRoot.localRotation = Quaternion.Euler(0f, 0f, -12f);
+            Material axeHandle = RuntimeMaterialFactory.Create("AxeWoodHandle", new Color(0.31f, 0.17f, 0.08f));
+            Material axeSteel = RuntimeMaterialFactory.Create("AxeSteelHead", new Color(0.48f, 0.53f, 0.57f));
+            CreateWeaponPart("AxeHandle", PrimitiveType.Cube, axeRoot,
+                new Vector3(0f, 0f, 0f), new Vector3(0.075f, 0.075f, 0.78f), axeHandle);
+            CreateWeaponPart("AxeHead", PrimitiveType.Cube, axeRoot,
+                new Vector3(0.02f, 0.12f, 0.22f), new Vector3(0.12f, 0.30f, 0.22f), axeSteel);
+            CreateWeaponPart("AxeBladeEdge", PrimitiveType.Cube, axeRoot,
+                new Vector3(0.01f, 0.12f, 0.34f), new Vector3(0.08f, 0.34f, 0.10f), axeSteel);
+            axeRoot.gameObject.SetActive(false);
+            Collider[] axeColliders = axeRoot.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < axeColliders.Length; i++)
+                if (axeColliders[i] != null) Object.Destroy(axeColliders[i]);
 
             // Prevent the decorative weapon from participating in collision queries.
             Collider[] colliders = gunRoot.GetComponentsInChildren<Collider>(true);
