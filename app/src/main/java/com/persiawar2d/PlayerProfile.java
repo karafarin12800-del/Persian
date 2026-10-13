@@ -19,10 +19,18 @@ public final class PlayerProfile {
     public static void ensureCreated(Context c) {
         SharedPreferences p = prefs(c);
         if (!p.contains(KEY_ID)) {
-            p.edit().putString(KEY_ID, UUID.randomUUID().toString())
+            SharedPreferences.Editor editor = p.edit()
+                    .putString(KEY_ID, UUID.randomUUID().toString())
                     .putString(KEY_NAME, "Player")
-                    .putInt(KEY_COINS, 500)
-                    .apply();
+                    .putInt(KEY_COINS, 500);
+            // Preserve a cosmetic already selected in older builds.
+            String legacySkin = c.getApplicationContext()
+                    .getSharedPreferences("player", Context.MODE_PRIVATE)
+                    .getString("skin", "classic");
+            if (legacySkin != null && !legacySkin.isEmpty()) {
+                editor.putBoolean("owned_" + legacySkin, true);
+            }
+            editor.apply();
         }
     }
 
