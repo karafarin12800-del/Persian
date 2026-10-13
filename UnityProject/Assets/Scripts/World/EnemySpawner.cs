@@ -295,6 +295,23 @@ namespace PersiaWar.Unity2D5D
             capsule.height = 1.8f;
             capsule.center = new Vector3(0f, 0.9f, 0f);
 
+            if (stageTwoArena)
+            {
+                GameObject meshSource = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                MeshFilter sourceFilter = meshSource.GetComponent<MeshFilter>();
+                MeshFilter alienFilter = enemy.AddComponent<MeshFilter>();
+                alienFilter.sharedMesh = sourceFilter.sharedMesh;
+                MeshRenderer alienRenderer = enemy.AddComponent<MeshRenderer>();
+                Color alienColor = archetype == 3 ? new Color(0.12f, 0.58f, 0.20f)
+                    : (archetype == 2 ? new Color(0.18f, 0.78f, 0.25f) : new Color(0.28f, 0.92f, 0.34f));
+                alienRenderer.sharedMaterial = RuntimeMaterialFactory.Create("StageTwoAlien_" + archetype, alienColor);
+                alienRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                alienRenderer.receiveShadows = false;
+                Collider temporaryCollider = meshSource.GetComponent<Collider>();
+                if (temporaryCollider != null) Destroy(temporaryCollider);
+                Destroy(meshSource);
+            }
+
             TargetHealth health = enemy.AddComponent<TargetHealth>();
             health.SetMaxHealth(archetype == 3 ? 160 : (archetype == 2 ? 120 : 100));
             enemy.AddComponent<EnemyHealthBar>();
@@ -314,7 +331,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Color color = stageTwoArena
                     ? (archetype == 3 ? new Color(0.12f, 0.58f, 0.20f) : (archetype == 2 ? new Color(0.18f, 0.78f, 0.25f) : new Color(0.28f, 0.92f, 0.34f)))
-                    : (archetype == 3 ? new Color(0.28f, 0.06f, 0.05f) : (archetype == 2 ? new Color(0.40f, 0.12f, 0.08f) : new Color(0.48f, 0.18f, 0.12f));
+                    : (archetype == 3 ? new Color(0.28f, 0.06f, 0.05f) : (archetype == 2 ? new Color(0.40f, 0.12f, 0.08f) : new Color(0.48f, 0.18f, 0.12f)));
                 renderer.sharedMaterial = RuntimeMaterialFactory.Create(enemy.name + "Material", color);
             }
 
