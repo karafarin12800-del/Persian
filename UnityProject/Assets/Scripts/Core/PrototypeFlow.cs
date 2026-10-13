@@ -1090,7 +1090,7 @@ namespace PersiaWar.Unity2D5D
             Rect map = GetStageTwoMapRect();
             float x = map.xMax + 26f;
             float width = Mathf.Max(140f, Screen.width - x - 18f);
-            return new Rect(x, map.y, width, map.height);
+            return new Rect(x, map.y, width, Screen.height - map.y - 10f);
         }
 
         private Rect GetStageTwoModeButtonRect(int index)
@@ -1283,7 +1283,7 @@ namespace PersiaWar.Unity2D5D
                 if (i == 0 || i == 13 || i == 20)
                     Fill(new Rect(p.x - 2f, p.y - h * 0.5f - 4f, 4f, 6f), new Color(0.85f, 0.76f, 0.54f, 1f));
             }
-            GUI.Label(new Rect(rect.x + 7f, rect.y + 6f, rect.width - 14f, 24f), "VILLAGE • COURTYARDS • GARDENS", smallStyle);
+            GUI.Label(new Rect(rect.x + 7f, rect.y + 6f, rect.width - 14f, 30f), "VILLAGE • COURTYARDS • GARDENS", menuSmallStyle);
         }
 
         private void StartMatch()
@@ -2048,7 +2048,7 @@ namespace PersiaWar.Unity2D5D
 
             menuHeaderStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.RoundToInt(39f * scale),
+                fontSize = Mathf.RoundToInt(42f * scale),
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 wordWrap = true
@@ -2066,7 +2066,7 @@ namespace PersiaWar.Unity2D5D
 
             menuSmallStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.RoundToInt(21f * scale),
+                fontSize = Mathf.RoundToInt(24f * scale),
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 wordWrap = true
@@ -2075,7 +2075,7 @@ namespace PersiaWar.Unity2D5D
 
             menuButtonStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.RoundToInt(25f * scale),
+                fontSize = Mathf.RoundToInt(30f * scale),
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 wordWrap = true,
