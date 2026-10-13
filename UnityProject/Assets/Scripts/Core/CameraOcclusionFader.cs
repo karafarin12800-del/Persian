@@ -72,9 +72,9 @@ namespace PersiaWar.Unity2D5D
                     hits, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
                 for (int i = 0; i < count; i++)
                 {
-                    // A contact almost at the target is not a camera occluder. This
+                    // Only contacts within a few centimeters of the target are ignored. This
                     // also prevents a nearby wall the player is touching from fading.
-                    if (stageTwoOcclusionMode && hits[i].distance >= distance - 0.85f)
+                    if (stageTwoOcclusionMode && hits[i].distance >= distance - 0.30f)
                         continue;
 
                     Collider col = hits[i].collider;
