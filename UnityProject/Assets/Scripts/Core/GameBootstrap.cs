@@ -567,8 +567,8 @@ namespace PersiaWar.Unity2D5D
             // cleanup, counts, or courtyard placement rules are allowed on this path.
             if (!stageTwoRequested)
             {
-                const int countPerType = 8;
-                for (int i = 0; i < countPerType * 4; i++)
+                const int stageOneCountPerType = 8;
+                for (int i = 0; i < stageOneCountPerType * 4; i++)
                 {
                     int houseIndex = Random.Range(0, androidBuildingCenters.Count);
                     Vector3 center = androidBuildingCenters[houseIndex];
@@ -576,9 +576,9 @@ namespace PersiaWar.Unity2D5D
                     float x = center.x + Random.Range(-half.x * 0.42f, half.x * 0.42f);
                     float z = center.z + Random.Range(-half.y * 0.42f, half.y * 0.42f);
                     float y = CalculateAndroidTerrainHeight(x, z) + 0.38f;
-                    PickupItem.PickupType type = i < countPerType ? PickupItem.PickupType.Weapon
-                        : (i < countPerType * 2 ? PickupItem.PickupType.Shield
-                        : (i < countPerType * 3 ? PickupItem.PickupType.Grenade : PickupItem.PickupType.QuickDash));
+                    PickupItem.PickupType type = i < stageOneCountPerType ? PickupItem.PickupType.Weapon
+                        : (i < stageOneCountPerType * 2 ? PickupItem.PickupType.Shield
+                        : (i < stageOneCountPerType * 3 ? PickupItem.PickupType.Grenade : PickupItem.PickupType.QuickDash));
                     Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
                         : (type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
                         : (type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f) : new Color(0.94f, 0.08f, 0.92f)));
