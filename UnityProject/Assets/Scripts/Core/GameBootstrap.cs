@@ -11,6 +11,8 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int seed = 32025;
         [SerializeField] private int enemyCount = 8;
         [SerializeField] private float enemySpawnRadius = 44f;
+        // Stage two is opt-in; the existing first-stage city remains the default path.
+        private bool stageTwoRequested;
 
         public bool IsWorldReady { get; private set; }
         public bool IsWorldPreparing { get; private set; }
@@ -71,6 +73,20 @@ namespace PersiaWar.Unity2D5D
             if (prepareRequested || IsWorldReady || IsWorldPreparing) return;
             prepareRequested = true;
             StartCoroutine(BuildWorldAfterStartup());
+        }
+
+        /// <summary>Rebuilds the battlefield as the stage-two Iranian village.</summary>
+        /// <remarks>Only called after stage one has been completed. The normal stage-one
+        /// preparation path and layout are unchanged.</remarks>
+        public void PrepareStageTwoVillage()
+        {
+            stageTwoRequested = true;
+            prepareRequested = false;
+            IsWorldReady = false;
+            IsWorldPreparing = false;
+            WorldBuildFailed = false;
+            WorldBuildError = string.Empty;
+            PrepareWorld();
         }
 
         private IEnumerator BuildWorldAfterStartup()
@@ -245,7 +261,10 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(worldSize + 8f, 0.35f, worldSize + 8f),
                 groundMaterial,
                 false);
-            BuildAndroidRoadGrid();
+            if (stageTwoRequested)
+                BuildAndroidVillagePaths();
+            else
+                BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
             SpawnRandomHouseLoot();
             RemoveAnyExtractionBeacon();
@@ -615,6 +634,12 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidCityPresentation()
         {
+            if (stageTwoRequested)
+            {
+                BuildAndroidVillagePresentation();
+                return;
+            }
+
             // Dense, readable 2.5D city layout: buildings hug the streets so the
             // gameplay camera never opens onto a large empty floor.
             androidBoxBatches.Clear();
@@ -1005,6 +1030,174 @@ namespace PersiaWar.Unity2D5D
             return obj;
         }
 
+        private void BuildAndroidVillagePaths()
+        {
+            // Stage-two paths are deliberately irregular, with short connectors and
+            // wider clearings rather than the first-stage straight road grid.
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            Vector3[] pathCenters =
+            {
+                new Vector3(-78f, 0f, -58f), new Vector3(-56f, 0f, -46f),
+                new Vector3(-34f, 0f, -28f), new Vector3(-10f, 0f, -8f),
+                new Vector3(14f, 0f, 12f), new Vector3(36f, 0f, 34f),
+                new Vector3(58f, 0f, 52f), new Vector3(78f, 0f, 68f)
+            };
+            for (int i = 0; i < pathCenters.Length - 1; i++)
+            {
+                Vector3 a = pathCenters[i];
+                Vector3 b = pathCenters[i + 1];
+                Vector3 delta = b - a;
+                Vector3 midpoint = (a + b) * 0.5f;
+                AddAndroidTerrainFollowingQuad(vertices, triangles, midpoint,
+                    new Vector2(6.2f, delta.magnitude + 4f), 0.045f);
+            }
+
+            // Two cross-lanes link house clusters and leave playable open courtyards.
+            Vector3[] crossCenters =
+            {
+                new Vector3(-58f, 0f, 8f), new Vector3(-30f, 0f, 18f),
+                new Vector3(0f, 0f, 30f), new Vector3(28f, 0f, 38f),
+                new Vector3(54f, 0f, 42f)
+            };
+            for (int i = 0; i < crossCenters.Length - 1; i++)
+            {
+                Vector3 a = crossCenters[i];
+                Vector3 b = crossCenters[i + 1];
+                AddAndroidTerrainFollowingQuad(vertices, triangles, (a + b) * 0.5f,
+                    new Vector2(5.2f, Vector3.Distance(a, b) + 2f), 0.047f);
+            }
+
+            CreateAndroidQuadBatch("StageTwoVillageDirtLanes", vertices, triangles,
+                MakeMaterial("VillageDirtPath", new Color(0.43f, 0.34f, 0.23f)));
+        }
+
+        private void BuildAndroidVillagePresentation()
+        {
+            androidBoxBatches.Clear();
+            androidBuildingCenters.Clear();
+            androidBuildingHalfExtents.Clear();
+
+            // Clustered old Iranian homes: close groups, gaps, and a few isolated homes.
+            Vector2[] plots =
+            {
+                new Vector2(-78f, -72f), new Vector2(-62f, -72f), new Vector2(-78f, -56f), new Vector2(-62f, -56f),
+                new Vector2(-24f, -70f), new Vector2(-8f, -70f), new Vector2(-24f, -54f),
+                new Vector2(34f, -72f), new Vector2(50f, -72f), new Vector2(66f, -56f),
+                new Vector2(-72f, -8f), new Vector2(-56f, 8f), new Vector2(-40f, 8f),
+                new Vector2(-4f, 0f), new Vector2(12f, 0f), new Vector2(28f, 16f),
+                new Vector2(62f, 12f), new Vector2(78f, 28f),
+                new Vector2(-60f, 58f), new Vector2(-44f, 74f), new Vector2(12f, 62f), new Vector2(28f, 78f),
+                new Vector2(62f, 70f)
+            };
+
+            for (int i = 0; i < plots.Length; i++)
+            {
+                Vector3 plot = new Vector3(plots[i].x, 0f, plots[i].y);
+                float jitterX = Mathf.Sin((i + 1) * 4.17f) * 1.4f;
+                float jitterZ = Mathf.Cos((i + 1) * 2.93f) * 1.3f;
+                plot.x += jitterX;
+                plot.z += jitterZ;
+
+                float wallHeight = 1.55f + (i % 4 == 0 ? 0.25f : 0f);
+                float wallThickness = 0.42f;
+                Material adobeWall = MakeMaterial("VillageCourtyardWall_" + (i % 3),
+                    i % 3 == 0 ? new Color(0.58f, 0.43f, 0.29f) :
+                    i % 3 == 1 ? new Color(0.67f, 0.51f, 0.35f) :
+                                 new Color(0.62f, 0.47f, 0.32f));
+                Material gateMaterial = MakeMaterial("VillageWoodGate_" + (i % 2),
+                    new Color(0.22f, 0.13f, 0.07f));
+
+                // Courtyard perimeter with a visible gate opening on the alley-facing side.
+                QueueAndroidBox("VillageCourtyardLeftWall",
+                    plot + new Vector3(-6.4f, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, 13.2f), adobeWall);
+                QueueAndroidBox("VillageCourtyardRightWall",
+                    plot + new Vector3(6.4f, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, 13.2f), adobeWall);
+                QueueAndroidBox("VillageCourtyardRearWall",
+                    plot + new Vector3(0f, wallHeight * 0.5f, 6.4f),
+                    new Vector3(13.2f, wallHeight, wallThickness), adobeWall);
+                QueueAndroidBox("VillageCourtyardFrontWallLeft",
+                    plot + new Vector3(-3.7f, wallHeight * 0.5f, -6.4f),
+                    new Vector3(5.8f, wallHeight, wallThickness), adobeWall);
+                QueueAndroidBox("VillageCourtyardFrontWallRight",
+                    plot + new Vector3(3.7f, wallHeight * 0.5f, -6.4f),
+                    new Vector3(5.8f, wallHeight, wallThickness), adobeWall);
+                QueueAndroidBox("VillageWoodGate",
+                    plot + new Vector3(0f, 0.95f, -6.42f),
+                    new Vector3(2.2f, 1.9f, 0.16f), gateMaterial);
+
+                CreateAndroidCollider("VillageCourtyardLeftCollider",
+                    plot + new Vector3(-6.4f, 0f, 0f), new Vector3(wallThickness, wallHeight, 13.2f));
+                CreateAndroidCollider("VillageCourtyardRightCollider",
+                    plot + new Vector3(6.4f, 0f, 0f), new Vector3(wallThickness, wallHeight, 13.2f));
+                CreateAndroidCollider("VillageCourtyardRearCollider",
+                    plot + new Vector3(0f, 0f, 6.4f), new Vector3(13.2f, wallHeight, wallThickness));
+                CreateAndroidCollider("VillageCourtyardFrontCollider",
+                    plot + new Vector3(-3.7f, 0f, -6.4f), new Vector3(5.8f, wallHeight, wallThickness));
+                CreateAndroidCollider("VillageCourtyardFrontCollider",
+                    plot + new Vector3(3.7f, 0f, -6.4f), new Vector3(5.8f, wallHeight, wallThickness));
+
+                Vector3 house = plot + new Vector3(0f, 0f, 2.4f);
+                float footprint = i % 5 == 0 ? 8.4f : Mathf.Lerp(5.8f, 7.2f, Mathf.Abs(Mathf.Sin(i * 2.37f)));
+                float depth = i % 5 == 0 ? 7.8f : Mathf.Lerp(5.3f, 6.5f, Mathf.Abs(Mathf.Cos(i * 1.71f)));
+                bool landmark = i == 0 || i == 13 || i == 20;
+                CreateAndroidBuilding(house, footprint, landmark ? 4.4f : 3.35f, depth, i,
+                    false, false);
+
+                if (landmark)
+                    CreateAndroidVillageWindcatcher(house, footprint, landmark ? 4.4f : 3.35f, depth, i);
+            }
+
+            // Trees and garden patches soften the adobe palette; trees are kept out of
+            // the main lanes and courtyard entrances to preserve fair combat visibility.
+            Vector3[] trees =
+            {
+                new Vector3(-88f, 0f, -38f), new Vector3(-46f, 0f, -82f),
+                new Vector3(-34f, 0f, -42f), new Vector3(6f, 0f, -44f),
+                new Vector3(76f, 0f, -18f), new Vector3(-88f, 0f, 36f),
+                new Vector3(-18f, 0f, 48f), new Vector3(44f, 0f, 56f),
+                new Vector3(82f, 0f, 82f), new Vector3(42f, 0f, -2f)
+            };
+            for (int i = 0; i < trees.Length; i++)
+            {
+                CreateAndroidTree(trees[i], 1.8f + (i % 3) * 0.35f);
+                if (i % 2 == 0)
+                    QueueAndroidBox("VillageGardenPatch",
+                        new Vector3(trees[i].x + 2.4f, 0.08f, trees[i].z + 1.8f),
+                        new Vector3(3.8f, 0.16f, 2.6f),
+                        MakeMaterial("VillageGardenGreen", new Color(0.20f, 0.43f, 0.16f)));
+            }
+
+            FlushAndroidBoxBatches();
+            Debug.Log("PERSIA_STAGE2: Iranian village layout built; houses=" + plots.Length + ", windcatchers=3");
+        }
+
+        private void CreateAndroidVillageWindcatcher(Vector3 house, float footprint, float bodyHeight, float depth, int index)
+        {
+            Material adobe = MakeMaterial("VillageWindcatcherAdobe_" + index, new Color(0.68f, 0.52f, 0.35f));
+            Material shadow = MakeMaterial("VillageWindcatcherOpening_" + index, new Color(0.22f, 0.25f, 0.23f));
+            float x = Mathf.Max(1.0f, footprint * 0.20f);
+            float z = Mathf.Max(1.0f, depth * 0.20f);
+            float h = 2.6f;
+            Vector3 basePoint = house + Vector3.up * (bodyHeight + h * 0.5f + 0.12f) + Vector3.right * (footprint * 0.22f);
+            QueueAndroidBox("PersianWindcatcherFront", basePoint + Vector3.forward * (z * 0.5f),
+                new Vector3(x, h, 0.28f), adobe);
+            QueueAndroidBox("PersianWindcatcherBack", basePoint - Vector3.forward * (z * 0.5f),
+                new Vector3(x, h, 0.28f), adobe);
+            QueueAndroidBox("PersianWindcatcherLeft", basePoint - Vector3.right * (x * 0.5f),
+                new Vector3(0.28f, h, z), adobe);
+            QueueAndroidBox("PersianWindcatcherRight", basePoint + Vector3.right * (x * 0.5f),
+                new Vector3(0.28f, h, z), adobe);
+            QueueAndroidBox("PersianWindcatcherDarkOpening",
+                basePoint + Vector3.forward * 0.16f,
+                new Vector3(x * 0.55f, h * 0.64f, 0.08f), shadow);
+            QueueAndroidBox("PersianWindcatcherTopCap",
+                basePoint + Vector3.up * (h * 0.5f),
+                new Vector3(x + 0.35f, 0.22f, z + 0.35f), adobe);
+        }
+
         private void CreateAndroidBuilding(
             Vector3 position,
             float footprint,
@@ -1020,14 +1213,23 @@ namespace PersiaWar.Unity2D5D
 
             // Brighter, clean stylized-realism palette inspired by the free city
             // reference, while staying fully procedural and Android-light.
-            Color[] palette =
-            {
-                new Color(0.76f, 0.67f, 0.54f),
-                new Color(0.67f, 0.73f, 0.75f),
-                new Color(0.80f, 0.71f, 0.57f),
-                new Color(0.58f, 0.66f, 0.68f),
-                new Color(0.63f, 0.70f, 0.58f)
-            };
+            Color[] palette = stageTwoRequested
+                ? new Color[]
+                {
+                    new Color(0.70f, 0.53f, 0.36f),
+                    new Color(0.77f, 0.61f, 0.43f),
+                    new Color(0.64f, 0.47f, 0.31f),
+                    new Color(0.73f, 0.56f, 0.39f),
+                    new Color(0.67f, 0.51f, 0.35f)
+                }
+                : new Color[]
+                {
+                    new Color(0.76f, 0.67f, 0.54f),
+                    new Color(0.67f, 0.73f, 0.75f),
+                    new Color(0.80f, 0.71f, 0.57f),
+                    new Color(0.58f, 0.66f, 0.68f),
+                    new Color(0.63f, 0.70f, 0.58f)
+                };
             int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
             Material facade = MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
             Material trim = MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
