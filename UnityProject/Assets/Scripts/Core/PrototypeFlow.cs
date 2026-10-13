@@ -1039,7 +1039,8 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
-            stageTwoLandingMode = 0;
+            stageTwoLandingMode = 1; // Stage 2 always uses the single fixed village map.
+            stageTwoLayoutVariant = 0;
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             GateGameplay(false);
@@ -1052,8 +1053,11 @@ namespace PersiaWar.Unity2D5D
             mode = ScreenMode.DropMap;
             if (stageNumber >= 2)
             {
-                stageTwoLandingMode = 0;
-                ChooseRandomStageTwoSpawn();
+                // Keep the village layout fixed. The player chooses only a landing
+                // point on this one map; no random landing or alternate layouts.
+                stageTwoLayoutVariant = 0;
+                stageTwoLandingMode = 1;
+                spawnChosen = false;
             }
             else
             {
@@ -1124,45 +1128,19 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(0f, 76f, Screen.width, 48f),
                 "STAGE 2  •  OLD IRANIAN VILLAGE", menuHeaderStyle);
             GUI.Label(new Rect(24f, 120f, Screen.width - 48f, 30f),
-                "CHOOSE HOW TO ENTER THE VILLAGE", menuSmallStyle);
+                "CHOOSE YOUR LANDING POINT", menuSmallStyle);
 
             Rect mapRect = GetStageTwoMapRect();
             Rect panel = GetStageTwoControlPanel();
 
-            // Keep the map on the left and group all landing controls on the right.
             Fill(panel, new Color(0.02f, 0.045f, 0.07f, 0.46f));
             Fill(new Rect(panel.x, panel.y, panel.width, 4f),
                 new Color(0.98f, 0.72f, 0.22f, 0.92f));
-            GUI.Label(new Rect(panel.x + 10f, panel.y + 5f, panel.width - 20f, 30f),
-                "LANDING METHOD", menuSmallStyle);
-
-            if (DrawFantasyButton(GetStageTwoModeButtonRect(0),
-                "RANDOM LANDING", stageTwoLandingMode == 0))
-            {
-                stageTwoLandingMode = 0;
-                ChooseRandomStageTwoSpawn();
-            }
-            if (DrawFantasyButton(GetStageTwoModeButtonRect(1),
-                "CHOOSE ON MAP", stageTwoLandingMode == 1))
-            {
-                stageTwoLandingMode = 1;
-                spawnChosen = false;
-            }
-
-            GUI.Label(new Rect(panel.x + 10f, panel.y + 166f, panel.width - 20f, 32f),
-                "VILLAGE LAYOUT", menuSmallStyle);
-            string[] layoutNames = { "CLUSTER", "GREEN", "SCATTERED" };
-            for (int i = 0; i < layoutNames.Length; i++)
-            {
-                if (DrawFantasyButton(GetStageTwoLayoutButtonRect(i),
-                    layoutNames[i] + (stageTwoLayoutVariant == i ? "  ✦" : ""),
-                    stageTwoLayoutVariant == i))
-                {
-                    stageTwoLayoutVariant = i;
-                    if (stageTwoLandingMode == 0)
-                        ChooseRandomStageTwoSpawn();
-                }
-            }
+            GUI.Label(new Rect(panel.x + 10f, panel.y + 8f, panel.width - 20f, 36f),
+                "LANDING POINT", menuButtonStyle);
+            GUI.Label(new Rect(panel.x + 10f, panel.y + 48f, panel.width - 20f, 74f),
+                "Tap an open area on the map. The village houses, trees and paths stay in the same places.",
+                menuSmallStyle);
 
             DrawStageTwoVillageMap(mapRect);
             if (spawnChosen)
@@ -1181,9 +1159,7 @@ namespace PersiaWar.Unity2D5D
 
             Rect hint = new Rect(panel.x + 8f, Screen.height - 119f, panel.width - 16f, 30f);
             GUI.Label(hint,
-                stageTwoLandingMode == 0
-                    ? "SAFE RANDOM LANDING SELECTED"
-                    : (spawnChosen ? "LANDING POINT SELECTED" : "TAP AN OPEN AREA ON THE MAP"),
+                spawnChosen ? "LANDING POINT SELECTED" : "TAP THE MAP TO CHOOSE",
                 menuSmallStyle);
 
             GUI.enabled = spawnChosen;
@@ -1210,33 +1186,6 @@ namespace PersiaWar.Unity2D5D
             }
             screen.y = Screen.height - screen.y;
 
-            if (GetStageTwoModeButtonRect(0).Contains(screen))
-            {
-                suppressMenuButtonClicksFrame = Time.frameCount;
-                stageTwoLandingMode = 0;
-                ChooseRandomStageTwoSpawn();
-                return;
-            }
-            if (GetStageTwoModeButtonRect(1).Contains(screen))
-            {
-                suppressMenuButtonClicksFrame = Time.frameCount;
-                stageTwoLandingMode = 1;
-                spawnChosen = false;
-                return;
-            }
-
-            for (int i = 0; i < 3; i++)
-            {
-                if (!GetStageTwoLayoutButtonRect(i).Contains(screen))
-                    continue;
-
-                suppressMenuButtonClicksFrame = Time.frameCount;
-                stageTwoLayoutVariant = i;
-                if (stageTwoLandingMode == 0)
-                    ChooseRandomStageTwoSpawn();
-                return;
-            }
-
             Rect startRect = GetStageTwoStartRect();
             if (spawnChosen && startRect.Contains(screen))
             {
@@ -1246,8 +1195,13 @@ namespace PersiaWar.Unity2D5D
             }
 
             Rect mapRect = GetStageTwoMapRect();
-            if (stageTwoLandingMode == 1 && mapRect.Contains(screen))
+            if (mapRect.Contains(screen))
             {
+                suppressMenuButtonClicksFrame = Time.frameCount;
+                // Ignore taps on the decorative map title; all other map taps pick
+                // the actual spawn point. Stage 2 has one immutable world layout.
+                if (screen.y < mapRect.y + 36f)
+                    return;
                 spawnWorld = MapPointToWorld(screen, mapRect);
                 spawnChosen = true;
             }
@@ -1279,8 +1233,6 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < houses.Length; i++)
             {
                 Vector2 center = houses[i];
-                if (stageTwoLayoutVariant == 1) center.x = -center.x;
-                else if (stageTwoLayoutVariant == 2) center = new Vector2(center.y, -center.x);
                 Vector2 p = WorldToMap(center, rect);
                 float w = rect.width * 0.045f;
                 float h = rect.height * 0.038f;
