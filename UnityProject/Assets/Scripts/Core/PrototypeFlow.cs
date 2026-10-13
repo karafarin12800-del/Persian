@@ -35,7 +35,7 @@ namespace PersiaWar.Unity2D5D
             "VOID RIFLE",
             "ALIEN SWORD"
         };
-        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350, 700, 600 };
+        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350, 450, 400 };
         private PlayerController player;
         private EnemySpawner enemySpawner;
         private MobileInputHub mobileInput;
@@ -1664,7 +1664,7 @@ namespace PersiaWar.Unity2D5D
 
             float elapsed = Time.unscaledTime - stageTwoLobbyStartedAt;
             string status = elapsed < 7f
-                ? "SEARCHING FOR ONLINE PLAYERS  •  " + Mathf.CeilToInt(7f - elapsed) + "s"
+                ? "WAITING FOR PLAYERS  •  " + Mathf.CeilToInt(7f - elapsed) + "s"
                 : "FILLING REMAINING SLOTS WITH LOCAL AI  •  +1 / SECOND";
             GUI.Label(new Rect(panel.x + 18f, panel.y + 190f, panel.width - 36f, 46f), status, menuSmallStyle);
             GUI.Label(new Rect(panel.x + 24f, panel.y + 244f, panel.width - 48f, 58f),
@@ -1825,9 +1825,21 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            // Axe is a stage-two-only weapon. Stage one's weapon cycle and loot
-            // remain the original three firearm profiles.
+            // Stage one keeps its original three firearms. Stage two additionally
+            // enables the axe, Void Rifle and Alien Sword when the local profile owns them.
             player.Weapon?.SetAxeEnabledForMatch(stageNumber >= 2);
+            if (stageNumber >= 2 && player.Weapon != null)
+            {
+                WeaponController.WeaponKind selectedKind = (WeaponController.WeaponKind)
+                    PlayerPrefs.GetInt("PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
+                bool ownsVoidRifle = PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0;
+                bool ownsAlienSword = PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0;
+                if (selectedKind == WeaponController.WeaponKind.VoidRifle && !ownsVoidRifle)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                if (selectedKind == WeaponController.WeaponKind.AlienSword && !ownsAlienSword)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                player.Weapon.SelectWeapon(selectedKind);
+            }
 
             StartupCheckpoint.Set("PlayerPreparedForMatch");
 
