@@ -1379,46 +1379,31 @@ namespace PersiaWar.Unity2D5D
                 float front = northPlot ? 2.0f : -lotDepth * 0.5f;
                 float rear = northPlot ? lotDepth * 0.5f : 2.0f;
                 float gateZ = northPlot ? lotDepth * 0.5f : -lotDepth * 0.5f;
-                QueueAndroidBox("VillageCourtyardLeftWall", plot + new Vector3(left, wallHeight * 0.5f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall);
-                QueueAndroidBox("VillageCourtyardRightWall", plot + new Vector3(right, wallHeight * 0.5f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall);
+                CreateAndroidBox("VillageCourtyardLeftWall", plot + new Vector3(left, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardRightWall", plot + new Vector3(right, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
 
                 if (style == 1)
                 {
                     // Open central garden ring: short rear and front wall segments leave access gaps.
-                    QueueAndroidBox("VillageCourtyardRearWallLeft", plot + new Vector3(-4.6f, wallHeight * 0.5f, rear),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardRearWallRight", plot + new Vector3(4.6f, wallHeight * 0.5f, rear),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardFrontWall", plot + new Vector3(0f, wallHeight * 0.5f, front),
-                        new Vector3(6.2f, wallHeight, wallThickness), adobeWall);
+                    CreateAndroidBox("VillageCourtyardRearWallLeft", plot + new Vector3(-4.6f, wallHeight * 0.5f, rear),
+                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
+                    CreateAndroidBox("VillageCourtyardRearWallRight", plot + new Vector3(4.6f, wallHeight * 0.5f, rear),
+                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
+                    CreateAndroidBox("VillageCourtyardFrontWall", plot + new Vector3(0f, wallHeight * 0.5f, front),
+                        new Vector3(6.2f, wallHeight, wallThickness), adobeWall, true);
                 }
                 else
                 {
-                    QueueAndroidBox("VillageCourtyardRearWall", plot + new Vector3(0f, wallHeight * 0.5f, rear),
-                        new Vector3(lotWidth, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardGateSideLeft", plot + new Vector3(-4.1f, wallHeight * 0.5f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
-                    QueueAndroidBox("VillageCourtyardGateSideRight", plot + new Vector3(4.1f, wallHeight * 0.5f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall);
+                    CreateAndroidBox("VillageCourtyardRearWall", plot + new Vector3(0f, wallHeight * 0.5f, rear),
+                        new Vector3(lotWidth, wallHeight, wallThickness), adobeWall, true);
+                    CreateAndroidBox("VillageCourtyardGateSideLeft", plot + new Vector3(-4.1f, wallHeight * 0.5f, gateZ),
+                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
+                    CreateAndroidBox("VillageCourtyardGateSideRight", plot + new Vector3(4.1f, wallHeight * 0.5f, gateZ),
+                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
                     QueueAndroidBox("VillageWoodGate", plot + new Vector3(0f, 0.72f, gateZ),
                         new Vector3(2.2f, 1.42f, 0.16f), gateMaterial);
-                }
-
-                // Colliders mirror the courtyard walls and leave a walkable gate opening.
-                CreateAndroidCollider("VillageCourtyardLeftCollider", plot + new Vector3(left, 0f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth));
-                CreateAndroidCollider("VillageCourtyardRightCollider", plot + new Vector3(right, 0f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth));
-                CreateAndroidCollider("VillageCourtyardRearCollider", plot + new Vector3(0f, 0f, rear),
-                    new Vector3(lotWidth, wallHeight, wallThickness));
-                if (style != 1)
-                {
-                    CreateAndroidCollider("VillageCourtyardGateSideCollider", plot + new Vector3(-4.1f, 0f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness));
-                    CreateAndroidCollider("VillageCourtyardGateSideCollider", plot + new Vector3(4.1f, 0f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness));
                 }
 
                 // Green vegetable beds occupy only part of each yard; most exposed ground stays dusty.
@@ -1545,13 +1530,22 @@ namespace PersiaWar.Unity2D5D
                 ? Mathf.Min(3.4f, footprint * 0.32f)
                 : Mathf.Min(1.35f, footprint * 0.18f);
             float doorHeight = isWarehouse ? 2.35f : 2.15f;
-            QueueAndroidBuildingFacade(position, footprint, bodyHeight, depth, doorWidth, doorHeight, facade);
-
-            // Split solid collision around the same visible doorway. Windows and all
-            // other wall sections remain blocked by solid colliders.
-            float collisionHeight = bodyHeight + (isPitchedRoof ? 1.6f : 0.65f);
-            CreateAndroidBuildingColliders(
-                position, footprint, depth, collisionHeight, doorWidth, doorHeight);
+            if (stageTwoRequested)
+            {
+                // Stage two uses one collider + one renderer for each physical wall
+                // section. The camera can fade only the wall actually between it and
+                // the player; the roof and rest of the house stay opaque.
+                CreateAndroidBuildingFacadeParts(position, footprint, bodyHeight, depth,
+                    doorWidth, doorHeight, facade);
+            }
+            else
+            {
+                // Keep stage one's original batched facade/collider path unchanged.
+                QueueAndroidBuildingFacade(position, footprint, bodyHeight, depth, doorWidth, doorHeight, facade);
+                float collisionHeight = bodyHeight + (isPitchedRoof ? 1.6f : 0.65f);
+                CreateAndroidBuildingColliders(
+                    position, footprint, depth, collisionHeight, doorWidth, doorHeight);
+            }
 
             if (isPitchedRoof)
             {
@@ -1867,6 +1861,42 @@ namespace PersiaWar.Unity2D5D
             QueueAndroidBox("CityBuildingDoorHeader",
                 position + new Vector3(0f, doorHeight + headerHeight * 0.5f, frontZ),
                 new Vector3(doorWidth, headerHeight, thickness), facade);
+        }
+
+        private void CreateAndroidBuildingFacadeParts(
+            Vector3 position,
+            float footprint,
+            float bodyHeight,
+            float depth,
+            float doorWidth,
+            float doorHeight,
+            Material facade)
+        {
+            float thickness = Mathf.Clamp(Mathf.Min(footprint, depth) * 0.08f, 0.35f, 0.60f);
+            float frontZ = -depth * 0.5f + thickness * 0.5f;
+            float backZ = depth * 0.5f - thickness * 0.5f;
+            float sideWidth = Mathf.Max(0.35f, (footprint - doorWidth) * 0.5f);
+
+            CreateAndroidBox("VillageFadeableHouseWall_Left",
+                position + new Vector3(-footprint * 0.5f + thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_Right",
+                position + new Vector3(footprint * 0.5f - thickness * 0.5f, bodyHeight * 0.5f, 0f),
+                new Vector3(thickness, bodyHeight, depth), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_Rear",
+                position + new Vector3(0f, bodyHeight * 0.5f, backZ),
+                new Vector3(footprint, bodyHeight, thickness), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_FrontLeft",
+                position + new Vector3(-doorWidth * 0.5f - sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade, true);
+            CreateAndroidBox("VillageFadeableHouseWall_FrontRight",
+                position + new Vector3(doorWidth * 0.5f + sideWidth * 0.5f, bodyHeight * 0.5f, frontZ),
+                new Vector3(sideWidth, bodyHeight, thickness), facade, true);
+
+            float headerHeight = Mathf.Max(0.1f, bodyHeight - doorHeight);
+            CreateAndroidBox("VillageFadeableHouseWall_DoorHeader",
+                position + new Vector3(0f, doorHeight + headerHeight * 0.5f, frontZ),
+                new Vector3(doorWidth, headerHeight, thickness), facade, true);
         }
 
         private void CreateAndroidBuildingColliders(
