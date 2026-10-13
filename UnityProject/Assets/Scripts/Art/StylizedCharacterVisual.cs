@@ -41,6 +41,8 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobilePack;
         private Renderer mobileHelmet;
         private Renderer mobileVisor;
+        private Renderer mobileFemaleHairLeft;
+        private Renderer mobileFemaleHairRight;
 
         public Transform Muzzle => muzzle;
         public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;
@@ -84,14 +86,15 @@ namespace PersiaWar.Unity2D5D
             EnsurePresentation();
             LoadCharacterSprite();
 
-            int index = Mathf.Clamp(heroIndex, 0, 4);
+            int index = Mathf.Clamp(heroIndex, 0, 5);
             Color[] variants =
             {
                 new Color(1.00f, 1.00f, 1.00f, 1.00f),
                 new Color(0.86f, 0.95f, 1.00f, 1.00f),
                 new Color(0.86f, 1.00f, 0.90f, 1.00f),
                 new Color(1.00f, 0.89f, 0.93f, 1.00f),
-                new Color(1.00f, 0.96f, 0.84f, 1.00f)
+                new Color(1.00f, 0.96f, 0.84f, 1.00f),
+                new Color(1.00f, 0.87f, 0.95f, 1.00f)
             };
 
             if (sprite != null)
@@ -240,6 +243,12 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, 1.57f, 0.01f), new Vector3(0.70f, 0.38f, 0.66f));
                 mobileVisor = CreateMobilePrimitive(PrimitiveType.Cube, "Visor", mobileModelRoot,
                     new Vector3(0f, 1.49f, 0.31f), new Vector3(0.44f, 0.15f, 0.10f));
+                mobileFemaleHairLeft = CreateMobilePrimitive(PrimitiveType.Capsule, "AnahitaLongHairLeft", mobileModelRoot,
+                    new Vector3(-0.25f, 1.16f, -0.06f), new Vector3(0.14f, 0.32f, 0.16f));
+                mobileFemaleHairRight = CreateMobilePrimitive(PrimitiveType.Capsule, "AnahitaLongHairRight", mobileModelRoot,
+                    new Vector3(0.25f, 1.16f, -0.06f), new Vector3(0.14f, 0.32f, 0.16f));
+                mobileFemaleHairLeft.enabled = false;
+                mobileFemaleHairRight.enabled = false;
             }
 
             Renderer[] parts =
@@ -299,7 +308,9 @@ namespace PersiaWar.Unity2D5D
 
         private void ApplyMobilePlayerColors(int heroIndex)
         {
-            Color shirtColor = heroIndex == 0 ? new Color(0.08f, 0.26f, 0.52f)
+            bool isAnahita = heroIndex == 5;
+            Color shirtColor = isAnahita ? new Color(0.82f, 0.22f, 0.50f)
+                : heroIndex == 0 ? new Color(0.08f, 0.26f, 0.52f)
                 : heroIndex == 1 ? new Color(0.10f, 0.42f, 0.52f)
                 : heroIndex == 2 ? new Color(0.16f, 0.46f, 0.24f)
                 : heroIndex == 3 ? new Color(0.42f, 0.16f, 0.46f)
@@ -307,12 +318,12 @@ namespace PersiaWar.Unity2D5D
 
             Color hairColor = heroIndex == 0
                 ? new Color(0.56f, 0.20f, 0.08f)
-                : new Color(0.12f, 0.09f, 0.07f);
+                : new Color(0.10f, 0.055f, 0.035f);
 
             SetRendererColor(mobileHead, new Color(0.78f, 0.53f, 0.34f));
             SetRendererColor(mobileBody, shirtColor * 0.85f);
             SetRendererColor(mobileShirt, shirtColor);
-            SetRendererColor(mobilePants, new Color(0.08f, 0.12f, 0.20f));
+            SetRendererColor(mobilePants, isAnahita ? new Color(0.58f, 0.13f, 0.38f) : new Color(0.08f, 0.12f, 0.20f));
             SetRendererColor(mobileShoes, new Color(0.10f, 0.11f, 0.13f));
             SetRendererColor(mobileHair, hairColor);
             SetRendererColor(mobileArmor, Color.Lerp(shirtColor, Color.white, 0.16f));
@@ -321,6 +332,32 @@ namespace PersiaWar.Unity2D5D
             SetRendererColor(mobilePack, new Color(0.07f, 0.09f, 0.12f));
             SetRendererColor(mobileHelmet, new Color(0.13f, 0.16f, 0.19f));
             SetRendererColor(mobileVisor, new Color(0.18f, 0.48f, 0.58f));
+
+            // Anahita is the rescued civilian hero: long dark hair and a dress,
+            // without the military helmet, visor, armor, or backpack.
+            if (mobilePants != null)
+            {
+                mobilePants.transform.localPosition = isAnahita
+                    ? new Vector3(0f, 0.34f, 0f)
+                    : new Vector3(0f, 0.28f, 0f);
+                mobilePants.transform.localScale = isAnahita
+                    ? new Vector3(0.68f, 0.43f, 0.54f)
+                    : new Vector3(0.62f, 0.28f, 0.48f);
+            }
+            if (mobileHelmet != null) mobileHelmet.enabled = !isAnahita;
+            if (mobileVisor != null) mobileVisor.enabled = !isAnahita;
+            if (mobileArmor != null) mobileArmor.enabled = !isAnahita;
+            if (mobilePack != null) mobilePack.enabled = !isAnahita;
+            if (mobileFemaleHairLeft != null)
+            {
+                mobileFemaleHairLeft.enabled = isAnahita;
+                SetRendererColor(mobileFemaleHairLeft, hairColor);
+            }
+            if (mobileFemaleHairRight != null)
+            {
+                mobileFemaleHairRight.enabled = isAnahita;
+                SetRendererColor(mobileFemaleHairRight, hairColor);
+            }
         }
 
         private void ApplyMobileEnemyColors(int archetypeIndex)
