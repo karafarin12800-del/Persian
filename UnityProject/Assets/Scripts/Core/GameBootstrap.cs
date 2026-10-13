@@ -47,6 +47,9 @@ namespace PersiaWar.Unity2D5D
 
         private readonly Dictionary<Material, AndroidBoxBatch> androidBoxBatches =
             new Dictionary<Material, AndroidBoxBatch>();
+        private readonly Dictionary<int, Material> stageTwoLitMaterialCache =
+            new Dictionary<int, Material>();
+        private Shader stageTwoLitShader;
         // Each Android house owns its own batched renderers so the camera can fade
         // only the building that actually blocks the player, not every house at once.
         private Transform androidCurrentBuildingRoot;
@@ -240,7 +243,9 @@ namespace PersiaWar.Unity2D5D
 
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
-            roadMaterial = MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
+            roadMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("Road", new Color(0.52f, 0.54f, 0.57f))
+                : MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
@@ -248,13 +253,27 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
-            Material groundMaterial = MakeMaterial("AndroidGround3D", stageTwoRequested ? new Color(0.43f, 0.34f, 0.23f) : new Color(0.12f, 0.46f, 0.08f));
-            buildingMaterial = MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
-            roofMaterial = MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
-            accentMaterial = MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
-            androidWindowMaterial = MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
-            androidShadowMaterial = MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
-            androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
+            Material groundMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidGround3D", new Color(0.43f, 0.34f, 0.23f))
+                : MakeMaterial("AndroidGround3D", new Color(0.12f, 0.46f, 0.08f));
+            buildingMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f))
+                : MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
+            roofMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f))
+                : MakeMaterial("AndroidRoof", new Color(0.095f, 0.115f, 0.145f));
+            accentMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f))
+                : MakeMaterial("AndroidAccent", new Color(0.86f, 0.66f, 0.22f));
+            androidWindowMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f))
+                : MakeMaterial("AndroidWindow", new Color(0.08f, 0.24f, 0.32f));
+            androidShadowMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f))
+                : MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
+            androidSidewalkMaterial = stageTwoRequested
+                ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f))
+                : MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
             // stays below the lowest terrain vertices, preventing black pinholes
@@ -726,7 +745,7 @@ namespace PersiaWar.Unity2D5D
             part.transform.localScale = preScaledForWeapon ? localScale * 0.5f : localScale;
             Renderer renderer = part.GetComponent<Renderer>();
             if (renderer != null)
-                renderer.sharedMaterial = MakeMaterial("StageTwoPickup_" + partName, color);
+                renderer.sharedMaterial = MakeStageTwoLitMaterial("StageTwoPickup_" + partName, color);
             Collider collider = part.GetComponent<Collider>();
             if (collider != null)
                 Destroy(collider);
@@ -735,8 +754,8 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnVillageAxePickups(int count)
         {
-            Material wood = MakeMaterial("VillageAxePickupWood", new Color(0.30f, 0.17f, 0.08f));
-            Material steel = MakeMaterial("VillageAxePickupSteel", new Color(0.55f, 0.60f, 0.63f));
+            Material wood = MakeStageTwoLitMaterial("VillageAxePickupWood", new Color(0.30f, 0.17f, 0.08f));
+            Material steel = MakeStageTwoLitMaterial("VillageAxePickupSteel", new Color(0.55f, 0.60f, 0.63f));
             for (int i = 0; i < count; i++)
             {
                 int houseIndex = Random.Range(0, androidBuildingCenters.Count);
@@ -831,8 +850,10 @@ namespace PersiaWar.Unity2D5D
             if (renderer != null)
             {
                 renderer.sharedMaterial = material;
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = false;
+                renderer.shadowCastingMode = stageTwoRequested
+                    ? UnityEngine.Rendering.ShadowCastingMode.On
+                    : UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = stageTwoRequested;
             }
         }
 
@@ -1273,7 +1294,7 @@ namespace PersiaWar.Unity2D5D
             }
 
             CreateAndroidQuadBatch("StageTwoVillageDirtLanes", vertices, triangles,
-                MakeMaterial("VillageDirtPath", new Color(0.43f, 0.34f, 0.23f)));
+                MakeStageTwoLitMaterial("VillageDirtPath", new Color(0.43f, 0.34f, 0.23f)));
         }
 
         private void BuildAndroidVillagePresentation()
@@ -1298,14 +1319,14 @@ namespace PersiaWar.Unity2D5D
 
             Material[] wallMaterials =
             {
-                MakeMaterial("VillageCourtyardWall_Sand", new Color(0.62f, 0.47f, 0.32f)),
-                MakeMaterial("VillageCourtyardWall_LightAdobe", new Color(0.70f, 0.54f, 0.38f)),
-                MakeMaterial("VillageCourtyardWall_DarkAdobe", new Color(0.53f, 0.39f, 0.27f))
+                MakeStageTwoLitMaterial("VillageCourtyardWall_Sand", new Color(0.62f, 0.47f, 0.32f)),
+                MakeStageTwoLitMaterial("VillageCourtyardWall_LightAdobe", new Color(0.70f, 0.54f, 0.38f)),
+                MakeStageTwoLitMaterial("VillageCourtyardWall_DarkAdobe", new Color(0.53f, 0.39f, 0.27f))
             };
-            Material gateMaterial = MakeMaterial("VillageWoodGate", new Color(0.22f, 0.13f, 0.07f));
-            Material gardenMaterial = MakeMaterial("VillageGardenGreen", new Color(0.19f, 0.39f, 0.13f));
-            Material hedgeMaterial = MakeMaterial("VillageDenseBoxwood", new Color(0.12f, 0.29f, 0.10f));
-            Material bareSoilMaterial = MakeMaterial("VillageGardenSoil", new Color(0.30f, 0.23f, 0.15f));
+            Material gateMaterial = MakeStageTwoLitMaterial("VillageWoodGate", new Color(0.22f, 0.13f, 0.07f));
+            Material gardenMaterial = MakeStageTwoLitMaterial("VillageGardenGreen", new Color(0.19f, 0.39f, 0.13f));
+            Material hedgeMaterial = MakeStageTwoLitMaterial("VillageDenseBoxwood", new Color(0.12f, 0.29f, 0.10f));
+            Material bareSoilMaterial = MakeStageTwoLitMaterial("VillageGardenSoil", new Color(0.30f, 0.23f, 0.15f));
 
             int windcatchers = 0;
             for (int i = 0; i < plots.Length; i++)
@@ -1460,8 +1481,8 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateAndroidVillageWindcatcher(Vector3 house, float footprint, float bodyHeight, float depth, int index)
         {
-            Material adobe = MakeMaterial("VillageWindcatcherAdobe_" + index, new Color(0.68f, 0.52f, 0.35f));
-            Material shadow = MakeMaterial("VillageWindcatcherOpening_" + index, new Color(0.22f, 0.25f, 0.23f));
+            Material adobe = MakeStageTwoLitMaterial("VillageWindcatcherAdobe_" + index, new Color(0.68f, 0.52f, 0.35f));
+            Material shadow = MakeStageTwoLitMaterial("VillageWindcatcherOpening_" + index, new Color(0.22f, 0.25f, 0.23f));
             float x = Mathf.Max(1.0f, footprint * 0.20f);
             float z = Mathf.Max(1.0f, depth * 0.20f);
             float h = 2.6f;
@@ -1515,15 +1536,15 @@ namespace PersiaWar.Unity2D5D
                     new Color(0.63f, 0.70f, 0.58f)
                 };
             int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
-            Material facade = MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
-            Material trim = MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
+            Material facade = stageTwoRequested ? MakeStageTwoLitMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]) : MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
+            Material trim = stageTwoRequested ? MakeStageTwoLitMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f)) : MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
             Material darkWindow = androidWindowMaterial != null
                 ? androidWindowMaterial
-                : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f));
-            Material door = MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
-            Material rooftop = MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
-            Material planter = MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
-            Material hedge = MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
+                : (stageTwoRequested ? MakeStageTwoLitMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f)) : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f)));
+            Material door = stageTwoRequested ? MakeStageTwoLitMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f)) : MakeMaterial("CityDoor_" + paletteIndex, new Color(0.16f, 0.12f, 0.10f));
+            Material rooftop = stageTwoRequested ? MakeStageTwoLitMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f)) : MakeMaterial("RooftopEquipment_" + paletteIndex, new Color(0.31f, 0.33f, 0.34f));
+            Material planter = stageTwoRequested ? MakeStageTwoLitMaterial("Planter", new Color(0.25f, 0.20f, 0.13f)) : MakeMaterial("Planter", new Color(0.25f, 0.20f, 0.13f));
+            Material hedge = stageTwoRequested ? MakeStageTwoLitMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f)) : MakeMaterial("Hedge", new Color(0.18f, 0.42f, 0.18f));
 
             float doorWidth = isWarehouse
                 ? Mathf.Min(3.4f, footprint * 0.32f)
@@ -1699,9 +1720,9 @@ namespace PersiaWar.Unity2D5D
         {
             position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             if (androidTreeTrunkMaterial == null)
-                androidTreeTrunkMaterial = MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+                androidTreeTrunkMaterial = MakeStageTwoLitMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
             if (androidTreeCrownMaterial == null)
-                androidTreeCrownMaterial = MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
+                androidTreeCrownMaterial = MakeStageTwoLitMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
 
             CreateAndroidBox(
                 "TreeTrunk",
@@ -2130,6 +2151,46 @@ namespace PersiaWar.Unity2D5D
                 if (c != null) Destroy(c);
             }
             return obj;
+        }
+
+        private Material MakeStageTwoLitMaterial(string name, Color color)
+        {
+            Shader shader = stageTwoLitShader;
+            if (shader == null)
+            {
+                shader = Resources.Load<Shader>("PersiaWarLit");
+                if (shader == null) shader = Shader.Find("PersiaWar/Lit");
+                if (shader == null) shader = Shader.Find("Standard");
+                stageTwoLitShader = shader;
+            }
+            if (shader == null)
+                return MakeMaterial(name, color);
+
+            unchecked
+            {
+                int key = shader.GetInstanceID();
+                key = key * 31 + Mathf.RoundToInt(color.r * 255f);
+                key = key * 31 + Mathf.RoundToInt(color.g * 255f);
+                key = key * 31 + Mathf.RoundToInt(color.b * 255f);
+                key = key * 31 + Mathf.RoundToInt(color.a * 255f);
+                if (stageTwoLitMaterialCache.TryGetValue(key, out Material cached) && cached != null)
+                    return cached;
+
+                Material material = new Material(shader)
+                {
+                    name = name,
+                    color = color,
+                    enableInstancing = true
+                };
+                if (material.HasProperty("_Color")) material.SetColor("_Color", color);
+                if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
+                if (material.HasProperty("_MainTex") && material.mainTexture == null)
+                    material.mainTexture = Texture2D.whiteTexture;
+                if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0f);
+                if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0.08f);
+                stageTwoLitMaterialCache[key] = material;
+                return material;
+            }
         }
 
         private Material MakeMaterial(string name, Color color)
