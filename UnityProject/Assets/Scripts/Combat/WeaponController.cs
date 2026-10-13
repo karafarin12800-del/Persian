@@ -621,7 +621,7 @@ namespace PersiaWar.Unity2D5D
                 if (distance <= 0.01f || distance > meleeRange) continue;
                 if (Vector3.Dot(forward, delta.normalized) < 0.25f) continue;
 
-                target.ApplyDamage(meleeDamage);
+                target.ApplyDamage(meleeDamage, transform);
                 hitSomething = true;
             }
 
