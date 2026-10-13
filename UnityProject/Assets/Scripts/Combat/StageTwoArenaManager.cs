@@ -140,6 +140,7 @@ namespace PersiaWar.Unity2D5D
             if (finished) return;
             finished = true;
             List<KeyValuePair<string, int>> ranking = kills.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key == "YOU" ? 0 : 1)
                 .ThenBy(pair => pair.Key, System.StringComparer.Ordinal).ToList();
             int rank = ranking.FindIndex(pair => pair.Key == "YOU") + 1;
             LastLocalRank = rank;
