@@ -633,7 +633,7 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
+                Rect continueRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 112f, 420f, 62f);
                 if (continueRect.Contains(gui))
                 {
                     EnterDropMap();
@@ -852,7 +852,7 @@ namespace PersiaWar.Unity2D5D
 
             // Handle START MATCH through real touch coordinates as well as IMGUI.
             // Some Android configurations do not synthesize MouseUp for GUI.Button.
-            Rect startRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+            Rect startRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 66f, 420f, 54f);
             if (spawnChosen && startRect.Contains(screen))
             {
                 StartMatch();
