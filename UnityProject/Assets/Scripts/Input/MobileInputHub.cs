@@ -110,13 +110,13 @@ namespace PersiaWar.Unity2D5D
 
         public void DeactivateMatch()
         {
-#if UNITY_ANDROID
-            // Re-enable touch-to-mouse synthesis for menu/pause IMGUI after gameplay.
-            Input.simulateMouseWithTouches = true;
-#endif
             matchActive = false;
             matchPaused = false;
             ResetAllPointers();
+#if UNITY_ANDROID
+            // Restore synthesized mouse input only after gameplay no longer owns touches.
+            Input.simulateMouseWithTouches = !matchActive;
+#endif
         }
 
         public void SetPaused(bool paused)
@@ -146,10 +146,10 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
 #if UNITY_ANDROID
-            // Keep IMGUI menu/pause controls clickable from the very first frame.
-            // Gameplay prefers real finger IDs and guards its fallback dispatcher.
+            // Before a match starts, menu controls use IMGUI mouse synthesis.
+            // Active-match transitions later switch to native touch ownership.
             Input.multiTouchEnabled = true;
-            Input.simulateMouseWithTouches = true;
+            Input.simulateMouseWithTouches = !matchActive;
 #endif
             if (moveRadius > 0f)
                 joystickRadius = Mathf.Clamp(moveRadius * 0.98f, 108f, 164f);
@@ -185,8 +185,9 @@ namespace PersiaWar.Unity2D5D
         {
             ResetAllPointers();
 #if UNITY_ANDROID
-            // Keep menu/pause IMGUI buttons usable after gameplay input is disabled.
-            Input.simulateMouseWithTouches = true;
+            // Do not turn mouse synthesis back on if the hub is temporarily disabled
+            // during an active match; the menu regains it only after DeactivateMatch.
+            Input.simulateMouseWithTouches = !matchActive;
 #endif
         }
 
