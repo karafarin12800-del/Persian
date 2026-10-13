@@ -2328,6 +2328,16 @@ namespace PersiaWar.Unity2D5D
                 smallStyle);
         }
 
+        private string GetStageTwoResultMessage()
+        {
+            StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+            int rank = arena != null ? arena.LastLocalRank : 0;
+            if (rank == 1) return "1ST PLACE  •  NEXT STAGE UNLOCKED  •  +300 COINS";
+            if (rank == 2) return "2ND PLACE  •  VOID RIFLE REWARD IN STORE";
+            if (rank == 3) return "3RD PLACE  •  ALIEN SWORD REWARD IN STORE";
+            return "ARENA CLEARED  •  FINAL RANK #" + rank + "  •  CHECK THE STORE";
+        }
+
         private void DrawAndroidResultOverlay()
         {
             EnsureUiInitialized();
@@ -2383,12 +2393,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
-                    ? (stageNumber >= 2
-                        ? "Arena cleared. Final rank: #" +
-                            (GetComponent<StageTwoArenaManager>() != null
-                                ? GetComponent<StageTwoArenaManager>().LastLocalRank.ToString()
-                                : "?") + ". Check the store for rewards."
-                        : "Extraction reached. Mission complete.")
+                    ? (stageNumber >= 2 ? GetStageTwoResultMessage() : "Extraction reached. Mission complete.")
                     : "Your fighter was defeated.",
                 bodyStyle);
 
