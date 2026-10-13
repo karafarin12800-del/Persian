@@ -1323,8 +1323,9 @@ namespace PersiaWar.Unity2D5D
                 int style = i % 4; // front yard, central garden, corner house, side garden
                 float wallHeight = 1.42f + (i % 3) * 0.12f;
                 float wallThickness = 0.38f;
-                float lotWidth = style == 1 ? 14.6f : 13.2f;
-                float lotDepth = style == 1 ? 14.6f : 13.2f;
+                // Closely adjoining plots give the village a compact lived-in texture.
+                float lotWidth = style == 1 ? 15.2f : 14.8f;
+                float lotDepth = style == 1 ? 15.2f : 14.8f;
                 Material adobeWall = wallMaterials[i % wallMaterials.Length];
 
                 androidCurrentBuildingRoot = new GameObject("Building_VillageHouse_" + (i + 1)).transform;
@@ -1373,38 +1374,36 @@ namespace PersiaWar.Unity2D5D
                     windcatchers++;
                 }
 
-                // Different wall arrangements prevent every house from looking identical.
+                // Fully close every yard on three sides and add a single real gate
+                // opening on the side facing the village lane. This also applies to
+                // central-garden plots; none of them should have wide, unexplained gaps.
                 float left = -lotWidth * 0.5f;
                 float right = lotWidth * 0.5f;
-                float front = northPlot ? 2.0f : -lotDepth * 0.5f;
-                float rear = northPlot ? lotDepth * 0.5f : 2.0f;
-                float gateZ = northPlot ? lotDepth * 0.5f : -lotDepth * 0.5f;
-                CreateAndroidBox("VillageCourtyardLeftWall", plot + new Vector3(left, wallHeight * 0.5f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
-                CreateAndroidBox("VillageCourtyardRightWall", plot + new Vector3(right, wallHeight * 0.5f, 0f),
-                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
+                float gateZ = northPlot ? -lotDepth * 0.5f : lotDepth * 0.5f;
+                float backZ = -gateZ;
+                const float gateOpening = 2.2f;
+                float gateSideWidth = Mathf.Max(0.5f, (lotWidth - gateOpening) * 0.5f);
 
-                if (style == 1)
-                {
-                    // Open central garden ring: short rear and front wall segments leave access gaps.
-                    CreateAndroidBox("VillageCourtyardRearWallLeft", plot + new Vector3(-4.6f, wallHeight * 0.5f, rear),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
-                    CreateAndroidBox("VillageCourtyardRearWallRight", plot + new Vector3(4.6f, wallHeight * 0.5f, rear),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
-                    CreateAndroidBox("VillageCourtyardFrontWall", plot + new Vector3(0f, wallHeight * 0.5f, front),
-                        new Vector3(6.2f, wallHeight, wallThickness), adobeWall, true);
-                }
-                else
-                {
-                    CreateAndroidBox("VillageCourtyardRearWall", plot + new Vector3(0f, wallHeight * 0.5f, rear),
-                        new Vector3(lotWidth, wallHeight, wallThickness), adobeWall, true);
-                    CreateAndroidBox("VillageCourtyardGateSideLeft", plot + new Vector3(-4.1f, wallHeight * 0.5f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
-                    CreateAndroidBox("VillageCourtyardGateSideRight", plot + new Vector3(4.1f, wallHeight * 0.5f, gateZ),
-                        new Vector3(4.0f, wallHeight, wallThickness), adobeWall, true);
-                    QueueAndroidBox("VillageWoodGate", plot + new Vector3(0f, 0.72f, gateZ),
-                        new Vector3(2.2f, 1.42f, 0.16f), gateMaterial);
-                }
+                CreateAndroidBox("VillageCourtyardLeftWall",
+                    plot + new Vector3(left, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardRightWall",
+                    plot + new Vector3(right, wallHeight * 0.5f, 0f),
+                    new Vector3(wallThickness, wallHeight, lotDepth), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardBackWall",
+                    plot + new Vector3(0f, wallHeight * 0.5f, backZ),
+                    new Vector3(lotWidth, wallHeight, wallThickness), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardGateSideLeft",
+                    plot + new Vector3(-(gateOpening * 0.5f + gateSideWidth * 0.5f),
+                        wallHeight * 0.5f, gateZ),
+                    new Vector3(gateSideWidth, wallHeight, wallThickness), adobeWall, true);
+                CreateAndroidBox("VillageCourtyardGateSideRight",
+                    plot + new Vector3(gateOpening * 0.5f + gateSideWidth * 0.5f,
+                        wallHeight * 0.5f, gateZ),
+                    new Vector3(gateSideWidth, wallHeight, wallThickness), adobeWall, true);
+                CreateAndroidBox("VillageWoodGate",
+                    plot + new Vector3(0f, wallHeight * 0.5f, gateZ),
+                    new Vector3(gateOpening, wallHeight * 0.92f, 0.16f), gateMaterial, false);
 
                 // Green vegetable beds occupy only part of each yard; most exposed ground stays dusty.
                 float gardenX = style == 2 ? 2.8f : (i % 2 == 0 ? -2.2f : 2.2f);
