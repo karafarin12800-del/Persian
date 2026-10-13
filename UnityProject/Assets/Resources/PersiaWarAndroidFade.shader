@@ -43,5 +43,5 @@ Shader "PersiaWar/AndroidFade"
             ENDCG
         }
     }
-    Fallback Off
+    Fallback "Unlit/Transparent"
 }
