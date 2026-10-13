@@ -575,9 +575,9 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(legend.x + 18f * scale, legend.y, 118f * scale, legend.height),
                 "L: LOOT", smallStyle);
             DrawCircle(new Vector2(legend.x + 148f * scale, legend.center.y),
-                3.5f * scale, new Color(0.20f, 0.58f, 1f, 1f));
+                3.5f * scale, stageNumber >= 2 ? new Color(0.22f, 0.96f, 0.32f, 1f) : new Color(0.20f, 0.58f, 1f, 1f));
             GUI.Label(new Rect(legend.x + 157f * scale, legend.y, legend.width - 162f * scale, legend.height),
-                "B: BEACON", smallStyle);
+                stageNumber >= 2 ? "A: ALIEN" : "B: BEACON", smallStyle);
 
             Rect counters = new Rect(
                 Screen.width - rightW - margin,
@@ -585,8 +585,24 @@ namespace PersiaWar.Unity2D5D
                 rightW,
                 30f * scale);
             Fill(counters, new Color(0.03f, 0.06f, 0.08f, 0.86f));
+            StageTwoArenaManager arenaManager = stageNumber >= 2 ? GetComponent<StageTwoArenaManager>() : null;
+            string counterText = stageNumber >= 2
+                ? "WAVE " + wave + "/5   KILLS " + (arenaManager != null ? arenaManager.LocalKills : 0)
+                : "WAVE  " + wave + "     SCORE  " + score;
             GUI.Label(new Rect(counters.x + 8f * scale, counters.y, counters.width - 16f * scale, counters.height),
-                "WAVE  " + wave + "     SCORE  " + score, smallStyle);
+                counterText, smallStyle);
+
+            if (stageNumber >= 2 && arenaManager != null)
+            {
+                Rect leaderboard = new Rect(map.x + 8f * scale, map.y + 30f * scale,
+                    Mathf.Min(154f * scale, map.width - 16f * scale), 82f * scale);
+                Fill(leaderboard, new Color(0.015f, 0.035f, 0.045f, 0.78f));
+                Fill(new Rect(leaderboard.x, leaderboard.y, 3f * scale, leaderboard.height),
+                    new Color(0.25f, 0.95f, 0.45f, 0.95f));
+                GUI.Label(new Rect(leaderboard.x + 7f * scale, leaderboard.y + 2f * scale,
+                    leaderboard.width - 12f * scale, leaderboard.height - 4f * scale),
+                    "TOP 3\\n" + arenaManager.GetLeaderboardText(), smallStyle);
+            }
 
             if (ExtractionBeacon.IsActive)
             {
@@ -2291,7 +2307,9 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
-                    ? "Extraction reached. Mission complete."
+                    ? (stageNumber >= 2
+                        ? "Arena cleared. Your kill ranking determines rewards."
+                        : "Extraction reached. Mission complete.")
                     : "Your fighter was defeated.",
                 bodyStyle);
 
