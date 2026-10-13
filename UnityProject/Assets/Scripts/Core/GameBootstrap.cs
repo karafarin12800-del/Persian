@@ -1059,6 +1059,34 @@ namespace PersiaWar.Unity2D5D
             return candidates.Count > 0 ? candidates[Random.Range(0, candidates.Count)] : -1;
         }
 
+        public bool RequiresStageOneGirlRescue =>
+            !stageTwoRequested && !VillageGirlRescued && captiveVillageGirlRoot != null;
+
+        public bool TryGetStageOneGirlBeacon(Vector3 playerPosition, out Vector3 beaconPosition)
+        {
+            beaconPosition = Vector3.zero;
+            if (!RequiresStageOneGirlRescue)
+                return false;
+
+            MoveCaptiveGirlAtLeast50mFrom(playerPosition);
+            Vector2 playerXZ = new Vector2(playerPosition.x, playerPosition.z);
+            Vector2 girlXZ = new Vector2(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z);
+            float distance = Vector2.Distance(playerXZ, girlXZ);
+            if (distance < 50f)
+            {
+                Debug.LogWarning("PERSIA_RESCUE: unable to guarantee the 50m captive distance; using normal extraction point.");
+                return false;
+            }
+
+            beaconPosition = new Vector3(
+                captiveVillageGirlPosition.x,
+                CalculateAndroidTerrainHeight(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z) + 0.08f,
+                captiveVillageGirlPosition.z);
+            Debug.Log("PERSIA_RESCUE: extraction beam placed on Anahita's house " +
+                distance.ToString("F1") + "m from player when final enemy was eliminated.");
+            return true;
+        }
+
         private void MoveCaptiveGirlAtLeast50mFrom(Vector3 playerPosition)
         {
             if (stageTwoRequested || VillageGirlRescued || captiveVillageGirlRoot == null ||
