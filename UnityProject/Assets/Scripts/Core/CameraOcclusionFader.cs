@@ -40,9 +40,18 @@ namespace PersiaWar.Unity2D5D
         {
             viewCamera = GetComponent<Camera>();
             fadeShader = Resources.Load<Shader>("PersiaWarAndroidFade");
-            if (fadeShader == null) fadeShader = Shader.Find("PersiaWar/AndroidFade");
-            if (fadeShader == null)
-                Debug.LogError("PERSIA_OCCLUSION: transparent fade shader missing; buildings cannot fade.");
+            if (fadeShader == null || !fadeShader.isSupported)
+                fadeShader = Shader.Find("PersiaWar/AndroidFade");
+            if (fadeShader == null || !fadeShader.isSupported)
+                fadeShader = Shader.Find("Sprites/Default");
+            if (fadeShader == null || !fadeShader.isSupported)
+                fadeShader = Shader.Find("Unlit/Transparent");
+
+            if (fadeShader == null || !fadeShader.isSupported)
+            {
+                fadeShader = null;
+                Debug.LogError("PERSIA_OCCLUSION: no supported transparent shader; keeping original wall materials.");
+            }
         }
 
         public void SetTarget(Transform value)
@@ -68,18 +77,26 @@ namespace PersiaWar.Unity2D5D
 
             if (distance > 0.1f)
             {
-                int count = Physics.SphereCastNonAlloc(from, sphereRadius, delta / distance,
-                    hits, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-                for (int i = 0; i < count; i++)
+                if (stageTwoOcclusionMode)
                 {
-                    // Only contacts within a few centimeters of the target are ignored. This
-                    // also prevents a nearby wall the player is touching from fading.
-                    if (stageTwoOcclusionMode && hits[i].distance >= distance - 0.30f)
-                        continue;
-
-                    Collider col = hits[i].collider;
-                    if (col == null || col.transform == target || col.transform.IsChildOf(target)) continue;
-                    AddBlockedRenderers(col);
+                    // Three narrow sight lines follow the visible player silhouette.
+                    // Unlike the wide sphere cast, a wall beside the sight line will not
+                    // fade early; a roof can fade when it actually cuts off the player.
+                    CollectStageTwoOccluders(from, target.position + Vector3.up * 0.35f);
+                    CollectStageTwoOccluders(from, target.position + Vector3.up * targetHeight);
+                    CollectStageTwoOccluders(from, target.position + Vector3.up * 1.65f);
+                }
+                else
+                {
+                    // Preserve stage one's original camera-fade behavior.
+                    int count = Physics.SphereCastNonAlloc(from, sphereRadius, delta / distance,
+                        hits, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                    for (int i = 0; i < count; i++)
+                    {
+                        Collider col = hits[i].collider;
+                        if (col == null || col.transform == target || col.transform.IsChildOf(target)) continue;
+                        AddBlockedRenderers(col);
+                    }
                 }
             }
 
@@ -106,6 +123,32 @@ namespace PersiaWar.Unity2D5D
                     DestroyFadeMaterials(e.fadeMaterials);
                     entries.Remove(r);
                 }
+            }
+        }
+
+        private void CollectStageTwoOccluders(Vector3 from, Vector3 to)
+        {
+            Vector3 delta = to - from;
+            float distance = delta.magnitude;
+            if (distance <= 0.1f)
+                return;
+
+            int count = Physics.RaycastNonAlloc(
+                from, delta / distance, hits, distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
+
+            for (int i = 0; i < count; i++)
+            {
+                // Ignore only a tiny contact at the target. Do not fade a wall just
+                // because it is near the player; it must intersect a camera-to-player ray.
+                if (hits[i].distance >= distance - 0.12f)
+                    continue;
+
+                Collider col = hits[i].collider;
+                if (col == null || col.transform == target || col.transform.IsChildOf(target))
+                    continue;
+
+                AddBlockedRenderers(col);
             }
         }
 
@@ -198,7 +241,24 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < entry.fadeMaterials.Length; i++)
             {
                 Material m = entry.fadeMaterials[i];
-                if (m != null) m.SetFloat(FadeAlphaId, alpha);
+                if (m == null) continue;
+
+                if (m.HasProperty(FadeAlphaId))
+                {
+                    m.SetFloat(FadeAlphaId, alpha);
+                }
+                else if (m.HasProperty(ColorId))
+                {
+                    Color tint = m.GetColor(ColorId);
+                    tint.a = alpha;
+                    m.SetColor(ColorId, tint);
+                }
+                else if (m.HasProperty(BaseColorId))
+                {
+                    Color tint = m.GetColor(BaseColorId);
+                    tint.a = alpha;
+                    m.SetColor(BaseColorId, tint);
+                }
             }
         }
 
