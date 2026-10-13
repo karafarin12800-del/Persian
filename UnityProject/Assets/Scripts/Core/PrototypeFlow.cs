@@ -37,6 +37,7 @@ namespace PersiaWar.Unity2D5D
         private int selectedHero;
         private int stageTwoOriginalHero;
         private bool stageTwoShopOpen;
+        private float girlRescueNoticeUntil;
         private int stageNumber = 1;
         // 0 = random landing, 1 = manual map landing.
         private int stageTwoLandingMode;
@@ -95,7 +96,8 @@ namespace PersiaWar.Unity2D5D
             "PARS GUARD",
             "ROYAL SCOUT",
             "SILK WARRIOR",
-            "DESERT KNIGHT"
+            "DESERT KNIGHT",
+            "ANAHITA"
         };
 
         private void Awake()
@@ -198,6 +200,7 @@ namespace PersiaWar.Unity2D5D
             // path that can advance the menu if touch-to-mouse synthesis is missing.
             if (mode == ScreenMode.Match)
             {
+                CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
                 return;
             }
@@ -257,6 +260,7 @@ namespace PersiaWar.Unity2D5D
 #if UNITY_ANDROID
                 DrawAndroidPresentationHUD();
                 DrawAndroidPauseControl();
+                DrawGirlRescueNotice();
 
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                 {
@@ -632,8 +636,8 @@ namespace PersiaWar.Unity2D5D
                 }
 
                 float gap = 14f;
-                float totalWidth = Mathf.Min(Screen.width - 44f, 980f);
-                float cardWidth = (totalWidth - gap * 4f) / 5f;
+                float totalWidth = Mathf.Min(Screen.width - 44f, 1120f);
+                float cardWidth = (totalWidth - gap * (HeroNames.Length - 1)) / HeroNames.Length;
                 float startX = (Screen.width - totalWidth) * 0.5f;
                 float top = 230f;
                 float cardHeight = Mathf.Min(310f, Screen.height - 360f);
@@ -644,8 +648,15 @@ namespace PersiaWar.Unity2D5D
                     if (!card.Contains(gui))
                         continue;
 
-                    selectedHero = hero;
-                    StartupCheckpoint.Set("HeroSelectedByTouch");
+                    if (IsHeroUnlocked(hero))
+                    {
+                        selectedHero = hero;
+                        StartupCheckpoint.Set("HeroSelectedByTouch");
+                    }
+                    else
+                    {
+                        StartupCheckpoint.Set("LockedHeroTouchIgnored_" + hero);
+                    }
                     return;
                 }
 
@@ -675,7 +686,7 @@ namespace PersiaWar.Unity2D5D
                 }
                 else
                 {
-                    Rect continueRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 112f, 420f, 62f);
+                    Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
                     if (continueRect.Contains(gui))
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
