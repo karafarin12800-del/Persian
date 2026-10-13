@@ -45,7 +45,7 @@ namespace PersiaWar.Unity2D5D
             spawning = false;
             initialWavePending = false;
             initialWaveComplete = false;
-            nextWaveCheckTime = 0f;
+            nextEnemyCheckTime = 0f;
         }
 
         public void Configure(Transform playerTransform, int enemyCount, float radius, float unusedSpeed)
