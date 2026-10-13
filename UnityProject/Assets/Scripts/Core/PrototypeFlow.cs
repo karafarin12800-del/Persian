@@ -897,6 +897,11 @@ namespace PersiaWar.Unity2D5D
                 new Vector2(49f, -15f), new Vector2(-38f, 32f), new Vector2(82f, 4f)
             };
             spawnWorld = safePoints[Random.Range(0, safePoints.Length)];
+            // Keep authored landing zones aligned with mirrored/rotated village layouts.
+            if (stageTwoLayoutVariant == 1)
+                spawnWorld.x = -spawnWorld.x;
+            else if (stageTwoLayoutVariant == 2)
+                spawnWorld = new Vector2(spawnWorld.y, -spawnWorld.x);
             spawnChosen = true;
             Debug.Log("PERSIA_STAGE2: random safe landing selected " + spawnWorld);
         }
