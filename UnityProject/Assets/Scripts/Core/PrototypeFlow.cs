@@ -645,12 +645,37 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                Rect continueRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 112f, 420f, 62f);
-                if (continueRect.Contains(gui))
+                if (stageNumber >= 2)
                 {
-                    EnterDropMap();
-                    StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
-                    return;
+                    float gapButtons = 12f;
+                    float shopWidth = Mathf.Clamp(Screen.width * 0.16f, 150f, 230f);
+                    float continueWidth = Mathf.Min(420f, Screen.width - 64f - shopWidth - gapButtons);
+                    float groupWidth = continueWidth + gapButtons + shopWidth;
+                    float left = (Screen.width - groupWidth) * 0.5f;
+                    Rect continueRect = new Rect(left, Screen.height - 112f, continueWidth, 62f);
+                    Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
+                    if (continueRect.Contains(gui))
+                    {
+                        EnterDropMap();
+                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        return;
+                    }
+                    if (shopRect.Contains(gui))
+                    {
+                        stageTwoShopOpen = true;
+                        StartupCheckpoint.Set("StageTwoCharacterShopOpened");
+                        return;
+                    }
+                }
+                else
+                {
+                    Rect continueRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 112f, 420f, 62f);
+                    if (continueRect.Contains(gui))
+                    {
+                        EnterDropMap();
+                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        return;
+                    }
                 }
             }
         }
