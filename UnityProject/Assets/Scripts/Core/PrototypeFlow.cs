@@ -268,7 +268,15 @@ namespace PersiaWar.Unity2D5D
                     {
                         resultOverlayStartTime = Time.unscaledTime;
                         if (GameSession.Instance.PlayerWon && gameBootstrap != null)
+                        {
                             gameBootstrap.ShowRandomExtractionBeacon();
+
+                            // EndMission normally freezes the match. Keep only a Stage 1
+                            // victory playable while Anahita is still captive so the
+                            // player can follow the beam and enter her house.
+                            if (stageNumber == 1 && !gameBootstrap.VillageGirlRescued)
+                                Time.timeScale = 1f;
+                        }
                     }
                     DrawAndroidResultOverlay();
                 }
@@ -798,7 +806,12 @@ namespace PersiaWar.Unity2D5D
                 // the normal 1.65-second blue-gate transition only after the rescue.
                 if (stageNumber == 1 && GameSession.Instance != null &&
                     GameSession.Instance.IsFinished && GameSession.Instance.PlayerWon)
+                {
+                    // Freeze the world for the familiar blue-gate interstitial after
+                    // the rescue; UI timing continues using unscaled time.
+                    Time.timeScale = 0f;
                     resultOverlayStartTime = Time.unscaledTime;
+                }
             }
         }
 
