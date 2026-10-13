@@ -550,16 +550,17 @@ namespace PersiaWar.Unity2D5D
                 PickupItem[] oldPickups = FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 for (int i = 0; i < oldPickups.Length; i++)
                 {
-                    if (oldPickups[i] != null && oldPickups[i].gameObject.name.StartsWith("HouseLoot_"))
+                    if (oldPickups[i] != null)
                         Destroy(oldPickups[i].gameObject);
                 }
             }
 
-            // Thirteen pairs of each existing weapon/supply category, randomized around
-            // the homes and yard entrances rather than hidden only inside buildings.
+            // Thirteen pairs of each firearm/supply category, randomized around
+            // homes and yard entrances rather than hidden only inside buildings.
             const int pairsPerType = 13;
             const int countPerType = pairsPerType * 2;
-            for (int i = 0; i < countPerType * 4; i++)
+            const int supplyTypeCount = 6;
+            for (int i = 0; i < countPerType * supplyTypeCount; i++)
             {
                 int typeIndex = i / countPerType;
                 int houseIndex = Random.Range(0, androidBuildingCenters.Count);
@@ -573,11 +574,15 @@ namespace PersiaWar.Unity2D5D
                 PickupItem.PickupType type = typeIndex == 0 ? PickupItem.PickupType.Weapon
                     : typeIndex == 1 ? PickupItem.PickupType.Shield
                     : typeIndex == 2 ? PickupItem.PickupType.Grenade
-                    : PickupItem.PickupType.QuickDash;
+                    : typeIndex == 3 ? PickupItem.PickupType.QuickDash
+                    : typeIndex == 4 ? PickupItem.PickupType.Ammo
+                    : PickupItem.PickupType.Medkit;
                 Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
                     : type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
                     : type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f)
-                    : new Color(0.94f, 0.08f, 0.92f);
+                    : type == PickupItem.PickupType.QuickDash ? new Color(0.94f, 0.08f, 0.92f)
+                    : type == PickupItem.PickupType.Ammo ? new Color(0.88f, 0.78f, 0.25f)
+                    : new Color(0.18f, 0.78f, 0.32f);
                 GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube
                     : type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad : PrimitiveType.Sphere);
                 item.name = "VillageLoot_" + type + "_" + i;
@@ -609,10 +614,12 @@ namespace PersiaWar.Unity2D5D
                 if (type == PickupItem.PickupType.Weapon)
                     pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
                 else
-                    pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
+                    pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35
+                        : type == PickupItem.PickupType.Medkit ? 30
+                        : type == PickupItem.PickupType.Ammo ? 45 : 2);
             }
             if (stageTwoRequested) SpawnVillageAxePickups(26);
-            Debug.Log("PERSIA_LOOT: stage-two village spawned 26 each of firearms, shields, grenades, quick-dash supplies and axes");
+            Debug.Log("PERSIA_LOOT: stage-two village spawned 26 each of firearms, shields, grenades, quick-dash, ammo, medkits and axes");
         }
 
         private void SpawnVillageAxePickups(int count)
