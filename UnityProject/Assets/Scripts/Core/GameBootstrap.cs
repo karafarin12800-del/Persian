@@ -1096,7 +1096,7 @@ namespace PersiaWar.Unity2D5D
             List<int> candidates = new List<int>();
             int farthestIndex = -1;
             float farthestDistanceSq = -1f;
-            const float minimumDistanceSq = 50f * 50f;
+            const float minimumDistanceSq = 58f * 58f;
 
             for (int i = 0; i < androidBuildingCenters.Count; i++)
             {
