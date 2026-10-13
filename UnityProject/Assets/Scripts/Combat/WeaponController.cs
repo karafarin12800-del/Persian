@@ -112,8 +112,8 @@ namespace PersiaWar.Unity2D5D
         public void SetAxeEnabledForMatch(bool enabledForStageTwo)
         {
             axeEnabledForMatch = enabledForStageTwo;
-            if (!axeEnabledForMatch)
-                axeEquippedAsMelee = false;
+            // Each match begins with fists again; an axe is kept only after pickup.
+            axeEquippedAsMelee = false;
             if (!axeEnabledForMatch && (weaponKind == WeaponKind.Axe ||
                 weaponKind == WeaponKind.VoidRifle || weaponKind == WeaponKind.AlienSword))
             {
