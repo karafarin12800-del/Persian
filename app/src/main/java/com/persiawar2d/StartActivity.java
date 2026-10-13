@@ -52,26 +52,26 @@ public final class StartActivity extends Activity {
     private void build() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL); root.setGravity(Gravity.CENTER);
-        root.setPadding(dp(24), dp(12), dp(24), dp(12));
+        root.setPadding(dp(18), dp(5), dp(18), dp(5));
         root.setBackgroundColor(Color.rgb(7,27,43));
 
         TextView title = new TextView(this);
         title.setText("PARALLEL WORLDS"); title.setTextColor(gold); title.setTextSize(34);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); title.setGravity(Gravity.CENTER);
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(54)));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(44)));
 
         TextView subtitle = new TextView(this);
         subtitle.setText("SURVIVE • EXPLORE • UNLOCK NEW WORLDS");
         subtitle.setTextColor(Color.rgb(230,205,155)); subtitle.setTextSize(13); subtitle.setGravity(Gravity.CENTER);
-        root.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(28)));
+        root.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(22)));
 
         playerLabel = new TextView(this);
         playerLabel.setTextColor(Color.WHITE); playerLabel.setTextSize(15); playerLabel.setGravity(Gravity.CENTER);
-        root.addView(playerLabel, new LinearLayout.LayoutParams(-1, dp(34)));
+        root.addView(playerLabel, new LinearLayout.LayoutParams(-1, dp(26)));
 
         TextView start = button("▶  CONTINUE / START GAME");
         start.setOnClickListener(v -> startActivity(new Intent(this, MainActivity.class)));
-        addMenuButton(root, start, 58);
+        addMenuButton(root, start, 48);
 
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER);
@@ -79,28 +79,28 @@ public final class StartActivity extends Activity {
         chars.setOnClickListener(v -> chooseCharacter());
         TextView store = button("◈  STORE");
         store.setOnClickListener(v -> startActivity(new Intent(this, StoreActivity.class)));
-        LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, dp(54), 1);
-        half.setMargins(dp(5), dp(6), dp(5), dp(6));
+        LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, dp(44), 1);
+        half.setMargins(dp(4), dp(3), dp(4), dp(3));
         row.addView(chars, half);
-        row.addView(store, new LinearLayout.LayoutParams(0, dp(54), 1));
+        row.addView(store, new LinearLayout.LayoutParams(0, dp(44), 1));
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(dp(540), -2);
         root.addView(row, rowLp);
 
         TextView profile = button("☻  PLAYER PROFILE / CHANGE NAME");
         profile.setOnClickListener(v -> showNameDialog(false));
-        addMenuButton(root, profile, 50);
+        addMenuButton(root, profile, 42);
 
         TextView info = new TextView(this);
         info.setText("Offline-first profile  •  Touch controls unchanged  •  Store purchases are currently simulated");
         info.setTextColor(Color.rgb(185,198,197)); info.setTextSize(11); info.setGravity(Gravity.CENTER);
-        root.addView(info, new LinearLayout.LayoutParams(-1, dp(30)));
+        root.addView(info, new LinearLayout.LayoutParams(-1, dp(20)));
         setContentView(root);
         refreshPlayerLabel();
     }
 
     private void addMenuButton(LinearLayout root, TextView button, int heightDp) {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(540), dp(heightDp));
-        lp.setMargins(0, dp(5), 0, dp(5));
+        lp.setMargins(0, dp(3), 0, dp(3));
         root.addView(button, lp);
     }
 
