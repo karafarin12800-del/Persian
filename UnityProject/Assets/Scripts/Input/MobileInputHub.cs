@@ -1383,7 +1383,7 @@ namespace PersiaWar.Unity2D5D
                     buttonTextStyle);
             }
 
-            DrawTouchDiagnosticOverlay(scale);
+            // Touch diagnostics stay in logs/checkpoints only; never cover the battlefield.
         }
 
         // Read-only runtime telemetry: it deliberately does not consume touches or
