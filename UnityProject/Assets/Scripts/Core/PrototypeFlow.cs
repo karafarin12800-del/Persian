@@ -2053,12 +2053,16 @@ namespace PersiaWar.Unity2D5D
             if (enemySpawner != null && player != null)
             {
                 if (stageNumber >= 2)
+                {
+                    StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+                    if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
+                    arena.BeginArena(player.transform, 9);
                     enemySpawner.ConfigureStageTwoArena(player.transform);
+                }
                 else
-                    if (stageNumber >= 2)
-                    enemySpawner.ConfigureStageTwoArena(player.transform);
-                else
+                {
                     enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                }
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
@@ -2090,7 +2094,17 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null)
             {
-                enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                if (stageNumber >= 2)
+                {
+                    StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+                    if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
+                    arena.BeginArena(player.transform, 9);
+                    enemySpawner.ConfigureStageTwoArena(player.transform);
+                }
+                else
+                {
+                    enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                }
                 enemySpawner.enabled = true;
             }
 
