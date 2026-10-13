@@ -244,7 +244,7 @@ jobs:
 
           input_hub = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
           assert 'Input.multiTouchEnabled = true;' in input_hub, 'Android must use multi-touch.'
-          assert 'Input.simulateMouseWithTouches = false;' in input_hub and 'Input.simulateMouseWithTouches = true;' in input_hub, 'Mouse synthesis must be disabled during gameplay and restored for menus/pause.'
+          assert 'Input.simulateMouseWithTouches = false;' in input_hub and input_hub.count('Input.simulateMouseWithTouches = !matchActive;') >= 5, 'Touch-to-mouse synthesis must be disabled during active gameplay and follow match ownership in lifecycle callbacks.'
           assert 'if (matchActive && !matchPaused && Input.touchCount > 0)' in input_hub and 'Native Touch' in input_hub, 'Gameplay IMGUI fallback must not compete with native finger ownership.'
           assert 'if (Application.isMobilePlatform &&\n                Input.touchCount > 0 &&' not in input_hub, 'Do not suppress the entire fallback because one native contact exists.'
           gui_fallback_start = input_hub.index('private void HandleGuiPointerFallback()')
@@ -252,7 +252,7 @@ jobs:
           gui_fallback = input_hub[gui_fallback_start:gui_fallback_end]
           assert 'guiMoveMouseButton == e.button' in gui_fallback and 'guiFireMouseButton == e.button' in gui_fallback, 'Android fallback must preserve independent movement and fire mouse-button ownership.'
           assert 'movePointerId != -1000' in input_hub, 'The real-touch path must not overwrite movement supplied by the guarded GUI fallback.'
-          assert 'Input.simulateMouseWithTouches = true;' in input_hub, 'Android front-end IMGUI must retain synthesized touch support.'
+          assert 'Input.simulateMouseWithTouches = !matchActive;' in input_hub, 'Android front-end IMGUI must restore synthesized mouse input only when match ownership is inactive.'
           assert 'private void HandleAndroidPauseTouches()' in flow and 'MatchPausedByNativeTouch' in flow, 'Android pause/resume must use direct touch while gameplay mouse simulation is off.'
           assert 'if (handled)' in gui_fallback and 'e.Use();' in gui_fallback, 'Only controls owned by the fallback may consume IMGUI events.'
           assert 'float fireHit = actionHitRadius * 1.02f;' in input_hub and 'float actionHitRadius = BaseActionHitRadius * scale * controlScale;' in input_hub and 'bool broadFireZone' in input_hub and '!insideOtherActionZone' in input_hub, 'Mobile action hit zones must use the tested radius independent from the movement stick and preserve firing priority.'
