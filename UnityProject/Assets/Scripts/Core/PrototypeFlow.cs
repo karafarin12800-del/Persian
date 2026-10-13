@@ -267,16 +267,11 @@ namespace PersiaWar.Unity2D5D
                     if (resultOverlayStartTime < 0f)
                     {
                         resultOverlayStartTime = Time.unscaledTime;
-                        if (GameSession.Instance.PlayerWon && gameBootstrap != null)
-                        {
+                        // Stage 1's ExtractionBeacon is already attached to Anahita's
+                        // randomized house and is shown when the final wave is eliminated.
+                        // Do not draw a second, unrelated beam after mission completion.
+                        if (GameSession.Instance.PlayerWon && gameBootstrap != null && stageNumber >= 2)
                             gameBootstrap.ShowRandomExtractionBeacon();
-
-                            // EndMission normally freezes the match. Keep only a Stage 1
-                            // victory playable while Anahita is still captive so the
-                            // player can follow the beam and enter her house.
-                            if (stageNumber == 1 && !gameBootstrap.VillageGirlRescued)
-                                Time.timeScale = 1f;
-                        }
                     }
                     DrawAndroidResultOverlay();
                 }
@@ -802,16 +797,6 @@ namespace PersiaWar.Unity2D5D
             {
                 girlRescueNoticeUntil = Time.unscaledTime + 4.5f;
 
-                // If the last opponent has already been eliminated, give the player
-                // the normal 1.65-second blue-gate transition only after the rescue.
-                if (stageNumber == 1 && GameSession.Instance != null &&
-                    GameSession.Instance.IsFinished && GameSession.Instance.PlayerWon)
-                {
-                    // Freeze the world for the familiar blue-gate interstitial after
-                    // the rescue; UI timing continues using unscaled time.
-                    Time.timeScale = 0f;
-                    resultOverlayStartTime = Time.unscaledTime;
-                }
             }
         }
 
@@ -1949,31 +1934,8 @@ namespace PersiaWar.Unity2D5D
                 }
                 if (stageNumber == 1)
                 {
-                    if (gameBootstrap == null || !gameBootstrap.VillageGirlRescued)
-                    {
-                        // Leave movement available after the final elimination. The
-                        // victory gate marks the captive's randomized house, and Stage 2
-                        // will not start until the player reaches and frees her inside it.
-                        float rescueWidth = Mathf.Min(Screen.width - 36f, 700f);
-                        float rescueHeight = 104f;
-                        Rect rescuePanel = new Rect(
-                            (Screen.width - rescueWidth) * 0.5f,
-                            Screen.height * 0.22f,
-                            rescueWidth,
-                            rescueHeight);
-                        Fill(rescuePanel, new Color(0.025f, 0.045f, 0.065f, 0.91f));
-                        Fill(new Rect(rescuePanel.x, rescuePanel.y, rescuePanel.width, 4f),
-                            new Color(0.14f, 0.60f, 1f, 1f));
-                        GUI.Label(new Rect(rescuePanel.x + 12f, rescuePanel.y + 10f,
-                            rescuePanel.width - 24f, 37f),
-                            "ANAHITA IS STILL CAPTIVE", menuButtonStyle);
-                        GUI.Label(new Rect(rescuePanel.x + 12f, rescuePanel.y + 52f,
-                            rescuePanel.width - 24f, 40f),
-                            "FOLLOW THE BLUE BEAM • ENTER THE HOUSE TO RESCUE HER",
-                            menuSmallStyle);
-                        return;
-                    }
-
+                    // The mission only becomes a win after the player enters the
+                    // captive-house extraction beam, which has already rescued Anahita.
                     BeginStageTwoSelection();
                     return;
                 }
