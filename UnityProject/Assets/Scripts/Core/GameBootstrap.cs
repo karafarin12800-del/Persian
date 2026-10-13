@@ -1547,8 +1547,6 @@ namespace PersiaWar.Unity2D5D
             {
                 Vector3 a = pathCenters[i];
                 Vector3 b = pathCenters[i + 1];
-                Vector3 delta = b - a;
-                Vector3 midpoint = (a + b) * 0.5f;
                 AddAndroidOrientedTerrainPath(vertices, triangles, a, b, 6.2f, 0.045f);
             }
 
