@@ -1720,9 +1720,13 @@ namespace PersiaWar.Unity2D5D
         {
             position.y = CalculateAndroidTerrainHeight(position.x, position.z);
             if (androidTreeTrunkMaterial == null)
-                androidTreeTrunkMaterial = MakeStageTwoLitMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+                androidTreeTrunkMaterial = stageTwoRequested
+                    ? MakeStageTwoLitMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f))
+                    : MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
             if (androidTreeCrownMaterial == null)
-                androidTreeCrownMaterial = MakeStageTwoLitMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
+                androidTreeCrownMaterial = stageTwoRequested
+                    ? MakeStageTwoLitMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f))
+                    : MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
 
             CreateAndroidBox(
                 "TreeTrunk",
