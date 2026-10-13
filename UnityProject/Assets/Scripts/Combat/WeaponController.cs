@@ -36,6 +36,10 @@ namespace PersiaWar.Unity2D5D
         private PlayerController player;
         private Transform gunRoot;
         private Transform axeRoot;
+        private Vector3 axeRestLocalPosition;
+        private Quaternion axeRestLocalRotation;
+        private float axeSwingTimer;
+        private const float AxeSwingDuration = 0.48f;
         private Vector3 gunRestLocalPosition;
         private float recoilAmount;
         private LineRenderer rangeRing;
@@ -241,7 +245,16 @@ namespace PersiaWar.Unity2D5D
             // merely shrinking a rifle. The heavy profile uses a thicker receiver,
             // larger magazine, long barrel, stock and foregrip.
             gunRoot.gameObject.SetActive(!axe);
-            if (axeRoot != null) axeRoot.gameObject.SetActive(axe);
+            if (axeRoot != null)
+            {
+                axeRoot.gameObject.SetActive(axe);
+                if (axe)
+                {
+                    axeRoot.localPosition = axeRestLocalPosition;
+                    axeRoot.localRotation = axeRestLocalRotation;
+                }
+                else axeSwingTimer = 0f;
+            }
             gunRoot.localScale = Vector3.one * (heavy ? 1.08f : 1f);
             gunRestLocalPosition = pistol
                 ? new Vector3(0.24f, 0.93f, 0.33f)
@@ -444,14 +457,37 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            if (gunRoot == null) return;
+            if (gunRoot != null)
+            {
+                recoilAmount = Mathf.MoveTowards(recoilAmount, 0f, 5.5f * Time.deltaTime);
+                Vector3 target = gunRestLocalPosition + Vector3.back * recoilAmount;
+                gunRoot.localPosition = Vector3.Lerp(
+                    gunRoot.localPosition,
+                    target,
+                    1f - Mathf.Exp(-24f * Time.deltaTime));
+            }
 
-            recoilAmount = Mathf.MoveTowards(recoilAmount, 0f, 5.5f * Time.deltaTime);
-            Vector3 target = gunRestLocalPosition + Vector3.back * recoilAmount;
-            gunRoot.localPosition = Vector3.Lerp(
-                gunRoot.localPosition,
-                target,
-                1f - Mathf.Exp(-24f * Time.deltaTime));
+            if (axeRoot != null && axeRoot.gameObject.activeSelf)
+            {
+                if (axeSwingTimer > 0f)
+                {
+                    axeSwingTimer = Mathf.Max(0f, axeSwingTimer - Time.deltaTime);
+                    float progress = 1f - axeSwingTimer / AxeSwingDuration;
+                    float spin = Mathf.Sin(progress * Mathf.PI * 4f) * 155f;
+                    axeRoot.localRotation = axeRestLocalRotation * Quaternion.Euler(0f, spin * 0.28f, spin);
+                    axeRoot.localPosition = axeRestLocalPosition + new Vector3(
+                        Mathf.Sin(progress * Mathf.PI * 4f) * 0.10f,
+                        Mathf.Sin(progress * Mathf.PI * 8f) * 0.07f,
+                        0f);
+                }
+                else
+                {
+                    axeRoot.localRotation = Quaternion.Slerp(axeRoot.localRotation, axeRestLocalRotation,
+                        1f - Mathf.Exp(-22f * Time.deltaTime));
+                    axeRoot.localPosition = Vector3.Lerp(axeRoot.localPosition, axeRestLocalPosition,
+                        1f - Mathf.Exp(-22f * Time.deltaTime));
+                }
+            }
         }
 
         private void EnsureWeaponVisual()
@@ -501,8 +537,10 @@ namespace PersiaWar.Unity2D5D
             // A separate, lightweight axe model is shown only while the melee weapon is equipped.
             axeRoot = new GameObject("PlayerAxe").transform;
             axeRoot.SetParent(transform, false);
-            axeRoot.localPosition = new Vector3(0.30f, 0.90f, 0.40f);
-            axeRoot.localRotation = Quaternion.Euler(0f, 0f, -12f);
+            axeRestLocalPosition = new Vector3(0.30f, 0.90f, 0.40f);
+            axeRestLocalRotation = Quaternion.Euler(0f, 0f, -12f);
+            axeRoot.localPosition = axeRestLocalPosition;
+            axeRoot.localRotation = axeRestLocalRotation;
             Material axeHandle = RuntimeMaterialFactory.Create("AxeWoodHandle", new Color(0.31f, 0.17f, 0.08f));
             Material axeSteel = RuntimeMaterialFactory.Create("AxeSteelHead", new Color(0.48f, 0.53f, 0.57f));
             CreateWeaponPart("AxeHandle", PrimitiveType.Cube, axeRoot,
@@ -566,6 +604,8 @@ namespace PersiaWar.Unity2D5D
             if (player == null || player.IsDefeated || Time.time < nextMeleeTime) return false;
             nextMeleeTime = Time.time + meleeCooldown;
             IsMelee = true;
+            if (weaponKind == WeaponKind.Axe && axeRoot != null)
+                axeSwingTimer = AxeSwingDuration;
 
             TargetHealth[] targets = Object.FindObjectsByType<TargetHealth>(FindObjectsSortMode.None);
             Vector3 origin = transform.position;
