@@ -33,6 +33,7 @@ namespace PersiaWar.Unity2D5D
         private int reserve;
         private PlayerController player;
         private Transform gunRoot;
+        private Transform axeRoot;
         private Vector3 gunRestLocalPosition;
         private float recoilAmount;
         private LineRenderer rangeRing;
@@ -212,6 +213,7 @@ namespace PersiaWar.Unity2D5D
             // merely shrinking a rifle. The heavy profile uses a thicker receiver,
             // larger magazine, long barrel, stock and foregrip.
             gunRoot.gameObject.SetActive(!axe);
+            if (axeRoot != null) axeRoot.gameObject.SetActive(axe);
             gunRoot.localScale = Vector3.one * (heavy ? 1.08f : 1f);
             gunRestLocalPosition = pistol
                 ? new Vector3(0.24f, 0.93f, 0.33f)
@@ -467,6 +469,24 @@ namespace PersiaWar.Unity2D5D
             // Start with the pistol-only parts hidden until the active profile is applied.
             gunRoot.Find("PistolSlide").gameObject.SetActive(false);
             gunRoot.Find("PistolGrip").gameObject.SetActive(false);
+
+            // A separate, lightweight axe model is shown only while the melee weapon is equipped.
+            axeRoot = new GameObject("PlayerAxe").transform;
+            axeRoot.SetParent(transform, false);
+            axeRoot.localPosition = new Vector3(0.30f, 0.90f, 0.40f);
+            axeRoot.localRotation = Quaternion.Euler(0f, 0f, -12f);
+            Material axeHandle = RuntimeMaterialFactory.Create("AxeWoodHandle", new Color(0.31f, 0.17f, 0.08f));
+            Material axeSteel = RuntimeMaterialFactory.Create("AxeSteelHead", new Color(0.48f, 0.53f, 0.57f));
+            CreateWeaponPart("AxeHandle", PrimitiveType.Cube, axeRoot,
+                new Vector3(0f, 0f, 0f), new Vector3(0.075f, 0.075f, 0.78f), axeHandle);
+            CreateWeaponPart("AxeHead", PrimitiveType.Cube, axeRoot,
+                new Vector3(0.02f, 0.12f, 0.22f), new Vector3(0.12f, 0.30f, 0.22f), axeSteel);
+            CreateWeaponPart("AxeBladeEdge", PrimitiveType.Cube, axeRoot,
+                new Vector3(0.01f, 0.12f, 0.34f), new Vector3(0.08f, 0.34f, 0.10f), axeSteel);
+            axeRoot.gameObject.SetActive(false);
+            Collider[] axeColliders = axeRoot.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < axeColliders.Length; i++)
+                if (axeColliders[i] != null) Object.Destroy(axeColliders[i]);
 
             // Prevent the decorative weapon from participating in collision queries.
             Collider[] colliders = gunRoot.GetComponentsInChildren<Collider>(true);
