@@ -956,10 +956,11 @@ namespace PersiaWar.Unity2D5D
             }
 
             GUI.Label(new Rect(18f, Screen.height - 100f, Screen.width - 36f, 30f),
-                stageTwoLandingMode == 0 ? "A safe landing point is selected at random." : "Tap an open area on the map to set your landing point.", smallStyle);
-            Rect start = new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 52f);
+                stageTwoLandingMode == 0 ? "SAFE RANDOM LANDING SELECTED" : "TAP AN OPEN AREA ON THE MAP",
+                menuSmallStyle);
+            Rect start = new Rect(Screen.width * 0.5f - 210f, Screen.height - 66f, 420f, 54f);
             GUI.enabled = spawnChosen;
-            if (GUI.Button(start, "START STAGE 2", buttonStyle))
+            if (DrawFantasyButton(start, "ENTER VILLAGE  ⚔", true))
                 StartMatch();
             GUI.enabled = true;
         }
@@ -1225,6 +1226,10 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
+            // Axe is a stage-two-only weapon. Stage one's weapon cycle and loot
+            // remain the original three firearm profiles.
+            player.Weapon?.SetAxeEnabledForMatch(stageNumber >= 2);
+
             StartupCheckpoint.Set("PlayerPreparedForMatch");
 
             StartupCheckpoint.Set("MobileInputActivationDeferred");
@@ -1346,7 +1351,10 @@ namespace PersiaWar.Unity2D5D
             if (cameraOcclusionFader == null)
                 cameraOcclusionFader = androidRuntimeCamera.GetComponent<CameraOcclusionFader>();
             if (cameraOcclusionFader != null)
+            {
                 cameraOcclusionFader.SetTarget(player.transform);
+                cameraOcclusionFader.SetStageTwoMode(stageNumber >= 2);
+            }
 
             Quaternion orbit = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
             Vector3 desired = player.transform.position + orbit * Vector3.back * AndroidCameraDistance;
