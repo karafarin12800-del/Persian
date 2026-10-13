@@ -557,7 +557,7 @@ namespace PersiaWar.Unity2D5D
 
             // Thirteen pairs of each firearm/supply category, randomized around
             // homes and yard entrances rather than hidden only inside buildings.
-            const int pairsPerType = 13;
+            const int pairsPerType = 3; // six of each supply type: readable, not carpeted across the map.
             const int countPerType = pairsPerType * 2;
             const int supplyTypeCount = 6;
             for (int i = 0; i < countPerType * supplyTypeCount; i++)
@@ -579,17 +579,36 @@ namespace PersiaWar.Unity2D5D
                     : PickupItem.PickupType.Medkit;
                 Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
                     : type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
-                    : type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f)
-                    : type == PickupItem.PickupType.QuickDash ? new Color(0.94f, 0.08f, 0.92f)
+                    : type == PickupItem.PickupType.Grenade ? new Color(0.20f, 0.28f, 0.18f)
+                    : type == PickupItem.PickupType.QuickDash ? new Color(0.18f, 0.68f, 0.72f)
                     : type == PickupItem.PickupType.Ammo ? new Color(0.88f, 0.78f, 0.25f)
                     : new Color(0.18f, 0.78f, 0.32f);
-                GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube
-                    : type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad : PrimitiveType.Sphere);
+                GameObject item = GameObject.CreatePrimitive(
+                    type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube
+                    : type == PickupItem.PickupType.Grenade ? PrimitiveType.Cylinder
+                    : type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad
+                    : type == PickupItem.PickupType.Ammo ? PrimitiveType.Cube
+                    : PrimitiveType.Sphere);
                 item.name = "VillageLoot_" + type + "_" + i;
                 item.transform.SetParent(worldRoot, true);
                 item.transform.position = new Vector3(x, y, z);
                 item.transform.localScale = type == PickupItem.PickupType.Weapon ? new Vector3(0.82f, 0.18f, 0.28f)
-                    : type == PickupItem.PickupType.QuickDash ? new Vector3(0.72f, 0.72f, 1f) : Vector3.one * 0.48f;
+                    : type == PickupItem.PickupType.Grenade ? new Vector3(0.25f, 0.32f, 0.25f)
+                    : type == PickupItem.PickupType.Ammo ? new Vector3(0.28f, 0.22f, 0.34f)
+                    : type == PickupItem.PickupType.QuickDash ? new Vector3(0.72f, 0.72f, 1f)
+                    : Vector3.one * 0.40f;
+                if (type == PickupItem.PickupType.Grenade)
+                {
+                    // A compact olive grenade body with a visible metal cap, not a red sphere.
+                    GameObject cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    cap.name = "GrenadeMetalCap";
+                    cap.transform.SetParent(item.transform, false);
+                    cap.transform.localPosition = new Vector3(0f, 0.48f, 0f);
+                    cap.transform.localScale = new Vector3(0.42f, 0.18f, 0.42f);
+                    cap.GetComponent<Renderer>().sharedMaterial = MakeMaterial("VillageGrenadeCap", new Color(0.42f, 0.44f, 0.40f));
+                    Collider capCollider = cap.GetComponent<Collider>();
+                    if (capCollider != null) Destroy(capCollider);
+                }
                 if (type == PickupItem.PickupType.QuickDash)
                 {
                     MeshFilter mf = item.GetComponent<MeshFilter>();
@@ -618,8 +637,8 @@ namespace PersiaWar.Unity2D5D
                         : type == PickupItem.PickupType.Medkit ? 30
                         : type == PickupItem.PickupType.Ammo ? 45 : 2);
             }
-            if (stageTwoRequested) SpawnVillageAxePickups(26);
-            Debug.Log("PERSIA_LOOT: stage-two village spawned 26 each of firearms, shields, grenades, quick-dash, ammo, medkits and axes");
+            if (stageTwoRequested) SpawnVillageAxePickups(6);
+            Debug.Log("PERSIA_LOOT: stage-two village spawned six of each supply category plus six axes; placement randomized");
         }
 
         private void SpawnVillageAxePickups(int count)
