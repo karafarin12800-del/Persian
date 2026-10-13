@@ -802,13 +802,13 @@ namespace PersiaWar.Unity2D5D
 
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
             float width = Mathf.Min(Screen.width - 36f, 720f);
-            float height = 76f * scale;
+            float height = 86f * scale;
             Rect notice = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.28f, width, height);
             Fill(notice, new Color(0.025f, 0.045f, 0.065f, 0.94f));
             Fill(new Rect(notice.x, notice.y, notice.width, 4f * scale), new Color(0.98f, 0.72f, 0.22f, 1f));
-            GUI.Label(new Rect(notice.x + 12f, notice.y + 7f * scale, notice.width - 24f, 31f * scale),
-                "ANAHITA RESCUED!", menuHeaderStyle);
-            GUI.Label(new Rect(notice.x + 12f, notice.y + 39f * scale, notice.width - 24f, 27f * scale),
+            GUI.Label(new Rect(notice.x + 12f, notice.y + 5f * scale, notice.width - 24f, 38f * scale),
+                "ANAHITA RESCUED!", menuButtonStyle);
+            GUI.Label(new Rect(notice.x + 12f, notice.y + 45f * scale, notice.width - 24f, 31f * scale),
                 "SHE WILL BE AVAILABLE FOR STAGE 2", menuSmallStyle);
         }
 
