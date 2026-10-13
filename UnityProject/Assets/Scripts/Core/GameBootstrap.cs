@@ -13,6 +13,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float enemySpawnRadius = 44f;
         // Stage two is opt-in; the existing first-stage city remains the default path.
         private bool stageTwoRequested;
+        private int stageTwoLayoutVariant;
 
         public bool IsWorldReady { get; private set; }
         public bool IsWorldPreparing { get; private set; }
@@ -78,9 +79,10 @@ namespace PersiaWar.Unity2D5D
         /// <summary>Rebuilds the battlefield as the stage-two Iranian village.</summary>
         /// <remarks>Only called after stage one has been completed. The normal stage-one
         /// preparation path and layout are unchanged.</remarks>
-        public void PrepareStageTwoVillage()
+        public void PrepareStageTwoVillage(int layoutVariant)
         {
             stageTwoRequested = true;
+            stageTwoLayoutVariant = Mathf.Clamp(layoutVariant, 0, 2);
             prepareRequested = false;
             IsWorldReady = false;
             IsWorldPreparing = false;
@@ -1093,7 +1095,16 @@ namespace PersiaWar.Unity2D5D
 
             for (int i = 0; i < plots.Length; i++)
             {
-                Vector3 plot = new Vector3(plots[i].x, 0f, plots[i].y);
+                Vector2 plotPattern = plots[i];
+                if (stageTwoLayoutVariant == 1)
+                    plotPattern.x = -plotPattern.x;
+                else if (stageTwoLayoutVariant == 2)
+                {
+                    float oldX = plotPattern.x;
+                    plotPattern.x = plotPattern.y;
+                    plotPattern.y = -oldX;
+                }
+                Vector3 plot = new Vector3(plotPattern.x, 0f, plotPattern.y);
                 float jitterX = Mathf.Sin((i + 1) * 4.17f) * 1.4f;
                 float jitterZ = Mathf.Cos((i + 1) * 2.93f) * 1.3f;
                 plot.x += jitterX;
@@ -1162,10 +1173,19 @@ namespace PersiaWar.Unity2D5D
             };
             for (int i = 0; i < trees.Length; i++)
             {
-                CreateAndroidTree(trees[i], 1.8f + (i % 3) * 0.35f);
+                Vector3 treePosition = trees[i];
+                if (stageTwoLayoutVariant == 1)
+                    treePosition.x = -treePosition.x;
+                else if (stageTwoLayoutVariant == 2)
+                {
+                    float oldX = treePosition.x;
+                    treePosition.x = treePosition.z;
+                    treePosition.z = -oldX;
+                }
+                CreateAndroidTree(treePosition, 1.8f + (i % 3) * 0.35f);
                 if (i % 2 == 0)
                     QueueAndroidBox("VillageGardenPatch",
-                        new Vector3(trees[i].x + 2.4f, 0.08f, trees[i].z + 1.8f),
+                        new Vector3(treePosition.x + 2.4f, 0.08f, treePosition.z + 1.8f),
                         new Vector3(3.8f, 0.16f, 2.6f),
                         MakeMaterial("VillageGardenGreen", new Color(0.20f, 0.43f, 0.16f)));
             }
