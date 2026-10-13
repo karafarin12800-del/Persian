@@ -254,7 +254,8 @@ namespace PersiaWar.Unity2D5D
             Renderer[] parts =
             {
                 mobileHead, mobileBody, mobileShirt, mobilePants, mobileShoes, mobileHair,
-                mobileArmor, mobileLeftArm, mobileRightArm, mobilePack, mobileHelmet, mobileVisor
+                mobileArmor, mobileLeftArm, mobileRightArm, mobilePack, mobileHelmet, mobileVisor,
+                mobileFemaleHairLeft, mobileFemaleHairRight
             };
             for (int i = 0; i < parts.Length; i++)
             {
