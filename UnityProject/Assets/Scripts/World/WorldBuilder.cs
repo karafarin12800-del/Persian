@@ -4,7 +4,7 @@ namespace PersiaWar.Unity2D5D
 {
     public sealed class WorldBuilder : MonoBehaviour
     {
-        [SerializeField] private float worldSize = 220f;
+        [SerializeField] private float worldSize = 220.8f;
 
         // These values are deliberately based on the existing character scale.
         // Character scale stays unchanged; the environment is enlarged to match it.

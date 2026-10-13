@@ -11,6 +11,7 @@ namespace PersiaWar.Unity2D5D
         private Vector3 direction;
         private float remainingLife;
         private Transform owner;
+        private float remainingDistance;
 
         public void SetDefaults(float projectileSpeed, float projectileLifetime, int projectileDamage)
         {
@@ -28,6 +29,7 @@ namespace PersiaWar.Unity2D5D
         {
             direction = worldDirection.normalized;
             remainingLife = lifetime;
+            remainingDistance = Mathf.Max(0f, speed * lifetime);
 
             if (direction.sqrMagnitude > 0.001f)
                 transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
@@ -35,26 +37,34 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            float step = speed * Time.deltaTime;
+            float step = Mathf.Min(speed * Time.deltaTime, remainingDistance);
 
-            if (step > 0.001f && TryResolveSweep(step))
+            if (step <= 0.001f || remainingDistance <= 0.001f)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            if (TryResolveSweep(step))
                 return;
 
             transform.position += direction * step;
+            remainingDistance -= step;
             remainingLife -= Time.deltaTime;
 
-            if (remainingLife <= 0f)
+            if (remainingLife <= 0f || remainingDistance <= 0.001f)
                 Destroy(gameObject);
         }
 
         private bool TryResolveSweep(float distance)
         {
-            RaycastHit[] hits = Physics.RaycastAll(
+            RaycastHit[] hits = Physics.SphereCastAll(
                 transform.position,
+                0.12f,
                 direction,
-                distance + 0.08f,
+                distance,
                 ~0,
-                QueryTriggerInteraction.Ignore);
+                QueryTriggerInteraction.Collide);
 
             if (hits == null || hits.Length == 0)
                 return false;

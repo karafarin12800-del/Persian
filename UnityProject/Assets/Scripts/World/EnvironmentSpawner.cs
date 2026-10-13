@@ -10,7 +10,7 @@ namespace PersiaWar.Unity2D5D
     {
         [SerializeField] private int buildings = 28;
         [SerializeField] private int trees = 44;
-        [SerializeField] private float worldSize = 220f;
+        [SerializeField] private float worldSize = 220.8f;
 
         // Scale reference: the current player character remains the baseline and is NOT resized.
         // Roads/alleys/buildings/trees are enlarged around that baseline.

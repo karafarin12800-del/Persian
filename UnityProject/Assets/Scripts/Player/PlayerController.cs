@@ -5,13 +5,15 @@ namespace PersiaWar.Unity2D5D
     public sealed class PlayerController : MonoBehaviour
     {
         [SerializeField] private float moveSpeed = 11.5f;
-        [SerializeField] private float worldLimit = 94f;
+        [SerializeField] private float worldLimit = 108.1f;
         [SerializeField] private float turnSpeed = 18f;
         [SerializeField] private float collisionRadius = 0.62f;
         [SerializeField] private int shield = 0;
         [SerializeField] private float spawnMovementLockSeconds = 0.45f;
 
         private Vector3 input;
+        private Vector3 aimDirection;
+        private bool hasAimDirection;
         private WeaponController weapon;
         private NearestTargetAim aim;
         private TargetHealth health;
@@ -21,6 +23,8 @@ namespace PersiaWar.Unity2D5D
         private float groundY;
         private float movementLockUntil;
         private bool movementEnabled = true;
+        [SerializeField] private int quickDashCharges;
+        public int QuickDashCharges => quickDashCharges;
 
         public NearestTargetAim Aim => aim;
         public WeaponController Weapon => weapon;
@@ -28,6 +32,7 @@ namespace PersiaWar.Unity2D5D
         public PlayerInventory Inventory => inventory;
         public GrenadeController Grenades => grenadeController;
         public int Shield => shield;
+        public float WorldLimit => worldLimit;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
         public bool IsMovementEnabled => movementEnabled && Time.time >= movementLockUntil && !IsDefeated;
@@ -59,6 +64,8 @@ namespace PersiaWar.Unity2D5D
         {
             IsDefeated = false;
             input = Vector3.zero;
+            aimDirection = Vector3.zero;
+            hasAimDirection = false;
             movementEnabled = true;
             groundY = 0f;
             movementLockUntil = Time.time + Mathf.Max(0f, spawnMovementLockSeconds);
@@ -84,7 +91,10 @@ namespace PersiaWar.Unity2D5D
         {
             movementEnabled = enabled;
             if (!enabled)
+            {
                 SetMoveInput(Vector2.zero);
+                ClearAimDirection();
+            }
         }
 
         public void LockMovementFor(float seconds)
@@ -103,6 +113,28 @@ namespace PersiaWar.Unity2D5D
 
             Vector2 clamped = Vector2.ClampMagnitude(value, 1f);
             input = new Vector3(clamped.x, 0f, clamped.y);
+        }
+
+        // Aim is a separate intent from movement: the player can keep strafing
+        // while facing the assisted target under the held-fire control.
+        public void SetAimDirection(Vector3 direction)
+        {
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 0.0001f || IsDefeated)
+            {
+                hasAimDirection = false;
+                aimDirection = Vector3.zero;
+                return;
+            }
+
+            aimDirection = direction.normalized;
+            hasAimDirection = true;
+        }
+
+        public void ClearAimDirection()
+        {
+            hasAimDirection = false;
+            aimDirection = Vector3.zero;
         }
 
         public void ReceiveDamage(int amount)
@@ -131,11 +163,26 @@ namespace PersiaWar.Unity2D5D
             shield = Mathf.Clamp(shield + Mathf.Max(0, amount), 0, 100);
         }
 
+        public void AddQuickDashCharges(int amount) { quickDashCharges = Mathf.Clamp(quickDashCharges + Mathf.Max(0, amount), 0, 12); }
+        public bool TryQuickDash()
+        {
+            if (!IsMovementEnabled || quickDashCharges <= 0) return false;
+            Vector3 direction = input.sqrMagnitude > 0.01f ? input.normalized : transform.forward;
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 0.001f) return false;
+            direction.Normalize(); Vector3 origin = transform.position; float moved = 0f;
+            const float distance = 2.6f, step = 0.20f;
+            while (moved < distance) { float delta = Mathf.Min(step, distance - moved); Vector3 candidate = origin + direction * (moved + delta); candidate.y = groundY; candidate.x = Mathf.Clamp(candidate.x, -worldLimit, worldLimit); candidate.z = Mathf.Clamp(candidate.z, -worldLimit, worldLimit); if (WouldCollide(candidate)) break; moved += delta; }
+            if (moved < 0.35f) return false;
+            transform.position = new Vector3(origin.x + direction.x * moved, groundY, origin.z + direction.z * moved); quickDashCharges--; StartupCheckpoint.Set("QuickDashUsed"); return true;
+        }
+
         public void HandleDefeat()
         {
             IsDefeated = true;
             movementEnabled = false;
             input = Vector3.zero;
+            ClearAimDirection();
             enabled = false;
             GameSession.Instance?.EndMission(false);
         }
@@ -164,18 +211,33 @@ namespace PersiaWar.Unity2D5D
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
             next.y = 0f;
 
-            // Android input validation phase: movement must not be blocked by
-            // procedural city colliders. Collision-aware navigation will be restored
-            // after the input path is proven stable.
             if (desired.sqrMagnitude > 0.00001f)
-                transform.position = next;
+            {
+                if (!WouldCollide(next))
+                {
+                    transform.position = next;
+                }
+                else
+                {
+                    // Slide along walls and parked vehicles instead of stopping at
+                    // every diagonal collision. Both candidate positions still pass
+                    // through the same solid-obstacle query.
+                    Vector3 slideX = new Vector3(next.x, next.y, transform.position.z);
+                    Vector3 slideZ = new Vector3(transform.position.x, next.y, next.z);
+                    if (!WouldCollide(slideX))
+                        transform.position = slideX;
+                    else if (!WouldCollide(slideZ))
+                        transform.position = slideZ;
+                }
+            }
 
             if (visual != null)
                 visual.SetMoving(input.sqrMagnitude > 0.0001f);
 
-            if (input.sqrMagnitude > 0.0001f)
+            Vector3 facingDirection = hasAimDirection ? aimDirection : input;
+            if (facingDirection.sqrMagnitude > 0.0001f)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(input, Vector3.up);
+                Quaternion targetRotation = Quaternion.LookRotation(facingDirection, Vector3.up);
                 transform.rotation = Quaternion.Slerp(
                     transform.rotation,
                     targetRotation,

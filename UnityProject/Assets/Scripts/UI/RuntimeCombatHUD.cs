@@ -14,6 +14,9 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle medium;
         private GUIStyle bold;
         private Texture2D pixel;
+        private EnemyChase[] radarEnemies = System.Array.Empty<EnemyChase>();
+        private float nextRadarRefreshTime;
+        private const float RadarWorldRadius = 55f;
 
         public void ConfigurePlayer(PlayerController value)
         {
@@ -30,14 +33,14 @@ namespace PersiaWar.Unity2D5D
 
             small = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 15,
+                fontSize = 18,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleLeft
             };
-            medium = new GUIStyle(small) { fontSize = 20 };
+            medium = new GUIStyle(small) { fontSize = 24 };
             bold = new GUIStyle(small)
             {
-                fontSize = 24,
+                fontSize = 28,
                 alignment = TextAnchor.MiddleCenter
             };
         }
@@ -45,6 +48,13 @@ namespace PersiaWar.Unity2D5D
         private void OnDestroy()
         {
             if (pixel != null) Destroy(pixel);
+        }
+
+        private void Update()
+        {
+            if (Time.unscaledTime < nextRadarRefreshTime) return;
+            nextRadarRefreshTime = Time.unscaledTime + 0.5f;
+            radarEnemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
         }
 
         private void OnGUI()
@@ -74,11 +84,12 @@ namespace PersiaWar.Unity2D5D
 
             DrawTopStatus(margin, scale, hp, currentHealth, maxHealth, shield, shieldAmount, ammo, reserve, grenades);
             DrawCounters(margin, scale, wave, score);
+            DrawEnemyRadar(margin, scale);
 
             if (player.IsDefeated)
             {
-                float w = 360f * scale;
-                Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - 48f * scale, w, 96f * scale);
+                float w = 400f * scale;
+                Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - 48f * scale, w, 110f * scale);
                 Fill(panel, new Color(0.05f, 0.06f, 0.08f, 0.86f));
                 GUI.Label(panel, "GAME OVER", bold);
             }
@@ -86,27 +97,27 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawTopStatus(float margin, float scale, float hp, int currentHealth, int maxHealth, float shield, int shieldAmount, int ammo, int reserve, int grenades)
         {
-            float panelW = 360f * scale;
-            float panelH = 96f * scale;
+            float panelW = 400f * scale;
+            float panelH = 110f * scale;
             Rect panel = new Rect(margin, margin, panelW, panelH);
             Fill(panel, new Color(0.05f, 0.08f, 0.12f, 0.74f));
 
-            Rect portrait = new Rect(panel.x + 10f * scale, panel.y + 10f * scale, 58f * scale, 58f * scale);
+            Rect portrait = new Rect(panel.x + 10f * scale, panel.y + 10f * scale, 62f * scale, 62f * scale);
             Fill(portrait, new Color(0.90f, 0.40f, 0.16f, 0.96f));
             GUI.Label(portrait, "P", bold);
 
             float barX = portrait.xMax + 10f * scale;
             float barWidth = panelW - (barX - panel.x) - 12f * scale;
-            GUI.Label(new Rect(barX, panel.y + 5f * scale, barWidth, 25f * scale), "PERSIA WARRIOR", medium);
+            GUI.Label(new Rect(barX, panel.y + 5f * scale, barWidth, 29f * scale), "PERSIA WARRIOR", medium);
 
-            GUI.Label(new Rect(barX, panel.y + 31f * scale, barWidth, 17f * scale),
+            GUI.Label(new Rect(barX, panel.y + 35f * scale, barWidth, 20f * scale),
                 "HP  " + currentHealth + " / " + maxHealth, small);
-            DrawBar(new Rect(barX, panel.y + 48f * scale, barWidth, 9f * scale),
+            DrawBar(new Rect(barX, panel.y + 55f * scale, barWidth, 9f * scale),
                 hp, new Color(0.25f, 0.90f, 0.36f));
 
-            GUI.Label(new Rect(barX, panel.y + 58f * scale, barWidth, 17f * scale),
+            GUI.Label(new Rect(barX, panel.y + 66f * scale, barWidth, 20f * scale),
                 "SHIELD  " + shieldAmount + " / 100", small);
-            DrawBar(new Rect(barX, panel.y + 75f * scale, barWidth, 9f * scale),
+            DrawBar(new Rect(barX, panel.y + 87f * scale, barWidth, 9f * scale),
                 shield, new Color(0.30f, 0.66f, 1f));
 
             float itemY = panel.yMax + 8f * scale;
@@ -116,12 +127,60 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawCounters(float margin, float scale, int wave, int score)
         {
-            float w = 180f * scale;
+            float w = 200f * scale;
             Rect waveRect = new Rect(Screen.width - w - margin, margin, w, 38f * scale);
             DrawChip(waveRect, "WAVE  " + wave, new Color(0.10f, 0.12f, 0.18f));
 
             Rect scoreRect = new Rect(Screen.width - w - margin, waveRect.yMax + 8f * scale, w, 38f * scale);
-            DrawChip(scoreRect, "KILLS  " + score, new Color(0.18f, 0.10f, 0.10f));
+            DrawChip(scoreRect, "SCORE  " + score, new Color(0.18f, 0.10f, 0.10f));
+        }
+
+        private void DrawEnemyRadar(float margin, float scale)
+        {
+            if (player == null) return;
+
+            // Compact north-up tactical minimap. Blue dots are enemies; the warm
+            // center dot is the player. Refreshing the enemy cache at 2 Hz keeps
+            // this affordable on Android.
+            float size = 132f * scale;
+            float x = Screen.width - size - margin;
+            float y = margin + 84f * scale;
+            Rect panel = new Rect(x, y, size, size);
+            Fill(panel, new Color(0.025f, 0.06f, 0.10f, 0.90f));
+            Fill(new Rect(x + 2f, y + 2f, size - 4f, 2f * scale), new Color(0.24f, 0.66f, 0.92f, 0.95f));
+            GUI.Label(new Rect(x + 7f * scale, y + 3f * scale, size - 14f * scale, 22f * scale),
+                "RADAR  •  ENEMIES", small);
+
+            float mapLeft = x + 8f * scale;
+            float mapTop = y + 28f * scale;
+            float mapSize = size - 16f * scale;
+            float centerX = mapLeft + mapSize * 0.5f;
+            float centerY = mapTop + mapSize * 0.5f;
+            Fill(new Rect(mapLeft, mapTop, mapSize, mapSize), new Color(0.08f, 0.13f, 0.17f, 0.95f));
+            Fill(new Rect(centerX - 0.5f * scale, mapTop, 1f * scale, mapSize), new Color(0.32f, 0.43f, 0.48f, 0.50f));
+            Fill(new Rect(mapLeft, centerY - 0.5f * scale, mapSize, 1f * scale), new Color(0.32f, 0.43f, 0.48f, 0.50f));
+
+            Vector3 playerPosition = player.transform.position;
+            float pixelsPerUnit = mapSize / (RadarWorldRadius * 2f);
+            for (int i = 0; i < radarEnemies.Length; i++)
+            {
+                EnemyChase enemy = radarEnemies[i];
+                if (enemy == null || !enemy.isActiveAndEnabled) continue;
+                Vector3 offset = enemy.transform.position - playerPosition;
+                if (Mathf.Abs(offset.x) > RadarWorldRadius || Mathf.Abs(offset.z) > RadarWorldRadius) continue;
+
+                float dotX = centerX + offset.x * pixelsPerUnit;
+                float dotY = centerY - offset.z * pixelsPerUnit;
+                float dotSize = 7f * scale;
+                Fill(new Rect(dotX - dotSize * 0.5f, dotY - dotSize * 0.5f, dotSize, dotSize),
+                    new Color(0.06f, 0.12f, 0.32f, 1f));
+                Fill(new Rect(dotX - dotSize * 0.5f - scale, dotY - dotSize * 0.5f - scale,
+                    dotSize + 2f * scale, dotSize + 2f * scale), new Color(0.18f, 0.28f, 0.52f, 0.62f));
+            }
+
+            float playerDot = 8f * scale;
+            Fill(new Rect(centerX - playerDot * 0.5f, centerY - playerDot * 0.5f, playerDot, playerDot),
+                new Color(1f, 0.66f, 0.18f, 1f));
         }
 
         private void DrawBar(Rect rect, float value, Color fill)

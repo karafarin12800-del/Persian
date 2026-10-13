@@ -6,17 +6,16 @@ namespace PersiaWar.Unity2D5D
     public sealed class EnemySpawner : MonoBehaviour
     {
         [SerializeField] private Transform player;
-        [SerializeField] private int startingCount = 8;
+        [SerializeField] private int startingCount = 24;
         [SerializeField] private float spawnRadius = 44f;
         [SerializeField] private float nextWaveDelay = 3f;
         [SerializeField] private float initialSpawnDelay = 6.5f;
         [SerializeField] private float enemyCheckInterval = 0.5f;
-        [SerializeField] private int maxPerWave = 12;
-        [SerializeField] private int victoryWave = 5;
+        [SerializeField] private int maxPerWave = 24;
+        [SerializeField] private int victoryWave = 4;
 
 #if UNITY_ANDROID
-        // Android enemy gameplay is reopened in a staged configuration:
-        // the first wave contains one enemy and later waves grow after kills.
+        // Spawn 24 enemies in the initial Android match, spreading construction across frames.
         private const bool AndroidEnemyDiagnosticDisabled = false;
 #endif
 
@@ -35,7 +34,7 @@ namespace PersiaWar.Unity2D5D
             player = playerTransform;
 #if UNITY_ANDROID
             // Enforce a smaller mobile wave cap even when older scene data requested 42+ enemies.
-            maxPerWave = Mathf.Clamp(maxPerWave, 1, 12);
+            maxPerWave = Mathf.Clamp(maxPerWave, 1, 24);
 #endif
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
@@ -128,9 +127,11 @@ namespace PersiaWar.Unity2D5D
 
         private void SpawnWave()
         {
-            int count = Mathf.Min(startingCount + wave - 1, maxPerWave);
+            // Four sequential combat waves: six enemies per wave when the match is configured for 24.
+            // The next wave is not spawned until Update confirms every enemy in this wave is gone.
+            int count = Mathf.Clamp(Mathf.CeilToInt(startingCount / 4f), 1, maxPerWave);
 #if UNITY_ANDROID
-            count = Mathf.Min(count, 12);
+            count = Mathf.Min(count, 24);
 #endif
 
 #if UNITY_ANDROID
@@ -143,7 +144,7 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < count * 3 && spawned < count; i++)
             {
                 float angle = Random.Range(0f, Mathf.PI * 2f);
-                float distance = Random.Range(spawnRadius * 0.72f, spawnRadius);
+                float distance = Random.Range(Mathf.Max(45f, spawnRadius * 0.72f), Mathf.Max(50f, spawnRadius));
                 Vector3 position = player.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
                 position.y = 1f;
 
@@ -172,10 +173,11 @@ namespace PersiaWar.Unity2D5D
         {
             int spawned = 0;
             int attemptsPerEnemy = 60;
+            // Only this wave is spawned here; the next starts after every enemy dies.
 
             // Select positions throughout the playable city instead of clustering
-            // everyone in a ring around the player. Spawn one valid enemy per frame
-            // to avoid a single-frame allocation spike on Android.
+            // everyone in a ring around the player. Spawn one valid enemy per frame,
+            // in four clearly separated groups of six, to smooth both visuals and CPU load.
             while (spawned < count)
             {
                 bool foundPosition = false;
@@ -193,7 +195,7 @@ namespace PersiaWar.Unity2D5D
                         ? new Vector2(player.position.x, player.position.z)
                         : Vector2.zero;
 
-                    if (Vector2.Distance(candidateXZ, playerXZ) < 18f)
+                    if (Vector2.Distance(candidateXZ, playerXZ) < 45f)
                         continue;
 
                     if (Physics.CheckSphere(candidate + Vector3.up * 0.7f, 0.85f, ~0,
@@ -210,7 +212,7 @@ namespace PersiaWar.Unity2D5D
                     // Deterministic fallback ring prevents a crowded city tile from
                     // silently reducing the requested 32-player starting lobby.
                     float angle = (spawned + 0.5f) / Mathf.Max(1, count) * Mathf.PI * 2f;
-                    float distance = 70f;
+                    float distance = 76f;
                     position = new Vector3(
                         Mathf.Clamp((player != null ? player.position.x : 0f) + Mathf.Cos(angle) * distance, -84f, 84f),
                         1f,
@@ -222,6 +224,7 @@ namespace PersiaWar.Unity2D5D
                 spawned++;
                 StartupCheckpoint.Set("AndroidEnemySpawnComplete");
                 yield return null;
+
             }
 
             failedSpawnAttempts = 0;

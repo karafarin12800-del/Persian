@@ -10,6 +10,7 @@ namespace PersiaWar.Unity2D5D
 
         private Vector3 direction;
         private Transform owner;
+        private float remainingDistance;
 
         public void Configure(Vector3 launchDirection, int damageAmount)
         {
@@ -28,31 +29,43 @@ namespace PersiaWar.Unity2D5D
             owner = ownerTransform;
             // Lifetime is the physical range limit: the projectile cannot damage
             // anything after travelling farther than the configured weapon range.
+            remainingDistance = Mathf.Max(0f, maxRange);
             lifetime = Mathf.Max(0.05f, Mathf.Max(1f, maxRange) / Mathf.Max(1f, speed));
         }
 
         private void Update()
         {
-            float step = speed * Time.deltaTime;
+            float step = Mathf.Min(speed * Time.deltaTime, remainingDistance);
 
-            if (step > 0.001f && TryResolveSweep(step))
+            if (step <= 0.001f || remainingDistance <= 0.001f)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            if (TryResolveSweep(step))
                 return;
 
             transform.position += direction * step;
+            remainingDistance -= step;
             lifetime -= Time.deltaTime;
 
-            if (lifetime <= 0f)
+            if (lifetime <= 0f || remainingDistance <= 0.001f)
                 Destroy(gameObject);
         }
 
         private bool TryResolveSweep(float distance)
         {
-            RaycastHit[] hits = Physics.RaycastAll(
+            // Enemy shots are visible capsules, not mathematical zero-width rays.
+            // Sweep a small radius and include trigger colliders so the projectile can
+            // reliably register the player's runtime collider on Android.
+            RaycastHit[] hits = Physics.SphereCastAll(
                 transform.position,
+                0.22f,
                 direction,
-                distance + 0.08f,
+                distance,
                 ~0,
-                QueryTriggerInteraction.Ignore);
+                QueryTriggerInteraction.Collide);
 
             if (hits == null || hits.Length == 0)
                 return false;

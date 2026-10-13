@@ -82,12 +82,59 @@ jobs:
           ):
               assert callback in hub, f"Missing input reset lifecycle path: {callback}"
           assert "TryGetTouch(movePointerId" in hub and "TryGetTouch(firePointerId" in hub, "Movement and fire must keep separate finger IDs"
+          assert "else if (Input.touchCount > 0)" in hub and "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement must preserve the last joystick vector while Android reports another active contact"
+          assert "MovePointerRecoveryGraceSeconds = 0.24f" in hub and "movePointerMissingSince" in hub, "A canceled/missing joystick pointer must use a recovery window instead of being immediately reset"
+          assert "movementStillHeld" in hub and "FirePointerRecoveryGraceSeconds = 0.24f" in hub, "Movement and held-fire input must survive transient touch-ID gaps independently"
+          assert "movementRecoveryActive = true;" in hub and "if (fireStillHeld ||" in hub, "A canceled movement pointer must preserve the last vector while a separate fire touch remains held"
+          assert "MobileFirePointerReboundAfterCancel" in hub and "candidate.rawPosition.x < Screen.width * 0.58f" in hub, "A canceled fire pointer must search for a different live right-side finger before releasing"
+          assert hub.count("Input.simulateMouseWithTouches = !matchActive;") >= 5, "Every lifecycle entry/exit must obey exclusive touch-vs-mouse ownership"
+          deactivate_start = hub.index("public void DeactivateMatch()")
+          deactivate_end = hub.index("public void SetPaused(", deactivate_start)
+          deactivate = hub[deactivate_start:deactivate_end]
+          assert deactivate.index("matchActive = false;") < deactivate.index("Input.simulateMouseWithTouches = !matchActive;"), "Mouse synthesis may be restored only after match ownership is released"
+          disable_start = hub.index("private void OnDisable()")
+          disable_end = hub.index("private void OnApplicationPause(", disable_start)
+          assert "Input.simulateMouseWithTouches = !matchActive;" in hub[disable_start:disable_end], "Disabling the input component must not enable a competing path during a match"
+          assert "if (matchActive && !matchPaused && Input.touchCount > 0)" in hub and "Native Touch" in hub, "Gameplay IMGUI fallback must not compete with native finger ownership"
+          assert "if (Application.isMobilePlatform &&\n                Input.touchCount > 0 &&" not in hub, "Do not suppress the entire fallback because one native contact exists"
+          assert "MobileMoveAndFireTouchConcurrent" in hub and "MobileShotFiredWhileMoving" in hub, "One-shot breadcrumbs must record whether simultaneous touch and moving-fire paths were reached"
+          native_touch_start = hub.index("private void HandleAndroidTouches()")
+          native_touch_end = hub.index("private void MarkLateTouchRecovery(Touch touch)", native_touch_start)
+          native_touch_dispatch = hub[native_touch_start:native_touch_end]
+          assert "Vector2 touchStartScreen = touch.rawPosition;" in native_touch_dispatch, "Late-discovered contacts must use their original touch position"
+          assert "if (touch.phase != TouchPhase.Began) continue;" not in native_touch_dispatch, "A missed Began frame must not permanently lose a movement/fire pointer"
+          assert "touch.fingerId == movePointerId" in native_touch_dispatch and "touch.fingerId == firePointerId" in native_touch_dispatch, "Late contact recovery must preserve independent movement/fire finger ownership"
+          assert "MobileLateTouchRecoveredFromActivePhase" in hub, "Late contact recovery must leave a diagnostic breadcrumb"
+          assert "private int dashPointerId = -1;" in hub and "Retain ownership of the dash contact" in hub, "Late-discovered dash contacts must be captured once, not trigger a dash repeatedly every frame"
+          assert "ReleasePointer(ref dashPointerId);" in hub and "dashPointerId = -1;" in hub, "Dash pointer ownership must be released on lift and lifecycle reset"
+          assert "player.SetMoveInput(ToWorldMove(ApplyDeadZone(moveValue)));" in hub, "Movement continuity fallback must preserve the last joystick vector"
+          assert "if (!Input.multiTouchEnabled)" in hub and "Input.multiTouchEnabled = true;" in hub, "Android multi-touch must be enforced during active touch dispatch"
+          player_controller = (scripts / "Player/PlayerController.cs").read_text(encoding="utf-8")
+          assert "if (!WouldCollide(next))" in player_controller and "WouldCollide(slideX)" in player_controller, "Player movement must respect solid obstacles and allow wall sliding"
+          assert "public void SetAimDirection(Vector3 direction)" in player_controller and "hasAimDirection ? aimDirection : input" in player_controller, "Player facing must be decoupled from movement to support strafing"
+          bootstrap = (scripts / "Core/GameBootstrap.cs").read_text(encoding="utf-8")
+          assert "worldSize = 220.8f" in bootstrap and "CreateAndroidBuildingColliders(" in bootstrap and "CityVehicleCollider" in bootstrap, "Expanded city, door gaps, and vehicle colliders must be present"
+          assert "ShowRandomExtractionBeacon()" in bootstrap and "BlueSkyGuideBeamCore" in bootstrap, "Victory-only extraction guide beacon must be present"
+          assert "minimapPickups" in flow and "AndroidSkyGuideBeaconPoint" in flow and "B: BEACON" in flow, "Minimap must display loot and the blue guide beacon"
+          assert "survivorCount.ToString()" in flow and "SCORE  " in flow, "HUD counters must be dynamic and correctly labeled"
+          enemy = (scripts / "Enemy/EnemyChase.cs").read_text(encoding="utf-8")
+          assert "new Color(0.10f, 0.55f, 1f)" in enemy, "Enemy projectiles must be blue"
+          audio = scripts / "Core/RuntimeGameAudio.cs"
+          audio_source = audio.read_text(encoding="utf-8")
+          assert audio.exists() and "BuildMusicLoop()" in audio_source and "PlayPlayerShot()" in audio_source, "Runtime music and shot audio must be present"
+          assert 'activity.Call("setVolumeControlStream", 3)' in audio_source, "Android hardware volume keys must target the media stream"
+          hud = (scripts / "UI/RuntimeCombatHUD.cs").read_text(encoding="utf-8")
+          assert "fontSize = 18" in hud and "fontSize = 24" in hud, "Player HUD text must be larger"
+          assert "private const float BaseActionHitRadius = 122f;" in hub, "Action touch zones must not inherit the enlarged movement-joystick radius"
+          assert hub.count("float actionHitRadius = BaseActionHitRadius * scale * controlScale;") == 2, "Real touch and IMGUI fallback must share the same action hit radius"
           fallback_start = hub.index("private void HandleGuiPointerFallback()")
           fallback_end = hub.index("private void CreateGuiTextures()", fallback_start)
           fallback = hub[fallback_start:fallback_end]
           assert "if (Application.isMobilePlatform)\n                return;" not in fallback, "Android must not exit the IMGUI fallback before checking whether legacy touches are missing."
-          assert "Input.touchCount > 0" in fallback and "guiFallbackOwnsPointer" in fallback, "Android fallback must defer to real fingers but recover when touch entries are absent."
+          assert "guiMoveMouseButton == e.button" in fallback and "guiFireMouseButton == e.button" in fallback, "Fallback must keep movement and fire ownership independent even when native contacts are partially visible."
           assert "private void HandleHeroSelectTouches()" in flow and "HeroSelectionContinuedByTouch" in flow, "Hero selection/continue must accept direct Android touches."
+          assert "private void HandleAndroidPauseTouches()" in flow and "MatchPausedByNativeTouch" in flow, "Android pause/resume must use native touch while mouse simulation is disabled."
+          assert "bool pauseButtonPressed = GUI.Button(" in flow and "if (!Application.isMobilePlatform && pauseButtonPressed)" in flow, "The pause/resume button must remain visible on Android while native touch owns its activation."
           assert "startRect.Contains(screen)" in flow and "StartMatch();" in flow, "Start Match must accept direct Android touches."
           assert "Screen.height - bottom - 236f * scale" in hub and "Screen.height - bottom - 300f * scale" in hub, "Grenade/reload hit zones must remain separate from adjacent actions"
 

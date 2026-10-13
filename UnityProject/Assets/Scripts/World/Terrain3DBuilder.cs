@@ -10,7 +10,7 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public sealed class Terrain3DBuilder : MonoBehaviour
     {
-        [SerializeField] private float size = 220f;
+        [SerializeField] private float size = 220.8f;
         [SerializeField] private int subdivisions = 24;
         [SerializeField] private float height = 0.65f;
         [SerializeField] private float baseY = -0.35f;

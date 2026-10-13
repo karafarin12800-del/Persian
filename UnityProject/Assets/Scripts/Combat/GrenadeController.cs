@@ -68,6 +68,9 @@ namespace PersiaWar.Unity2D5D
                 yield return null;
             }
 
+            // Make the detonation readable even when no enemy is inside the blast.
+            CreateExplosionFeedback(target);
+
             Collider[] hits = Physics.OverlapSphere(target, explosionRadius, ~0, QueryTriggerInteraction.Collide);
             foreach (Collider hit in hits)
             {
@@ -84,6 +87,31 @@ namespace PersiaWar.Unity2D5D
 
             if (grenade != null)
                 Destroy(grenade);
+        }
+
+        private void CreateExplosionFeedback(Vector3 center)
+        {
+#if UNITY_ANDROID
+            GameObject flash = AndroidSafeRuntimeFactory.CreateMarker(
+                "GrenadeExplosionFlash",
+                center,
+                new Vector3(explosionRadius * 1.5f, 0.12f, explosionRadius * 1.5f),
+                new Color(1f, 0.48f, 0.08f, 0.95f),
+                false);
+#else
+            GameObject flash = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            flash.name = "GrenadeExplosionFlash";
+            flash.transform.position = center;
+            flash.transform.localScale = new Vector3(explosionRadius * 1.5f, 0.12f, explosionRadius * 1.5f);
+            Collider flashCollider = flash.GetComponent<Collider>();
+            if (flashCollider != null) Destroy(flashCollider);
+            Renderer flashRenderer = flash.GetComponent<Renderer>();
+            if (flashRenderer != null)
+                flashRenderer.sharedMaterial = RuntimeMaterialFactory.Create(
+                    "GrenadeExplosionFlashMaterial", new Color(1f, 0.48f, 0.08f, 0.95f));
+#endif
+            if (flash != null)
+                Destroy(flash, 0.22f);
         }
 
         private static GameObject CreateRuntimeGrenade(Vector3 position)

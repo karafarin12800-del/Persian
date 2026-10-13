@@ -20,6 +20,22 @@ namespace PersiaWar.Unity2D5D
         private float nextRangedTime;
         private int archetype = 1;
         private float collisionRadius = 0.55f;
+
+        // Tactical disengage is time-boxed; enemies resume combat instead of fleeing forever.
+        [SerializeField] private float retreatDuration = 2.1f;
+        [SerializeField] private float retreatCooldown = 6.0f;
+        [SerializeField] private float stuckRecoveryDelay = 1.35f;
+        [SerializeField] private float stuckRecoveryDuration = 2.2f;
+        private float retreatUntil;
+        private float nextRetreatAllowed;
+        private float recoveryUntil;
+        private float nextRecoveryAllowed;
+        private float lastProgressTime;
+        private Vector3 lastObservedPosition;
+        private Vector3 recoveryDirection;
+        private bool movementRequested;
+        [SerializeField] private float fallbackWorldLimit = 108.1f;
+        private PlayerController targetPlayer;
         private StylizedCharacterVisual visual;
         private Transform weaponVisualRoot;
         private static Material enemyRifleReceiverMaterial;
@@ -51,6 +67,7 @@ namespace PersiaWar.Unity2D5D
         public void SetTarget(Transform targetTransform)
         {
             target = targetTransform;
+            targetPlayer = target != null ? target.GetComponentInParent<PlayerController>() : null;
         }
 
         public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
@@ -64,13 +81,19 @@ namespace PersiaWar.Unity2D5D
 
         public void Configure(Transform targetTransform, int enemyArchetype)
         {
-            target = targetTransform;
+            SetTarget(targetTransform);
             archetype = Mathf.Clamp(enemyArchetype, 1, 3);
             // With a full 32-combatant lobby, lower mobile AI polling frequency to
             // reduce per-frame physics-query pressure without changing attack rules.
             retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;
 
-            moveSpeed = archetype == 3 ? 2.6f : (archetype == 2 ? 3.1f : 3.0f);
+            // Faster mobile combat pacing, tuned by the enemy's carried weapon:
+            // pistol users close distance fastest; heavy-gun users move more slowly.
+            // Keep enemies challenging but controllable on mobile: reduce the
+            // previous sprint speeds by 25 percent.
+            moveSpeed = DroppedWeaponKind == WeaponController.WeaponKind.LightPistol
+                ? 7.83f
+                : (DroppedWeaponKind == WeaponController.WeaponKind.HeavyMachineGun ? 6.21f : 7.0875f);
             meleeDamage = archetype == 3 ? 14 : (archetype == 2 ? 9 : 7);
             rangedDamage = archetype == 3 ? 15 : (archetype == 2 ? 10 : 8);
             // Use the same configured range as the weapon the enemy visibly carries/drops.
@@ -170,10 +193,11 @@ namespace PersiaWar.Unity2D5D
             weaponVisualRoot = new GameObject("EnemyRifleVisual").transform;
             weaponVisualRoot.SetParent(mount, false);
             weaponVisualRoot.localPosition = mount == visual.transform
-                ? new Vector3(0.34f, 0.86f, 0.10f)
-                : new Vector3(0.24f, 0.78f, 0.34f);
-            weaponVisualRoot.localRotation = Quaternion.identity;
-            weaponVisualRoot.localScale = Vector3.one;
+                ? new Vector3(0.20f, 0.83f, 0.28f)
+                : new Vector3(0.16f, 0.72f, 0.42f);
+            // Make the silhouette readable at the game's isometric camera distance.
+            weaponVisualRoot.localRotation = Quaternion.Euler(0f, -8f, 0f);
+            weaponVisualRoot.localScale = Vector3.one * 1.45f;
 
             if (enemyRifleReceiverMaterial == null)
                 enemyRifleReceiverMaterial = RuntimeMaterialFactory.Create(
@@ -229,6 +253,7 @@ namespace PersiaWar.Unity2D5D
             part.transform.SetParent(weaponVisualRoot, false);
             part.transform.localPosition = localPosition;
             part.transform.localScale = localScale;
+            part.transform.localRotation = Quaternion.identity;
 
             Collider collider = part.GetComponent<Collider>();
             if (collider != null)
@@ -245,17 +270,28 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            if (target != null)
+                targetPlayer = target.GetComponentInParent<PlayerController>();
+
             CapsuleCollider capsule = GetComponent<CapsuleCollider>();
             if (capsule != null)
                 collisionRadius = Mathf.Max(
                     0.35f,
                     capsule.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
 
+            lastObservedPosition = transform.position;
+            lastProgressTime = Time.time;
+
             // Wait for Configure() so the correct archetype is known before loading art.
         }
 
         private void Update()
         {
+            // Keep actors inside the arena and detect stalled movement every frame,
+            // not only on the slower mobile AI retarget ticks.
+            ClampInsidePlayableArea();
+            TrackMovementProgress();
+
             if (target == null || Time.time < nextRetargetTime)
                 return;
 
@@ -271,21 +307,56 @@ namespace PersiaWar.Unity2D5D
             PlayerController player = target.GetComponentInParent<PlayerController>();
             bool hasLineOfSight = player == null || HasLineOfSightToPlayer(player);
 
-            // If a wall blocks sight, keep navigating even inside the normal stop range
-            // instead of idling against a wall with no attack lane.
-            bool shouldMove = distance > stopDistance || (player != null && !hasLineOfSight);
+            TargetHealth ownHealth = GetComponent<TargetHealth>();
+            bool criticallyWounded = ownHealth != null &&
+                ownHealth.MaxHealth > 0 &&
+                ownHealth.CurrentHealth <= Mathf.CeilToInt(ownHealth.MaxHealth * 0.30f) &&
+                player != null;
+
+            // Retreat only for a short burst, then re-engage. This avoids the old
+            // permanent flee state that pushed wounded enemies into map corners.
+            if (criticallyWounded && Time.time >= nextRetreatAllowed)
+            {
+                retreatUntil = Time.time + retreatDuration;
+                nextRetreatAllowed = Time.time + retreatCooldown;
+            }
+
+            bool retreating = criticallyWounded && Time.time < retreatUntil;
+            bool recoveringFromStall = Time.time < recoveryUntil;
+            Vector3 movementDirection = retreating
+                ? GetBoundaryAwareRetreatDirection(-direction)
+                : direction;
+
+            // A lateral recovery step breaks wall/corner deadlocks; it takes priority
+            // over both pursuit and retreat for a short, bounded interval.
+            if (recoveringFromStall)
+                movementDirection = recoveryDirection;
+
+            // If a wall blocks sight, keep navigating even inside the normal stop range.
+            bool shouldMove = recoveringFromStall || retreating ||
+                distance > stopDistance || (player != null && !hasLineOfSight);
+            movementRequested = shouldMove;
+
             if (shouldMove)
-                UpdatePursuitMovement(direction, distance, hasLineOfSight);
+                UpdatePursuitMovement(
+                    movementDirection,
+                    distance,
+                    (retreating || recoveringFromStall) ? false : hasLineOfSight);
             else
                 ClearNavigationPath();
 
             if (visual != null)
             {
-                visual.SetFacing(shouldMove && !hasLineOfSight ? GetCurrentMovementDirection(direction) : direction);
+                bool repositioning = retreating || recoveringFromStall ||
+                    (shouldMove && !hasLineOfSight);
+                Vector3 facing = repositioning
+                    ? GetCurrentMovementDirection(movementDirection)
+                    : direction;
+                visual.SetFacing(facing);
                 visual.SetMoving(shouldMove);
             }
 
-            if (player == null)
+            if (player == null || retreating)
                 return;
 
             if (distance <= meleeDistance && Time.time >= nextAttackTime && hasLineOfSight)
@@ -299,6 +370,100 @@ namespace PersiaWar.Unity2D5D
                 FireProjectile(direction);
                 nextRangedTime = Time.time + rangedCooldown;
             }
+        }
+
+        private void TrackMovementProgress()
+        {
+            Vector3 current = transform.position;
+            if (!movementRequested)
+            {
+                lastObservedPosition = current;
+                lastProgressTime = Time.time;
+                return;
+            }
+
+            if (HorizontalDistance(current, lastObservedPosition) >= 0.18f)
+            {
+                lastObservedPosition = current;
+                lastProgressTime = Time.time;
+                return;
+            }
+
+            lastObservedPosition = current;
+            if (Time.time - lastProgressTime < stuckRecoveryDelay ||
+                Time.time < nextRecoveryAllowed)
+                return;
+
+            recoveryDirection = ChooseRecoveryDirection();
+            recoveryUntil = Time.time + stuckRecoveryDuration;
+            nextRecoveryAllowed = recoveryUntil + 0.8f;
+            lastProgressTime = Time.time;
+            ClearNavigationPath();
+        }
+
+        private Vector3 GetBoundaryAwareRetreatDirection(Vector3 awayFromTarget)
+        {
+            float safeLimit = Mathf.Max(1f, GetWorldLimit() - 5f);
+            Vector3 position = transform.position;
+
+            if ((position.x >= safeLimit && awayFromTarget.x > 0f) ||
+                (position.x <= -safeLimit && awayFromTarget.x < 0f))
+                awayFromTarget.x = 0f;
+
+            if ((position.z >= safeLimit && awayFromTarget.z > 0f) ||
+                (position.z <= -safeLimit && awayFromTarget.z < 0f))
+                awayFromTarget.z = 0f;
+
+            if (awayFromTarget.sqrMagnitude < 0.01f)
+            {
+                // At a corner, move inward rather than repeatedly pressing against bounds.
+                awayFromTarget = new Vector3(
+                    -Mathf.Sign(position.x),
+                    0f,
+                    -Mathf.Sign(position.z));
+            }
+
+            return awayFromTarget.sqrMagnitude > 0.01f
+                ? awayFromTarget.normalized
+                : Vector3.forward;
+        }
+
+        private Vector3 ChooseRecoveryDirection()
+        {
+            Vector3 towardTarget = target != null
+                ? target.position - transform.position
+                : transform.forward;
+            towardTarget.y = 0f;
+            if (towardTarget.sqrMagnitude < 0.01f)
+                towardTarget = transform.forward;
+            towardTarget.Normalize();
+
+            Vector3 tangent = Vector3.Cross(Vector3.up, towardTarget).normalized;
+            if ((GetInstanceID() & 1) != 0)
+                tangent = -tangent;
+
+            Vector3 candidate = transform.position + tangent * 2.5f;
+            ClampToPlayableArea(ref candidate);
+            if (CanMoveTo(candidate))
+                return tangent;
+
+            tangent = -tangent;
+            candidate = transform.position + tangent * 2.5f;
+            ClampToPlayableArea(ref candidate);
+            if (CanMoveTo(candidate))
+                return tangent;
+
+            Vector3 inward = new Vector3(
+                -Mathf.Sign(transform.position.x),
+                0f,
+                -Mathf.Sign(transform.position.z)).normalized;
+            candidate = transform.position + inward * 2.5f;
+            ClampToPlayableArea(ref candidate);
+            if (inward.sqrMagnitude > 0.01f && CanMoveTo(candidate))
+                return inward;
+
+            // Last resort: advance toward the fight instead of staying in place.
+            return towardTarget;
         }
 
         private Vector3 GetCurrentMovementDirection(Vector3 fallback)
@@ -331,6 +496,7 @@ namespace PersiaWar.Unity2D5D
                     navigationWaypoints[navigationWaypointIndex],
                     step);
                 routeNext.y = 0f;
+                ClampToPlayableArea(ref routeNext);
                 if (CanMoveTo(routeNext))
                 {
                     transform.position = routeNext;
@@ -349,6 +515,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Vector3 directNext = transform.position + direction * advance;
                 directNext.y = 0f;
+                ClampToPlayableArea(ref directNext);
                 if (CanMoveTo(directNext))
                 {
                     transform.position = directNext;
@@ -568,6 +735,32 @@ namespace PersiaWar.Unity2D5D
             return true;
         }
 
+        private float GetWorldLimit()
+        {
+            if (targetPlayer == null && target != null)
+                targetPlayer = target.GetComponentInParent<PlayerController>();
+
+            return targetPlayer != null
+                ? Mathf.Max(1f, targetPlayer.WorldLimit)
+                : Mathf.Max(1f, fallbackWorldLimit);
+        }
+
+        private void ClampToPlayableArea(ref Vector3 position)
+        {
+            float limit = GetWorldLimit();
+            position.x = Mathf.Clamp(position.x, -limit, limit);
+            position.z = Mathf.Clamp(position.z, -limit, limit);
+        }
+
+        private void ClampInsidePlayableArea()
+        {
+            Vector3 position = transform.position;
+            Vector3 clamped = position;
+            ClampToPlayableArea(ref clamped);
+            if ((position - clamped).sqrMagnitude > 0.0001f)
+                transform.position = clamped;
+        }
+
         private bool CanTravelDirectly(Vector3 from, Vector3 to)
         {
             Vector3 delta = to - from;
@@ -693,7 +886,7 @@ namespace PersiaWar.Unity2D5D
                 origin + shotDirection * 0.16f,
                 Quaternion.LookRotation(shotDirection, Vector3.up),
                 new Vector3(0.07f, 0.07f, 0.07f),
-                new Color(0.92f, 0.18f, 0.10f));
+                new Color(0.10f, 0.55f, 1f));
 #else
             GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             projectile.name = "EnemyProjectile";
@@ -731,6 +924,7 @@ namespace PersiaWar.Unity2D5D
 
             if (visual != null)
                 visual.PlayFire();
+            RuntimeGameAudio.PlayEnemyShot();
         }
     }
 }

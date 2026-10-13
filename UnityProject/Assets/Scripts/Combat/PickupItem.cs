@@ -10,7 +10,8 @@ namespace PersiaWar.Unity2D5D
             Medkit,
             Grenade,
             Shield,
-            Weapon
+            Weapon,
+            QuickDash
         }
 
         [SerializeField] private PickupType type = PickupType.Ammo;
@@ -20,6 +21,7 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private WeaponController.WeaponKind weaponKind = WeaponController.WeaponKind.AssaultRifle;
 
         private float startY;
+        private bool weaponPickupScaleApplied;
 
         public void Configure(PickupType pickupType, int value)
         {
@@ -32,15 +34,36 @@ namespace PersiaWar.Unity2D5D
             type = PickupType.Weapon;
             weaponKind = kind;
             amount = Mathf.Max(1, reserveAmmo);
+            ApplyWeaponPickupScale();
         }
 
         private void Awake()
         {
+            if (type == PickupType.Weapon) ApplyWeaponPickupScale();
             startY = transform.position.y;
             SphereCollider trigger = GetComponent<SphereCollider>();
             if (trigger == null) trigger = gameObject.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
             trigger.radius = 0.7f;
+        }
+
+        private void ApplyWeaponPickupScale()
+        {
+            if (weaponPickupScaleApplied) return;
+
+            // Dropped weapon parts are child meshes under a root pickup collider.
+            // Enlarge the visible model only so the pickup radius does not double.
+            if (transform.childCount > 0)
+            {
+                for (int i = 0; i < transform.childCount; i++)
+                    transform.GetChild(i).localScale *= 2f;
+            }
+            else
+            {
+                transform.localScale *= 2f;
+            }
+
+            weaponPickupScaleApplied = true;
         }
 
         private void Update()
@@ -73,6 +96,9 @@ namespace PersiaWar.Unity2D5D
                 case PickupType.Weapon:
                     if (player.Weapon != null)
                         player.Weapon.EquipWeaponFromPickup(weaponKind, amount);
+                    break;
+                case PickupType.QuickDash:
+                    player.AddQuickDashCharges(2);
                     break;
             }
 

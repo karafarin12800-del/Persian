@@ -104,9 +104,9 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             float scale = Mathf.Clamp(Screen.height / 720f, 0.70f, 1.25f);
-            float width = 78f * scale;
-            float barHeight = 8f * scale;
-            float labelHeight = 17f * scale;
+            float width = 92f * scale;
+            float barHeight = 10f * scale;
+            float labelHeight = 22f * scale;
             float x = Mathf.Clamp(screenPoint.x - width * 0.5f, 2f, Screen.width - width - 2f);
             float guiY = Screen.height - screenPoint.y;
             float labelY = guiY - labelHeight - barHeight - 4f * scale;
@@ -128,7 +128,7 @@ namespace PersiaWar.Unity2D5D
                 };
             }
 
-            labelStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(12f * scale), 9, 16);
+            labelStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(15f * scale), 11, 19);
             labelStyle.normal.textColor = Color.white;
             GUI.Label(labelRect, health.CurrentHealth + " / " + health.MaxHealth, labelStyle);
 
