@@ -1352,42 +1352,70 @@ namespace PersiaWar.Unity2D5D
                 androidCurrentBuildingRoot = new GameObject("Building_VillageHouse_" + (i + 1)).transform;
                 androidCurrentBuildingRoot.SetParent(worldRoot, true);
 
-                // Every courtyard has its own planting bed and a small bare-soil patch.
-                // House/garden proportions and positions differ from plot to plot.
+                // Every courtyard has its own planting bed and bare-soil patch.
+                // The south-side houses put the garden toward the village center;
+                // the north-side houses reverse that order so the house comes first.
                 Vector3 house;
                 float footprint;
                 float depth;
                 float houseHeight = i % 7 == 0 ? 4.4f : 3.35f;
-                if (style == 0)
+
+                if (style == 1)
                 {
-                    house = plot + new Vector3(0f, 0f, northPlot ? -2.55f : 2.55f);
-                    footprint = 7.4f + (i % 3) * 0.55f;
-                    depth = 5.2f + (i % 2) * 0.65f;
-                }
-                else if (style == 1)
-                {
-                    // Central courtyard: house wings enclose a garden on three sides.
-                    house = plot + new Vector3(northPlot ? 3.1f : -3.1f, 0f, 0f);
+                    // A real central-courtyard compound: two side wings and a rear
+                    // wing form a U around a garden, instead of a single box beside it.
+                    const float wingWidth = 4.8f;
+                    const float wingDepth = 8.8f;
+                    const float wingOffsetX = 4.9f;
+                    Vector3 leftWing = plot + new Vector3(-wingOffsetX, 0f, 0f);
+                    Vector3 rightWing = plot + new Vector3(wingOffsetX, 0f, 0f);
+                    Vector3 rearWing = plot + new Vector3(0f, 0f, northPlot ? 4.8f : -4.8f);
+
+                    androidBuildingCenters.Add(leftWing);
+                    androidBuildingHalfExtents.Add(new Vector2(wingWidth * 0.5f, wingDepth * 0.5f));
+                    CreateAndroidBuilding(leftWing, wingWidth, houseHeight, wingDepth,
+                        i * 3, false, false);
+
+                    androidBuildingCenters.Add(rightWing);
+                    androidBuildingHalfExtents.Add(new Vector2(wingWidth * 0.5f, wingDepth * 0.5f));
+                    CreateAndroidBuilding(rightWing, wingWidth, houseHeight, wingDepth,
+                        i * 3 + 1, false, false);
+
                     footprint = 5.4f;
-                    depth = 8.0f;
-                }
-                else if (style == 2)
-                {
-                    // Corner house leaves a broad L-shaped usable yard.
-                    house = plot + new Vector3(-3.2f, 0f, northPlot ? -3.0f : 3.0f);
-                    footprint = 6.3f;
-                    depth = 6.0f;
+                    depth = 3.8f;
+                    house = rearWing;
+                    androidBuildingCenters.Add(rearWing);
+                    androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
+                    CreateAndroidBuilding(rearWing, footprint, houseHeight, depth,
+                        i * 3 + 2, false, false);
                 }
                 else
                 {
-                    house = plot + new Vector3(0f, 0f, northPlot ? -2.7f : 2.7f);
-                    footprint = 8.2f;
-                    depth = 5.4f;
-                }
+                    if (style == 0)
+                    {
+                        house = plot + new Vector3(0f, 0f, -2.55f);
+                        footprint = 7.4f + (i % 3) * 0.55f;
+                        depth = 5.2f + (i % 2) * 0.65f;
+                    }
+                    else if (style == 2)
+                    {
+                        // Corner plot: offset house leaves an L-shaped yard.
+                        house = plot + new Vector3(-3.2f, 0f, -3.0f);
+                        footprint = 6.3f;
+                        depth = 6.0f;
+                    }
+                    else
+                    {
+                        // Long side-facing house with a garden strip along one edge.
+                        house = plot + new Vector3(0f, 0f, -2.7f);
+                        footprint = 8.2f;
+                        depth = 5.4f;
+                    }
 
-                androidBuildingCenters.Add(house);
-                androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
-                CreateAndroidBuilding(house, footprint, houseHeight, depth, i, false, false);
+                    androidBuildingCenters.Add(house);
+                    androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
+                    CreateAndroidBuilding(house, footprint, houseHeight, depth, i, false, false);
+                }
 
                 if (i == 0 || i == 13 || i == 24)
                 {
@@ -1427,8 +1455,8 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(gateOpening, wallHeight * 0.92f, 0.16f), gateMaterial, false);
 
                 // Green vegetable beds occupy only part of each yard; most exposed ground stays dusty.
-                float gardenX = style == 2 ? 2.8f : (i % 2 == 0 ? -2.2f : 2.2f);
-                float gardenZ = northPlot ? 4.2f : -4.2f;
+                float gardenX = style == 1 ? 0f : (style == 2 ? 2.8f : (i % 2 == 0 ? -2.2f : 2.2f));
+                float gardenZ = style == 1 ? 0f : 4.2f;
                 QueueAndroidBox("VillageGardenBed", plot + new Vector3(gardenX, 0.10f, gardenZ),
                     new Vector3(style == 1 ? 4.2f : 3.6f, 0.16f, style == 2 ? 2.8f : 3.0f), gardenMaterial);
                 QueueAndroidBox("VillageBareSoilBed", plot + new Vector3(-gardenX * 0.55f, 0.055f, gardenZ * 0.55f),
@@ -1437,7 +1465,7 @@ namespace PersiaWar.Unity2D5D
                 // Boxwood hedges partition shared yards and village lanes without sealing paths.
                 if (i % 2 == 0)
                 {
-                    float hedgeZ = northPlot ? 0.8f : -0.8f;
+                    float hedgeZ = 0.8f;
                     QueueAndroidBox("VillageBoxwoodDivider", plot + new Vector3(0f, 0.42f, hedgeZ),
                         new Vector3(4.2f + (i % 3), 0.84f, 0.72f), hedgeMaterial);
                 }
