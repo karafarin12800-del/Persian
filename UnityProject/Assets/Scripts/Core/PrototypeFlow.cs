@@ -35,6 +35,7 @@ namespace PersiaWar.Unity2D5D
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
+        private int stageTwoOriginalHero;
         private int stageNumber = 1;
         // 0 = random landing, 1 = manual map landing.
         private int stageTwoLandingMode;
@@ -666,9 +667,13 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
-            if (DrawFantasyButton(continueRect,
-                stageNumber >= 2 ? "KEEP CURRENT HERO  •  CONTINUE" : "SELECT SPAWN POINT", true))
+            Rect continueRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 112f, 420f, 62f);
+            string continueLabel = stageNumber >= 2
+                ? (selectedHero == stageTwoOriginalHero
+                    ? "KEEP CURRENT HERO  •  CONTINUE"
+                    : "USE SELECTED HERO  •  CONTINUE")
+                : "SELECT SPAWN POINT";
+            if (DrawFantasyButton(continueRect, continueLabel, true))
                 EnterDropMap();
         }
 
@@ -866,6 +871,7 @@ namespace PersiaWar.Unity2D5D
         private void BeginStageTwoSelection()
         {
             stageNumber = 2;
+            stageTwoOriginalHero = selectedHero;
             mode = ScreenMode.HeroSelect;
             spawnChosen = false;
             startingMatch = false;
