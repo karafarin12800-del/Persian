@@ -66,6 +66,7 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle menuSmallStyle;
         private GUIStyle menuButtonStyle;
         private int menuStyleScreenHeight = -1;
+        private int suppressMenuButtonClicksFrame = -1;
 
         // These X/Z centers mirror GameBootstrap.BuildAndroidCityPresentation exactly.
         // Keep the minimap's house marks tied to the actual Android city layout.
@@ -623,7 +624,10 @@ namespace PersiaWar.Unity2D5D
                 {
                     Rect shopBack = new Rect(Screen.width * 0.5f - 160f, Screen.height - 104f, 320f, 62f);
                     if (shopBack.Contains(gui))
+                    {
                         stageTwoShopOpen = false;
+                        suppressMenuButtonClicksFrame = Time.frameCount;
+                    }
                     return;
                 }
 
@@ -656,12 +660,14 @@ namespace PersiaWar.Unity2D5D
                     Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
                     if (continueRect.Contains(gui))
                     {
+                        suppressMenuButtonClicksFrame = Time.frameCount;
                         EnterDropMap();
                         StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
                         return;
                     }
                     if (shopRect.Contains(gui))
                     {
+                        suppressMenuButtonClicksFrame = Time.frameCount;
                         stageTwoShopOpen = true;
                         StartupCheckpoint.Set("StageTwoCharacterShopOpened");
                         return;
@@ -672,6 +678,7 @@ namespace PersiaWar.Unity2D5D
                     Rect continueRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 112f, 420f, 62f);
                     if (continueRect.Contains(gui))
                     {
+                        suppressMenuButtonClicksFrame = Time.frameCount;
                         EnterDropMap();
                         StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
                         return;
@@ -684,7 +691,7 @@ namespace PersiaWar.Unity2D5D
         {
             GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
             GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f),
-                stageNumber >= 2 ? "CURRENT HERO IS PRESELECTED  •  FREE CHARACTERS BELOW" : "SHORT  •  CHIBI  •  PERSIAN-INSPIRED",
+                stageNumber >= 2 ? "CURRENT HERO IS PRESELECTED  •  FREE CHARACTERS BELOW" : "KEEP YOUR HERO OR SELECT ANOTHER FREE CHARACTER",
                 menuSmallStyle);
 
             float gap = 14f;
@@ -1965,6 +1972,11 @@ namespace PersiaWar.Unity2D5D
 
             bool clicked = GUI.Button(rect, GUIContent.none, GUIStyle.none);
             GUI.Label(rect, label, menuButtonStyle);
+            // Native Android menu touch handling can change screens in Update before
+            // the synthesized IMGUI mouse event is processed. Suppress that same-frame
+            // click so the new screen cannot accidentally activate a second button.
+            if (Time.frameCount == suppressMenuButtonClicksFrame)
+                return false;
             return clicked;
         }
 
