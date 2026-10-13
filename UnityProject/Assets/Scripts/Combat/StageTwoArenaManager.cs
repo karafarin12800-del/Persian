@@ -46,11 +46,6 @@ namespace PersiaWar.Unity2D5D
                 bot.transform.position = position;
                 bot.transform.localScale = Vector3.one;
 
-                CapsuleCollider capsule = bot.AddComponent<CapsuleCollider>();
-                capsule.height = 1.8f;
-                capsule.radius = 0.32f;
-                capsule.center = new Vector3(0f, 0.9f, 0f);
-
                 Color[] palette =
                 {
                     new Color(0.20f, 0.72f, 0.94f), new Color(0.90f, 0.42f, 0.18f),
