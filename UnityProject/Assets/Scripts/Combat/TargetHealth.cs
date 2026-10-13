@@ -106,19 +106,25 @@ namespace PersiaWar.Unity2D5D
 
         private static void SpawnBloodEffect(Vector3 position)
         {
-            // A flat, irregular stain remains on the ground for three seconds.
+            // A wider, irregular blood pool spreads across the ground and remains for four seconds.
             GameObject stain = new GameObject("EnemyBloodStain");
             stain.transform.position = new Vector3(position.x, 0.055f, position.z);
             Material stainMaterial = RuntimeMaterialFactory.Create(
                 "EnemyBloodStainMaterial", new Color(0.30f, 0.008f, 0.018f));
 
             CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(0f, 0f, 0f), new Vector3(0.82f, 0.018f, 0.56f), 0f);
+                new Vector3(0f, 0f, 0f), new Vector3(1.15f, 0.018f, 0.78f), 0f);
             CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(0.24f, 0.002f, 0.10f), new Vector3(0.48f, 0.016f, 0.32f), 24f);
+                new Vector3(0.38f, 0.002f, 0.18f), new Vector3(0.68f, 0.016f, 0.44f), 24f);
             CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(-0.22f, 0.003f, -0.12f), new Vector3(0.42f, 0.015f, 0.30f), -31f);
-            Destroy(stain, 3f);
+                new Vector3(-0.36f, 0.003f, -0.22f), new Vector3(0.62f, 0.015f, 0.40f), -31f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(0.58f, 0.001f, -0.34f), new Vector3(0.44f, 0.014f, 0.27f), 48f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(-0.62f, 0.001f, 0.30f), new Vector3(0.40f, 0.014f, 0.25f), -52f);
+            CreateBloodStainBlob(stain.transform, stainMaterial,
+                new Vector3(0.05f, 0.001f, 0.57f), new Vector3(0.38f, 0.014f, 0.24f), 12f);
+            Destroy(stain, 4f);
 
             // Short impact spray supplements the persistent ground stain.
             GameObject blood = new GameObject("EnemyDefeatBloodParticles");
