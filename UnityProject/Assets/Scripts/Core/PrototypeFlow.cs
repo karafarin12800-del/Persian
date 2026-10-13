@@ -25,14 +25,17 @@ namespace PersiaWar.Unity2D5D
         private string playerId = string.Empty;
         private int storeCoins;
         private int selectedProfileCosmetic;
+        private int selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
         private bool soundEnabled = true;
         private static readonly string[] StoreCosmeticNames =
         {
             "ROYAL PROFILE FRAME",
             "GOLD NAMEPLATE",
-            "AZURE BANNER"
+            "AZURE BANNER",
+            "VOID RIFLE",
+            "ALIEN SWORD"
         };
-        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350 };
+        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350, 700, 600 };
         private PlayerController player;
         private EnemySpawner enemySpawner;
         private MobileInputHub mobileInput;
@@ -692,6 +695,7 @@ namespace PersiaWar.Unity2D5D
 
             storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
             selectedProfileCosmetic = PlayerPrefs.GetInt("PW.ProfileCosmetic", 0);
+            selectedStoreWeaponKind = PlayerPrefs.GetInt("PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
             soundEnabled = PlayerPrefs.GetInt("PW.SoundEnabled", 1) != 0;
             AudioListener.volume = soundEnabled ? 1f : 0f;
             if (!PlayerPrefs.HasKey("PW.CosmeticOwned.0"))
@@ -842,24 +846,63 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetStoreItemRect(int index)
         {
-            float gap = 18f;
-            float totalWidth = Mathf.Min(Screen.width - 60f, 1050f);
-            float cardWidth = (totalWidth - gap * 2f) / 3f;
-            float cardHeight = Mathf.Min(330f, Screen.height * 0.48f);
+            const int columns = 3;
+            float gap = 12f;
+            float totalWidth = Mathf.Min(Screen.width - 44f, 1050f);
+            float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
+            float cardHeight = Mathf.Min(220f, Screen.height * 0.27f);
             float left = (Screen.width - totalWidth) * 0.5f;
-            return new Rect(left + index * (cardWidth + gap), Screen.height * 0.30f, cardWidth, cardHeight);
+            int column = index % columns;
+            int row = index / columns;
+            float top = Screen.height * 0.25f;
+            return new Rect(left + column * (cardWidth + gap), top + row * (cardHeight + gap), cardWidth, cardHeight);
         }
 
         private Rect GetStoreActionRect(int index)
         {
             Rect card = GetStoreItemRect(index);
-            return new Rect(card.x + 14f, card.yMax - 62f, card.width - 28f, 48f);
+            return new Rect(card.x + 10f, card.yMax - 44f, card.width - 20f, 34f);
+        }
+
+        private bool IsStoreItemOwned(int index)
+        {
+            if (index < 3)
+                return PlayerPrefs.GetInt("PW.CosmeticOwned." + index, index == 0 ? 1 : 0) != 0;
+            string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
+            return PlayerPrefs.GetInt(rewardKey, 0) != 0;
+        }
+
+        private bool IsStoreItemEquipped(int index)
+        {
+            if (index < 3) return selectedProfileCosmetic == index;
+            int kind = index == 3 ? (int)WeaponController.WeaponKind.VoidRifle : (int)WeaponController.WeaponKind.AlienSword;
+            return selectedStoreWeaponKind == kind;
         }
 
         private void PurchaseOrEquipCosmetic(int index)
         {
+            if (index >= 3)
+            {
+                string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
+                bool ownedWeapon = PlayerPrefs.GetInt(rewardKey, 0) != 0;
+                if (!ownedWeapon)
+                {
+                    int price = StoreCosmeticPrices[index];
+                    if (storeCoins < price) return;
+                    storeCoins -= price;
+                    PlayerPrefs.SetInt("PW.StoreCoins", storeCoins);
+                    PlayerPrefs.SetInt(rewardKey, 1);
+                }
+                selectedStoreWeaponKind = index == 3
+                    ? (int)WeaponController.WeaponKind.VoidRifle
+                    : (int)WeaponController.WeaponKind.AlienSword;
+                PlayerPrefs.SetInt("PW.SelectedWeaponKind", selectedStoreWeaponKind);
+                PlayerPrefs.Save();
+                return;
+            }
+
             string ownedKey = "PW.CosmeticOwned." + index;
-            bool owned = PlayerPrefs.GetInt(ownedKey, index == 0 ? 1 : 0) != 0;
+            bool owned = IsStoreItemOwned(index);
             if (!owned)
             {
                 int price = StoreCosmeticPrices[index];
@@ -883,20 +926,23 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < StoreCosmeticNames.Length; i++)
             {
                 Rect card = GetStoreItemRect(i);
-                bool owned = PlayerPrefs.GetInt("PW.CosmeticOwned." + i, i == 0 ? 1 : 0) != 0;
-                Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.92f));
-                Fill(new Rect(card.x, card.y, card.width, 5f), i == selectedProfileCosmetic
-                    ? new Color(1f, 0.78f, 0.25f, 1f) : new Color(0.38f, 0.50f, 0.60f, 1f));
-                Rect emblem = new Rect(card.center.x - 42f, card.y + 34f, 84f, 84f);
+                bool owned = IsStoreItemOwned(i);
+                bool equipped = IsStoreItemEquipped(i);
+                Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.78f));
+                Fill(new Rect(card.x, card.y, card.width, 4f), equipped
+                    ? new Color(0.24f, 0.92f, 0.98f, 0.95f) : new Color(0.38f, 0.50f, 0.60f, 0.72f));
+                Rect emblem = new Rect(card.center.x - 29f, card.y + 14f, 58f, 58f);
                 Color emblemColor = i == 0 ? new Color(0.83f, 0.57f, 0.16f)
-                    : i == 1 ? new Color(0.89f, 0.73f, 0.25f) : new Color(0.14f, 0.52f, 0.79f);
+                    : i == 1 ? new Color(0.89f, 0.73f, 0.25f)
+                    : i == 2 ? new Color(0.14f, 0.52f, 0.79f)
+                    : i == 3 ? new Color(0.08f, 0.72f, 0.98f) : new Color(0.20f, 0.95f, 0.58f);
                 Fill(emblem, emblemColor);
-                GUI.Label(new Rect(card.x + 8f, card.y + 136f, card.width - 16f, 54f), StoreCosmeticNames[i], menuSmallStyle);
-                GUI.Label(new Rect(card.x + 8f, card.y + 192f, card.width - 16f, 38f),
-                    owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
+                GUI.Label(new Rect(card.x + 6f, card.y + 76f, card.width - 12f, 34f), StoreCosmeticNames[i], menuSmallStyle);
+                GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f),
+                    owned ? (equipped ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
                     menuBodyStyle);
                 Rect action = GetStoreActionRect(i);
-                if (DrawFantasyButton(action, owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "EQUIP") : "UNLOCK"))
+                if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : (i >= 3 ? "EQUIP WEAPON" : "EQUIP")) : "UNLOCK"))
                     PurchaseOrEquipCosmetic(i);
             }
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
