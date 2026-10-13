@@ -8,7 +8,8 @@ namespace PersiaWar.Unity2D5D
         {
             LightPistol = 0,
             AssaultRifle = 1,
-            HeavyMachineGun = 2
+            HeavyMachineGun = 2,
+            Axe = 3
         }
 
         [SerializeField] private Projectile projectilePrefab;
@@ -46,6 +47,7 @@ namespace PersiaWar.Unity2D5D
             {
                 case WeaponKind.LightPistol: return LightPistolRange;
                 case WeaponKind.HeavyMachineGun: return HeavyMachineGunRange;
+                case WeaponKind.Axe: return 3.1f;
                 default: return AssaultRifleRange;
             }
         }
@@ -54,11 +56,11 @@ namespace PersiaWar.Unity2D5D
         public WeaponKind CurrentWeapon => weaponKind;
         public string CurrentWeaponName => weaponKind == WeaponKind.LightPistol
             ? "PISTOL"
-            : (weaponKind == WeaponKind.HeavyMachineGun ? "HEAVY" : "RIFLE");
+            : (weaponKind == WeaponKind.HeavyMachineGun ? "HEAVY" : (weaponKind == WeaponKind.Axe ? "AXE" : "RIFLE"));
         public float EffectiveRange => Mathf.Max(1f, weaponRange);
         public float MoveSpeedMultiplier => weaponKind == WeaponKind.LightPistol
             ? 1.20f
-            : (weaponKind == WeaponKind.HeavyMachineGun ? 0.78f : 1f);
+            : (weaponKind == WeaponKind.HeavyMachineGun ? 0.78f : (weaponKind == WeaponKind.Axe ? 0.92f : 1f));
         public int Magazine => magazine;
         public int Reserve => reserve;
         public int MagazineSize => magazineSize;
@@ -86,7 +88,7 @@ namespace PersiaWar.Unity2D5D
 
         public void CycleWeapon()
         {
-            weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
+            weaponKind = (WeaponKind)(((int)weaponKind + 1) % 4);
             ApplyWeaponProfile(true);
             RefreshWeaponVisual();
             UpdateRangeIndicator();
@@ -137,6 +139,17 @@ namespace PersiaWar.Unity2D5D
                     projectileDamage = 34;
                     fireCooldown = 0.31f;
                     magazineSize = 36;
+                    break;
+
+                case WeaponKind.Axe:
+                    projectileSpeed = 1f;
+                    weaponRange = 3.1f;
+                    projectileDamage = 0;
+                    fireCooldown = 0.55f;
+                    magazineSize = 1;
+                    meleeDamage = 72;
+                    meleeRange = 3.2f;
+                    meleeCooldown = 0.42f;
                     break;
 
                 default:
@@ -193,10 +206,12 @@ namespace PersiaWar.Unity2D5D
 
             bool pistol = weaponKind == WeaponKind.LightPistol;
             bool heavy = weaponKind == WeaponKind.HeavyMachineGun;
+            bool axe = weaponKind == WeaponKind.Axe;
 
             // Keep the pistol compact by changing its actual silhouette rather than
             // merely shrinking a rifle. The heavy profile uses a thicker receiver,
             // larger magazine, long barrel, stock and foregrip.
+            gunRoot.gameObject.SetActive(!axe);
             gunRoot.localScale = Vector3.one * (heavy ? 1.08f : 1f);
             gunRestLocalPosition = pistol
                 ? new Vector3(0.24f, 0.93f, 0.33f)
@@ -324,6 +339,7 @@ namespace PersiaWar.Unity2D5D
 
         public bool TryFire(Vector3 targetWorldPosition)
         {
+            if (weaponKind == WeaponKind.Axe) return false;
             IsMelee = false;
             if (Time.time < nextFireTime) return false;
             if (magazine <= 0)
@@ -360,6 +376,7 @@ namespace PersiaWar.Unity2D5D
 
         public bool TryFireDirection(Vector3 worldDirection)
         {
+            if (weaponKind == WeaponKind.Axe) return false;
             IsMelee = false;
 
             if (Time.time < nextFireTime) return false;
