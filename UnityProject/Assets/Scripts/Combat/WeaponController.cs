@@ -34,6 +34,7 @@ namespace PersiaWar.Unity2D5D
         private int magazine;
         private int reserve;
         private bool axeEnabledForMatch;
+        private bool axeEquippedAsMelee;
         private bool meleeProfileApplied;
         private PlayerController player;
         private Transform gunRoot;
@@ -111,6 +112,8 @@ namespace PersiaWar.Unity2D5D
         public void SetAxeEnabledForMatch(bool enabledForStageTwo)
         {
             axeEnabledForMatch = enabledForStageTwo;
+            if (!axeEnabledForMatch)
+                axeEquippedAsMelee = false;
             if (!axeEnabledForMatch && (weaponKind == WeaponKind.Axe ||
                 weaponKind == WeaponKind.VoidRifle || weaponKind == WeaponKind.AlienSword))
             {
@@ -119,12 +122,28 @@ namespace PersiaWar.Unity2D5D
                 RefreshWeaponVisual();
                 UpdateRangeIndicator();
             }
+            else
+            {
+                RefreshWeaponVisual();
+            }
         }
 
         public void CycleWeapon()
         {
-            int weaponCount = axeEnabledForMatch ? 6 : 3;
-            weaponKind = (WeaponKind)(((int)weaponKind + 1) % weaponCount);
+            if (!axeEnabledForMatch)
+            {
+                weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
+            }
+            else
+            {
+                WeaponKind[] stageTwoWeapons =
+                {
+                    WeaponKind.LightPistol, WeaponKind.AssaultRifle, WeaponKind.HeavyMachineGun,
+                    WeaponKind.VoidRifle, WeaponKind.AlienSword
+                };
+                int current = System.Array.IndexOf(stageTwoWeapons, weaponKind);
+                weaponKind = stageTwoWeapons[(current + 1 + stageTwoWeapons.Length) % stageTwoWeapons.Length];
+            }
             ApplyWeaponProfile(true);
             RefreshWeaponVisual();
             UpdateRangeIndicator();
@@ -133,8 +152,19 @@ namespace PersiaWar.Unity2D5D
 
         public void SelectWeapon(WeaponKind selectedWeapon)
         {
-            if ((selectedWeapon == WeaponKind.Axe || selectedWeapon == WeaponKind.VoidRifle ||
-                selectedWeapon == WeaponKind.AlienSword) && !axeEnabledForMatch)
+            if (selectedWeapon == WeaponKind.Axe)
+            {
+                if (axeEnabledForMatch)
+                {
+                    axeEquippedAsMelee = true;
+                    RefreshWeaponVisual();
+                    StartupCheckpoint.Set("AxeEquippedAsMelee");
+                }
+                return;
+            }
+
+            if ((selectedWeapon == WeaponKind.VoidRifle || selectedWeapon == WeaponKind.AlienSword) &&
+                !axeEnabledForMatch)
                 selectedWeapon = WeaponKind.AssaultRifle;
 
             bool changed = weaponKind != selectedWeapon;
@@ -153,6 +183,17 @@ namespace PersiaWar.Unity2D5D
 
         public void EquipWeaponFromPickup(WeaponKind selectedWeapon, int reserveAmmo)
         {
+            if (selectedWeapon == WeaponKind.Axe)
+            {
+                if (axeEnabledForMatch)
+                {
+                    axeEquippedAsMelee = true;
+                    RefreshWeaponVisual();
+                    StartupCheckpoint.Set("AxePickupEquippedAsMelee");
+                }
+                return;
+            }
+
             SelectWeapon(selectedWeapon);
             AddReserveAmmo(reserveAmmo);
             StartupCheckpoint.Set("WeaponPickupEquipped_" + CurrentWeaponName);
@@ -276,14 +317,14 @@ namespace PersiaWar.Unity2D5D
 
             bool pistol = weaponKind == WeaponKind.LightPistol;
             bool heavy = weaponKind == WeaponKind.HeavyMachineGun;
-            bool axe = weaponKind == WeaponKind.Axe;
+            bool axe = axeEquippedAsMelee || weaponKind == WeaponKind.Axe;
             bool sword = weaponKind == WeaponKind.AlienSword;
             bool voidRifle = weaponKind == WeaponKind.VoidRifle;
 
             // Keep the pistol compact by changing its actual silhouette rather than
             // merely shrinking a rifle. The heavy profile uses a thicker receiver,
             // larger magazine, long barrel, stock and foregrip.
-            gunRoot.gameObject.SetActive(!axe && !sword);
+            gunRoot.gameObject.SetActive(weaponKind != WeaponKind.Axe && !sword);
             if (axeRoot != null)
             {
                 axeRoot.gameObject.SetActive(axe);
@@ -617,7 +658,7 @@ namespace PersiaWar.Unity2D5D
             // A separate, lightweight axe model is shown only while the axe is equipped.
             axeRoot = new GameObject("PlayerAxe").transform;
             axeRoot.SetParent(transform, false);
-            axeRestLocalPosition = new Vector3(0.30f, 0.90f, 0.40f);
+            axeRestLocalPosition = new Vector3(-0.30f, 0.90f, 0.32f);
             axeRestLocalRotation = Quaternion.Euler(0f, 0f, -12f);
             axeRoot.localPosition = axeRestLocalPosition;
             axeRoot.localRotation = axeRestLocalRotation;
@@ -698,13 +739,17 @@ namespace PersiaWar.Unity2D5D
 
         public bool TryMelee()
         {
-            if (player == null || player.IsDefeated || Time.time < nextMeleeTime) return false;
-            nextMeleeTime = Time.time + meleeCooldown;
+            if (player == null || player.IsDefeated) return false;
+            bool axeAttack = axeEquippedAsMelee || weaponKind == WeaponKind.Axe;
+            bool swordAttack = weaponKind == WeaponKind.AlienSword;
+            float cooldown = axeAttack ? 0.42f : (swordAttack ? 0.34f : meleeCooldown);
+            float attackRange = axeAttack ? 3.2f : (swordAttack ? 3.5f : meleeRange);
+            int attackDamage = axeAttack ? 72 : (swordAttack ? 90 : meleeDamage);
+            if (Time.time < nextMeleeTime) return false;
+            nextMeleeTime = Time.time + cooldown;
             IsMelee = true;
-            if (weaponKind == WeaponKind.Axe && axeRoot != null)
-                axeSwingTimer = AxeSwingDuration;
-            if (weaponKind == WeaponKind.AlienSword && swordRoot != null)
-                swordSwingTimer = AxeSwingDuration;
+            if (axeAttack && axeRoot != null) axeSwingTimer = AxeSwingDuration;
+            if (swordAttack && swordRoot != null) swordSwingTimer = AxeSwingDuration;
 
             TargetHealth[] targets = Object.FindObjectsByType<TargetHealth>(FindObjectsSortMode.None);
             Vector3 origin = transform.position;
@@ -717,10 +762,10 @@ namespace PersiaWar.Unity2D5D
                 Vector3 delta = target.transform.position - origin;
                 delta.y = 0f;
                 float distance = delta.magnitude;
-                if (distance <= 0.01f || distance > meleeRange) continue;
+                if (distance <= 0.01f || distance > attackRange) continue;
                 if (Vector3.Dot(forward, delta.normalized) < 0.25f) continue;
 
-                target.ApplyDamage(meleeDamage, transform);
+                target.ApplyDamage(attackDamage, transform);
                 hitSomething = true;
             }
 
