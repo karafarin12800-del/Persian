@@ -154,19 +154,30 @@ namespace PersiaWar.Unity2D5D
 
         private void AddBlockedRenderers(Collider col)
         {
+            if (col == null) return;
+
+            // Stage two fades the complete house (walls, roof and attached details)
+            // whenever any part of that house intersects a camera-to-player sightline.
+            // This avoids a roof or facade detail remaining opaque over the player.
+            if (stageTwoOcclusionMode)
+            {
+                Transform stageTwoRoot = FindBuildingOrTreeRoot(col.transform);
+                if (stageTwoRoot == null) return;
+
+                Renderer[] stageTwoRenderers = stageTwoRoot.GetComponentsInChildren<Renderer>(false);
+                for (int i = 0; i < stageTwoRenderers.Length; i++)
+                    if (stageTwoRenderers[i] != null && stageTwoRenderers[i].enabled)
+                        blocked.Add(stageTwoRenderers[i]);
+                return;
+            }
+
+            // Preserve stage one's original behavior exactly.
             Renderer direct = col.GetComponent<Renderer>();
             if (direct != null && direct.enabled && IsBuildingOrTree(direct.transform))
             {
                 blocked.Add(direct);
                 return;
             }
-
-            // In stage two, colliders without their own renderer belong to scenery
-            // that was not split into independently fadeable pieces. Never walk up to
-            // the house root and fade every child renderer because one collider hit.
-            // Stage-two wall/facade segments now carry their own colliders/renderers.
-            if (stageTwoOcclusionMode)
-                return;
 
             Transform root = FindBuildingOrTreeRoot(col.transform);
             if (root == null) return;
