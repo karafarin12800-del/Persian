@@ -2131,9 +2131,9 @@ namespace PersiaWar.Unity2D5D
                 GateGameplay(false);
             }
 
+            StageThreeWorldBuilder.ClearExistingWorld();
             if (stageNumber == 3)
             {
-                StageThreeWorldBuilder.ClearExistingWorld();
                 stageThreeWorldBuilder = gameRoot.GetComponent<StageThreeWorldBuilder>();
                 if (stageThreeWorldBuilder == null)
                     stageThreeWorldBuilder = gameRoot.AddComponent<StageThreeWorldBuilder>();
