@@ -2673,29 +2673,6 @@ namespace PersiaWar.Unity2D5D
         // Dedicated shortcut so Stage 3 can be entered from the Stage 2 result
         // screen without replaying Stage 1. Stage 3 world construction is added
         // separately; this only establishes the independent test entry point.
-        private void BeginStageThreeTestEntry()
-        {
-            Time.timeScale = 1f;
-            stageNumber = 3;
-            stageTwoShopOpen = false;
-            stageTwoLobbyRunning = false;
-            stageTwoLobbyReady = true;
-            startingMatch = false;
-            spawnChosen = false;
-            matchPaused = false;
-            resultOverlayStartTime = -1f;
-            mode = ScreenMode.HeroSelect;
-
-            if (GameSession.Instance != null)
-                GameSession.Instance.ResetMatch();
-            if (activeCamera != null) activeCamera.enabled = false;
-            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
-            GateGameplay(false);
-
-            StartupCheckpoint.Set("StageThreeTestEntryOpened");
-            Debug.Log("PERSIA_STAGE3: direct test entry opened from Stage 2 results");
-        }
-
         private void DrawAndroidStabilityStatus()
         {
             // This is diagnostics only. The old implementation painted a full-screen
