@@ -761,6 +761,33 @@ namespace PersiaWar.Unity2D5D
             return new Rect((Screen.width - width) * 0.5f, Screen.height - 86f * scale, width, 54f * scale);
         }
 
+        // Shared back control for each pre-match step. It sits in the top-left
+        // corner, away from bottom confirmation buttons and the map touch area.
+        private Rect GetFlowBackRect()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
+            return new Rect(18f * scale, 18f * scale,
+                Mathf.Min(190f * scale, Screen.width * 0.42f), 48f * scale);
+        }
+
+        private void GoBackFromHeroSelection()
+        {
+            stageTwoShopOpen = false;
+            mode = ScreenMode.MainMenu;
+            StartupCheckpoint.Set("BackFromHeroSelection");
+        }
+
+        private void GoBackFromDropMap()
+        {
+            spawnChosen = false;
+            startingMatch = false;
+            stageTwoLobbyRunning = false;
+            stageTwoLobbyReady = false;
+            StopAllCoroutines();
+            mode = ScreenMode.HeroSelect;
+            StartupCheckpoint.Set("BackFromDropMapToHeroSelection");
+        }
+
         private void HandleLobbyTouches()
         {
             if (!Application.isMobilePlatform || Input.touchCount <= 0)
@@ -1071,7 +1098,7 @@ namespace PersiaWar.Unity2D5D
                     continue;
 
                 Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
-                if (stageNumber >= 2 && stageTwoShopOpen)
+                if (stageTwoShopOpen && stageNumber >= 2)
                 {
                     Rect shopBack = new Rect(Screen.width * 0.5f - 160f, Screen.height - 104f, 320f, 62f);
                     if (shopBack.Contains(gui))
@@ -1079,6 +1106,13 @@ namespace PersiaWar.Unity2D5D
                         stageTwoShopOpen = false;
                         suppressMenuButtonClicksFrame = Time.frameCount;
                     }
+                    return;
+                }
+
+                if (GetFlowBackRect().Contains(gui))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    GoBackFromHeroSelection();
                     return;
                 }
 
@@ -1147,6 +1181,8 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawHeroSelect()
         {
+            if (DrawFantasyButton(GetFlowBackRect(), "← BACK"))
+                GoBackFromHeroSelection();
             GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
             string heroHint = stageNumber >= 2
                 ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
@@ -1328,6 +1364,8 @@ namespace PersiaWar.Unity2D5D
         }
         private void DrawDropMap()
         {
+            if (DrawFantasyButton(GetFlowBackRect(), "← BACK"))
+                GoBackFromDropMap();
             if (stageNumber >= 2)
             {
                 DrawStageTwoDropMap();
@@ -1455,6 +1493,13 @@ namespace PersiaWar.Unity2D5D
 
             screen.y = Screen.height - screen.y;
 
+            if (GetFlowBackRect().Contains(screen))
+            {
+                suppressMenuButtonClicksFrame = Time.frameCount;
+                GoBackFromDropMap();
+                return;
+            }
+
             // Handle START MATCH through real touch coordinates as well as IMGUI.
             // Some Android configurations do not synthesize MouseUp for GUI.Button.
             Rect startRect = new Rect(Screen.width * 0.5f - 210f, Screen.height - 66f, 420f, 54f);
@@ -1569,6 +1614,8 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageTwoDropMap()
         {
+            if (DrawFantasyButton(GetFlowBackRect(), "← BACK"))
+                GoBackFromDropMap();
             GUI.Label(new Rect(0f, 76f, Screen.width, 48f),
                 "STAGE 2  •  OLD IRANIAN VILLAGE", menuHeaderStyle);
             GUI.Label(new Rect(24f, 120f, Screen.width - 48f, 30f),
@@ -1629,6 +1676,13 @@ namespace PersiaWar.Unity2D5D
                 screen = Input.mousePosition;
             }
             screen.y = Screen.height - screen.y;
+
+            if (GetFlowBackRect().Contains(screen))
+            {
+                suppressMenuButtonClicksFrame = Time.frameCount;
+                GoBackFromDropMap();
+                return;
+            }
 
             Rect startRect = GetStageTwoStartRect();
             if (spawnChosen && startRect.Contains(screen))
