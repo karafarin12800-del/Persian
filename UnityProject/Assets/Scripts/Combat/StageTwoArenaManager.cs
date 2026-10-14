@@ -48,23 +48,14 @@ namespace PersiaWar.Unity2D5D
                 bot.transform.position = position;
                 bot.transform.localScale = Vector3.one;
 
-                Color[] palette =
-                {
-                    new Color(0.20f, 0.72f, 0.94f), new Color(0.90f, 0.42f, 0.18f),
-                    new Color(0.66f, 0.38f, 0.91f), new Color(0.92f, 0.72f, 0.20f),
-                    new Color(0.16f, 0.78f, 0.57f), new Color(0.84f, 0.30f, 0.42f),
-                    new Color(0.42f, 0.62f, 0.96f), new Color(0.78f, 0.80f, 0.84f),
-                    new Color(0.40f, 0.82f, 0.25f)
-                };
-                Material suit = RuntimeMaterialFactory.Create(bot.name + "_Suit", palette[i % palette.Length]);
-                Material dark = RuntimeMaterialFactory.Create(bot.name + "_Trim", new Color(0.045f, 0.07f, 0.10f));
-                CreatePart(bot.transform, "Armor", PrimitiveType.Capsule,
-                    new Vector3(0f, 1.02f, 0f), new Vector3(0.62f, 0.66f, 0.42f), suit);
-                CreatePart(bot.transform, "Helmet", PrimitiveType.Sphere,
-                    new Vector3(0f, 1.70f, 0.02f), new Vector3(0.38f, 0.38f, 0.38f), dark);
-                CreatePart(bot.transform, "Visor", PrimitiveType.Cube,
-                    new Vector3(0f, 1.70f, 0.19f), new Vector3(0.25f, 0.09f, 0.035f),
-                    RuntimeMaterialFactory.Create(bot.name + "_Visor", new Color(0.28f, 0.96f, 1f)));
+                // Use the same six selectable hero designs as the local player instead
+                // of unrelated capsule/helmet placeholders. Each offline competitor
+                // selects one hero silhouette and applies its matching player palette.
+                int heroChoice = Random.Range(0, 6);
+                StylizedCharacterVisual visual = StylizedCharacterVisual.Attach(bot.transform, true, 1);
+                if (visual != null)
+                    visual.ConfigurePlayerHero(heroChoice);
+
                 StageTwoBotCompetitor brain = bot.AddComponent<StageTwoBotCompetitor>();
                 brain.Configure(this, i + 1);
                 bots.Add(bot);
