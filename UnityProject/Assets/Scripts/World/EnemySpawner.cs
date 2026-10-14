@@ -157,8 +157,17 @@ namespace PersiaWar.Unity2D5D
                 // begins on the final kill instead of waiting for corpse cleanup.
                 int livingEnemies = 0;
                 for (int i = 0; i < enemies.Length; i++)
-                    if (enemies[i] != null && enemies[i].enabled)
+                {
+                    EnemyChase alien = enemies[i];
+                    if (alien == null) continue;
+
+                    // Aliens keep full health while their two-second landing animation
+                    // runs with EnemyChase disabled. Count health, not behaviour enabled
+                    // state, so the final victory cannot fire during the green-beam wave.
+                    TargetHealth health = alien.GetComponent<TargetHealth>();
+                    if (health != null && health.CurrentHealth > 0)
                         livingEnemies++;
+                }
 
                 if (wave >= 5 && livingEnemies == 0)
                 {
