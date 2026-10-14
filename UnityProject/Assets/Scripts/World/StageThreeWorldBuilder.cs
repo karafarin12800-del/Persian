@@ -35,6 +35,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
     private Color savedCameraBackground;
+    private CameraClearFlags savedCameraClearFlags;
     private Color savedAmbientLight;
     private bool ambientCaptured;
 
@@ -117,6 +118,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             savedCameraPosition = gameplayCamera.transform.position;
             savedCameraRotation = gameplayCamera.transform.rotation;
             savedCameraBackground = gameplayCamera.backgroundColor;
+            savedCameraClearFlags = gameplayCamera.clearFlags;
+            gameplayCamera.clearFlags = CameraClearFlags.SolidColor;
             gameplayCamera.backgroundColor = new Color(0.008f, 0.014f, 0.027f, 1f);
             gameplayCamera.farClipPlane = Mathf.Max(gameplayCamera.farClipPlane, 280f);
         }
@@ -313,13 +316,13 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         // The huge top platform is built in four pieces, leaving an open shaft above the lift.
-        CreateBox("S3_TopPlatformWest", new Vector3(-13.5f, 25.2f, 0f),
+        CreateBox("S3_TopPlatformWest", new Vector3(-13.5f, 24.65f, 0f),
             new Vector3(18f, 1.1f, 47f), silverMaterial, true);
-        CreateBox("S3_TopPlatformEast", new Vector3(13.5f, 25.2f, 0f),
+        CreateBox("S3_TopPlatformEast", new Vector3(13.5f, 24.65f, 0f),
             new Vector3(18f, 1.1f, 47f), silverMaterial, true);
-        CreateBox("S3_TopPlatformNorth", new Vector3(0f, 25.2f, 13.5f),
+        CreateBox("S3_TopPlatformNorth", new Vector3(0f, 24.65f, 13.5f),
             new Vector3(9f, 1.1f, 20f), silverMaterial, true);
-        CreateBox("S3_TopPlatformSouth", new Vector3(0f, 25.2f, -13.5f),
+        CreateBox("S3_TopPlatformSouth", new Vector3(0f, 24.65f, -13.5f),
             new Vector3(9f, 1.1f, 20f), silverMaterial, true);
 
         // A high-tech crown rises above the deck to make the destination visible from afar.
@@ -466,7 +469,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
         Vector3 playerOffset = Vector3.up * 0.95f;
         Vector3 platformStart = new Vector3(0f, 0.28f, 0f);
-        Vector3 platformTop = new Vector3(0f, 24.1f, 0f);
+        Vector3 platformTop = new Vector3(0f, 24.65f, 0f);
         float elapsed = 0f;
         const float elevatorDuration = 4.0f;
 
@@ -565,6 +568,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         if (gameplayCamera != null)
         {
             gameplayCamera.backgroundColor = savedCameraBackground;
+            gameplayCamera.clearFlags = savedCameraClearFlags;
             gameplayCamera.transform.position = savedCameraPosition;
             gameplayCamera.transform.rotation = savedCameraRotation;
         }
