@@ -72,6 +72,9 @@ namespace PersiaWar.Unity2D5D
         private float resultOverlayStartTime = -1f;
         private StageTwoVictorySequence stageTwoVictorySequence;
         private bool forceStageOneWorldRebuildForTest;
+        private bool stageTestRun;
+        private int savedCampaignStageNumber = 1;
+        private int savedStage3Unlocked;
         private string lobbyNotice = string.Empty;
         private float lobbyNoticeUntil;
         private string startupStatus = string.Empty;
@@ -885,19 +888,45 @@ namespace PersiaWar.Unity2D5D
 
         private void StartCampaignFromMenu()
         {
+            if (stageTestRun)
+                RestoreCampaignProgressAfterTest();
+
             if (stageNumber >= 3)
             {
                 ShowLobbyNotice("STAGE 3 IS NOT READY TO PLAY YET. USE TEST STAGE 1 OR 2 WHILE IT IS BEING BUILT.");
                 return;
             }
 
+            // If Stage 2 was tested last, don't accidentally reuse its generated
+            // village when the real campaign resumes at Stage 1.
+            forceStageOneWorldRebuildForTest = stageNumber == 1;
             mode = ScreenMode.HeroSelect;
             spawnChosen = false;
             StartupCheckpoint.Set("CampaignContinue_Stage" + stageNumber);
         }
 
+        private void CaptureCampaignProgressBeforeTest()
+        {
+            if (stageTestRun) return;
+            savedCampaignStageNumber = stageNumber;
+            savedStage3Unlocked = PlayerPrefs.GetInt("PW.Stage3Unlocked", 0);
+            stageTestRun = true;
+        }
+
+        private void RestoreCampaignProgressAfterTest()
+        {
+            if (!stageTestRun) return;
+            stageNumber = Mathf.Clamp(savedCampaignStageNumber, 1, 3);
+            PlayerPrefs.SetInt("PW.Stage3Unlocked", savedStage3Unlocked);
+            PlayerPrefs.Save();
+            stageTestRun = false;
+            forceStageOneWorldRebuildForTest = stageNumber == 1;
+            StartupCheckpoint.Set("TestMode_CampaignProgressRestored_Stage" + stageNumber);
+        }
+
         private void BeginStageTestEntry(int targetStage)
         {
+            CaptureCampaignProgressBeforeTest();
             Time.timeScale = 1f;
             lobbyNotice = string.Empty;
             lobbyNoticeUntil = 0f;
@@ -1000,9 +1029,6 @@ namespace PersiaWar.Unity2D5D
             if (gameRoot != null) gameRoot.SetActive(false);
 
             Time.timeScale = 1f;
-            stageNumber = 3;
-            PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
-            PlayerPrefs.Save();
 
             stageTwoLobbyRunning = false;
             stageTwoLobbyReady = false;
@@ -1011,9 +1037,23 @@ namespace PersiaWar.Unity2D5D
             matchPaused = false;
             spawnChosen = false;
             resultOverlayStartTime = -1f;
-            mode = ScreenMode.MainMenu;
-            ShowLobbyNotice(result + "  •  NEXT: STAGE 3 (IN DEVELOPMENT)");
-            StartupCheckpoint.Set("StageTwoCutsceneComplete_MainMenu_Stage3Next");
+
+            if (stageTestRun)
+            {
+                RestoreCampaignProgressAfterTest();
+                mode = ScreenMode.MainMenu;
+                ShowLobbyNotice("STAGE 2 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
+                StartupCheckpoint.Set("StageTwoTestComplete_CampaignUnchanged_" + result);
+            }
+            else
+            {
+                stageNumber = 3;
+                PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
+                PlayerPrefs.Save();
+                mode = ScreenMode.MainMenu;
+                ShowLobbyNotice("STAGE 2 COMPLETE  •  NEXT: STAGE 3 (IN DEVELOPMENT)");
+                StartupCheckpoint.Set("StageTwoCutsceneComplete_MainMenu_Stage3Next_" + result);
+            }
         }
 
         private void ReturnToMainMenuFromResult()
@@ -1032,6 +1072,7 @@ namespace PersiaWar.Unity2D5D
             matchPaused = false;
             spawnChosen = false;
             resultOverlayStartTime = -1f;
+            RestoreCampaignProgressAfterTest();
             mode = ScreenMode.MainMenu;
             StartupCheckpoint.Set("ResultOverlay_ReturnToMainMenu");
         }
@@ -2671,7 +2712,16 @@ namespace PersiaWar.Unity2D5D
                 "PLAY AGAIN",
                 buttonStyle))
             {
-                session.RestartMission();
+                if (stageNumber == 2)
+                {
+                    Time.timeScale = 1f;
+                    if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                    BeginStageTwoSelection();
+                }
+                else
+                {
+                    session.RestartMission();
+                }
             }
 
             if (GUI.Button(
