@@ -927,6 +927,7 @@ namespace PersiaWar.Unity2D5D
         private void BeginStageTestEntry(int targetStage)
         {
             CaptureCampaignProgressBeforeTest();
+            StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
             lobbyNotice = string.Empty;
             lobbyNoticeUntil = 0f;
@@ -1023,6 +1024,7 @@ namespace PersiaWar.Unity2D5D
             stageTwoVictorySequence.FinishAndCleanup();
             Destroy(stageTwoVictorySequence);
             stageTwoVictorySequence = null;
+            StageTwoArenaManager.Instance?.ResetForStageChange();
 
             GateGameplay(false);
             if (activeCamera != null) activeCamera.enabled = false;
@@ -1061,6 +1063,7 @@ namespace PersiaWar.Unity2D5D
 
         private void ReturnToMainMenuFromResult()
         {
+            StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
             if (stageTwoVictorySequence != null)
             {
