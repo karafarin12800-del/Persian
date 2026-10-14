@@ -311,7 +311,7 @@ namespace PersiaWar.Unity2D5D
 
             Vector3 target = approaching
                 ? approach
-                : shipRoot.TransformPoint(actor.DeckLocalPosition);
+                : shipRoot.TransformPoint(actor.InteriorLocalPosition);
 
             Vector3 flatDirection = target - current;
             flatDirection.y = 0f;
@@ -330,10 +330,21 @@ namespace PersiaWar.Unity2D5D
         private void BoardActor(ActorState actor)
         {
             if (actor == null || actor.Root == null || actor.Boarded || shipRoot == null) return;
+
+            // The hero crosses the rear ramp into the passenger cabin. Hide the
+            // model only after boarding so they are not visible riding on the roof.
             actor.Root.SetParent(shipRoot, true);
-            actor.Root.localPosition = actor.DeckLocalPosition;
+            actor.Root.localPosition = actor.InteriorLocalPosition;
             actor.Root.localRotation = Quaternion.identity;
+            if (actor.Renderers != null)
+            {
+                for (int i = 0; i < actor.Renderers.Length; i++)
+                    if (actor.Renderers[i] != null)
+                        actor.Renderers[i].enabled = false;
+            }
+            actor.HiddenInsideShip = true;
             actor.Boarded = true;
+            Debug.Log("PERSIA_STAGE2_END: local hero entered the ship passenger bay.");
         }
 
         private void BoardAnyRemainingActors()
@@ -376,10 +387,7 @@ namespace PersiaWar.Unity2D5D
                 landingPosition.x + Mathf.Cos(angle) * 7.3f,
                 actorRoot.position.y,
                 landingPosition.z + Mathf.Sin(angle) * 5.2f);
-            state.DeckLocalPosition = new Vector3(
-                Mathf.Cos(angle) * 4.2f,
-                1.15f,
-                Mathf.Sin(angle) * 2.6f);
+            state.InteriorLocalPosition = new Vector3(0f, -0.57f, -2.25f);
             actors.Add(state);
         }
 
@@ -396,6 +404,11 @@ namespace PersiaWar.Unity2D5D
                 actor.ColliderWasEnabled[i] = collider.enabled;
                 collider.enabled = false;
             }
+
+            actor.Renderers = actor.Root.GetComponentsInChildren<Renderer>(true);
+            actor.RendererWasEnabled = new bool[actor.Renderers.Length];
+            for (int i = 0; i < actor.Renderers.Length; i++)
+                actor.RendererWasEnabled[i] = actor.Renderers[i] != null && actor.Renderers[i].enabled;
 
             actor.Bodies = actor.Root.GetComponentsInChildren<Rigidbody>(true);
             actor.BodyWasKinematic = new bool[actor.Bodies.Length];
@@ -859,6 +872,13 @@ namespace PersiaWar.Unity2D5D
                     for (int c = 0; c < actor.Colliders.Length; c++)
                         if (actor.Colliders[c] != null)
                             actor.Colliders[c].enabled = actor.ColliderWasEnabled[c];
+                }
+
+                if (actor.Renderers != null && actor.RendererWasEnabled != null)
+                {
+                    for (int r = 0; r < actor.Renderers.Length; r++)
+                        if (actor.Renderers[r] != null)
+                            actor.Renderers[r].enabled = actor.RendererWasEnabled[r];
                 }
 
                 if (actor.Bodies != null)
