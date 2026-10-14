@@ -203,6 +203,15 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("StageTwoArenaRank_" + rank);
         }
 
+        public void ResetForStageChange()
+        {
+            ClearBots();
+            kills.Clear();
+            finished = false;
+            LastLocalRank = 0;
+            localPlayer = null;
+        }
+
         private void ClearBots()
         {
             for (int i = 0; i < bots.Count; i++)
