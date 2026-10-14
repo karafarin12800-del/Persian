@@ -2100,6 +2100,18 @@ namespace PersiaWar.Unity2D5D
         private void CreateAndroidTree(Vector3 position, float scale)
         {
             position.y = CalculateAndroidTerrainHeight(position.x, position.z);
+
+            // Stage 2 only: group the trunk and both canopy sections beneath one
+            // identifiable root. The camera fader can then fade the complete tree
+            // when a tree collider actually intersects the camera-to-player sightline.
+            // Stage 1 keeps its original hierarchy and rendering path unchanged.
+            Transform previousBuildingRoot = androidCurrentBuildingRoot;
+            if (stageTwoRequested)
+            {
+                androidCurrentBuildingRoot = new GameObject("Tree_OcclusionRoot").transform;
+                androidCurrentBuildingRoot.SetParent(worldRoot, true);
+            }
+
             if (androidTreeTrunkMaterial == null)
                 androidTreeTrunkMaterial = stageTwoRequested
                     ? MakeStageTwoLitMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f))
@@ -2129,6 +2141,9 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
                 androidTreeCrownMaterial,
                 true);
+
+            if (stageTwoRequested)
+                androidCurrentBuildingRoot = previousBuildingRoot;
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
