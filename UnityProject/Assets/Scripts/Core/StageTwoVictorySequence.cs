@@ -572,8 +572,12 @@ namespace PersiaWar.Unity2D5D
             {
                 Collider collider = overlaps[i];
                 if (collider == null || collider.isTrigger) continue;
-                Transform hitTransform = collider.transform;
 
+                // Terrain, the road mesh and sidewalks are walkable surfaces, not
+                // obstructions to an invisible ship appearing just above the ground.
+                if (IsWalkableGroundCollider(collider)) continue;
+
+                Transform hitTransform = collider.transform;
                 if (localPlayer != null &&
                     (hitTransform == localPlayer || hitTransform.IsChildOf(localPlayer) ||
                      localPlayer.IsChildOf(hitTransform)))
@@ -584,6 +588,22 @@ namespace PersiaWar.Unity2D5D
                 return true;
             }
             return false;
+        }
+
+        private static bool IsWalkableGroundCollider(Collider collider)
+        {
+            if (collider == null) return false;
+            if (collider is TerrainCollider) return true;
+
+            string objectName = collider.gameObject.name;
+            return objectName == "AndroidTerrain3D" ||
+                objectName == "Terrain3D" ||
+                objectName == "StageTwoVillageDirtLanes" ||
+                objectName == "AndroidRoadGrid" ||
+                objectName == "AndroidSidewalkGrid" ||
+                objectName == "AndroidContinuousGroundFoundation" ||
+                objectName.StartsWith("Road", System.StringComparison.OrdinalIgnoreCase) ||
+                objectName.StartsWith("Sidewalk", System.StringComparison.OrdinalIgnoreCase);
         }
 
         private void BuildShip()
