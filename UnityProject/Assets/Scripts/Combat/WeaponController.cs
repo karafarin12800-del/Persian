@@ -164,27 +164,75 @@ namespace PersiaWar.Unity2D5D
         {
             if (gunRoot == null) return;
 
-            float visualScale = weaponKind == WeaponKind.LightPistol
-                ? 0.62f
-                : (weaponKind == WeaponKind.HeavyMachineGun ? 1.28f : 1f);
+            bool pistol = weaponKind == WeaponKind.LightPistol;
+            bool heavy = weaponKind == WeaponKind.HeavyMachineGun;
 
-            gunRestLocalPosition = weaponKind == WeaponKind.LightPistol
+            // Keep the pistol compact by changing its actual silhouette rather than
+            // merely shrinking a rifle. The heavy profile uses a thicker receiver,
+            // larger magazine, long barrel, stock and foregrip.
+            gunRoot.localScale = Vector3.one * (heavy ? 1.08f : 1f);
+            gunRestLocalPosition = pistol
                 ? new Vector3(0.24f, 0.93f, 0.33f)
-                : (weaponKind == WeaponKind.HeavyMachineGun
+                : (heavy
                     ? new Vector3(0.40f, 1.04f, 0.48f)
                     : new Vector3(0.34f, 1.02f, 0.42f));
-
-            gunRoot.localScale = Vector3.one * visualScale;
             gunRoot.localPosition = gunRestLocalPosition;
+
+            SetWeaponPart("Receiver", true,
+                Vector3.zero,
+                pistol ? new Vector3(0.16f, 0.11f, 0.30f)
+                    : (heavy ? new Vector3(0.26f, 0.20f, 0.64f) : new Vector3(0.22f, 0.18f, 0.56f)));
+            SetWeaponPart("Stock", !pistol,
+                heavy ? new Vector3(0f, 0.015f, -0.39f) : new Vector3(0f, 0.015f, -0.38f),
+                heavy ? new Vector3(0.18f, 0.16f, 0.36f) : new Vector3(0.16f, 0.14f, 0.34f));
+            SetWeaponPart("Magazine", true,
+                pistol ? new Vector3(0.01f, -0.115f, 0.01f) : new Vector3(0.01f, -0.15f, 0.03f),
+                pistol ? new Vector3(0.09f, 0.18f, 0.12f)
+                    : (heavy ? new Vector3(0.16f, 0.34f, 0.21f) : new Vector3(0.13f, 0.28f, 0.18f)));
+            SetWeaponPart("TopRail", !pistol,
+                new Vector3(0f, heavy ? 0.15f : 0.13f, 0.08f),
+                heavy ? new Vector3(0.16f, 0.07f, 0.52f) : new Vector3(0.13f, 0.06f, 0.45f));
+            SetWeaponPart("Barrel", true,
+                new Vector3(0f, 0f, pistol ? 0.19f : (heavy ? 0.56f : 0.58f)),
+                pistol ? new Vector3(0.042f, 0.13f, 0.042f)
+                    : (heavy ? new Vector3(0.075f, 0.35f, 0.075f) : new Vector3(0.065f, 0.33f, 0.065f)));
+            SetWeaponPart("MuzzleBreak", heavy,
+                new Vector3(0f, 0f, 1.0f),
+                new Vector3(0.15f, 0.12f, 0.13f));
+            SetWeaponPart("FrontGrip", !pistol,
+                new Vector3(0f, -0.12f, heavy ? 0.45f : 0.43f),
+                heavy ? new Vector3(0.14f, 0.25f, 0.15f) : new Vector3(0.11f, 0.20f, 0.12f));
+
+            SetWeaponPart("PistolSlide", pistol,
+                new Vector3(0f, 0.055f, 0.06f), new Vector3(0.17f, 0.045f, 0.27f));
+            SetWeaponPart("PistolGrip", pistol,
+                new Vector3(0f, -0.115f, -0.035f), new Vector3(0.095f, 0.16f, 0.13f));
 
             if (muzzle != null)
             {
-                muzzle.localPosition = weaponKind == WeaponKind.LightPistol
+                muzzle.localPosition = pistol
                     ? new Vector3(0.24f, 0.93f, 0.66f)
-                    : (weaponKind == WeaponKind.HeavyMachineGun
-                        ? new Vector3(0.40f, 1.04f, 1.22f)
+                    : (heavy
+                        ? new Vector3(0.40f, 1.04f, 1.38f)
                         : new Vector3(0.36f, 1.02f, 1.12f));
             }
+        }
+
+        private void SetWeaponPart(string partName, bool visible, Vector3 localPosition, Vector3 localScale)
+        {
+            if (gunRoot == null)
+                return;
+
+            Transform part = gunRoot.Find(partName);
+            if (part == null)
+                return;
+
+            part.gameObject.SetActive(visible);
+            if (!visible)
+                return;
+
+            part.localPosition = localPosition;
+            part.localScale = localScale;
         }
 
         private void LateUpdate()
@@ -365,6 +413,14 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(0f, 0f, 0.94f), new Vector3(0.12f, 0.10f, 0.10f), accent);
             CreateWeaponPart("FrontGrip", PrimitiveType.Cube, gunRoot,
                 new Vector3(0f, -0.12f, 0.43f), new Vector3(0.11f, 0.20f, 0.12f), grip);
+            CreateWeaponPart("PistolSlide", PrimitiveType.Cube, gunRoot,
+                new Vector3(0f, 0.055f, 0.06f), new Vector3(0.17f, 0.045f, 0.27f), metal);
+            CreateWeaponPart("PistolGrip", PrimitiveType.Cube, gunRoot,
+                new Vector3(0f, -0.115f, -0.035f), new Vector3(0.095f, 0.16f, 0.13f), grip);
+
+            // Start with the pistol-only parts hidden until the active profile is applied.
+            gunRoot.Find("PistolSlide").gameObject.SetActive(false);
+            gunRoot.Find("PistolGrip").gameObject.SetActive(false);
 
             // Prevent the decorative weapon from participating in collision queries.
             Collider[] colliders = gunRoot.GetComponentsInChildren<Collider>(true);
