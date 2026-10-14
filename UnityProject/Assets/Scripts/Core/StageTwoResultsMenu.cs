@@ -85,7 +85,10 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
         session = GameSession.Instance;
         if (flow == null) ResolveFlow();
         object stage = Read(flow, "stageNumber");
-        return flow != null && stage is int && (int)stage >= 2 && session != null && session.IsFinished;
+        object mode = Read(flow, "mode");
+        return flow != null && stage is int && (int)stage >= 2 &&
+            mode != null && string.Equals(mode.ToString(), "Match", StringComparison.Ordinal) &&
+            session != null && session.IsFinished;
     }
 
     private void EnsureStyles()
