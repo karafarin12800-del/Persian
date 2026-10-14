@@ -151,7 +151,16 @@ namespace PersiaWar.Unity2D5D
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
             if (stageTwoArena)
             {
-                if (wave >= 5 && enemies.Length == 0)
+                // TargetHealth disables EnemyChase as soon as an alien dies, then
+                // keeps its falling body visible for a short effect. Count only
+                // enabled combatants for the Stage 2 victory trigger so the flash
+                // begins on the final kill instead of waiting for corpse cleanup.
+                int livingEnemies = 0;
+                for (int i = 0; i < enemies.Length; i++)
+                    if (enemies[i] != null && enemies[i].enabled)
+                        livingEnemies++;
+
+                if (wave >= 5 && livingEnemies == 0)
                 {
                     PlayerController activePlayer = player != null ? player.GetComponent<PlayerController>() : null;
                     StageTwoArenaManager.Instance?.FinishArena();
@@ -160,8 +169,8 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                // Five 20-alien waves; begin the next drop as soon as six or fewer
-                // aliens remain on the ground. Stage one retains its original logic.
+                // Wave spawning still respects all remaining bodies for spacing;
+                // only the final victory check ignores already-defeated corpses.
                 if (wave < 5 && enemies.Length <= 6 && !spawning)
                 {
                     spawning = true;
