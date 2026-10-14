@@ -228,9 +228,14 @@ namespace PersiaWar.Unity2D5D
 
                 for (int attempt = 0; attempt < attemptsPerEnemy; attempt++)
                 {
-                    // Stage two uses a nearby drop ring so the player can actually see
-                    // the green sky landings. Stage one keeps its original map-wide spawn.
-                    Vector3 candidate;
+                    // Preserve map-wide candidate selection for the original stage.
+                    Vector3 candidate = new Vector3(
+                        Random.Range(-82f, 82f),
+                        1f,
+                        Random.Range(-82f, 82f));
+
+                    // Stage two deliberately overrides that candidate with a nearby
+                    // ring so the green sky landings appear around the active player.
                     if (stageTwoArena)
                     {
                         float angle = (spawned + Random.Range(-0.35f, 0.35f)) /
@@ -242,21 +247,17 @@ namespace PersiaWar.Unity2D5D
                             1f,
                             Mathf.Clamp(center.z + Mathf.Sin(angle) * radius, -82f, 82f));
                     }
-                    else
-                    {
-                        candidate = new Vector3(
-                            Random.Range(-82f, 82f),
-                            1f,
-                            Random.Range(-82f, 82f));
-                    }
 
                     Vector2 candidateXZ = new Vector2(candidate.x, candidate.z);
                     Vector2 playerXZ = player != null
                         ? new Vector2(player.position.x, player.position.z)
                         : Vector2.zero;
 
-                    if (!stageTwoArena && Vector2.Distance(candidateXZ, playerXZ) < 45f)
-                        continue;
+                    if (!stageTwoArena)
+                    {
+                        if (Vector2.Distance(candidateXZ, playerXZ) < 45f)
+                            continue;
+                    }
 
                     if (Physics.CheckSphere(candidate + Vector3.up * 0.7f, 0.85f, ~0,
                         QueryTriggerInteraction.Ignore))
