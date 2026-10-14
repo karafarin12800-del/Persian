@@ -64,6 +64,22 @@ namespace PersiaWar.Unity2D5D
 
         public void Configure(Transform playerTransform, int enemyCount, float radius, float unusedSpeed)
         {
+            // Configure() is the Stage 1 path. Explicitly clear Stage 2 arena state
+            // when a direct test-menu jump switches back to the campaign's first level.
+            stageTwoArena = false;
+            if (initialWaveCoroutine != null)
+            {
+                StopCoroutine(initialWaveCoroutine);
+                initialWaveCoroutine = null;
+            }
+            CancelInvoke(nameof(SpawnNextWave));
+            spawning = false;
+            initialWavePending = false;
+            initialWaveComplete = false;
+            initialWaveStarted = false;
+            failedSpawnAttempts = 0;
+            wave = 1;
+            EnemiesSpawnedForArena = 0;
             player = playerTransform;
 #if UNITY_ANDROID
             // Enforce a smaller mobile wave cap even when older scene data requested 42+ enemies.
@@ -71,13 +87,15 @@ namespace PersiaWar.Unity2D5D
 #endif
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
+            if (isActiveAndEnabled)
+                TryStartInitialWave();
         }
 
         private void OnEnable()
         {
-            // ConfigureStageTwoArena may have been called while this component was
-            // disabled by the match-start safety gate. Re-enable must start the wave.
-            if (stageTwoArena && player != null)
+            // A previously used spawner may have its Start() method already completed.
+            // Any newly configured stage should still arm its initial wave on re-enable.
+            if (player != null && !initialWaveStarted)
                 TryStartInitialWave();
         }
 
