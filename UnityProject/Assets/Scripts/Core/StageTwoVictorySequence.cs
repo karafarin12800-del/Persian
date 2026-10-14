@@ -659,6 +659,9 @@ namespace PersiaWar.Unity2D5D
 
             Material material = new Material(shader);
             material.name = "StageTwoDecloakEffectMaterial";
+            material.color = color;
+            if (material.HasProperty("_Color")) material.SetColor("_Color", color);
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
             SetMaterialAlpha(material, color.a);
             if (material.HasProperty("_EmissionColor"))
             {
