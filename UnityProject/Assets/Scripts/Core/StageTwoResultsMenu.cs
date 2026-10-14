@@ -15,8 +15,7 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
     private GUIStyle textStyle;
     private GUIStyle buttonStyle;
     private Texture2D pixel;
-    private bool handledFinishedMatch;
-    private int lastAwardedSessionId = -1;
+    private bool rewardGrantedForCurrentFinish;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InstallForLoadedScene()
@@ -38,6 +37,55 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
     {
         UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
         ResolveFlow();
+    }
+
+    private void Update()
+    {
+        // Gameplay disables touch-to-mouse synthesis while the match owns input.
+        // Read real Android finger IDs here so result actions still work on device.
+        GameSession session;
+        if (!IsStageTwoFinished(out session))
+        {
+            if (session == null || !session.IsFinished)
+                rewardGrantedForCurrentFinish = false;
+            return;
+        }
+
+        if (!Application.isMobilePlatform || Input.touchCount == 0)
+            return;
+
+        Rect primary, chooseMap, chooseCharacter, store, purchases, mainMenu;
+        GetResultButtonRects(out primary, out chooseMap, out chooseCharacter,
+            out store, out purchases, out mainMenu);
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase != TouchPhase.Began)
+                continue;
+
+            Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
+            if (primary.Contains(point) || mainMenu.Contains(point))
+                HandleResultAction("main-menu");
+            else if (chooseMap.Contains(point))
+                HandleResultAction("choose-map");
+            else if (chooseCharacter.Contains(point))
+                HandleResultAction("choose-character");
+            else if (store.Contains(point) || purchases.Contains(point))
+                HandleResultAction("store");
+            else
+                continue;
+
+            return;
+        }
+    }
+
+    private void HandleResultAction(string destination)
+    {
+        if (flow == null) ResolveFlow();
+        if (flow == null) return;
+        flow.NavigateFromStageTwoResults(destination);
+        rewardGrantedForCurrentFinish = false;
     }
 
     private void OnDisable()
@@ -118,6 +166,38 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
         GUI.color = old;
     }
 
+    private Rect GetResultPanel(out float scale)
+    {
+        scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
+        float width = Mathf.Min(Screen.width - 28f * scale, 650f * scale);
+        float height = Mathf.Min(Screen.height - 28f * scale, 650f * scale);
+        return new Rect((Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f, width, height);
+    }
+
+    private void GetResultButtonRects(out Rect primary, out Rect chooseMap,
+        out Rect chooseCharacter, out Rect store, out Rect purchases, out Rect mainMenu)
+    {
+        float scale;
+        Rect panel = GetResultPanel(out scale);
+        float gap = 10f * scale;
+        float buttonHeight = 46f * scale;
+        float halfWidth = (panel.width - 44f * scale - gap) * 0.5f;
+        float left = panel.x + 22f * scale;
+        float right = left + halfWidth + gap;
+        float y = panel.y + 214f * scale;
+
+        primary = new Rect(left, y, panel.width - 44f * scale, buttonHeight);
+        y += buttonHeight + gap;
+        chooseMap = new Rect(left, y, halfWidth, buttonHeight);
+        chooseCharacter = new Rect(right, y, halfWidth, buttonHeight);
+        y += buttonHeight + gap;
+        store = new Rect(left, y, halfWidth, buttonHeight);
+        purchases = new Rect(right, y, halfWidth, buttonHeight);
+        y += buttonHeight + gap;
+        mainMenu = new Rect(left, y, panel.width - 44f * scale, buttonHeight);
+    }
+
     private void OnGUI()
     {
         GameSession session;
@@ -128,10 +208,8 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
         // only for Stage 2. Stage 1's extraction/next-stage flow is unaffected.
         Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0.015f, 0.035f, 0.055f, 0.985f));
 
-        float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
-        float width = Mathf.Min(Screen.width - 28f * scale, 650f * scale);
-        float height = Mathf.Min(Screen.height - 28f * scale, 650f * scale);
-        Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+        float scale;
+        Rect panel = GetResultPanel(out scale);
         Fill(panel, new Color(0.045f, 0.085f, 0.12f, 1f));
         Fill(new Rect(panel.x, panel.y, panel.width, 5f * scale), session.PlayerWon
             ? new Color(0.25f, 0.83f, 0.48f, 1f)
@@ -152,84 +230,49 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
             "\nScore: " + session.Score + "     Eliminations: " + session.EnemiesDefeated, textStyle);
 
         int coins = rank == 1 ? 300 : (rank == 2 ? 180 : (rank == 3 ? 120 : 40));
-        // Grant the match reward exactly once for this finished GameSession.
-        int sessionId = session.GetInstanceID();
-        if (lastAwardedSessionId != sessionId)
+        // GameSession is persistent across scenes and matches, so the session's
+        // instance ID is not a unique match ID. Track award state per finished run.
+        if (!rewardGrantedForCurrentFinish)
         {
             int balance = PlayerPrefs.GetInt("PW.StoreCoins", 500);
             PlayerPrefs.SetInt("PW.StoreCoins", balance + coins);
             PlayerPrefs.Save();
             Write(flow, "storeCoins", balance + coins);
-            lastAwardedSessionId = sessionId;
+            rewardGrantedForCurrentFinish = true;
         }
         GUI.Label(new Rect(panel.x + 18, panel.y + 164 * scale, panel.width - 36, 30 * scale),
             "MATCH REWARD  +" + coins + " COINS", textStyle);
 
-        float gap = 10 * scale;
-        float btnH = 46 * scale;
-        float btnW = (panel.width - 44 * scale - gap) * 0.5f;
-        float x1 = panel.x + 22 * scale;
-        float x2 = x1 + btnW + gap;
-        float y = panel.y + 214 * scale;
+        Rect primary, chooseMap, chooseCharacter, store, purchases, mainMenu;
+        GetResultButtonRects(out primary, out chooseMap, out chooseCharacter,
+            out store, out purchases, out mainMenu);
 
-        if (GUI.Button(new Rect(x1, y, panel.width - 44 * scale, btnH), "PLAY AGAIN", buttonStyle))
+        if (GUI.Button(primary, "BACK TO MAIN MENU", buttonStyle))
         {
-            handledFinishedMatch = true;
-            session.RestartMission();
+            HandleResultAction("main-menu");
             return;
         }
-        y += btnH + 10 * scale;
-        if (GUI.Button(new Rect(x1, y, btnW, btnH), "CHOOSE MAP", buttonStyle))
+        if (GUI.Button(chooseMap, "CHOOSE MAP", buttonStyle))
         {
-            Time.timeScale = 1f;
-            Write(flow, "matchPaused", false);
-            Write(flow, "startingMatch", false);
-            Write(flow, "spawnChosen", false);
-            Write(flow, "stageTwoShopOpen", false);
-            Write(flow, "mode", Enum.Parse(Read(flow, "mode").GetType(), "DropMap"));
-            // GateGameplay takes a bool; stop the previous match before changing screens.
-            MethodInfo gate = flow.GetType().GetMethod("GateGameplay", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (gate != null) gate.Invoke(flow, new object[] { false });
+            HandleResultAction("choose-map");
             return;
         }
-        if (GUI.Button(new Rect(x2, y, btnW, btnH), "CHOOSE CHARACTER", buttonStyle))
+        if (GUI.Button(chooseCharacter, "CHOOSE CHARACTER", buttonStyle))
         {
-            Time.timeScale = 1f;
-            Write(flow, "matchPaused", false);
-            Write(flow, "stageTwoShopOpen", false);
-            Write(flow, "mode", Enum.Parse(Read(flow, "mode").GetType(), "HeroSelect"));
-            MethodInfo gate = flow.GetType().GetMethod("GateGameplay", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (gate != null) gate.Invoke(flow, new object[] { false });
+            HandleResultAction("choose-character");
             return;
         }
-        y += btnH + 10 * scale;
-        if (GUI.Button(new Rect(x1, y, btnW, btnH), "STORE", buttonStyle))
+        if (GUI.Button(store, "STORE", buttonStyle))
         {
-            Time.timeScale = 1f;
-            Write(flow, "matchPaused", false);
-            Write(flow, "mode", Enum.Parse(Read(flow, "mode").GetType(), "Store"));
-            MethodInfo gate = flow.GetType().GetMethod("GateGameplay", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (gate != null) gate.Invoke(flow, new object[] { false });
+            HandleResultAction("store");
             return;
         }
-        if (GUI.Button(new Rect(x2, y, btnW, btnH), "COINS & PURCHASES", buttonStyle))
+        if (GUI.Button(purchases, "COINS & PURCHASES", buttonStyle))
         {
-            Time.timeScale = 1f;
-            Write(flow, "matchPaused", false);
-            Write(flow, "mode", Enum.Parse(Read(flow, "mode").GetType(), "Store"));
-            MethodInfo gate = flow.GetType().GetMethod("GateGameplay", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (gate != null) gate.Invoke(flow, new object[] { false });
+            HandleResultAction("store");
             return;
         }
-        y += btnH + 10 * scale;
-        if (GUI.Button(new Rect(x1, y, panel.width - 44 * scale, btnH), "MAIN MENU", buttonStyle))
-        {
-            Time.timeScale = 1f;
-            Write(flow, "matchPaused", false);
-            Write(flow, "stageTwoShopOpen", false);
-            Write(flow, "mode", Enum.Parse(Read(flow, "mode").GetType(), "MainMenu"));
-            MethodInfo gate = flow.GetType().GetMethod("GateGameplay", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (gate != null) gate.Invoke(flow, new object[] { false });
-        }
+        if (GUI.Button(mainMenu, "MAIN MENU", buttonStyle))
+            HandleResultAction("main-menu");
     }
 }
