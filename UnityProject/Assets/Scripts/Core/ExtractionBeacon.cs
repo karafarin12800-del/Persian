@@ -27,6 +27,45 @@ namespace PersiaWar.Unity2D5D
         public static Vector3 WorldPosition =>
             instance != null ? instance.groundPosition : Vector3.zero;
 
+        /// <summary>
+        /// Removes the previous mission's blue extraction visuals before a new stage
+        /// is built. Stage 2 uses its own evacuation ship beam at the end of the match.
+        /// </summary>
+        public static void ClearForStageTransition()
+        {
+            if (instance != null)
+            {
+                instance.completed = true;
+                instance.beamCreated = false;
+                UnityEngine.Object.Destroy(instance.gameObject);
+                instance = null;
+            }
+
+            string[] beamNames =
+            {
+                "BlueExtractionBeamOuter",
+                "BlueExtractionBeamCore",
+                "BlueExtractionGroundRing",
+                "BlueSkyGuideBeamOuter",
+                "BlueSkyGuideBeamCore",
+                "BlueSkyGuideGroundRing",
+                "BlueSkyGuideGroundLight"
+            };
+
+            GameObject[] existing = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            for (int i = 0; i < existing.Length; i++)
+            {
+                GameObject item = existing[i];
+                if (item == null) continue;
+                for (int n = 0; n < beamNames.Length; n++)
+                {
+                    if (item.name != beamNames[n]) continue;
+                    UnityEngine.Object.Destroy(item);
+                    break;
+                }
+            }
+        }
+
         public static void ActivateForVictory(PlayerController playerController)
         {
             if (playerController == null || playerController.IsDefeated)

@@ -70,6 +70,13 @@ namespace PersiaWar.Unity2D5D
         private bool matchInputArmed;
         private bool matchPaused;
         private float resultOverlayStartTime = -1f;
+        private StageTwoVictorySequence stageTwoVictorySequence;
+        private bool forceStageOneWorldRebuildForTest;
+        private bool stageTestRun;
+        private int savedCampaignStageNumber = 1;
+        private int savedStage3Unlocked;
+        private string lobbyNotice = string.Empty;
+        private float lobbyNoticeUntil;
         private string startupStatus = string.Empty;
         private GameObject mainCameraRoot;
         private GameObject playerRoot;
@@ -224,6 +231,19 @@ namespace PersiaWar.Unity2D5D
             // path that can advance the menu if touch-to-mouse synthesis is missing.
             if (mode == ScreenMode.Match)
             {
+                GameSession session = GameSession.Instance;
+                if (session != null && session.IsFinished)
+                {
+                    if (stageNumber == 2 && session.PlayerWon)
+                    {
+                        if (stageTwoVictorySequence == null)
+                            StartStageTwoVictorySequence();
+                        else if (stageTwoVictorySequence.IsComplete)
+                            CompleteStageTwoVictoryTransition();
+                    }
+                    return;
+                }
+
                 CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
                 return;
@@ -288,6 +308,12 @@ namespace PersiaWar.Unity2D5D
             if (mode == ScreenMode.Match)
             {
 #if UNITY_ANDROID
+                if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
+                {
+                    DrawStageTwoCinematicOverlay();
+                    return;
+                }
+
                 DrawAndroidPresentationHUD();
                 DrawAndroidPauseControl();
                 DrawGirlRescueNotice();
@@ -711,12 +737,15 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetLobbyButtonRect(int index)
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
             float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
-            float height = 58f * scale;
-            float gap = 14f * scale;
-            float totalHeight = height * 4f + gap * 3f;
-            float top = Mathf.Max(145f * scale, (Screen.height - totalHeight) * 0.48f);
+            float heightLimit = Mathf.Max(30f, (Screen.height - 120f * scale) / 9f);
+            float height = Mathf.Min(58f * scale, heightLimit);
+            float gapLimit = Mathf.Max(3f, (Screen.height - 100f * scale - height * 7f) / 6f);
+            float gap = Mathf.Min(14f * scale, gapLimit);
+            float totalHeight = height * 7f + gap * 6f;
+            float topLimit = Mathf.Max(54f * scale, Screen.height - totalHeight - 8f);
+            float top = Mathf.Clamp((Screen.height - totalHeight) * 0.48f, 54f * scale, topLimit);
             float left = Mathf.Max(Screen.width * 0.52f, Screen.width - width - 28f);
             left = Mathf.Min(left, Screen.width - width - 18f);
             return new Rect(left, top + index * (height + gap), width, height);
@@ -743,15 +772,11 @@ namespace PersiaWar.Unity2D5D
                 Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
                 if (mode == ScreenMode.MainMenu)
                 {
-                    for (int button = 0; button < 4; button++)
+                    for (int button = 0; button < 7; button++)
                     {
                         if (!GetLobbyButtonRect(button).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
-                        if (button == 0) mode = ScreenMode.HeroSelect;
-                        else if (button == 1) mode = ScreenMode.Profile;
-                        else if (button == 2) mode = ScreenMode.Store;
-                        else mode = ScreenMode.Settings;
-                        StartupCheckpoint.Set("LobbyNavigation_" + mode);
+                        ActivateLobbyButton(button);
                         return;
                     }
                 }
@@ -807,23 +832,270 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(card.x + 18f, card.y + card.height - 68f, card.width - 36f, 48f),
                 "OFFLINE PROFILE", menuSmallStyle);
 
-            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height * 0.15f, Screen.width * 0.54f, 54f),
-                "YOUR NEXT BATTLE BEGINS HERE", menuBodyStyle);
-            string[] labels = { "PLAY", "PLAYER PROFILE", "STORE", "SETTINGS" };
+            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height * 0.055f, Screen.width * 0.54f, 46f),
+                "CAMPAIGN  •  STAGE TEST ACCESS", menuBodyStyle);
+            string[] labels =
+            {
+                "PLAY / CONTINUE CAMPAIGN",
+                "PLAYER PROFILE",
+                "STORE",
+                "SETTINGS",
+                "TEST STAGE 1",
+                "TEST STAGE 2",
+                "TEST STAGE 3"
+            };
+
             for (int i = 0; i < labels.Length; i++)
             {
                 Rect button = GetLobbyButtonRect(i);
-                if (DrawFantasyButton(button, labels[i], i == 0))
-                {
-                    if (i == 0) mode = ScreenMode.HeroSelect;
-                    else if (i == 1) mode = ScreenMode.Profile;
-                    else if (i == 2) mode = ScreenMode.Store;
-                    else mode = ScreenMode.Settings;
-                    StartupCheckpoint.Set("LobbyNavigation_" + mode);
-                }
+                if (DrawFantasyButton(button, labels[i], i == 0 || i >= 4))
+                    ActivateLobbyButton(i);
             }
-            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height - 54f, Screen.width * 0.54f, 28f),
+
+            if (!string.IsNullOrEmpty(lobbyNotice) && Time.unscaledTime < lobbyNoticeUntil)
+            {
+                Rect lastButton = GetLobbyButtonRect(6);
+                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
+                float noticeHeight = 34f * scale;
+                float noticeY = Mathf.Min(lastButton.yMax + 6f * scale, Screen.height - 58f * scale - noticeHeight);
+                Rect notice = new Rect(Screen.width * 0.52f, noticeY,
+                    Screen.width * 0.42f, noticeHeight);
+                Fill(notice, new Color(0.025f, 0.06f, 0.09f, 0.95f));
+                GUI.Label(notice, lobbyNotice, menuSmallStyle);
+            }
+
+            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height - 42f, Screen.width * 0.54f, 24f),
                 "PERSIA WAR  •  UNITY EDITION", menuSmallStyle);
+        }
+
+        private void ActivateLobbyButton(int index)
+        {
+            if (index == 0)
+            {
+                StartCampaignFromMenu();
+                return;
+            }
+            if (index == 1) mode = ScreenMode.Profile;
+            else if (index == 2) mode = ScreenMode.Store;
+            else if (index == 3) mode = ScreenMode.Settings;
+            else if (index == 4) BeginStageTestEntry(1);
+            else if (index == 5) BeginStageTestEntry(2);
+            else if (index == 6) ShowLobbyNotice(
+                "STAGE 3 IS NEXT IN THE CAMPAIGN, BUT ITS ALIEN-FORTRESS WORLD IS STILL UNDER CONSTRUCTION.");
+
+            StartupCheckpoint.Set("LobbyNavigation_" + mode);
+        }
+
+        private void StartCampaignFromMenu()
+        {
+            if (stageTestRun)
+                RestoreCampaignProgressAfterTest();
+
+            if (stageNumber >= 3)
+            {
+                ShowLobbyNotice("STAGE 3 IS NOT READY TO PLAY YET. USE TEST STAGE 1 OR 2 WHILE IT IS BEING BUILT.");
+                return;
+            }
+
+            // If Stage 2 was tested last, don't accidentally reuse its generated
+            // village when the real campaign resumes at Stage 1.
+            forceStageOneWorldRebuildForTest = stageNumber == 1;
+            mode = ScreenMode.HeroSelect;
+            spawnChosen = false;
+            StartupCheckpoint.Set("CampaignContinue_Stage" + stageNumber);
+        }
+
+        private void CaptureCampaignProgressBeforeTest()
+        {
+            if (stageTestRun) return;
+            savedCampaignStageNumber = stageNumber;
+            savedStage3Unlocked = PlayerPrefs.GetInt("PW.Stage3Unlocked", 0);
+            stageTestRun = true;
+        }
+
+        private void RestoreCampaignProgressAfterTest()
+        {
+            if (!stageTestRun) return;
+            stageNumber = Mathf.Clamp(savedCampaignStageNumber, 1, 3);
+            PlayerPrefs.SetInt("PW.Stage3Unlocked", savedStage3Unlocked);
+            PlayerPrefs.Save();
+            stageTestRun = false;
+            forceStageOneWorldRebuildForTest = stageNumber == 1;
+            StartupCheckpoint.Set("TestMode_CampaignProgressRestored_Stage" + stageNumber);
+        }
+
+        private void BeginStageTestEntry(int targetStage)
+        {
+            CaptureCampaignProgressBeforeTest();
+            StageTwoArenaManager.Instance?.ResetForStageChange();
+            Time.timeScale = 1f;
+            lobbyNotice = string.Empty;
+            lobbyNoticeUntil = 0f;
+            matchPaused = false;
+            startingMatch = false;
+            spawnChosen = false;
+            resultOverlayStartTime = -1f;
+
+            if (stageTwoVictorySequence != null)
+            {
+                stageTwoVictorySequence.FinishAndCleanup();
+                Destroy(stageTwoVictorySequence);
+                stageTwoVictorySequence = null;
+            }
+
+            if (targetStage == 1)
+            {
+                stageNumber = 1;
+                selectedHero = 0;
+                stageTwoOriginalHero = 0;
+                stageTwoLandingMode = 0;
+                stageTwoLayoutVariant = 0;
+                stageTwoShopOpen = false;
+                stageTwoLobbyRunning = false;
+                stageTwoLobbyReady = false;
+                stageTwoLobbyPlayers = 1;
+                forceStageOneWorldRebuildForTest = true;
+                ExtractionBeacon.ClearForStageTransition();
+                if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                if (activeCamera != null) activeCamera.enabled = false;
+                if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+                GateGameplay(false);
+                mode = ScreenMode.HeroSelect;
+                StartupCheckpoint.Set("DirectStageTestEntry_1");
+                return;
+            }
+
+            if (targetStage == 2)
+            {
+                stageTwoLobbyRunning = false;
+                stageTwoLobbyReady = false;
+                stageTwoLobbyPlayers = 1;
+                forceStageOneWorldRebuildForTest = false;
+                if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                BeginStageTwoSelection();
+                StartupCheckpoint.Set("DirectStageTestEntry_2");
+            }
+        }
+
+        private void ShowLobbyNotice(string message)
+        {
+            lobbyNotice = message ?? string.Empty;
+            lobbyNoticeUntil = Time.unscaledTime + 8f;
+            StartupCheckpoint.Set("LobbyNoticeShown");
+        }
+
+        private void StartStageTwoVictorySequence()
+        {
+            if (stageTwoVictorySequence != null) return;
+            GateGameplay(false);
+            if (followCamera != null) followCamera.enabled = false;
+            stageTwoVictorySequence = gameObject.AddComponent<StageTwoVictorySequence>();
+            Transform localRoot = playerRoot != null ? playerRoot.transform
+                : (player != null ? player.transform : null);
+            Camera cinematicCamera = androidRuntimeCamera != null && androidRuntimeCamera.isActiveAndEnabled
+                ? androidRuntimeCamera
+                : (activeCamera != null && activeCamera.isActiveAndEnabled ? activeCamera : Camera.main);
+            stageTwoVictorySequence.Begin(localRoot, cinematicCamera);
+        }
+
+        private void DrawStageTwoCinematicOverlay()
+        {
+            if (stageTwoVictorySequence == null) return;
+
+            Rect fullScreen = new Rect(0f, 0f, Screen.width, Screen.height);
+            float flash = stageTwoVictorySequence.FlashAlpha;
+            if (flash > 0f)
+            {
+                // A fast white hit and green energy tint signal the stealth field
+                // collapse; the ship itself materializes in place behind this flash.
+                Fill(fullScreen, new Color(1f, 1f, 1f, Mathf.Clamp01(flash * 0.86f)));
+                Fill(fullScreen, new Color(0.48f, 1f, 0.62f, Mathf.Clamp01(flash * 0.40f)));
+            }
+
+            float decloakGlow = stageTwoVictorySequence.DecloakGlowAlpha;
+            if (decloakGlow > 0.001f)
+                Fill(fullScreen, new Color(0.38f, 1f, 0.54f, decloakGlow * 0.09f));
+
+            string caption = stageTwoVictorySequence.GetCaption();
+            if (!string.IsNullOrEmpty(caption) && flash < 0.05f)
+            {
+                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.7f, 1.25f);
+                Rect captionRect = new Rect(0f, Screen.height * 0.13f, Screen.width, 56f * scale);
+                Fill(new Rect(Screen.width * 0.12f, captionRect.y, Screen.width * 0.76f, captionRect.height),
+                    new Color(0.015f, 0.035f, 0.055f, 0.78f));
+                GUI.Label(captionRect, caption, menuHeaderStyle);
+            }
+        }
+
+        private void CompleteStageTwoVictoryTransition()
+        {
+            if (stageTwoVictorySequence == null) return;
+
+            // Capture result text before disabling the stage systems.
+            string result = GetStageTwoResultMessage();
+            stageTwoVictorySequence.FinishAndCleanup();
+            Destroy(stageTwoVictorySequence);
+            stageTwoVictorySequence = null;
+            StageTwoArenaManager.Instance?.ResetForStageChange();
+
+            GateGameplay(false);
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
+            if (playerRoot != null) playerRoot.SetActive(false);
+            if (gameRoot != null) gameRoot.SetActive(false);
+
+            Time.timeScale = 1f;
+
+            stageTwoLobbyRunning = false;
+            stageTwoLobbyReady = false;
+            stageTwoLobbyPlayers = 1;
+            startingMatch = false;
+            matchPaused = false;
+            spawnChosen = false;
+            resultOverlayStartTime = -1f;
+
+            if (stageTestRun)
+            {
+                RestoreCampaignProgressAfterTest();
+                mode = ScreenMode.MainMenu;
+                ShowLobbyNotice("STAGE 2 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
+                StartupCheckpoint.Set("StageTwoTestComplete_CampaignUnchanged_" + result);
+            }
+            else
+            {
+                stageNumber = 3;
+                PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
+                PlayerPrefs.Save();
+                mode = ScreenMode.MainMenu;
+                ShowLobbyNotice("STAGE 2 COMPLETE  •  NEXT: STAGE 3 (IN DEVELOPMENT)");
+                StartupCheckpoint.Set("StageTwoCutsceneComplete_MainMenu_Stage3Next_" + result);
+            }
+        }
+
+        private void ReturnToMainMenuFromResult()
+        {
+            StageTwoArenaManager.Instance?.ResetForStageChange();
+            Time.timeScale = 1f;
+            if (stageTwoVictorySequence != null)
+            {
+                stageTwoVictorySequence.FinishAndCleanup();
+                Destroy(stageTwoVictorySequence);
+                stageTwoVictorySequence = null;
+            }
+            GateGameplay(false);
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
+            if (playerRoot != null) playerRoot.SetActive(false);
+            if (gameRoot != null) gameRoot.SetActive(false);
+            startingMatch = false;
+            matchPaused = false;
+            spawnChosen = false;
+            resultOverlayStartTime = -1f;
+            RestoreCampaignProgressAfterTest();
+            mode = ScreenMode.MainMenu;
+            StartupCheckpoint.Set("ResultOverlay_ReturnToMainMenu");
         }
 
         private void DrawProfileScreen()
@@ -1395,9 +1667,14 @@ namespace PersiaWar.Unity2D5D
 
         private void BeginStageTwoSelection()
         {
+            ExtractionBeacon.ClearForStageTransition();
+            Time.timeScale = 1f;
             stageNumber = 2;
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
+            stageTwoLobbyRunning = false;
+            stageTwoLobbyReady = false;
+            stageTwoLobbyPlayers = 1;
             mode = ScreenMode.HeroSelect;
             spawnChosen = false;
             startingMatch = false;
@@ -1612,6 +1889,12 @@ namespace PersiaWar.Unity2D5D
         {
             if (!spawnChosen || startingMatch || stageTwoLobbyRunning)
                 return;
+            if (stageNumber >= 3)
+            {
+                ShowLobbyNotice("STAGE 3 IS NOT READY TO PLAY YET. ITS ALIEN-FORTRESS WORLD WILL BE ADDED NEXT.");
+                mode = ScreenMode.MainMenu;
+                return;
+            }
 
             matchPaused = false;
             Time.timeScale = 1f;
@@ -1793,15 +2076,29 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            if (stageNumber >= 2)
+            if (stageNumber == 2)
             {
                 startupStatus = "Stage 3: preparing Iranian village stage...";
                 gameBootstrap.PrepareStageTwoVillage(stageTwoLayoutVariant);
             }
-            else if (!gameBootstrap.IsWorldReady && !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
+            else if (stageNumber == 1 && forceStageOneWorldRebuildForTest)
+            {
+                startupStatus = "Stage 3: rebuilding a clean Stage 1 test world...";
+                forceStageOneWorldRebuildForTest = false;
+                gameBootstrap.PrepareStageOneWorldForTest();
+            }
+            else if (stageNumber == 1 && !gameBootstrap.IsWorldReady &&
+                !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
             {
                 startupStatus = "Stage 3: requesting battlefield build...";
                 gameBootstrap.PrepareWorld();
+            }
+            else if (stageNumber >= 3)
+            {
+                startingMatch = false;
+                mode = ScreenMode.MainMenu;
+                ShowLobbyNotice("STAGE 3 IS NOT READY TO PLAY YET.");
+                yield break;
             }
 
             while (gameBootstrap.IsWorldPreparing)
@@ -1979,6 +2276,12 @@ namespace PersiaWar.Unity2D5D
 
         private void LateUpdate()
         {
+            // Hold the camera where the fight ended during the evacuation. If the
+            // camera kept tracking the player as the ship ascends, the ship would
+            // stay centred instead of visibly leaving the frame in two seconds.
+            if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
+                return;
+
 #if UNITY_ANDROID
             if (androidRuntimeCamera == null || player == null)
                 return;
@@ -2351,8 +2654,22 @@ namespace PersiaWar.Unity2D5D
             GameSession session = GameSession.Instance;
             if (session == null || !session.IsFinished)
                 return;
-            // The blue extraction gate is reserved for a win after the final opponent
-            // is eliminated. A player defeat skips the transition and shows GAME OVER.
+            // Stage 2 victory is a separate evacuation sequence, triggered by
+            // EnemySpawner only after the final wave has spawned and every alien is dead.
+            if (session.PlayerWon && stageNumber == 2)
+            {
+                if (stageTwoVictorySequence == null)
+                    StartStageTwoVictorySequence();
+                if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
+                {
+                    DrawStageTwoCinematicOverlay();
+                    return;
+                }
+                if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsComplete)
+                    return;
+            }
+
+            // The blue extraction gate is reserved for Stage 1's final opponent.
             if (session.PlayerWon && stageNumber == 1)
             {
                 float elapsed = Mathf.Max(0f, Time.unscaledTime - resultOverlayStartTime);
@@ -2408,15 +2725,44 @@ namespace PersiaWar.Unity2D5D
                 "SCORE  " + session.Score + "    ENEMIES  " + session.EnemiesDefeated,
                 smallStyle);
 
+            float buttonGap = 14f;
+            float buttonWidth = (panel.width - 64f - buttonGap) * 0.5f;
+            float buttonY = panel.y + panel.height - 82f;
             if (GUI.Button(
-                new Rect(panel.x + 80f, panel.y + panel.height - 82f, panel.width - 160f, 54f),
+                new Rect(panel.x + 32f, buttonY, buttonWidth, 54f),
                 "PLAY AGAIN",
                 buttonStyle))
             {
-                session.RestartMission();
+                if (stageTestRun)
+                {
+                    // Keep the saved campaign stage while restarting the requested test;
+                    // reloading the scene here would lose this temporary test-mode state.
+                    BeginStageTestEntry(stageNumber);
+                }
+                else if (stageNumber == 2)
+                {
+                    Time.timeScale = 1f;
+                    if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                    BeginStageTwoSelection();
+                }
+                else
+                {
+                    session.RestartMission();
+                }
+            }
+
+            if (GUI.Button(
+                new Rect(panel.x + 32f + buttonWidth + buttonGap, buttonY, buttonWidth, 54f),
+                "MAIN MENU",
+                buttonStyle))
+            {
+                ReturnToMainMenuFromResult();
             }
         }
 
+        // Dedicated shortcut so Stage 3 can be entered from the Stage 2 result
+        // screen without replaying Stage 1. Stage 3 world construction is added
+        // separately; this only establishes the independent test entry point.
         private void DrawAndroidStabilityStatus()
         {
             // This is diagnostics only. The old implementation painted a full-screen

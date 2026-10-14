@@ -64,6 +64,22 @@ namespace PersiaWar.Unity2D5D
 
         public void Configure(Transform playerTransform, int enemyCount, float radius, float unusedSpeed)
         {
+            // Configure() is the Stage 1 path. Explicitly clear Stage 2 arena state
+            // when a direct test-menu jump switches back to the campaign's first level.
+            stageTwoArena = false;
+            if (initialWaveCoroutine != null)
+            {
+                StopCoroutine(initialWaveCoroutine);
+                initialWaveCoroutine = null;
+            }
+            CancelInvoke(nameof(SpawnNextWave));
+            spawning = false;
+            initialWavePending = false;
+            initialWaveComplete = false;
+            initialWaveStarted = false;
+            failedSpawnAttempts = 0;
+            wave = 1;
+            EnemiesSpawnedForArena = 0;
             player = playerTransform;
 #if UNITY_ANDROID
             // Enforce a smaller mobile wave cap even when older scene data requested 42+ enemies.
@@ -71,13 +87,15 @@ namespace PersiaWar.Unity2D5D
 #endif
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
+            if (isActiveAndEnabled)
+                TryStartInitialWave();
         }
 
         private void OnEnable()
         {
-            // ConfigureStageTwoArena may have been called while this component was
-            // disabled by the match-start safety gate. Re-enable must start the wave.
-            if (stageTwoArena && player != null)
+            // A previously used spawner may have its Start() method already completed.
+            // Any newly configured stage should still arm its initial wave on re-enable.
+            if (player != null && !initialWaveStarted)
                 TryStartInitialWave();
         }
 
@@ -151,7 +169,25 @@ namespace PersiaWar.Unity2D5D
             EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
             if (stageTwoArena)
             {
-                if (wave >= 5 && enemies.Length == 0)
+                // TargetHealth disables EnemyChase as soon as an alien dies, then
+                // keeps its falling body visible for a short effect. Count only
+                // enabled combatants for the Stage 2 victory trigger so the flash
+                // begins on the final kill instead of waiting for corpse cleanup.
+                int livingEnemies = 0;
+                for (int i = 0; i < enemies.Length; i++)
+                {
+                    EnemyChase alien = enemies[i];
+                    if (alien == null) continue;
+
+                    // Aliens keep full health while their two-second landing animation
+                    // runs with EnemyChase disabled. Count health, not behaviour enabled
+                    // state, so the final victory cannot fire during the green-beam wave.
+                    TargetHealth health = alien.GetComponent<TargetHealth>();
+                    if (health != null && health.CurrentHealth > 0)
+                        livingEnemies++;
+                }
+
+                if (wave >= 5 && livingEnemies == 0)
                 {
                     PlayerController activePlayer = player != null ? player.GetComponent<PlayerController>() : null;
                     StageTwoArenaManager.Instance?.FinishArena();
@@ -160,8 +196,8 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                // Five 20-alien waves; begin the next drop as soon as six or fewer
-                // aliens remain on the ground. Stage one retains its original logic.
+                // Wave spawning still respects all remaining bodies for spacing;
+                // only the final victory check ignores already-defeated corpses.
                 if (wave < 5 && enemies.Length <= 6 && !spawning)
                 {
                     spawning = true;
