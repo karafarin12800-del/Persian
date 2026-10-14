@@ -2460,7 +2460,6 @@ namespace PersiaWar.Unity2D5D
             }
             if (player != null)
             {
-                player.SetMoveInput(Vector2.zero);
                 player.ClearAimDirection();
             }
             GateGameplay(false);
