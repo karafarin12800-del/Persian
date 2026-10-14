@@ -67,8 +67,8 @@ namespace PersiaWar.Unity2D5D
 
         private Vector3 FindBotSpawn(int index, int total)
         {
-            // Stratify offline competitors into separate cells across the whole map.
-            // This avoids placing all competitors around the local player in one ring.
+            // Assign each competitor a distinct map cell, then validate spacing from
+            // the local player, existing competitors, aliens and solid world objects.
             int columns = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Max(1, total)));
             int rows = Mathf.CeilToInt(total / (float)Mathf.Max(1, columns));
             int column = index % columns;
@@ -76,23 +76,61 @@ namespace PersiaWar.Unity2D5D
             float cellWidth = 168f / columns;
             float cellDepth = 168f / rows;
 
-            for (int attempt = 0; attempt < 40; attempt++)
+            for (int attempt = 0; attempt < 48; attempt++)
             {
                 Vector3 candidate = new Vector3(
-                    -84f + (column + Random.Range(0.15f, 0.85f)) * cellWidth,
+                    -84f + (column + Random.Range(0.12f, 0.88f)) * cellWidth,
                     0f,
-                    -84f + (row + Random.Range(0.15f, 0.85f)) * cellDepth);
-                if (Physics.CheckSphere(candidate + Vector3.up, 0.45f, ~0, QueryTriggerInteraction.Ignore))
-                    continue;
-                return candidate;
+                    -84f + (row + Random.Range(0.12f, 0.88f)) * cellDepth);
+                if (IsBotSpawnClear(candidate, 14f, 10f, 8f))
+                    return candidate;
             }
 
-            // Keep the final fallback in the assigned terrain cell too, rather than
-            // teleporting a competitor back beside the local player.
+            // If the assigned cell is blocked or too close to the player, search
+            // other map-wide positions without collapsing the lobby into one cluster.
+            for (int attempt = 0; attempt < 100; attempt++)
+            {
+                Vector3 candidate = new Vector3(
+                    Random.Range(-82f, 82f), 0f, Random.Range(-82f, 82f));
+                if (IsBotSpawnClear(candidate, 14f, 10f, 8f))
+                    return candidate;
+            }
+
+            // Last-resort fallback stays in the assigned cell; all normal placements
+            // have already been checked against obstacles and other actors.
             return new Vector3(
                 -84f + (column + 0.5f) * cellWidth,
                 0f,
                 -84f + (row + 0.5f) * cellDepth);
+        }
+
+        private bool IsBotSpawnClear(Vector3 candidate, float playerSpacing,
+            float competitorSpacing, float enemySpacing)
+        {
+            if (Physics.CheckSphere(candidate + Vector3.up, 0.45f, ~0,
+                QueryTriggerInteraction.Ignore))
+                return false;
+
+            if (localPlayer != null &&
+                Vector3.Distance(candidate, localPlayer.position) < playerSpacing)
+                return false;
+
+            for (int i = 0; i < bots.Count; i++)
+            {
+                if (bots[i] != null &&
+                    Vector3.Distance(candidate, bots[i].transform.position) < competitorSpacing)
+                    return false;
+            }
+
+            EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+            for (int i = 0; i < enemies.Length; i++)
+            {
+                if (enemies[i] != null &&
+                    Vector3.Distance(candidate, enemies[i].transform.position) < enemySpacing)
+                    return false;
+            }
+
+            return true;
         }
 
         private static void CreatePart(Transform parent, string partName, PrimitiveType type,
