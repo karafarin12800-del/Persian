@@ -992,17 +992,29 @@ namespace PersiaWar.Unity2D5D
             stageTwoVictorySequence = gameObject.AddComponent<StageTwoVictorySequence>();
             Transform localRoot = playerRoot != null ? playerRoot.transform
                 : (player != null ? player.transform : null);
-            stageTwoVictorySequence.Begin(localRoot);
+            Camera cinematicCamera = androidRuntimeCamera != null && androidRuntimeCamera.isActiveAndEnabled
+                ? androidRuntimeCamera
+                : (activeCamera != null && activeCamera.isActiveAndEnabled ? activeCamera : Camera.main);
+            stageTwoVictorySequence.Begin(localRoot, cinematicCamera);
         }
 
         private void DrawStageTwoCinematicOverlay()
         {
             if (stageTwoVictorySequence == null) return;
 
+            Rect fullScreen = new Rect(0f, 0f, Screen.width, Screen.height);
             float flash = stageTwoVictorySequence.FlashAlpha;
             if (flash > 0f)
-                Fill(new Rect(0f, 0f, Screen.width, Screen.height),
-                    new Color(1f, 0.91f, 0.60f, Mathf.Clamp01(flash)));
+            {
+                // A fast white hit and green energy tint signal the stealth field
+                // collapse; the ship itself materializes in place behind this flash.
+                Fill(fullScreen, new Color(1f, 1f, 1f, Mathf.Clamp01(flash * 0.86f)));
+                Fill(fullScreen, new Color(0.48f, 1f, 0.62f, Mathf.Clamp01(flash * 0.40f)));
+            }
+
+            float decloakGlow = stageTwoVictorySequence.DecloakGlowAlpha;
+            if (decloakGlow > 0.001f)
+                Fill(fullScreen, new Color(0.38f, 1f, 0.54f, decloakGlow * 0.09f));
 
             string caption = stageTwoVictorySequence.GetCaption();
             if (!string.IsNullOrEmpty(caption) && flash < 0.05f)
