@@ -86,11 +86,31 @@ namespace PersiaWar.Unity2D5D
             StartCoroutine(BuildWorldAfterStartup());
         }
 
+        /// <summary>For the temporary main-menu test entry, rebuilds a clean Stage 1 world.</summary>
+        public void PrepareStageOneWorldForTest()
+        {
+            ExtractionBeacon.ClearForStageTransition();
+            stageTwoRequested = false;
+            stageTwoLayoutVariant = 0;
+            prepareRequested = false;
+            IsWorldReady = false;
+            IsWorldPreparing = false;
+            WorldBuildFailed = false;
+            WorldBuildError = string.Empty;
+            extractionBeaconShown = false;
+            VillageGirlRescued = false;
+            captiveVillageGirlRoot = null;
+            PrepareWorld();
+        }
+
         /// <summary>Rebuilds the battlefield as the stage-two Iranian village.</summary>
         /// <remarks>Only called after stage one has been completed. The normal stage-one
         /// preparation path and layout are unchanged.</remarks>
         public void PrepareStageTwoVillage(int layoutVariant)
         {
+            // Remove the blue extraction beam left by Stage 1; Stage 2 should not
+            // begin with a persistent blue objective light.
+            ExtractionBeacon.ClearForStageTransition();
             stageTwoRequested = true;
             stageTwoLayoutVariant = Mathf.Clamp(layoutVariant, 0, 2);
             prepareRequested = false;
