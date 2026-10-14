@@ -326,7 +326,9 @@ namespace PersiaWar.Unity2D5D
                 {
                     Vector3 candidate = new Vector3(roadCoordinates[x], reference.y, roadCoordinates[z]);
                     float distance = (new Vector2(candidate.x - reference.x, candidate.z - reference.z)).sqrMagnitude;
-                    if (distance > 625f || distance >= bestDistance) continue;
+                    // Prefer the nearest clear road intersection, but search the
+                    // whole map if the streets beside the player are blocked.
+                    if (distance >= bestDistance) continue;
                     if (!IsLandingAreaClear(candidate)) continue;
 
                     bestDistance = distance;
