@@ -2408,10 +2408,15 @@ namespace PersiaWar.Unity2D5D
             EnsureAndroidPrimitiveMeshes();
 
             GameObject obj = new GameObject(objectName);
-            // Keep roof panels and other individual building details inside the same
-            // house hierarchy as the facade batches. The occlusion fader discovers
-            // the house root from CityBuildingCollider and fades all child renderers.
-            Transform parent = androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot;
+            // Stage-two courtyard walls/gate-side sections are independent occluders.
+            // Do not parent them to the house root: the fader must be able to fade a
+            // wall between camera and player without making the actual house disappear.
+            bool separateCourtyardSegment = stageTwoRequested &&
+                (objectName.IndexOf("VillageCourtyard", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 objectName.StartsWith("VillageWoodGate", System.StringComparison.OrdinalIgnoreCase));
+            Transform parent = separateCourtyardSegment
+                ? worldRoot
+                : (androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot);
             obj.transform.SetParent(parent, true);
             obj.transform.position = position;
             obj.transform.localScale = size;
