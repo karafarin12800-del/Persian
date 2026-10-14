@@ -94,12 +94,21 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         greenGlowMaterial = CreateMaterial("S3_UplinkEnergy", new Color(0.34f, 1f, 0.73f), new Color(0.10f, 0.9f, 0.55f));
         warningMaterial = CreateMaterial("S3_HazardWarning", new Color(1f, 0.23f, 0.12f), new Color(1f, 0.08f, 0.025f));
 
-        BuildLighting();
-        BuildGroundAndBoundary();
-        BuildAlienCity();
-        BuildFortressAndNineRoutes();
-        BuildHovercraftPatrols();
-        BuildLiftAndBeam();
+        try
+        {
+            BuildLighting();
+            BuildGroundAndBoundary();
+            BuildAlienCity();
+            BuildFortressAndNineRoutes();
+            BuildHovercraftPatrols();
+            BuildLiftAndBeam();
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError("PERSIA_STAGE3: world build failed: " + exception);
+            ClearWorldAndRestorePrevious();
+            return false;
+        }
 
         worldBuilt = true;
         isComplete = false;
