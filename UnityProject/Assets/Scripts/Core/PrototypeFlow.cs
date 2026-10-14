@@ -284,6 +284,21 @@ namespace PersiaWar.Unity2D5D
                 Vector2 gui = new Vector2(
                     touch.position.x,
                     Screen.height - touch.position.y);
+
+                // Keep a single native Android touch owner. The Stage 2 result
+                // screen only interprets this point; PrototypeFlow owns GetTouch.
+                GameSession session = GameSession.Instance;
+                if (stageNumber >= 2 && session != null && session.IsFinished)
+                {
+                    global::StageTwoResultsMenu resultsMenu =
+                        GetComponent<global::StageTwoResultsMenu>();
+                    if (resultsMenu != null && resultsMenu.HandleNativeTouch(gui))
+                    {
+                        StartupCheckpoint.Set("StageTwoResultActionByNativeTouch");
+                        return;
+                    }
+                }
+
                 if (!button.Contains(gui))
                     continue;
 
