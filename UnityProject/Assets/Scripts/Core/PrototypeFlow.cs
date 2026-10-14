@@ -305,6 +305,12 @@ namespace PersiaWar.Unity2D5D
             if (mode == ScreenMode.Match)
             {
 #if UNITY_ANDROID
+                if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
+                {
+                    DrawStageTwoCinematicOverlay();
+                    return;
+                }
+
                 DrawAndroidPresentationHUD();
                 DrawAndroidPauseControl();
                 DrawGirlRescueNotice();
@@ -952,6 +958,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (stageTwoVictorySequence != null) return;
             GateGameplay(false);
+            if (followCamera != null) followCamera.enabled = false;
             stageTwoVictorySequence = gameObject.AddComponent<StageTwoVictorySequence>();
             Transform localRoot = playerRoot != null ? playerRoot.transform
                 : (player != null ? player.transform : null);
