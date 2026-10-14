@@ -56,7 +56,7 @@ namespace PersiaWar.Unity2D5D
 
         private const float FlashDuration = 0.42f;
         private const float DescentDuration = 1.35f;
-        private const float BoardingDuration = 3.55f;
+        private const float BoardingDuration = 8.5f;
         private const float AscentDuration = 2.0f;
         private const float AscentHeight = 68f;
 
@@ -169,7 +169,7 @@ namespace PersiaWar.Unity2D5D
                 // First move toward the landing area around the ship, then climb
                 // aboard. The late cutoff keeps the scene moving even if an actor
                 // starts far away or is caught on nearby scenery.
-                bool approaching = phaseElapsed < 2.2f &&
+                bool approaching = phaseElapsed < 6.5f &&
                     Vector2.Distance(new Vector2(current.x, current.z),
                         new Vector2(approach.x, approach.z)) > 1.1f;
 
@@ -187,7 +187,7 @@ namespace PersiaWar.Unity2D5D
                 }
 
                 actor.Root.position = Vector3.MoveTowards(current, target,
-                    (approaching ? 7.5f : 9f) * deltaTime);
+                    (approaching ? 13.5f : 12.5f) * deltaTime);
 
                 if (!approaching && Vector3.Distance(actor.Root.position, target) <= 0.8f)
                     BoardActor(actor);
