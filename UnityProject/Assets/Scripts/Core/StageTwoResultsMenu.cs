@@ -16,6 +16,7 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
     private GUIStyle buttonStyle;
     private Texture2D pixel;
     private bool handledFinishedMatch;
+    private int lastAwardedSessionId = -1;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InstallForLoadedScene()
@@ -148,6 +149,16 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
             "\nScore: " + session.Score + "     Eliminations: " + session.EnemiesDefeated, textStyle);
 
         int coins = rank == 1 ? 300 : (rank == 2 ? 180 : (rank == 3 ? 120 : 40));
+        // Grant the match reward exactly once for this finished GameSession.
+        int sessionId = session.GetInstanceID();
+        if (lastAwardedSessionId != sessionId)
+        {
+            int balance = PlayerPrefs.GetInt("PW.StoreCoins", 500);
+            PlayerPrefs.SetInt("PW.StoreCoins", balance + coins);
+            PlayerPrefs.Save();
+            Write(flow, "storeCoins", balance + coins);
+            lastAwardedSessionId = sessionId;
+        }
         GUI.Label(new Rect(panel.x + 18, panel.y + 164 * scale, panel.width - 36, 30 * scale),
             "MATCH REWARD  +" + coins + " COINS", textStyle);
 
@@ -173,8 +184,7 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
             Write(flow, "spawnChosen", false);
             Write(flow, "stageTwoShopOpen", false);
             Write(flow, "mode", Enum.Parse(Read(flow, "mode").GetType(), "DropMap"));
-            Invoke(flow, "GateGameplay");
-            // GateGameplay takes a bool; invoke explicitly to stop the previous match.
+            // GateGameplay takes a bool; stop the previous match before changing screens.
             MethodInfo gate = flow.GetType().GetMethod("GateGameplay", BindingFlags.Instance | BindingFlags.NonPublic);
             if (gate != null) gate.Invoke(flow, new object[] { false });
             return;
