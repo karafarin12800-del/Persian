@@ -39,45 +39,32 @@ public sealed class StageTwoResultsMenu : MonoBehaviour
         ResolveFlow();
     }
 
-    private void Update()
+    /// <summary>
+    /// Called by PrototypeFlow, the existing authoritative Android touch reader.
+    /// Keeping native touch ownership there avoids creating a second input path.
+    /// </summary>
+    public bool HandleNativeTouch(Vector2 point)
     {
-        // Gameplay disables touch-to-mouse synthesis while the match owns input.
-        // Read real Android finger IDs here so result actions still work on device.
         GameSession session;
         if (!IsStageTwoFinished(out session))
-        {
-            if (session == null || !session.IsFinished)
-                rewardGrantedForCurrentFinish = false;
-            return;
-        }
-
-        if (!Application.isMobilePlatform || Input.touchCount == 0)
-            return;
+            return false;
 
         Rect primary, chooseMap, chooseCharacter, store, purchases, mainMenu;
         GetResultButtonRects(out primary, out chooseMap, out chooseCharacter,
             out store, out purchases, out mainMenu);
 
-        for (int i = 0; i < Input.touchCount; i++)
-        {
-            Touch touch = Input.GetTouch(i);
-            if (touch.phase != TouchPhase.Began)
-                continue;
+        if (primary.Contains(point) || mainMenu.Contains(point))
+            HandleResultAction("main-menu");
+        else if (chooseMap.Contains(point))
+            HandleResultAction("choose-map");
+        else if (chooseCharacter.Contains(point))
+            HandleResultAction("choose-character");
+        else if (store.Contains(point) || purchases.Contains(point))
+            HandleResultAction("store");
+        else
+            return false;
 
-            Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
-            if (primary.Contains(point) || mainMenu.Contains(point))
-                HandleResultAction("main-menu");
-            else if (chooseMap.Contains(point))
-                HandleResultAction("choose-map");
-            else if (chooseCharacter.Contains(point))
-                HandleResultAction("choose-character");
-            else if (store.Contains(point) || purchases.Contains(point))
-                HandleResultAction("store");
-            else
-                continue;
-
-            return;
-        }
+        return true;
     }
 
     private void HandleResultAction(string destination)
