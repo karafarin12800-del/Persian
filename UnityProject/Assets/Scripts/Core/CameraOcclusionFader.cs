@@ -155,13 +155,36 @@ namespace PersiaWar.Unity2D5D
         {
             if (col == null) return;
 
-            // Stage two fades the complete house (walls, roof and attached details)
-            // whenever any part of that house intersects a camera-to-player sightline.
-            // This avoids a roof or facade detail remaining opaque over the player.
+            // Stage two fades only what the camera-to-player sightline actually hits.
+            // Courtyard walls and individual house wall/roof pieces have their own
+            // renderer and collider, so entering a yard never fades the whole house.
+            // Trees remain grouped and fade as one recognizable tree.
             if (stageTwoOcclusionMode)
             {
+                string hitName = col.gameObject.name.ToLowerInvariant();
+                bool fadeOnlyHitPiece =
+                    hitName.Contains("courtyard") ||
+                    hitName.Contains("fadeablehousewall") ||
+                    hitName.Contains("fadeableflatroof");
+
+                if (fadeOnlyHitPiece)
+                {
+                    Renderer direct = col.GetComponent<Renderer>();
+                    if (direct != null && direct.enabled)
+                    {
+                        blocked.Add(direct);
+                        return;
+                    }
+                }
+
                 Transform stageTwoRoot = FindBuildingOrTreeRoot(col.transform);
-                if (stageTwoRoot == null) return;
+                if (stageTwoRoot == null)
+                {
+                    Renderer direct = col.GetComponent<Renderer>();
+                    if (direct != null && direct.enabled)
+                        blocked.Add(direct);
+                    return;
+                }
 
                 Renderer[] stageTwoRenderers = stageTwoRoot.GetComponentsInChildren<Renderer>(false);
                 for (int i = 0; i < stageTwoRenderers.Length; i++)
