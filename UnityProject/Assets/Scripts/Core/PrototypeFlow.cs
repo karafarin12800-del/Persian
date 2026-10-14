@@ -2718,7 +2718,13 @@ namespace PersiaWar.Unity2D5D
                 "PLAY AGAIN",
                 buttonStyle))
             {
-                if (stageNumber == 2)
+                if (stageTestRun)
+                {
+                    // Keep the saved campaign stage while restarting the requested test;
+                    // reloading the scene here would lose this temporary test-mode state.
+                    BeginStageTestEntry(stageNumber);
+                }
+                else if (stageNumber == 2)
                 {
                     Time.timeScale = 1f;
                     if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
