@@ -610,15 +610,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     }
 
     private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale,
-        Material material, bool collider, Quaternion rotation = default(Quaternion))
+        Material material, bool collider, Quaternion? rotation = null)
     {
         GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
         box.name = objectName;
         box.transform.SetParent(worldRoot, false);
         box.transform.position = position;
         box.transform.localScale = scale;
-        if (rotation != default(Quaternion))
-            box.transform.rotation = rotation;
+        if (rotation.HasValue)
+            box.transform.rotation = rotation.Value;
         SetRenderer(box, material);
         if (!collider)
             RemoveCollider(box);
