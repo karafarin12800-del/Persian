@@ -2408,13 +2408,60 @@ namespace PersiaWar.Unity2D5D
                 "SCORE  " + session.Score + "    ENEMIES  " + session.EnemiesDefeated,
                 smallStyle);
 
-            if (GUI.Button(
+            if (stageNumber == 2 && session.PlayerWon)
+            {
+                float buttonGap = 14f;
+                float buttonWidth = (panel.width - 64f - buttonGap) * 0.5f;
+                float buttonY = panel.y + panel.height - 82f;
+                if (GUI.Button(
+                    new Rect(panel.x + 32f, buttonY, buttonWidth, 54f),
+                    "PLAY AGAIN",
+                    buttonStyle))
+                {
+                    session.RestartMission();
+                }
+
+                if (GUI.Button(
+                    new Rect(panel.x + 32f + buttonWidth + buttonGap, buttonY, buttonWidth, 54f),
+                    "STAGE 3 TEST",
+                    buttonStyle))
+                {
+                    BeginStageThreeTestEntry();
+                }
+            }
+            else if (GUI.Button(
                 new Rect(panel.x + 80f, panel.y + panel.height - 82f, panel.width - 160f, 54f),
                 "PLAY AGAIN",
                 buttonStyle))
             {
                 session.RestartMission();
             }
+        }
+
+        // Dedicated shortcut so Stage 3 can be entered from the Stage 2 result
+        // screen without replaying Stage 1. Stage 3 world construction is added
+        // separately; this only establishes the independent test entry point.
+        private void BeginStageThreeTestEntry()
+        {
+            Time.timeScale = 1f;
+            stageNumber = 3;
+            stageTwoShopOpen = false;
+            stageTwoLobbyRunning = false;
+            stageTwoLobbyReady = true;
+            startingMatch = false;
+            spawnChosen = false;
+            matchPaused = false;
+            resultOverlayStartTime = -1f;
+            mode = ScreenMode.HeroSelect;
+
+            if (GameSession.Instance != null)
+                GameSession.Instance.ResetMatch();
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            GateGameplay(false);
+
+            StartupCheckpoint.Set("StageThreeTestEntryOpened");
+            Debug.Log("PERSIA_STAGE3: direct test entry opened from Stage 2 results");
         }
 
         private void DrawAndroidStabilityStatus()
