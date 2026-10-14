@@ -30,14 +30,17 @@ namespace PersiaWar.Unity2D5D
             public Vector3 OriginalLocalScale;
             public Collider[] Colliders;
             public bool[] ColliderWasEnabled;
+            public Renderer[] Renderers;
+            public bool[] RendererWasEnabled;
             public Rigidbody[] Bodies;
             public bool[] BodyWasKinematic;
             public bool[] BodyDetectedCollisions;
             public Vector3[] BodyVelocity;
             public Vector3[] BodyAngularVelocity;
             public Vector3 ApproachPosition;
-            public Vector3 DeckLocalPosition;
+            public Vector3 InteriorLocalPosition;
             public bool Boarded;
+            public bool HiddenInsideShip;
         }
 
         private readonly List<ActorState> actors = new List<ActorState>();
@@ -46,6 +49,9 @@ namespace PersiaWar.Unity2D5D
         private Camera cinematicCamera;
         private Vector3 originalCameraPosition;
         private Quaternion originalCameraRotation;
+        private float originalCameraFieldOfView;
+        private float originalCameraOrthographicSize;
+        private bool cameraWasOrthographic;
         private Vector3 cameraStartPosition;
         private Quaternion cameraStartRotation;
         private Vector3 cameraTargetPosition;
@@ -69,9 +75,10 @@ namespace PersiaWar.Unity2D5D
         private const float CameraSettleDuration = 0.58f;
         private const float FlashDuration = 0.20f;
         private const float DecloakDuration = 2.0f;
-        private const float BoardingDuration = 5.2f;
+        private const float BoardingDuration = 6.2f;
         private const float AscentDuration = 2.0f;
         private const float AscentHeight = 70f;
+        private const float DecloakDistance = 30f;
 
         public bool IsRunning { get; private set; }
         public bool IsComplete { get; private set; }
@@ -119,6 +126,9 @@ namespace PersiaWar.Unity2D5D
             {
                 originalCameraPosition = cinematicCamera.transform.position;
                 originalCameraRotation = cinematicCamera.transform.rotation;
+                originalCameraFieldOfView = cinematicCamera.fieldOfView;
+                originalCameraOrthographicSize = cinematicCamera.orthographicSize;
+                cameraWasOrthographic = cinematicCamera.orthographic;
                 cameraStartPosition = originalCameraPosition;
                 cameraStartRotation = originalCameraRotation;
                 cameraStateCaptured = true;
@@ -141,12 +151,12 @@ namespace PersiaWar.Unity2D5D
             toShip.y = 0f;
             shipForward = toShip.sqrMagnitude > 0.001f ? toShip.normalized : viewForward;
 
-            // Reframe both hero and nearby reveal area. PrototypeFlow temporarily
-            // releases camera tracking while this sequence runs.
+            // Keep the hero near screen centre while pulling back enough to show
+            // the ship 30 metres away in the same cinematic shot.
             if (cinematicCamera != null)
             {
-                cameraTargetPosition = localPlayer.position - viewForward * 12.8f + Vector3.up * 7.6f;
-                Vector3 lookTarget = localPlayer.position + viewForward * 3.0f + Vector3.up * 1.25f;
+                cameraTargetPosition = localPlayer.position - viewForward * 19f + Vector3.up * 11.5f;
+                Vector3 lookTarget = localPlayer.position + Vector3.up * 1.2f;
                 Vector3 lookDirection = lookTarget - cameraTargetPosition;
                 cameraTargetRotation = lookDirection.sqrMagnitude > 0.001f
                     ? Quaternion.LookRotation(lookDirection, Vector3.up)
@@ -164,10 +174,9 @@ namespace PersiaWar.Unity2D5D
             {
                 ActorState actor = actors[i];
                 if (actor == null || actor.Root == null) continue;
-                // The approach point sits just behind the ship's rear edge;
-                // the deck point is inside the visible upper surface.
-                actor.ApproachPosition = shipRoot.TransformPoint(new Vector3(0f, 0f, -6.2f));
-                actor.DeckLocalPosition = new Vector3(0f, 1.25f, -1.25f);
+                // Approach the rear ramp and then enter the passenger cabin.
+                actor.ApproachPosition = shipRoot.TransformPoint(new Vector3(0f, -0.50f, -6.35f));
+                actor.InteriorLocalPosition = new Vector3(0f, -0.57f, -2.25f);
             }
 
             phaseElapsed = 0f;
@@ -176,7 +185,7 @@ namespace PersiaWar.Unity2D5D
             IsComplete = false;
             cleaned = false;
 
-            Debug.Log("PERSIA_STAGE2_END: camera centering; hidden ship placed 10-15m ahead of local hero.");
+            Debug.Log("PERSIA_STAGE2_END: camera framing; hidden ship placed 30m ahead on clear ground.");
         }
 
         private void Update()
@@ -198,6 +207,10 @@ namespace PersiaWar.Unity2D5D
                             Vector3.Lerp(cameraStartPosition, cameraTargetPosition, eased);
                         cinematicCamera.transform.rotation =
                             Quaternion.Slerp(cameraStartRotation, cameraTargetRotation, eased);
+                        if (cameraWasOrthographic)
+                            cinematicCamera.orthographicSize = Mathf.Max(originalCameraOrthographicSize, 20f);
+                        else
+                            cinematicCamera.fieldOfView = Mathf.Max(originalCameraFieldOfView, 78f);
                     }
 
                     if (t >= 1f)
