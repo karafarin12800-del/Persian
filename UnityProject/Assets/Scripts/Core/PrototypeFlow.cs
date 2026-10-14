@@ -2261,8 +2261,6 @@ namespace PersiaWar.Unity2D5D
             player.SetGroundedPosition(new Vector3(spawnWorld.x, 0f, spawnWorld.y));
             player.LockMovementFor(0.50f);
             ApplyHeroStyle(selectedHero);
-            if (stageNumber == 3 && stageThreeWorldBuilder != null)
-                stageThreeWorldBuilder.ConfigurePlayer(player, activeCamera);
 
 #if UNITY_ANDROID
             // Use a completely isolated runtime camera for Android. It has no
@@ -2296,6 +2294,9 @@ namespace PersiaWar.Unity2D5D
             if (activeCamera != null)
                 activeCamera.enabled = true;
 #endif
+
+            if (stageNumber == 3 && stageThreeWorldBuilder != null)
+                stageThreeWorldBuilder.ConfigurePlayer(player, activeCamera);
 
             if (activeCamera != null)
                 activeCamera.enabled = false;
