@@ -170,7 +170,7 @@ namespace PersiaWar.Unity2D5D
                 // aboard. The late cutoff keeps the scene moving even if an actor
                 // starts far away or is caught on nearby scenery.
                 bool approaching = phaseElapsed < 2.2f &&
-                    Vector3.Distance(new Vector2(current.x, current.z),
+                    Vector2.Distance(new Vector2(current.x, current.z),
                         new Vector2(approach.x, approach.z)) > 1.1f;
 
                 Vector3 target = approaching
