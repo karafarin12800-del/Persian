@@ -145,6 +145,16 @@ namespace PersiaWar.Unity2D5D
                 viewForward = Vector3.forward;
 
             Vector3 landingGround = FindDecloakPoint(localPlayer.position, viewForward, localPlayer);
+            if (float.IsNaN(landingGround.x) || float.IsNaN(landingGround.y) ||
+                float.IsNaN(landingGround.z))
+            {
+                FinishAndCleanup();
+                IsRunning = false;
+                IsComplete = true;
+                Phase = SequencePhase.Complete;
+                return;
+            }
+
             groundY = landingGround.y;
             landingPosition = new Vector3(landingGround.x, groundY + 0.92f, landingGround.z);
             Vector3 toShip = landingPosition - localPlayer.position;
@@ -582,17 +592,39 @@ namespace PersiaWar.Unity2D5D
             darkMaterial = CreateMaterial(new Color(0.075f, 0.14f, 0.22f, 1f), true, false);
             cyanMaterial = CreateMaterial(new Color(0.32f, 1f, 0.47f, 1f), true, true);
 
-            CreateShipPart("MainHull", PrimitiveType.Sphere, new Vector3(0f, 0f, 0f),
-                new Vector3(18f, 1.55f, 9f), hullMaterial);
-            CreateShipPart("LowerKeel", PrimitiveType.Cube, new Vector3(0f, -0.22f, -0.15f),
-                new Vector3(13f, 0.55f, 6.1f), darkMaterial);
-            CreateShipPart("UpperDeck", PrimitiveType.Cube, new Vector3(0f, 0.48f, 0.15f),
-                new Vector3(10f, 0.34f, 4.6f), hullMaterial);
-            CreateShipPart("CommandDome", PrimitiveType.Sphere, new Vector3(0f, 0.92f, 0.45f),
-                new Vector3(5.4f, 1.15f, 3.5f), hullMaterial);
-            CreateShipPart("CentralSpine", PrimitiveType.Cube, new Vector3(0f, 0.90f, -1.6f),
-                new Vector3(7.2f, 0.52f, 1.2f), darkMaterial);
+            // Split the hull into port/starboard lobes to leave a real open
+            // passenger channel down the centre instead of a solid hull roof.
+            CreateShipPart("PortHull", PrimitiveType.Sphere, new Vector3(-6.5f, 0f, 0f),
+                new Vector3(8.8f, 1.45f, 9.0f), hullMaterial);
+            CreateShipPart("StarboardHull", PrimitiveType.Sphere, new Vector3(6.5f, 0f, 0f),
+                new Vector3(8.8f, 1.45f, 9.0f), hullMaterial);
 
+            CreateShipPart("PortKeel", PrimitiveType.Cube, new Vector3(-3.8f, -0.58f, -0.15f),
+                new Vector3(5.6f, 0.36f, 6.1f), darkMaterial);
+            CreateShipPart("StarboardKeel", PrimitiveType.Cube, new Vector3(3.8f, -0.58f, -0.15f),
+                new Vector3(5.6f, 0.36f, 6.1f), darkMaterial);
+
+            // An open-stern passenger bay. The hero walks up the ramp and through
+            // the centre aisle; the bay is enclosed by low sidewalls, not a roof.
+            CreateShipPart("PassengerCabinFloor", PrimitiveType.Cube,
+                new Vector3(0f, -0.72f, -1.85f), new Vector3(3.35f, 0.14f, 4.65f), darkMaterial);
+            CreateShipPart("PassengerCabinPortWall", PrimitiveType.Cube,
+                new Vector3(-1.72f, 0.12f, -1.85f), new Vector3(0.18f, 1.72f, 4.65f), darkMaterial);
+            CreateShipPart("PassengerCabinStarboardWall", PrimitiveType.Cube,
+                new Vector3(1.72f, 0.12f, -1.85f), new Vector3(0.18f, 1.72f, 4.65f), darkMaterial);
+            CreateShipPart("PassengerCabinForwardBulkhead", PrimitiveType.Cube,
+                new Vector3(0f, 0.12f, 0.43f), new Vector3(3.35f, 1.72f, 0.18f), darkMaterial);
+            CreateShipPart("RearEntryRamp", PrimitiveType.Cube,
+                new Vector3(0f, -0.72f, -5.20f), new Vector3(3.8f, 0.14f, 2.65f), darkMaterial);
+
+            CreateShipPart("PortDeck", PrimitiveType.Cube, new Vector3(-4.35f, 0.48f, 0.15f),
+                new Vector3(3.1f, 0.34f, 4.6f), hullMaterial);
+            CreateShipPart("StarboardDeck", PrimitiveType.Cube, new Vector3(4.35f, 0.48f, 0.15f),
+                new Vector3(3.1f, 0.34f, 4.6f), hullMaterial);
+            CreateShipPart("CommandDome", PrimitiveType.Sphere, new Vector3(0f, 0.92f, 1.0f),
+                new Vector3(5.4f, 1.15f, 3.5f), hullMaterial);
+            CreateShipPart("CentralSpine", PrimitiveType.Cube, new Vector3(0f, 0.90f, 2.0f),
+                new Vector3(7.2f, 0.52f, 1.2f), darkMaterial);
             CreateShipPart("PortWing", PrimitiveType.Cube, new Vector3(-7.2f, -0.12f, 0.4f),
                 new Vector3(5.3f, 0.52f, 2.4f), darkMaterial);
             CreateShipPart("StarboardWing", PrimitiveType.Cube, new Vector3(7.2f, -0.12f, 0.4f),
@@ -613,10 +645,11 @@ namespace PersiaWar.Unity2D5D
 
             for (int window = -3; window <= 3; window++)
             {
-                CreateShipPart("DeckLight", PrimitiveType.Cube, new Vector3(window * 1.25f, 0.76f, 2.1f),
-                    new Vector3(0.42f, 0.12f, 0.14f), cyanMaterial);
-                CreateShipPart("DeckLight", PrimitiveType.Cube, new Vector3(window * 1.25f, 0.76f, -2.1f),
-                    new Vector3(0.42f, 0.12f, 0.14f), cyanMaterial);
+                float z = window * 1.05f;
+                CreateShipPart("DeckLight", PrimitiveType.Cube, new Vector3(-4.35f, 0.76f, z),
+                    new Vector3(0.16f, 0.12f, 0.42f), cyanMaterial);
+                CreateShipPart("DeckLight", PrimitiveType.Cube, new Vector3(4.35f, 0.76f, z),
+                    new Vector3(0.16f, 0.12f, 0.42f), cyanMaterial);
             }
         }
 
@@ -913,6 +946,11 @@ namespace PersiaWar.Unity2D5D
             {
                 cinematicCamera.transform.position = originalCameraPosition;
                 cinematicCamera.transform.rotation = originalCameraRotation;
+                cinematicCamera.orthographic = cameraWasOrthographic;
+                if (cameraWasOrthographic)
+                    cinematicCamera.orthographicSize = originalCameraOrthographicSize;
+                else
+                    cinematicCamera.fieldOfView = originalCameraFieldOfView;
             }
 
             if (greenSparks != null) Destroy(greenSparks.gameObject);
