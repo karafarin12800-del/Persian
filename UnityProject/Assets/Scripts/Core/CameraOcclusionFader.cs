@@ -169,10 +169,10 @@ namespace PersiaWar.Unity2D5D
 
                 if (fadeOnlyHitPiece)
                 {
-                    Renderer direct = col.GetComponent<Renderer>();
-                    if (direct != null && direct.enabled)
+                    Renderer directPiece = col.GetComponent<Renderer>();
+                    if (directPiece != null && directPiece.enabled)
                     {
-                        blocked.Add(direct);
+                        blocked.Add(directPiece);
                         return;
                     }
                 }
@@ -180,9 +180,9 @@ namespace PersiaWar.Unity2D5D
                 Transform stageTwoRoot = FindBuildingOrTreeRoot(col.transform);
                 if (stageTwoRoot == null)
                 {
-                    Renderer direct = col.GetComponent<Renderer>();
-                    if (direct != null && direct.enabled)
-                        blocked.Add(direct);
+                    Renderer fallbackRenderer = col.GetComponent<Renderer>();
+                    if (fallbackRenderer != null && fallbackRenderer.enabled)
+                        blocked.Add(fallbackRenderer);
                     return;
                 }
 
