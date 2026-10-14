@@ -440,79 +440,82 @@ namespace PersiaWar.Unity2D5D
             forward = GetFlatDirection(forward);
             if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
 
-            float[] distances = { 12.5f, 10.5f, 14.5f };
-            float[] angleOffsets = { 0f, 22f, -22f, 42f, -42f, 65f, -65f, 92f, -92f, 125f, -125f, 160f, 180f };
-            Vector3 best = reference + forward * 12.5f;
-            float bestScore = float.MaxValue;
-            bool foundClear = false;
-
-            for (int d = 0; d < distances.Length; d++)
+            // Search straight ahead first, then fan around it in five-degree steps.
+            // Do not clamp a position: the final location must actually be 30m away.
+            List<float> angleOffsets = new List<float> { 0f };
+            for (float angle = 5f; angle < 180f; angle += 5f)
             {
-                for (int a = 0; a < angleOffsets.Length; a++)
-                {
-                    Vector3 direction = Quaternion.AngleAxis(angleOffsets[a], Vector3.up) * forward;
-                    Vector3 candidate = reference + direction * distances[d];
-                    candidate.x = Mathf.Clamp(candidate.x, -83f, 83f);
-                    candidate.z = Mathf.Clamp(candidate.z, -83f, 83f);
-                    candidate.y = reference.y;
+                angleOffsets.Add(angle);
+                angleOffsets.Add(-angle);
+            }
+            angleOffsets.Add(180f);
 
-                    float actualDistance = Vector2.Distance(
-                        new Vector2(candidate.x, candidate.z),
-                        new Vector2(reference.x, reference.z));
-                    if (actualDistance < 10f || actualDistance > 15.25f) continue;
-                    if (!IsLandingAreaClear(candidate)) continue;
+            for (int a = 0; a < angleOffsets.Count; a++)
+            {
+                float offset = angleOffsets[a];
+                Vector3 direction = Quaternion.AngleAxis(offset, Vector3.up) * forward;
+                Vector3 candidate = reference + direction * DecloakDistance;
 
-                    bool clearApproach = HasClearApproach(reference, candidate, localPlayer);
-                    float score = Mathf.Abs(actualDistance - 12.5f) + (clearApproach ? 0f : 20f);
-                    if (score >= bestScore) continue;
+                if (candidate.x < -83f || candidate.x > 83f ||
+                    candidate.z < -83f || candidate.z > 83f)
+                    continue;
 
-                    bestScore = score;
-                    best = candidate;
-                    foundClear = true;
-                }
-                if (foundClear && bestScore < 1.1f) break;
+                candidate.y = 0f;
+                float actualDistance = Vector2.Distance(
+                    new Vector2(candidate.x, candidate.z),
+                    new Vector2(reference.x, reference.z));
+                if (Mathf.Abs(actualDistance - DecloakDistance) > 0.20f)
+                    continue;
+
+                Quaternion shipRotation = Quaternion.LookRotation(direction, Vector3.up);
+                if (!IsLandingAreaClear(candidate, shipRotation, localPlayer))
+                    continue;
+                if (!HasClearApproach(reference, candidate, localPlayer))
+                    continue;
+
+                RaycastHit hit;
+                Vector3 rayOrigin = new Vector3(candidate.x, Mathf.Max(80f, reference.y + 80f), candidate.z);
+                if (Physics.Raycast(rayOrigin, Vector3.down, out hit, 180f,
+                    ~0, QueryTriggerInteraction.Ignore))
+                    candidate.y = hit.point.y;
+
+                Debug.Log("PERSIA_STAGE2_END: clear decloak site selected at " +
+                    Vector2.Distance(new Vector2(reference.x, reference.z),
+                        new Vector2(candidate.x, candidate.z)).ToString("F1") + "m; angle=" +
+                    offset.ToString("F0") + " degrees.");
+                return candidate;
             }
 
-            if (!foundClear)
-            {
-                // Last-resort placement still respects the requested range as much
-                // as map bounds allow, rather than spawning the ship on the hero.
-                best = reference + forward * 12.5f;
-                best.x = Mathf.Clamp(best.x, -83f, 83f);
-                best.z = Mathf.Clamp(best.z, -83f, 83f);
-                best.y = reference.y;
-            }
-
-            RaycastHit hit;
-            Vector3 rayOrigin = new Vector3(best.x, Mathf.Max(80f, reference.y + 80f), best.z);
-            if (Physics.Raycast(rayOrigin, Vector3.down, out hit, 180f, ~0, QueryTriggerInteraction.Ignore))
-                best.y = hit.point.y;
-            else
-                best.y = reference.y;
-
-            Debug.Log("PERSIA_STAGE2_END: decloak point distance=" +
-                Vector2.Distance(new Vector2(reference.x, reference.z), new Vector2(best.x, best.z)).ToString("F1") + "m.");
-            return best;
+            // A ship must never appear inside a building or on top of another actor.
+            // If the map offers no valid 30m landing/approach point, skip the scene
+            // instead of teleporting the ship or hero into occupied space.
+            Debug.LogError("PERSIA_STAGE2_END: no clear ground and unobstructed path found at 30m.");
+            return new Vector3(float.NaN, float.NaN, float.NaN);
         }
 
         private bool HasClearApproach(Vector3 fromPosition, Vector3 toPosition, Transform localPlayer)
         {
-            Vector3 from = fromPosition + Vector3.up * 1.1f;
-            Vector3 to = toPosition + Vector3.up * 1.1f;
+            Vector3 from = fromPosition + Vector3.up * 1.05f;
+            Vector3 to = toPosition + Vector3.up * 1.05f;
             Vector3 delta = to - from;
             float distance = delta.magnitude;
             if (distance < 0.1f) return true;
 
-            RaycastHit[] hits = Physics.RaycastAll(
-                from, delta / distance, distance, ~0, QueryTriggerInteraction.Ignore);
+            // Sweep the character-width corridor rather than using a centre ray,
+            // so automatic boarding will not cut through walls, cars or fences.
+            RaycastHit[] hits = Physics.SphereCastAll(
+                from, 0.42f, delta / distance, distance,
+                ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < hits.Length; i++)
             {
                 Collider collider = hits[i].collider;
                 if (collider == null || collider.isTrigger) continue;
                 Transform hit = collider.transform;
-                if (localPlayer != null && (hit == localPlayer || hit.IsChildOf(localPlayer) || localPlayer.IsChildOf(hit)))
+                if (localPlayer != null &&
+                    (hit == localPlayer || hit.IsChildOf(localPlayer) || localPlayer.IsChildOf(hit)))
                     continue;
                 if (hit.GetComponentInParent<PlayerController>() != null ||
+                    hit.GetComponentInParent<StageTwoBotCompetitor>() != null ||
                     hit.GetComponentInParent<EnemyChase>() != null ||
                     hit.GetComponentInParent<PickupItem>() != null)
                     continue;
@@ -527,39 +530,47 @@ namespace PersiaWar.Unity2D5D
             return direction.sqrMagnitude > 0.001f ? direction.normalized : Vector3.zero;
         }
 
-        private bool IsLandingAreaClear(Vector3 candidate)
+        private bool IsLandingAreaClear(Vector3 candidate, Quaternion shipRotation, Transform localPlayer)
         {
-            // The lower edge of this probe stays above the terrain, so the ground
+            // Check the full roughly 21m x 11m footprint at hull height, plus
+            // the space above it. Both probes start above the ground so the floor
             // itself does not make every candidate appear occupied.
-            Collider[] overlaps = Physics.OverlapBox(
-                candidate + Vector3.up * 4.2f,
-                new Vector3(4.5f, 2.2f, 8.0f),
-                Quaternion.identity,
+            Collider[] lowOverlaps = Physics.OverlapBox(
+                candidate + Vector3.up * 2.30f,
+                new Vector3(10.8f, 2.15f, 5.6f),
+                shipRotation,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+            Collider[] highOverlaps = Physics.OverlapBox(
+                candidate + Vector3.up * 6.10f,
+                new Vector3(10.8f, 3.50f, 5.6f),
+                shipRotation,
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
+            if (HasBlockingOverlap(lowOverlaps, localPlayer)) return false;
+            if (HasBlockingOverlap(highOverlaps, localPlayer)) return false;
+            return true;
+        }
+
+        private static bool HasBlockingOverlap(Collider[] overlaps, Transform localPlayer)
+        {
             for (int i = 0; i < overlaps.Length; i++)
             {
                 Collider collider = overlaps[i];
-                if (collider == null) continue;
+                if (collider == null || collider.isTrigger) continue;
                 Transform hitTransform = collider.transform;
-                bool belongsToActor = false;
-                for (int a = 0; a < actors.Count; a++)
-                {
-                    Transform root = actors[a].Root;
-                    if (root != null && (hitTransform == root || hitTransform.IsChildOf(root)))
-                    {
-                        belongsToActor = true;
-                        break;
-                    }
-                }
-                if (!belongsToActor &&
-                    hitTransform.GetComponentInParent<PlayerController>() == null &&
-                    hitTransform.GetComponentInParent<StageTwoBotCompetitor>() == null)
-                    return false;
-            }
 
-            return true;
+                if (localPlayer != null &&
+                    (hitTransform == localPlayer || hitTransform.IsChildOf(localPlayer) ||
+                     localPlayer.IsChildOf(hitTransform)))
+                    continue;
+
+                // Any other solid object—including a house, tree, car, fence or
+                // competitor—means that this is not clear landing space.
+                return true;
+            }
+            return false;
         }
 
         private void BuildShip()
