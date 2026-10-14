@@ -84,6 +84,9 @@ namespace PersiaWar.Unity2D5D
             shipStartPosition = landingPosition + Vector3.up * 34f;
 
             BuildShip();
+            // Rotate the long hull axis along the nearby road corridor so its
+            // wings are less likely to clip the village buildings while landing.
+            shipRoot.rotation = Quaternion.Euler(0f, 90f, 0f);
             shipRoot.position = shipStartPosition;
             BuildEnergyBeam();
 
@@ -149,6 +152,61 @@ namespace PersiaWar.Unity2D5D
         {
             Phase = next;
             phaseElapsed = 0f;
+        }
+
+        private void UpdateBoardingActors()
+        {
+            float deltaTime = Mathf.Max(0f, Time.unscaledDeltaTime);
+            for (int i = 0; i < actors.Count; i++)
+            {
+                ActorState actor = actors[i];
+                if (actor == null || actor.Root == null || actor.Boarded) continue;
+
+                Vector3 current = actor.Root.position;
+                Vector3 approach = actor.ApproachPosition;
+                approach.y = current.y;
+
+                // First move toward the landing area around the ship, then climb
+                // aboard. The late cutoff keeps the scene moving even if an actor
+                // starts far away or is caught on nearby scenery.
+                bool approaching = phaseElapsed < 2.2f &&
+                    Vector3.Distance(new Vector2(current.x, current.z),
+                        new Vector2(approach.x, approach.z)) > 1.1f;
+
+                Vector3 target = approaching
+                    ? approach
+                    : shipRoot.TransformPoint(actor.DeckLocalPosition);
+
+                Vector3 delta = target - current;
+                Vector3 flatDirection = new Vector3(delta.x, 0f, delta.z);
+                if (flatDirection.sqrMagnitude > 0.02f)
+                {
+                    Quaternion facing = Quaternion.LookRotation(flatDirection.normalized, Vector3.up);
+                    actor.Root.rotation = Quaternion.Slerp(actor.Root.rotation, facing,
+                        1f - Mathf.Exp(-7f * deltaTime));
+                }
+
+                actor.Root.position = Vector3.MoveTowards(current, target,
+                    (approaching ? 7.5f : 9f) * deltaTime);
+
+                if (!approaching && Vector3.Distance(actor.Root.position, target) <= 0.8f)
+                    BoardActor(actor);
+            }
+        }
+
+        private void BoardActor(ActorState actor)
+        {
+            if (actor == null || actor.Root == null || actor.Boarded || shipRoot == null) return;
+            actor.Root.SetParent(shipRoot, true);
+            actor.Root.localPosition = actor.DeckLocalPosition;
+            actor.Root.localRotation = Quaternion.identity;
+            actor.Boarded = true;
+        }
+
+        private void BoardAnyRemainingActors()
+        {
+            for (int i = 0; i < actors.Count; i++)
+                BoardActor(actors[i]);
         }
 
         private void CollectLivingActors(Transform localPlayer)
