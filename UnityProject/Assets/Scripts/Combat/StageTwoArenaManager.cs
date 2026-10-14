@@ -67,23 +67,32 @@ namespace PersiaWar.Unity2D5D
 
         private Vector3 FindBotSpawn(int index, int total)
         {
+            // Stratify offline competitors into separate cells across the whole map.
+            // This avoids placing all competitors around the local player in one ring.
+            int columns = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Max(1, total)));
+            int rows = Mathf.CeilToInt(total / (float)Mathf.Max(1, columns));
+            int column = index % columns;
+            int row = index / columns;
+            float cellWidth = 168f / columns;
+            float cellDepth = 168f / rows;
+
             for (int attempt = 0; attempt < 40; attempt++)
             {
-                float angle = (index / (float)Mathf.Max(1, total)) * Mathf.PI * 2f + Random.Range(-0.28f, 0.28f);
-                float radius = Random.Range(24f, 48f);
-                Vector3 candidate = (localPlayer != null ? localPlayer.position : Vector3.zero)
-                    + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
-                candidate.y = 0f;
+                Vector3 candidate = new Vector3(
+                    -84f + (column + Random.Range(0.15f, 0.85f)) * cellWidth,
+                    0f,
+                    -84f + (row + Random.Range(0.15f, 0.85f)) * cellDepth);
                 if (Physics.CheckSphere(candidate + Vector3.up, 0.45f, ~0, QueryTriggerInteraction.Ignore))
                     continue;
                 return candidate;
             }
 
-            float fallbackAngle = (index + 1) * Mathf.PI * 2f / Mathf.Max(1, total);
-            Vector3 fallback = (localPlayer != null ? localPlayer.position : Vector3.zero)
-                + new Vector3(Mathf.Cos(fallbackAngle), 0f, Mathf.Sin(fallbackAngle)) * (30f + index * 1.5f);
-            fallback.y = 0f;
-            return fallback;
+            // Keep the final fallback in the assigned terrain cell too, rather than
+            // teleporting a competitor back beside the local player.
+            return new Vector3(
+                -84f + (column + 0.5f) * cellWidth,
+                0f,
+                -84f + (row + 0.5f) * cellDepth);
         }
 
         private static void CreatePart(Transform parent, string partName, PrimitiveType type,
