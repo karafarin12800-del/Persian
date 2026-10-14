@@ -108,9 +108,8 @@ namespace PersiaWar.Unity2D5D
                 float distance = (candidate.transform.position - transform.position).sqrMagnitude;
                 if (distance >= nearestDistance) continue;
 
-                float worldDistance = Mathf.Sqrt(distance);
-                if (!HasLineOfSight(candidate, worldDistance)) continue;
-
+                // Select nearby enemies even when a wall blocks the shot; the
+                // movement logic can then flank around the obstacle instead of roaming away.
                 nearestDistance = distance;
                 currentTarget = candidate;
             }
