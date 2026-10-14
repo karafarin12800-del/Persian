@@ -228,18 +228,16 @@ namespace PersiaWar.Unity2D5D
 
                 for (int attempt = 0; attempt < attemptsPerEnemy; attempt++)
                 {
+                    // Stage-two drops must be visible in the active camera area,
+                    // not silently scattered 45-100 metres away across the map.
+                    // Keep each wave around the player while varying angle and distance.
+                    float angle = Random.Range(0f, Mathf.PI * 2f);
+                    float radius = Random.Range(18f, 34f);
+                    Vector3 center = player != null ? player.position : Vector3.zero;
                     Vector3 candidate = new Vector3(
-                        Random.Range(-82f, 82f),
+                        Mathf.Clamp(center.x + Mathf.Cos(angle) * radius, -82f, 82f),
                         1f,
-                        Random.Range(-82f, 82f));
-
-                    Vector2 candidateXZ = new Vector2(candidate.x, candidate.z);
-                    Vector2 playerXZ = player != null
-                        ? new Vector2(player.position.x, player.position.z)
-                        : Vector2.zero;
-
-                    if (Vector2.Distance(candidateXZ, playerXZ) < 45f)
-                        continue;
+                        Mathf.Clamp(center.z + Mathf.Sin(angle) * radius, -82f, 82f));
 
                     if (Physics.CheckSphere(candidate + Vector3.up * 0.7f, 0.85f, ~0,
                         QueryTriggerInteraction.Ignore))
@@ -252,14 +250,14 @@ namespace PersiaWar.Unity2D5D
 
                 if (!foundPosition)
                 {
-                    // Deterministic fallback ring prevents a crowded city tile from
-                    // silently reducing the requested 32-player starting lobby.
-                    float angle = (spawned + 0.5f) / Mathf.Max(1, count) * Mathf.PI * 2f;
-                    float distance = 76f;
+                    // If houses occupy every random candidate, use a deterministic
+                    // nearby ring so the green sky drops still appear around the player.
+                    float fallbackAngle = (spawned + 0.5f) / Mathf.Max(1, count) * Mathf.PI * 2f;
+                    float fallbackDistance = 26f;
                     position = new Vector3(
-                        Mathf.Clamp((player != null ? player.position.x : 0f) + Mathf.Cos(angle) * distance, -84f, 84f),
+                        Mathf.Clamp((player != null ? player.position.x : 0f) + Mathf.Cos(fallbackAngle) * fallbackDistance, -82f, 82f),
                         1f,
-                        Mathf.Clamp((player != null ? player.position.z : 0f) + Mathf.Sin(angle) * distance, -84f, 84f));
+                        Mathf.Clamp((player != null ? player.position.z : 0f) + Mathf.Sin(fallbackAngle) * fallbackDistance, -82f, 82f));
                 }
 
                 StartupCheckpoint.Set("AndroidEnemySpawnAttempt");
@@ -359,8 +357,8 @@ namespace PersiaWar.Unity2D5D
             if (alien == null) yield break;
             GameObject beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             beam.name = "AlienGreenLandingBeam";
-            beam.transform.position = new Vector3(groundPosition.x, 7f, groundPosition.z);
-            beam.transform.localScale = new Vector3(0.42f, 7f, 0.42f);
+            beam.transform.position = new Vector3(groundPosition.x, 9f, groundPosition.z);
+            beam.transform.localScale = new Vector3(0.60f, 9f, 0.60f);
             Collider beamCollider = beam.GetComponent<Collider>();
             if (beamCollider != null) Destroy(beamCollider);
             Renderer beamRenderer = beam.GetComponent<Renderer>();
@@ -372,8 +370,10 @@ namespace PersiaWar.Unity2D5D
                 beamRenderer.receiveShadows = false;
             }
 
-            Vector3 start = groundPosition + Vector3.up * 13f;
-            float duration = 0.9f;
+            // Keep the green column visible long enough to read clearly on mobile:
+            // each alien descends from the sky for exactly about two seconds.
+            Vector3 start = groundPosition + Vector3.up * 18f;
+            float duration = 2.0f;
             float elapsed = 0f;
             while (elapsed < duration && alien != null)
             {
