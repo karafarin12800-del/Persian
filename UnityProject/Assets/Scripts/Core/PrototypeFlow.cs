@@ -597,8 +597,14 @@ namespace PersiaWar.Unity2D5D
 
             if (stageNumber >= 2 && arenaManager != null)
             {
-                Rect leaderboard = new Rect(map.x + 8f * scale, map.y + 30f * scale,
-                    Mathf.Min(154f * scale, map.width - 16f * scale), 82f * scale);
+                // Put the winners/leaderboard panel to the LEFT of the map, not on
+                // top of the tactical map markers. Keep it responsive on narrow phones.
+                float leaderboardWidth = Mathf.Min(
+                    154f * scale,
+                    Mathf.Max(96f * scale, map.x - margin - 12f * scale));
+                float leaderboardX = Mathf.Max(margin, map.x - leaderboardWidth - 12f * scale);
+                Rect leaderboard = new Rect(leaderboardX, map.y + 30f * scale,
+                    leaderboardWidth, 82f * scale);
                 Fill(leaderboard, new Color(0.015f, 0.035f, 0.045f, 0.78f));
                 Fill(new Rect(leaderboard.x, leaderboard.y, 3f * scale, leaderboard.height),
                     new Color(0.25f, 0.95f, 0.45f, 0.95f));
