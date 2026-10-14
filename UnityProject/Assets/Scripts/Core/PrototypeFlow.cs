@@ -1025,6 +1025,9 @@ namespace PersiaWar.Unity2D5D
             stageTwoVictorySequence = null;
 
             GateGameplay(false);
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
             if (playerRoot != null) playerRoot.SetActive(false);
             if (gameRoot != null) gameRoot.SetActive(false);
 
@@ -1066,6 +1069,9 @@ namespace PersiaWar.Unity2D5D
                 stageTwoVictorySequence = null;
             }
             GateGameplay(false);
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
             if (playerRoot != null) playerRoot.SetActive(false);
             if (gameRoot != null) gameRoot.SetActive(false);
             startingMatch = false;
