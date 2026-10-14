@@ -36,6 +36,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Quaternion savedCameraRotation;
     private Color savedCameraBackground;
     private CameraClearFlags savedCameraClearFlags;
+    private float savedCameraFarClip;
     private Color savedAmbientLight;
     private bool ambientCaptured;
 
@@ -119,6 +120,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             savedCameraRotation = gameplayCamera.transform.rotation;
             savedCameraBackground = gameplayCamera.backgroundColor;
             savedCameraClearFlags = gameplayCamera.clearFlags;
+            savedCameraFarClip = gameplayCamera.farClipPlane;
             gameplayCamera.clearFlags = CameraClearFlags.SolidColor;
             gameplayCamera.backgroundColor = new Color(0.008f, 0.014f, 0.027f, 1f);
             gameplayCamera.farClipPlane = Mathf.Max(gameplayCamera.farClipPlane, 280f);
@@ -230,17 +232,16 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                     new Vector3(width + 1.5f, 1.1f, depth + 1.5f), darkMetalMaterial, true,
                     Quaternion.Euler(0f, yaw, 0f));
 
-                int floorCount = Mathf.Clamp(Mathf.FloorToInt(height / 5f), 3, 5);
-                for (int floor = 1; floor <= floorCount; floor++)
-                {
-                    float y = Mathf.Min(height - 1.2f, floor * height / (floorCount + 1f));
-                    CreateBox("S3_TowerWindowBand", new Vector3(x, y, z - depth * 0.5f - 0.035f),
-                        new Vector3(width * 0.62f, 0.36f, 0.07f), windowMaterial, false,
-                        Quaternion.Euler(0f, yaw, 0f));
-                    CreateBox("S3_TowerLightBand", new Vector3(x, y + 0.43f, z - depth * 0.5f - 0.06f),
-                        new Vector3(width * 0.72f, 0.08f, 0.08f), cyanGlowMaterial, false,
-                        Quaternion.Euler(0f, yaw, 0f));
-                }
+                float windowY = height * 0.48f;
+                CreateBox("S3_TowerWindowSpine", new Vector3(x, windowY, z - depth * 0.5f - 0.045f),
+                    new Vector3(width * 0.50f, Mathf.Min(height * 0.58f, 12f), 0.08f), windowMaterial, false,
+                    Quaternion.Euler(0f, yaw, 0f));
+                CreateBox("S3_TowerLightBand", new Vector3(x, height * 0.70f, z - depth * 0.5f - 0.075f),
+                    new Vector3(width * 0.72f, 0.11f, 0.10f), cyanGlowMaterial, false,
+                    Quaternion.Euler(0f, yaw, 0f));
+                CreateBox("S3_TowerLowerWindow", new Vector3(x, height * 0.23f, z - depth * 0.5f - 0.045f),
+                    new Vector3(width * 0.34f, Mathf.Min(height * 0.20f, 3.4f), 0.08f), windowMaterial, false,
+                    Quaternion.Euler(0f, yaw, 0f));
 
                 CreateBox("S3_TowerCrown", new Vector3(x, height + 0.35f, z),
                     new Vector3(width * 0.62f, 0.7f, depth * 0.62f), darkMetalMaterial, false,
@@ -569,6 +570,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         {
             gameplayCamera.backgroundColor = savedCameraBackground;
             gameplayCamera.clearFlags = savedCameraClearFlags;
+            gameplayCamera.farClipPlane = savedCameraFarClip;
             gameplayCamera.transform.position = savedCameraPosition;
             gameplayCamera.transform.rotation = savedCameraRotation;
         }
