@@ -71,6 +71,7 @@ namespace PersiaWar.Unity2D5D
         private bool matchPaused;
         private float resultOverlayStartTime = -1f;
         private StageTwoVictorySequence stageTwoVictorySequence;
+        private StageThreeWorldBuilder stageThreeWorldBuilder;
         private bool forceStageOneWorldRebuildForTest;
         private bool stageTestRun;
         private int savedCampaignStageNumber = 1;
@@ -241,6 +242,11 @@ namespace PersiaWar.Unity2D5D
                         else if (stageTwoVictorySequence.IsComplete)
                             CompleteStageTwoVictoryTransition();
                     }
+                    else if (stageNumber == 3 && session.PlayerWon &&
+                        stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
+                    {
+                        ReturnToMainMenuFromResult();
+                    }
                     return;
                 }
 
@@ -314,9 +320,19 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                DrawAndroidPresentationHUD();
+                if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
+                {
+                    DrawStageThreeCinematicOverlay();
+                    return;
+                }
+
+                if (stageNumber == 3)
+                    DrawStageThreeHUD();
+                else
+                    DrawAndroidPresentationHUD();
                 DrawAndroidPauseControl();
-                DrawGirlRescueNotice();
+                if (stageNumber != 3)
+                    DrawGirlRescueNotice();
 
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                 {
@@ -880,8 +896,7 @@ namespace PersiaWar.Unity2D5D
             else if (index == 3) mode = ScreenMode.Settings;
             else if (index == 4) BeginStageTestEntry(1);
             else if (index == 5) BeginStageTestEntry(2);
-            else if (index == 6) ShowLobbyNotice(
-                "STAGE 3 IS NEXT IN THE CAMPAIGN, BUT ITS ALIEN-FORTRESS WORLD IS STILL UNDER CONSTRUCTION.");
+            else if (index == 6) BeginStageTestEntry(3);
 
             StartupCheckpoint.Set("LobbyNavigation_" + mode);
         }
@@ -891,9 +906,9 @@ namespace PersiaWar.Unity2D5D
             if (stageTestRun)
                 RestoreCampaignProgressAfterTest();
 
-            if (stageNumber >= 3)
+            if (stageNumber > 3)
             {
-                ShowLobbyNotice("STAGE 3 IS NOT READY TO PLAY YET. USE TEST STAGE 1 OR 2 WHILE IT IS BEING BUILT.");
+                ShowLobbyNotice("NO FURTHER STAGE IS AVAILABLE YET.");
                 return;
             }
 
@@ -927,6 +942,7 @@ namespace PersiaWar.Unity2D5D
         private void BeginStageTestEntry(int targetStage)
         {
             CaptureCampaignProgressBeforeTest();
+            StageThreeWorldBuilder.ClearExistingWorld();
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
             lobbyNotice = string.Empty;
@@ -974,6 +990,30 @@ namespace PersiaWar.Unity2D5D
                 if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
                 BeginStageTwoSelection();
                 StartupCheckpoint.Set("DirectStageTestEntry_2");
+                return;
+            }
+
+            if (targetStage == 3)
+            {
+                stageNumber = 3;
+                selectedHero = 0;
+                stageTwoOriginalHero = 0;
+                stageTwoLandingMode = 0;
+                stageTwoLayoutVariant = 0;
+                stageTwoShopOpen = false;
+                stageTwoLobbyRunning = false;
+                stageTwoLobbyReady = false;
+                stageTwoLobbyPlayers = 1;
+                forceStageOneWorldRebuildForTest = false;
+                spawnWorld = new Vector2(0f, -84f);
+                spawnChosen = true;
+                if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                if (activeCamera != null) activeCamera.enabled = false;
+                if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+                GateGameplay(false);
+                mode = ScreenMode.DropMap;
+                StartCoroutine(BeginMainGameAfterMenuFrame());
+                StartupCheckpoint.Set("DirectStageTestEntry_3");
             }
         }
 
@@ -996,6 +1036,31 @@ namespace PersiaWar.Unity2D5D
                 ? androidRuntimeCamera
                 : (activeCamera != null && activeCamera.isActiveAndEnabled ? activeCamera : Camera.main);
             stageTwoVictorySequence.Begin(localRoot, cinematicCamera);
+        }
+
+        private void DrawStageThreeHUD()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            Rect panel = new Rect(14f * scale, 14f * scale, Mathf.Min(Screen.width - 28f * scale, 390f * scale), 66f * scale);
+            Fill(panel, new Color(0.015f, 0.028f, 0.05f, 0.84f));
+            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.22f, 0.91f, 1f, 0.95f));
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 6f * scale, panel.width - 22f * scale, 25f * scale),
+                "ALIEN PLANET  •  STAGE 3", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 34f * scale, panel.width - 22f * scale, 24f * scale),
+                "ENTER ONE OF 9 GATES  •  REACH THE CENTRAL LIFT", menuSmallStyle);
+        }
+
+        private void DrawStageThreeCinematicOverlay()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.01f, 0.025f, 0.045f, 0.12f));
+            Rect panel = new Rect(Screen.width * 0.12f, Screen.height * 0.76f, Screen.width * 0.76f, 66f * scale);
+            Fill(panel, new Color(0.015f, 0.05f, 0.075f, 0.88f));
+            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.20f, 1f, 0.68f, 1f));
+            GUI.Label(new Rect(panel.x + 14f * scale, panel.y + 7f * scale, panel.width - 24f * scale, 28f * scale),
+                "CENTRAL UPLINK ACTIVATED", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 14f * scale, panel.y + 35f * scale, panel.width - 24f * scale, 22f * scale),
+                "THE SIGNAL IS TAKING YOU UP...", menuSmallStyle);
         }
 
         private void DrawStageTwoCinematicOverlay()
@@ -1889,16 +1954,16 @@ namespace PersiaWar.Unity2D5D
         {
             if (!spawnChosen || startingMatch || stageTwoLobbyRunning)
                 return;
-            if (stageNumber >= 3)
+            if (stageNumber > 3)
             {
-                ShowLobbyNotice("STAGE 3 IS NOT READY TO PLAY YET. ITS ALIEN-FORTRESS WORLD WILL BE ADDED NEXT.");
+                ShowLobbyNotice("NO FURTHER STAGE IS AVAILABLE YET.");
                 mode = ScreenMode.MainMenu;
                 return;
             }
 
             matchPaused = false;
             Time.timeScale = 1f;
-            if (stageNumber >= 2 && !stageTwoLobbyReady)
+            if (stageNumber == 2 && !stageTwoLobbyReady)
             {
                 StartCoroutine(RunStageTwoLobby());
                 return;
@@ -2066,53 +2131,67 @@ namespace PersiaWar.Unity2D5D
                 GateGameplay(false);
             }
 
-            if (gameBootstrap == null)
-                gameBootstrap = gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
-            if (gameBootstrap == null)
+            if (stageNumber == 3)
             {
-                startupStatus = "Battlefield bootstrap is missing.";
-                StartupCheckpoint.Set("GameBootstrapMissing");
-                startingMatch = false;
-                yield break;
+                StageThreeWorldBuilder.ClearExistingWorld();
+                stageThreeWorldBuilder = gameRoot.GetComponent<StageThreeWorldBuilder>();
+                if (stageThreeWorldBuilder == null)
+                    stageThreeWorldBuilder = gameRoot.AddComponent<StageThreeWorldBuilder>();
+                if (GameSession.Instance != null)
+                    GameSession.Instance.ResetMatch();
+                startupStatus = "Stage 3: building the alien fortress and nine routes...";
+                if (!stageThreeWorldBuilder.BuildWorld())
+                {
+                    startupStatus = "Stage 3 world construction failed.";
+                    StartupCheckpoint.Set("StageThreeWorldBuildFailed");
+                    startingMatch = false;
+                    mode = ScreenMode.MainMenu;
+                    yield break;
+                }
             }
+            else
+            {
+                if (gameBootstrap == null)
+                    gameBootstrap = gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : FindFirstObjectByType<GameBootstrap>(FindObjectsInactive.Include);
+                if (gameBootstrap == null)
+                {
+                    startupStatus = "Battlefield bootstrap is missing.";
+                    StartupCheckpoint.Set("GameBootstrapMissing");
+                    startingMatch = false;
+                    yield break;
+                }
 
-            if (stageNumber == 2)
-            {
-                startupStatus = "Stage 3: preparing Iranian village stage...";
-                gameBootstrap.PrepareStageTwoVillage(stageTwoLayoutVariant);
-            }
-            else if (stageNumber == 1 && forceStageOneWorldRebuildForTest)
-            {
-                startupStatus = "Stage 3: rebuilding a clean Stage 1 test world...";
-                forceStageOneWorldRebuildForTest = false;
-                gameBootstrap.PrepareStageOneWorldForTest();
-            }
-            else if (stageNumber == 1 && !gameBootstrap.IsWorldReady &&
-                !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
-            {
-                startupStatus = "Stage 3: requesting battlefield build...";
-                gameBootstrap.PrepareWorld();
-            }
-            else if (stageNumber >= 3)
-            {
-                startingMatch = false;
-                mode = ScreenMode.MainMenu;
-                ShowLobbyNotice("STAGE 3 IS NOT READY TO PLAY YET.");
-                yield break;
-            }
+                if (stageNumber == 2)
+                {
+                    startupStatus = "Stage 2: preparing Iranian village stage...";
+                    gameBootstrap.PrepareStageTwoVillage(stageTwoLayoutVariant);
+                }
+                else if (stageNumber == 1 && forceStageOneWorldRebuildForTest)
+                {
+                    startupStatus = "Stage 1: rebuilding a clean test world...";
+                    forceStageOneWorldRebuildForTest = false;
+                    gameBootstrap.PrepareStageOneWorldForTest();
+                }
+                else if (stageNumber == 1 && !gameBootstrap.IsWorldReady &&
+                    !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
+                {
+                    startupStatus = "Stage 1: requesting battlefield build...";
+                    gameBootstrap.PrepareWorld();
+                }
 
-            while (gameBootstrap.IsWorldPreparing)
-            {
-                startupStatus = gameBootstrap.CurrentStage;
-                yield return null;
-            }
+                while (gameBootstrap.IsWorldPreparing)
+                {
+                    startupStatus = gameBootstrap.CurrentStage;
+                    yield return null;
+                }
 
-            if (gameBootstrap.WorldBuildFailed || !gameBootstrap.IsWorldReady)
-            {
-                startupStatus = "Battlefield preparation failed: " + gameBootstrap.WorldBuildError;
-                StartupCheckpoint.Set("MatchActivationFailed");
-                startingMatch = false;
-                yield break;
+                if (gameBootstrap.WorldBuildFailed || !gameBootstrap.IsWorldReady)
+                {
+                    startupStatus = "Battlefield preparation failed: " + gameBootstrap.WorldBuildError;
+                    StartupCheckpoint.Set("MatchActivationFailed");
+                    startingMatch = false;
+                    yield break;
+                }
             }
 
             startupStatus = "Stage 8: activating player...";
@@ -2182,6 +2261,8 @@ namespace PersiaWar.Unity2D5D
             player.SetGroundedPosition(new Vector3(spawnWorld.x, 0f, spawnWorld.y));
             player.LockMovementFor(0.50f);
             ApplyHeroStyle(selectedHero);
+            if (stageNumber == 3 && stageThreeWorldBuilder != null)
+                stageThreeWorldBuilder.ConfigurePlayer(player, activeCamera);
 
 #if UNITY_ANDROID
             // Use a completely isolated runtime camera for Android. It has no
@@ -2280,6 +2361,8 @@ namespace PersiaWar.Unity2D5D
             // camera kept tracking the player as the ship ascends, the ship would
             // stay centred instead of visibly leaving the frame in two seconds.
             if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
+                return;
+            if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
                 return;
 
 #if UNITY_ANDROID
@@ -2453,18 +2536,25 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                if (stageNumber >= 2)
+                if (stageNumber == 3)
                 {
-                    StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
-                    if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
-                    arena.BeginArena(player.transform, 9);
-                    enemySpawner.ConfigureStageTwoArena(player.transform);
+                    enemySpawner.enabled = false;
                 }
                 else
                 {
-                    enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                    if (stageNumber == 2)
+                    {
+                        StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+                        if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
+                        arena.BeginArena(player.transform, 9);
+                        enemySpawner.ConfigureStageTwoArena(player.transform);
+                    }
+                    else
+                    {
+                        enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                    }
+                    enemySpawner.enabled = true;
                 }
-                enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
 
@@ -2495,18 +2585,25 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null)
             {
-                if (stageNumber >= 2)
+                if (stageNumber == 3)
                 {
-                    StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
-                    if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
-                    arena.BeginArena(player.transform, 9);
-                    enemySpawner.ConfigureStageTwoArena(player.transform);
+                    enemySpawner.enabled = false;
                 }
                 else
                 {
-                    enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                    if (stageNumber == 2)
+                    {
+                        StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+                        if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
+                        arena.BeginArena(player.transform, 9);
+                        enemySpawner.ConfigureStageTwoArena(player.transform);
+                    }
+                    else
+                    {
+                        enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                    }
+                    enemySpawner.enabled = true;
                 }
-                enemySpawner.enabled = true;
             }
 
             if (combatHud == null)
