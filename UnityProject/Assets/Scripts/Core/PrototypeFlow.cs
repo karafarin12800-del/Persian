@@ -157,6 +157,12 @@ namespace PersiaWar.Unity2D5D
             EnsureUiInitialized();
             CacheGameplayRoots();
 
+            // The app starts in BootScene and loads the gameplay scene afterwards.
+            // A one-shot AfterSceneLoad installer can run before PrototypeFlow exists,
+            // so attach the Stage 2 results UI here, when this flow is definitely alive.
+            if (GetComponent<global::StageTwoResultsMenu>() == null)
+                gameObject.AddComponent<global::StageTwoResultsMenu>();
+
             // Resolve the known dormant roots directly instead of performing several
             // global FindFirstObjectByType(..., Include) scans during scene entry.
             player = playerRoot != null
@@ -2425,6 +2431,87 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        /// <summary>
+        /// Safely leaves a finished Stage 2 match and returns to an in-scene menu.
+        /// Do not call GameSession.RestartMission here: it reloads the active scene,
+        /// which may be the bootstrap scene rather than the intended in-game menu.
+        /// </summary>
+        public void NavigateFromStageTwoResults(string destination)
+        {
+            if (stageNumber < 2)
+                return;
+
+            Time.timeScale = 1f;
+            matchPaused = false;
+            startingMatch = false;
+            matchInputArmed = false;
+            stageTwoLobbyRunning = false;
+            stageTwoLobbyReady = false;
+            stageTwoLobbyPlayers = 1;
+            stageTwoShopOpen = false;
+            spawnChosen = false;
+            resultOverlayStartTime = -1f;
+
+            // Return touch ownership to the front-end before changing the active menu.
+            if (mobileInput != null)
+            {
+                mobileInput.DeactivateMatch();
+                mobileInput.SetPaused(false);
+            }
+            if (player != null)
+            {
+                player.SetMoveInput(Vector2.zero);
+                player.ClearAimDirection();
+            }
+            GateGameplay(false);
+
+            // A subsequent match starts with a clean result/score state rather than
+            // immediately reopening the previous result panel.
+            if (GameSession.Instance != null)
+                GameSession.Instance.ResetMatch();
+
+            // Remove leftover combat entities so a rematch does not count dead-match
+            // enemies or old pickups as part of the next arena.
+            EnemyChase[] oldEnemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
+            for (int i = 0; i < oldEnemies.Length; i++)
+            {
+                if (oldEnemies[i] != null)
+                    Destroy(oldEnemies[i].gameObject);
+            }
+            PickupItem[] oldPickups = FindObjectsByType<PickupItem>(FindObjectsSortMode.None);
+            for (int i = 0; i < oldPickups.Length; i++)
+            {
+                if (oldPickups[i] != null)
+                    Destroy(oldPickups[i].gameObject);
+            }
+
+            string target = string.IsNullOrEmpty(destination) ? "main-menu" : destination.ToLowerInvariant();
+            switch (target)
+            {
+                case "choose-map":
+                    mode = ScreenMode.DropMap;
+                    stageTwoLandingMode = 1;
+                    stageTwoLayoutVariant = 0;
+                    break;
+                case "choose-character":
+                    mode = ScreenMode.HeroSelect;
+                    break;
+                case "store":
+                    mode = ScreenMode.Store;
+                    break;
+                default:
+                    mode = ScreenMode.MainMenu;
+                    break;
+            }
+
+            if (target != "choose-map")
+                spawnChosen = false;
+            if (target == "main-menu")
+                stageTwoOriginalHero = selectedHero;
+
+            StartupCheckpoint.Set("StageTwoResultsNavigation_" + target);
+        }
+
         private void GateGameplay(bool enabled)
         {
             if (player != null) player.enabled = enabled;
@@ -2517,6 +2604,14 @@ namespace PersiaWar.Unity2D5D
             GameSession session = GameSession.Instance;
             if (session == null || !session.IsFinished)
                 return;
+
+            // Stage 2 has its own full results/menu component with native Android
+            // touch handling. Never draw the old single-button overlay here: its
+            // PLAY AGAIN button reloaded the active scene and could send users back
+            // to BootScene (or appear to close the app).
+            if (stageNumber >= 2)
+                return;
+
             // The blue extraction gate is reserved for a win after the final opponent
             // is eliminated. A player defeat skips the transition and shows GAME OVER.
             if (session.PlayerWon && stageNumber == 1)
