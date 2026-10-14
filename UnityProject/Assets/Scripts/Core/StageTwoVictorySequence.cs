@@ -156,6 +156,15 @@ namespace PersiaWar.Unity2D5D
             actors.Clear();
             List<Transform> seen = new List<Transform>();
 
+            // The local PlayerController has already been gated off for the end
+            // cinematic, so explicitly include its root before querying active AIs.
+            if (localPlayer != null)
+            {
+                PlayerController localController = localPlayer.GetComponentInChildren<PlayerController>(true);
+                if (localController == null || !localController.IsDefeated)
+                    AddActor(localPlayer, true, seen);
+            }
+
             PlayerController[] players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
             for (int i = 0; i < players.Length; i++)
             {
