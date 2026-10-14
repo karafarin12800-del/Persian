@@ -2207,6 +2207,12 @@ namespace PersiaWar.Unity2D5D
 
         private void LateUpdate()
         {
+            // Hold the camera where the fight ended during the evacuation. If the
+            // camera kept tracking the player as the ship ascends, the ship would
+            // stay centred instead of visibly leaving the frame in two seconds.
+            if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
+                return;
+
 #if UNITY_ANDROID
             if (androidRuntimeCamera == null || player == null)
                 return;
