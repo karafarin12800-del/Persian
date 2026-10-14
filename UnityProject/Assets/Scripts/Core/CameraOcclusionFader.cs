@@ -79,12 +79,11 @@ namespace PersiaWar.Unity2D5D
             {
                 if (stageTwoOcclusionMode)
                 {
-                    // Three narrow sight lines follow the visible player silhouette.
-                    // Unlike the wide sphere cast, a wall beside the sight line will not
-                    // fade early; a roof can fade when it actually cuts off the player.
-                    CollectStageTwoOccluders(from, target.position + Vector3.up * 0.35f);
+                    // Stage two uses one precise sightline through the player's torso.
+                    // Do not fade a house merely because its edge/roof is near the player:
+                    // the house must physically intersect the camera-to-player line.
+                    // This keeps houses behind the player opaque and prevents premature fades.
                     CollectStageTwoOccluders(from, target.position + Vector3.up * targetHeight);
-                    CollectStageTwoOccluders(from, target.position + Vector3.up * 1.65f);
                 }
                 else
                 {
@@ -135,7 +134,7 @@ namespace PersiaWar.Unity2D5D
 
             int count = Physics.RaycastNonAlloc(
                 from, delta / distance, hits, distance,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < count; i++)
             {
@@ -154,19 +153,53 @@ namespace PersiaWar.Unity2D5D
 
         private void AddBlockedRenderers(Collider col)
         {
+            if (col == null) return;
+
+            // Stage two fades only what the camera-to-player sightline actually hits.
+            // Courtyard walls and individual house wall/roof pieces have their own
+            // renderer and collider, so entering a yard never fades the whole house.
+            // Trees remain grouped and fade as one recognizable tree.
+            if (stageTwoOcclusionMode)
+            {
+                string hitName = col.gameObject.name.ToLowerInvariant();
+                bool fadeOnlyHitPiece =
+                    hitName.Contains("courtyard") ||
+                    hitName.Contains("fadeablehousewall") ||
+                    hitName.Contains("fadeableflatroof");
+
+                if (fadeOnlyHitPiece)
+                {
+                    Renderer directPiece = col.GetComponent<Renderer>();
+                    if (directPiece != null && directPiece.enabled)
+                    {
+                        blocked.Add(directPiece);
+                        return;
+                    }
+                }
+
+                Transform stageTwoRoot = FindBuildingOrTreeRoot(col.transform);
+                if (stageTwoRoot == null)
+                {
+                    Renderer fallbackRenderer = col.GetComponent<Renderer>();
+                    if (fallbackRenderer != null && fallbackRenderer.enabled)
+                        blocked.Add(fallbackRenderer);
+                    return;
+                }
+
+                Renderer[] stageTwoRenderers = stageTwoRoot.GetComponentsInChildren<Renderer>(false);
+                for (int i = 0; i < stageTwoRenderers.Length; i++)
+                    if (stageTwoRenderers[i] != null && stageTwoRenderers[i].enabled)
+                        blocked.Add(stageTwoRenderers[i]);
+                return;
+            }
+
+            // Preserve stage one's original behavior exactly.
             Renderer direct = col.GetComponent<Renderer>();
             if (direct != null && direct.enabled && IsBuildingOrTree(direct.transform))
             {
                 blocked.Add(direct);
                 return;
             }
-
-            // In stage two, colliders without their own renderer belong to scenery
-            // that was not split into independently fadeable pieces. Never walk up to
-            // the house root and fade every child renderer because one collider hit.
-            // Stage-two wall/facade segments now carry their own colliders/renderers.
-            if (stageTwoOcclusionMode)
-                return;
 
             Transform root = FindBuildingOrTreeRoot(col.transform);
             if (root == null) return;

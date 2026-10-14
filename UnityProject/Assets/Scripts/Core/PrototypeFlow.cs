@@ -25,14 +25,17 @@ namespace PersiaWar.Unity2D5D
         private string playerId = string.Empty;
         private int storeCoins;
         private int selectedProfileCosmetic;
+        private int selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
         private bool soundEnabled = true;
         private static readonly string[] StoreCosmeticNames =
         {
             "ROYAL PROFILE FRAME",
             "GOLD NAMEPLATE",
-            "AZURE BANNER"
+            "AZURE BANNER",
+            "VOID RIFLE",
+            "ALIEN SWORD"
         };
-        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350 };
+        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350, 450, 400 };
         private PlayerController player;
         private EnemySpawner enemySpawner;
         private MobileInputHub mobileInput;
@@ -60,6 +63,10 @@ namespace PersiaWar.Unity2D5D
         // 0 = village cluster, 1 = mirrored village, 2 = rotated village.
         private int stageTwoLayoutVariant;
         private bool startingMatch;
+        private bool stageTwoLobbyRunning;
+        private bool stageTwoLobbyReady;
+        private int stageTwoLobbyPlayers = 1;
+        private float stageTwoLobbyStartedAt;
         private bool matchInputArmed;
         private bool matchPaused;
         private float resultOverlayStartTime = -1f;
@@ -293,8 +300,6 @@ namespace PersiaWar.Unity2D5D
                         // Stage 1's ExtractionBeacon is already attached to Anahita's
                         // randomized house and is shown when the final wave is eliminated.
                         // Do not draw a second, unrelated beam after mission completion.
-                        if (GameSession.Instance.PlayerWon && gameBootstrap != null && stageNumber >= 2)
-                            gameBootstrap.ShowRandomExtractionBeacon();
                     }
                     DrawAndroidResultOverlay();
                 }
@@ -302,6 +307,12 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
             DrawBackdrop();
+
+            if (stageTwoLobbyRunning)
+            {
+                DrawStageTwoLobbyOverlay();
+                return;
+            }
 
             if (startingMatch)
             {
@@ -536,7 +547,7 @@ namespace PersiaWar.Unity2D5D
                     new Color(0.20f, 0.95f, 1f, 1f));
             }
 
-            if (ExtractionBeacon.IsActive)
+            if (stageNumber < 2 && ExtractionBeacon.IsActive)
             {
                 Vector3 extractionWorld = ExtractionBeacon.WorldPosition;
                 Vector2 extractionPoint = WorldToMap(
@@ -567,9 +578,9 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(legend.x + 18f * scale, legend.y, 118f * scale, legend.height),
                 "L: LOOT", smallStyle);
             DrawCircle(new Vector2(legend.x + 148f * scale, legend.center.y),
-                3.5f * scale, new Color(0.20f, 0.58f, 1f, 1f));
+                3.5f * scale, stageNumber >= 2 ? new Color(0.22f, 0.96f, 0.32f, 1f) : new Color(0.20f, 0.58f, 1f, 1f));
             GUI.Label(new Rect(legend.x + 157f * scale, legend.y, legend.width - 162f * scale, legend.height),
-                "B: BEACON", smallStyle);
+                stageNumber >= 2 ? "A: ALIEN" : "B: BEACON", smallStyle);
 
             Rect counters = new Rect(
                 Screen.width - rightW - margin,
@@ -577,10 +588,32 @@ namespace PersiaWar.Unity2D5D
                 rightW,
                 30f * scale);
             Fill(counters, new Color(0.03f, 0.06f, 0.08f, 0.86f));
+            StageTwoArenaManager arenaManager = stageNumber >= 2 ? GetComponent<StageTwoArenaManager>() : null;
+            string counterText = stageNumber >= 2
+                ? "WAVE " + wave + "/5   KILLS " + (arenaManager != null ? arenaManager.LocalKills : 0)
+                : "WAVE  " + wave + "     SCORE  " + score;
             GUI.Label(new Rect(counters.x + 8f * scale, counters.y, counters.width - 16f * scale, counters.height),
-                "WAVE  " + wave + "     SCORE  " + score, smallStyle);
+                counterText, smallStyle);
 
-            if (ExtractionBeacon.IsActive)
+            if (stageNumber >= 2 && arenaManager != null)
+            {
+                // Put the winners/leaderboard panel to the LEFT of the map, not on
+                // top of the tactical map markers. Keep it responsive on narrow phones.
+                float leaderboardWidth = Mathf.Min(
+                    154f * scale,
+                    Mathf.Max(96f * scale, map.x - margin - 12f * scale));
+                float leaderboardX = Mathf.Max(margin, map.x - leaderboardWidth - 12f * scale);
+                Rect leaderboard = new Rect(leaderboardX, map.y + 30f * scale,
+                    leaderboardWidth, 82f * scale);
+                Fill(leaderboard, new Color(0.015f, 0.035f, 0.045f, 0.78f));
+                Fill(new Rect(leaderboard.x, leaderboard.y, 3f * scale, leaderboard.height),
+                    new Color(0.25f, 0.95f, 0.45f, 0.95f));
+                GUI.Label(new Rect(leaderboard.x + 7f * scale, leaderboard.y + 2f * scale,
+                    leaderboard.width - 12f * scale, leaderboard.height - 4f * scale),
+                    "TOP 3\\n" + arenaManager.GetLeaderboardText(), smallStyle);
+            }
+
+            if (stageNumber < 2 && ExtractionBeacon.IsActive)
             {
                 float objectiveWidth = 360f * scale;
                 Rect objective = new Rect(
@@ -668,6 +701,7 @@ namespace PersiaWar.Unity2D5D
 
             storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
             selectedProfileCosmetic = PlayerPrefs.GetInt("PW.ProfileCosmetic", 0);
+            selectedStoreWeaponKind = PlayerPrefs.GetInt("PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
             soundEnabled = PlayerPrefs.GetInt("PW.SoundEnabled", 1) != 0;
             AudioListener.volume = soundEnabled ? 1f : 0f;
             if (!PlayerPrefs.HasKey("PW.CosmeticOwned.0"))
@@ -818,24 +852,63 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetStoreItemRect(int index)
         {
-            float gap = 18f;
-            float totalWidth = Mathf.Min(Screen.width - 60f, 1050f);
-            float cardWidth = (totalWidth - gap * 2f) / 3f;
-            float cardHeight = Mathf.Min(330f, Screen.height * 0.48f);
+            const int columns = 3;
+            float gap = 12f;
+            float totalWidth = Mathf.Min(Screen.width - 44f, 1050f);
+            float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
+            float cardHeight = Mathf.Min(220f, Screen.height * 0.27f);
             float left = (Screen.width - totalWidth) * 0.5f;
-            return new Rect(left + index * (cardWidth + gap), Screen.height * 0.30f, cardWidth, cardHeight);
+            int column = index % columns;
+            int row = index / columns;
+            float top = Screen.height * 0.25f;
+            return new Rect(left + column * (cardWidth + gap), top + row * (cardHeight + gap), cardWidth, cardHeight);
         }
 
         private Rect GetStoreActionRect(int index)
         {
             Rect card = GetStoreItemRect(index);
-            return new Rect(card.x + 14f, card.yMax - 62f, card.width - 28f, 48f);
+            return new Rect(card.x + 10f, card.yMax - 44f, card.width - 20f, 34f);
+        }
+
+        private bool IsStoreItemOwned(int index)
+        {
+            if (index < 3)
+                return PlayerPrefs.GetInt("PW.CosmeticOwned." + index, index == 0 ? 1 : 0) != 0;
+            string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
+            return PlayerPrefs.GetInt(rewardKey, 0) != 0;
+        }
+
+        private bool IsStoreItemEquipped(int index)
+        {
+            if (index < 3) return selectedProfileCosmetic == index;
+            int kind = index == 3 ? (int)WeaponController.WeaponKind.VoidRifle : (int)WeaponController.WeaponKind.AlienSword;
+            return selectedStoreWeaponKind == kind;
         }
 
         private void PurchaseOrEquipCosmetic(int index)
         {
+            if (index >= 3)
+            {
+                string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
+                bool ownedWeapon = PlayerPrefs.GetInt(rewardKey, 0) != 0;
+                if (!ownedWeapon)
+                {
+                    int price = StoreCosmeticPrices[index];
+                    if (storeCoins < price) return;
+                    storeCoins -= price;
+                    PlayerPrefs.SetInt("PW.StoreCoins", storeCoins);
+                    PlayerPrefs.SetInt(rewardKey, 1);
+                }
+                selectedStoreWeaponKind = index == 3
+                    ? (int)WeaponController.WeaponKind.VoidRifle
+                    : (int)WeaponController.WeaponKind.AlienSword;
+                PlayerPrefs.SetInt("PW.SelectedWeaponKind", selectedStoreWeaponKind);
+                PlayerPrefs.Save();
+                return;
+            }
+
             string ownedKey = "PW.CosmeticOwned." + index;
-            bool owned = PlayerPrefs.GetInt(ownedKey, index == 0 ? 1 : 0) != 0;
+            bool owned = IsStoreItemOwned(index);
             if (!owned)
             {
                 int price = StoreCosmeticPrices[index];
@@ -859,20 +932,23 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < StoreCosmeticNames.Length; i++)
             {
                 Rect card = GetStoreItemRect(i);
-                bool owned = PlayerPrefs.GetInt("PW.CosmeticOwned." + i, i == 0 ? 1 : 0) != 0;
-                Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.92f));
-                Fill(new Rect(card.x, card.y, card.width, 5f), i == selectedProfileCosmetic
-                    ? new Color(1f, 0.78f, 0.25f, 1f) : new Color(0.38f, 0.50f, 0.60f, 1f));
-                Rect emblem = new Rect(card.center.x - 42f, card.y + 34f, 84f, 84f);
+                bool owned = IsStoreItemOwned(i);
+                bool equipped = IsStoreItemEquipped(i);
+                Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.78f));
+                Fill(new Rect(card.x, card.y, card.width, 4f), equipped
+                    ? new Color(0.24f, 0.92f, 0.98f, 0.95f) : new Color(0.38f, 0.50f, 0.60f, 0.72f));
+                Rect emblem = new Rect(card.center.x - 29f, card.y + 14f, 58f, 58f);
                 Color emblemColor = i == 0 ? new Color(0.83f, 0.57f, 0.16f)
-                    : i == 1 ? new Color(0.89f, 0.73f, 0.25f) : new Color(0.14f, 0.52f, 0.79f);
+                    : i == 1 ? new Color(0.89f, 0.73f, 0.25f)
+                    : i == 2 ? new Color(0.14f, 0.52f, 0.79f)
+                    : i == 3 ? new Color(0.08f, 0.72f, 0.98f) : new Color(0.20f, 0.95f, 0.58f);
                 Fill(emblem, emblemColor);
-                GUI.Label(new Rect(card.x + 8f, card.y + 136f, card.width - 16f, 54f), StoreCosmeticNames[i], menuSmallStyle);
-                GUI.Label(new Rect(card.x + 8f, card.y + 192f, card.width - 16f, 38f),
-                    owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
+                GUI.Label(new Rect(card.x + 6f, card.y + 76f, card.width - 12f, 34f), StoreCosmeticNames[i], menuSmallStyle);
+                GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f),
+                    owned ? (equipped ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
                     menuBodyStyle);
                 Rect action = GetStoreActionRect(i);
-                if (DrawFantasyButton(action, owned ? (selectedProfileCosmetic == i ? "EQUIPPED" : "EQUIP") : "UNLOCK"))
+                if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : (i >= 3 ? "EQUIP WEAPON" : "EQUIP")) : "UNLOCK"))
                     PurchaseOrEquipCosmetic(i);
             }
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
@@ -1534,12 +1610,91 @@ namespace PersiaWar.Unity2D5D
 
         private void StartMatch()
         {
-            if (!spawnChosen || startingMatch)
+            if (!spawnChosen || startingMatch || stageTwoLobbyRunning)
                 return;
 
             matchPaused = false;
             Time.timeScale = 1f;
+            if (stageNumber >= 2 && !stageTwoLobbyReady)
+            {
+                StartCoroutine(RunStageTwoLobby());
+                return;
+            }
             StartCoroutine(BeginMatchSafely());
+        }
+
+        private IEnumerator RunStageTwoLobby()
+        {
+            stageTwoLobbyRunning = true;
+            stageTwoLobbyPlayers = 1;
+            stageTwoLobbyStartedAt = Time.unscaledTime;
+            StartupCheckpoint.Set("StageTwoLobbyStarted");
+
+            // This project has no online-session backend yet. Be explicit: the first
+            // slot is the local player and remaining slots are local AI competitors.
+            // A real human online count requires a server/networking service.
+            yield return new WaitForSecondsRealtime(7f);
+            while (stageTwoLobbyPlayers < 10)
+            {
+                stageTwoLobbyPlayers++;
+                StartupCheckpoint.Set("StageTwoLobbyRoster_" + stageTwoLobbyPlayers);
+                yield return new WaitForSecondsRealtime(1f);
+            }
+
+            stageTwoLobbyReady = true;
+            stageTwoLobbyRunning = false;
+            StartupCheckpoint.Set("StageTwoLobbyReady");
+            StartMatch();
+        }
+
+        private void DrawStageTwoLobbyOverlay()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.2f);
+            Rect shade = new Rect(0f, 0f, Screen.width, Screen.height);
+            Fill(shade, new Color(0.015f, 0.025f, 0.045f, 0.72f));
+
+            float width = Mathf.Min(Screen.width - 44f, 660f);
+            float height = Mathf.Min(Screen.height - 40f, 430f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Fill(new Rect(panel.x + 5f, panel.y + 8f, panel.width, panel.height), new Color(0f, 0f, 0f, 0.40f));
+            Fill(panel, new Color(0.035f, 0.075f, 0.12f, 0.91f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 5f), new Color(0.25f, 0.92f, 0.45f, 0.95f));
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 18f, panel.width - 36f, 54f), "STAGE 2  •  ARENA LOBBY", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 74f, panel.width - 36f, 42f),
+                "COMPETITORS  " + stageTwoLobbyPlayers + " / 10", menuBodyStyle);
+
+            Rect track = new Rect(panel.x + 42f, panel.y + 119f, panel.width - 84f, 16f);
+            Fill(track, new Color(0.10f, 0.16f, 0.20f, 0.95f));
+            Fill(new Rect(track.x, track.y, track.width * (stageTwoLobbyPlayers / 10f), track.height),
+                new Color(0.20f, 0.92f, 0.42f, 0.95f));
+
+            float elapsed = Time.unscaledTime - stageTwoLobbyStartedAt;
+            string status = elapsed < 7f
+                ? "WAITING FOR PLAYERS  •  " + Mathf.CeilToInt(7f - elapsed) + "s"
+                : "FILLING REMAINING SLOTS WITH LOCAL AI  •  +1 / SECOND";
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 143f, panel.width - 36f, 36f), status, menuSmallStyle);
+
+            float slotGap = 6f;
+            float slotWidth = (panel.width - 48f - slotGap * 4f) / 5f;
+            for (int slot = 0; slot < 10; slot++)
+            {
+                int column = slot % 5;
+                int row = slot / 5;
+                Rect slotRect = new Rect(panel.x + 24f + column * (slotWidth + slotGap),
+                    panel.y + 183f + row * 42f, slotWidth, 34f);
+                bool present = slot < stageTwoLobbyPlayers;
+                Fill(slotRect, present ? new Color(0.08f, 0.32f, 0.22f, 0.86f) : new Color(0.08f, 0.12f, 0.16f, 0.72f));
+                Fill(new Rect(slotRect.x, slotRect.y, 3f, slotRect.height),
+                    present ? new Color(0.25f, 0.92f, 0.45f, 0.95f) : new Color(0.38f, 0.45f, 0.50f, 0.55f));
+                string slotName = present ? (slot == 0 ? "YOU" : "AI-" + slot.ToString("00")) : "WAITING";
+                GUI.Label(new Rect(slotRect.x + 4f, slotRect.y, slotRect.width - 8f, slotRect.height),
+                    slotName, menuSmallStyle);
+            }
+
+            GUI.Label(new Rect(panel.x + 18f, panel.y + 274f, panel.width - 36f, 38f),
+                "100 ALIENS  •  5 WAVES  •  NEXT WAVE AT 6 REMAINING", menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 18f, panel.y + panel.height - 42f, panel.width - 36f, 28f),
+                "OFFLINE TEST: AI FILLS THE LOBBY; ONLINE SERVER NOT CONNECTED", menuSmallStyle);
         }
 
         private void DrawAndroidPauseControl()
@@ -1694,9 +1849,21 @@ namespace PersiaWar.Unity2D5D
                 yield break;
             }
 
-            // Axe is a stage-two-only weapon. Stage one's weapon cycle and loot
-            // remain the original three firearm profiles.
+            // Stage one keeps its original three firearms. Stage two additionally
+            // enables the axe, Void Rifle and Alien Sword when the local profile owns them.
             player.Weapon?.SetAxeEnabledForMatch(stageNumber >= 2);
+            if (stageNumber >= 2 && player.Weapon != null)
+            {
+                WeaponController.WeaponKind selectedKind = (WeaponController.WeaponKind)
+                    PlayerPrefs.GetInt("PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
+                bool ownsVoidRifle = PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0;
+                bool ownsAlienSword = PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0;
+                if (selectedKind == WeaponController.WeaponKind.VoidRifle && !ownsVoidRifle)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                if (selectedKind == WeaponController.WeaponKind.AlienSword && !ownsAlienSword)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                player.Weapon.SelectWeapon(selectedKind);
+            }
 
             StartupCheckpoint.Set("PlayerPreparedForMatch");
 
@@ -1983,7 +2150,17 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                if (stageNumber >= 2)
+                {
+                    StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+                    if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
+                    arena.BeginArena(player.transform, 9);
+                    enemySpawner.ConfigureStageTwoArena(player.transform);
+                }
+                else
+                {
+                    enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                }
                 enemySpawner.enabled = true;
                 StartupCheckpoint.Set("AndroidEnemyServiceEnabled");
             }
@@ -2015,7 +2192,17 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null)
             {
-                enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                if (stageNumber >= 2)
+                {
+                    StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+                    if (arena == null) arena = gameObject.AddComponent<StageTwoArenaManager>();
+                    arena.BeginArena(player.transform, 9);
+                    enemySpawner.ConfigureStageTwoArena(player.transform);
+                }
+                else
+                {
+                    enemySpawner.Configure(player.transform, 24, 84f, 0f);
+                }
                 enemySpawner.enabled = true;
             }
 
@@ -2147,6 +2334,16 @@ namespace PersiaWar.Unity2D5D
                 smallStyle);
         }
 
+        private string GetStageTwoResultMessage()
+        {
+            StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
+            int rank = arena != null ? arena.LastLocalRank : 0;
+            if (rank == 1) return "1ST PLACE  •  NEXT STAGE UNLOCKED  •  +300 COINS";
+            if (rank == 2) return "2ND PLACE  •  VOID RIFLE REWARD IN STORE";
+            if (rank == 3) return "3RD PLACE  •  ALIEN SWORD REWARD IN STORE";
+            return "ARENA CLEARED  •  FINAL RANK #" + rank + "  •  CHECK THE STORE";
+        }
+
         private void DrawAndroidResultOverlay()
         {
             EnsureUiInitialized();
@@ -2156,7 +2353,7 @@ namespace PersiaWar.Unity2D5D
                 return;
             // The blue extraction gate is reserved for a win after the final opponent
             // is eliminated. A player defeat skips the transition and shows GAME OVER.
-            if (session.PlayerWon)
+            if (session.PlayerWon && stageNumber == 1)
             {
                 float elapsed = Mathf.Max(0f, Time.unscaledTime - resultOverlayStartTime);
                 if (elapsed < 1.65f)
@@ -2202,7 +2399,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
-                    ? "Extraction reached. Mission complete."
+                    ? (stageNumber >= 2 ? GetStageTwoResultMessage() : "Extraction reached. Mission complete.")
                     : "Your fighter was defeated.",
                 bodyStyle);
 
@@ -2336,18 +2533,28 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
             bool hovered = Event.current != null && rect.Contains(Event.current.mousePosition);
-            Color gold = selected || hovered
-                ? new Color(1f, 0.78f, 0.25f, 1f)
-                : new Color(0.61f, 0.43f, 0.17f, 1f);
+            Color edge = selected || hovered
+                ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
+                : new Color(0.35f, 0.66f, 0.78f, 0.68f);
 
-            Fill(rect, gold);
+            // Layered translucent glass with a lower shadow and top bevel gives
+            // menu controls a raised, readable appearance without changing layout.
+            Fill(new Rect(rect.x + 3f * scale, rect.y + 5f * scale, rect.width, rect.height),
+                new Color(0f, 0f, 0f, 0.36f));
+            Fill(rect, edge);
             float inset = Mathf.Max(2f, 2.5f * scale);
             Rect inner = new Rect(rect.x + inset, rect.y + inset,
                 Mathf.Max(0f, rect.width - inset * 2f), Mathf.Max(0f, rect.height - inset * 2f));
-            Fill(inner, new Color(0.035f, 0.065f, 0.105f, 0.97f));
-            Fill(new Rect(inner.x + 4f * scale, inner.y + 2f * scale,
-                Mathf.Max(0f, inner.width - 8f * scale), Mathf.Max(1f, 1.5f * scale)),
-                new Color(1f, 0.76f, 0.28f, selected || hovered ? 0.95f : 0.50f));
+            Fill(inner, new Color(0.025f, 0.075f, 0.12f, 0.78f));
+            Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
+                Mathf.Max(0f, inner.width - 4f * scale), Mathf.Max(1f, rect.height * 0.20f)),
+                new Color(0.52f, 0.86f, 0.98f, selected || hovered ? 0.25f : 0.13f));
+            Fill(new Rect(inner.x + 2f * scale, inner.yMax - 3f * scale,
+                Mathf.Max(0f, inner.width - 4f * scale), 2f * scale),
+                new Color(0f, 0f, 0f, 0.30f));
+            Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
+                2f * scale, Mathf.Max(0f, inner.height - 4f * scale)),
+                new Color(0.65f, 0.94f, 1f, 0.34f));
 
             bool clicked = GUI.Button(rect, GUIContent.none, GUIStyle.none);
             GUI.Label(rect, label, menuButtonStyle);

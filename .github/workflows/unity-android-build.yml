@@ -203,9 +203,9 @@ jobs:
           assert 'startingCount = 24' in spawner and 'Mathf.CeilToInt(startingCount / 4f)' in spawner, 'The 24-enemy match must be divided into six-enemy waves.'
           assert 'private int victoryWave = 4;' in spawner and 'if (enemies.Length == 0)' in spawner, 'Next wave must wait for all enemies to be defeated and finish after four waves.'
           assert 'Random.Range(-82f, 82f)' in spawner and 'Random.Range(-82f, 82f)' in spawner, 'Android opponents are not selected across the full map.'
-          assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
+          assert 'stageTwoArena ? 0.30f : 0.15f' in spawner and 'WaitForSecondsRealtime(initialSpawnDelay)' in spawner and 'TryStartInitialWave()' in spawner, 'Enemy startup must use the short Android delay and explicitly arm Stage 2 waves.'
           assert 'Vector2.Distance(candidateXZ, playerXZ) < 45f' in spawner and 'Mathf.Max(45f, spawnRadius * 0.72f)' in spawner, 'Enemy waves must spawn farther from the player.'
-          assert 'yield return new WaitForSecondsRealtime(0.15f);' in spawner, 'Android initial lobby still waits for the long desktop spawn delay.'
+          assert 'stageTwoArena ? 0.30f : 0.15f' in spawner and 'WaitForSecondsRealtime(initialSpawnDelay)' in spawner and 'TryStartInitialWave()' in spawner, 'Enemy startup must use the short Android delay and explicitly arm Stage 2 waves.'
 
           assert 'enemySpawner.Configure(player.transform, 24, 84f, 0f);' in flow, 'Android match must start with 24 enemies.'
           assert 'float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);' in active_hud, 'Active Android minimap must be enlarged by a further 20 percent.'
