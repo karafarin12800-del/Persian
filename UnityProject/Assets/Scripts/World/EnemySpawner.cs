@@ -26,6 +26,8 @@ namespace PersiaWar.Unity2D5D
         private int failedSpawnAttempts;
         private bool initialWavePending;
         private bool initialWaveComplete;
+        private bool initialWaveStarted;
+        private Coroutine initialWaveCoroutine;
         private const int MaxFailedSpawnAttempts = 2;
 
         public int CurrentWave => wave;
@@ -43,9 +45,21 @@ namespace PersiaWar.Unity2D5D
             EnemiesSpawnedForArena = 0;
             failedSpawnAttempts = 0;
             spawning = false;
+            if (initialWaveCoroutine != null)
+            {
+                StopCoroutine(initialWaveCoroutine);
+                initialWaveCoroutine = null;
+            }
+            initialWaveStarted = false;
             initialWavePending = false;
             initialWaveComplete = false;
             nextEnemyCheckTime = 0f;
+
+            // Stage 2 can reuse the existing EnemySpawner after Stage 1. Start() does
+            // not run a second time on a reused component, so explicitly arm the first
+            // green-beam wave when the component is already active.
+            if (isActiveAndEnabled)
+                TryStartInitialWave();
         }
 
         public void Configure(Transform playerTransform, int enemyCount, float radius, float unusedSpeed)
@@ -57,6 +71,14 @@ namespace PersiaWar.Unity2D5D
 #endif
             startingCount = Mathf.Clamp(enemyCount, 1, maxPerWave);
             spawnRadius = Mathf.Max(16f, radius);
+        }
+
+        private void OnEnable()
+        {
+            // ConfigureStageTwoArena may have been called while this component was
+            // disabled by the match-start safety gate. Re-enable must start the wave.
+            if (stageTwoArena && player != null)
+                TryStartInitialWave();
         }
 
         private void Start()
@@ -76,26 +98,45 @@ namespace PersiaWar.Unity2D5D
                 if (found != null) player = found.transform;
             }
 
-            if (player != null)
-                StartCoroutine(SpawnInitialWaveAfterStartup());
+            TryStartInitialWave();
+        }
+
+        private void TryStartInitialWave()
+        {
+            if (!isActiveAndEnabled || player == null || initialWaveStarted)
+                return;
+
+            initialWaveStarted = true;
+            initialWavePending = true;
+            initialWaveCoroutine = StartCoroutine(SpawnInitialWaveAfterStartup());
         }
 
         private IEnumerator SpawnInitialWaveAfterStartup()
         {
 #if UNITY_ANDROID
-            // Spawn the full lobby as soon as the match is activated, not several seconds later.
-            yield return new WaitForSecondsRealtime(0.15f);
+            // The first green landing beams appear promptly; each alien then descends
+            // through its own two-second animation in AnimateAlienLanding().
+            yield return new WaitForSecondsRealtime(stageTwoArena ? 0.30f : 0.15f);
 #else
             yield return new WaitForSecondsRealtime(initialSpawnDelay);
 #endif
+            initialWaveCoroutine = null;
             initialWavePending = false;
 
-            if (player != null && player.GetComponent<PlayerController>()?.IsDefeated != true)
+            if (player != null)
             {
-                StartupCheckpoint.Set("AndroidEnemyWaveStart");
+                StartupCheckpoint.Set(stageTwoArena ? "StageTwoGreenBeamWaveStart" : "AndroidEnemyWaveStart");
+                Debug.Log(stageTwoArena
+                    ? "PERSIA_STAGE2: starting the initial green-beam alien wave."
+                    : "PERSIA_COMBAT: starting the initial enemy wave.");
                 SpawnWave();
                 initialWaveComplete = true;
-                StartupCheckpoint.Set("AndroidEnemyWaveReady");
+                StartupCheckpoint.Set(stageTwoArena ? "StageTwoGreenBeamWaveReady" : "AndroidEnemyWaveReady");
+            }
+            else
+            {
+                initialWaveStarted = false;
+                Debug.LogWarning("PERSIA_COMBAT: initial wave cannot start because the player target is missing.");
             }
         }
 
@@ -228,24 +269,28 @@ namespace PersiaWar.Unity2D5D
 
                 for (int attempt = 0; attempt < attemptsPerEnemy; attempt++)
                 {
-                    // Preserve map-wide candidate selection for the original stage.
+                    // Stage 1 keeps its original map-wide random candidate selection.
                     Vector3 candidate = new Vector3(
                         Random.Range(-82f, 82f),
                         1f,
                         Random.Range(-82f, 82f));
 
-                    // Stage two deliberately overrides that candidate with a nearby
-                    // ring so the green sky landings appear around the active player.
+                    // Stage 2 uses a shuffled grid across the whole playable terrain,
+                    // not a ring around the player. Every wave lands aliens in
+                    // separated parts of the village instead of one small cluster.
                     if (stageTwoArena)
                     {
-                        float angle = (spawned + Random.Range(-0.35f, 0.35f)) /
-                            Mathf.Max(1, count) * Mathf.PI * 2f;
-                        float radius = Random.Range(18f, 34f);
-                        Vector3 center = player != null ? player.position : Vector3.zero;
+                        int columns = Mathf.CeilToInt(Mathf.Sqrt(count));
+                        int rows = Mathf.CeilToInt(count / (float)Mathf.Max(1, columns));
+                        int slot = (spawned + (currentWave - 1) * 7) % Mathf.Max(1, count);
+                        int column = slot % columns;
+                        int row = slot / columns;
+                        float cellWidth = 172f / columns;
+                        float cellDepth = 172f / rows;
                         candidate = new Vector3(
-                            Mathf.Clamp(center.x + Mathf.Cos(angle) * radius, -82f, 82f),
+                            -86f + (column + Random.Range(0.20f, 0.80f)) * cellWidth,
                             1f,
-                            Mathf.Clamp(center.z + Mathf.Sin(angle) * radius, -82f, 82f));
+                            -86f + (row + Random.Range(0.20f, 0.80f)) * cellDepth);
                     }
 
                     Vector2 candidateXZ = new Vector2(candidate.x, candidate.z);
@@ -270,14 +315,31 @@ namespace PersiaWar.Unity2D5D
 
                 if (!foundPosition)
                 {
-                    // If houses occupy every random candidate, use a deterministic
-                    // nearby ring so the green sky drops still appear around the player.
-                    float fallbackAngle = (spawned + 0.5f) / Mathf.Max(1, count) * Mathf.PI * 2f;
-                    float fallbackDistance = 26f;
-                    position = new Vector3(
-                        Mathf.Clamp((player != null ? player.position.x : 0f) + Mathf.Cos(fallbackAngle) * fallbackDistance, -82f, 82f),
-                        1f,
-                        Mathf.Clamp((player != null ? player.position.z : 0f) + Mathf.Sin(fallbackAngle) * fallbackDistance, -82f, 82f));
+                    if (stageTwoArena)
+                    {
+                        // Last-resort placements remain map-wide too. This path still
+                        // creates the alien and its green descent beam if buildings
+                        // occupy all 60 attempts inside an individual grid cell.
+                        int columns = Mathf.CeilToInt(Mathf.Sqrt(count));
+                        int rows = Mathf.CeilToInt(count / (float)Mathf.Max(1, columns));
+                        int slot = (spawned + (currentWave - 1) * 7) % Mathf.Max(1, count);
+                        int column = slot % columns;
+                        int row = slot / columns;
+                        position = new Vector3(
+                            -86f + (column + 0.5f) * (172f / columns),
+                            1f,
+                            -86f + (row + 0.5f) * (172f / rows));
+                    }
+                    else
+                    {
+                        // Preserve the stage-one fallback unchanged.
+                        float fallbackAngle = (spawned + 0.5f) / Mathf.Max(1, count) * Mathf.PI * 2f;
+                        float fallbackDistance = 26f;
+                        position = new Vector3(
+                            Mathf.Clamp((player != null ? player.position.x : 0f) + Mathf.Cos(fallbackAngle) * fallbackDistance, -82f, 82f),
+                            1f,
+                            Mathf.Clamp((player != null ? player.position.z : 0f) + Mathf.Sin(fallbackAngle) * fallbackDistance, -82f, 82f));
+                    }
                 }
 
                 StartupCheckpoint.Set("AndroidEnemySpawnAttempt");
@@ -291,6 +353,10 @@ namespace PersiaWar.Unity2D5D
             failedSpawnAttempts = 0;
             if (GameSession.Instance != null)
                 GameSession.Instance.SetWave(currentWave);
+
+            if (stageTwoArena)
+                Debug.Log("PERSIA_STAGE2: spawned " + spawned + " aliens for wave " + currentWave +
+                    "; total arena aliens spawned=" + EnemiesSpawnedForArena + ".");
 
             SpawnWaveReward();
             spawning = false;
