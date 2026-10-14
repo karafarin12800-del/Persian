@@ -184,8 +184,11 @@ namespace PersiaWar.Unity2D5D
             {
                 ActorState actor = actors[i];
                 if (actor == null || actor.Root == null) continue;
-                // Approach the rear ramp and then enter the passenger cabin.
-                actor.ApproachPosition = shipRoot.TransformPoint(new Vector3(0f, -0.50f, -6.35f));
+                // Compute the entry point at full ship scale. The ship itself is
+                // currently tiny for the decloak effect, so TransformPoint here
+                // would incorrectly place the approach point almost at its centre.
+                actor.ApproachPosition = landingPosition +
+                    shipRoot.rotation * new Vector3(0f, 0f, -6.35f);
                 actor.InteriorLocalPosition = new Vector3(0f, -0.57f, -2.25f);
             }
 
