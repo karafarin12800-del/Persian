@@ -76,11 +76,11 @@ namespace PersiaWar.Unity2D5D
         {
             if (IsRunning || IsComplete) return;
 
-            CollectLivingActors(localPlayer);
             Vector3 mapReference = localPlayer != null ? localPlayer.position : Vector3.zero;
             Vector3 landingGround = FindLandingPoint(mapReference);
             groundY = landingGround.y;
             landingPosition = new Vector3(landingGround.x, groundY + 0.92f, landingGround.z);
+            CollectLivingActors(localPlayer);
             shipStartPosition = landingPosition + Vector3.up * 34f;
 
             BuildShip();
@@ -259,7 +259,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     Vector3 candidate = new Vector3(roadCoordinates[x], reference.y, roadCoordinates[z]);
                     float distance = (new Vector2(candidate.x - reference.x, candidate.z - reference.z)).sqrMagnitude;
-                    if (distance >= bestDistance) continue;
+                    if (distance > 625f || distance >= bestDistance) continue;
                     if (!IsLandingAreaClear(candidate)) continue;
 
                     bestDistance = distance;
@@ -307,7 +307,10 @@ namespace PersiaWar.Unity2D5D
                         break;
                     }
                 }
-                if (!belongsToActor) return false;
+                if (!belongsToActor &&
+                    hitTransform.GetComponentInParent<PlayerController>() == null &&
+                    hitTransform.GetComponentInParent<StageTwoBotCompetitor>() == null)
+                    return false;
             }
 
             return true;
