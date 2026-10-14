@@ -35,6 +35,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
     private Color savedCameraBackground;
+    private Color savedAmbientLight;
+    private bool ambientCaptured;
 
     private sealed class HovercraftPatrol
     {
@@ -65,6 +67,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     public bool BuildWorld()
     {
         ClearWorldAndRestorePrevious();
+        savedAmbientLight = RenderSettings.ambientLight;
+        ambientCaptured = true;
         GameObject oldWorld = FindSceneObject(WorldRootName);
         if (oldWorld != null)
             Destroy(oldWorld);
@@ -199,7 +203,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private void BuildAlienCity()
     {
         // A varied grid of tall silver towers; preserve a clear southern approach to the citadel.
-        float[] coordinates = { -82f, -62f, -42f, -22f, 22f, 42f, 62f, 82f };
+        float[] coordinates = { -82f, -54f, -26f, 26f, 54f, 82f };
         for (int ix = 0; ix < coordinates.Length; ix++)
         {
             for (int iz = 0; iz < coordinates.Length; iz++)
@@ -223,7 +227,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                     new Vector3(width + 1.5f, 1.1f, depth + 1.5f), darkMetalMaterial, true,
                     Quaternion.Euler(0f, yaw, 0f));
 
-                int floorCount = Mathf.Clamp(Mathf.FloorToInt(height / 4f), 3, 8);
+                int floorCount = Mathf.Clamp(Mathf.FloorToInt(height / 5f), 3, 5);
                 for (int floor = 1; floor <= floorCount; floor++)
                 {
                     float y = Mathf.Min(height - 1.2f, floor * height / (floorCount + 1f));
@@ -252,7 +256,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             Vector3 radial = DirectionAt(angle);
             Vector3 tangent = new Vector3(-radial.z, 0f, radial.x);
             Vector3 gateCenter = radial * FortressRadius;
-            Quaternion gateRotation = Quaternion.LookRotation(tangent, Vector3.up);
+            Quaternion gateRotation = Quaternion.LookRotation(radial, Vector3.up);
 
             CreateBox("S3_GateLeftPillar", gateCenter - tangent * 3.05f + Vector3.up * 6.2f,
                 new Vector3(1.3f, 12.4f, 2.2f), silverMaterial, true, gateRotation);
@@ -267,21 +271,21 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             Vector3 floorCenter = radial * 14.6f;
             CreateBox("S3_RouteFloor_" + route, new Vector3(floorCenter.x, 0.045f, floorCenter.z),
                 new Vector3(4.4f, 0.10f, 18.5f), darkMetalMaterial, false,
-                Quaternion.Euler(0f, -angle, 0f));
+                Quaternion.Euler(0f, angle, 0f));
 
             for (int side = -1; side <= 1; side += 2)
             {
                 Vector3 wallPosition = radial * 14.6f + tangent * side * 2.25f;
                 CreateBox("S3_RouteWall_" + route, wallPosition + Vector3.up * 2.1f,
                     new Vector3(0.42f, 4.2f, 18.2f), silverMaterial, true,
-                    Quaternion.Euler(0f, -angle, 0f));
+                    Quaternion.Euler(0f, angle, 0f));
                 for (int marker = 0; marker < 4; marker++)
                 {
                     Vector3 mark = radial * (7.6f + marker * 4.2f) +
                         tangent * side * 2.03f + Vector3.up * 2.6f;
                     CreateBox("S3_RouteGuide_" + route, mark,
                         new Vector3(0.08f, 0.10f, 1.25f), cyanGlowMaterial, false,
-                        Quaternion.Euler(0f, -angle, 0f));
+                        Quaternion.Euler(0f, angle, 0f));
                 }
             }
 
@@ -301,11 +305,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             CreateBox("S3_CitadelRingWall_" + segment,
                 new Vector3(center.x, 6.8f, center.z),
                 new Vector3(13.0f, 13.6f, 2.2f), silverMaterial, true,
-                Quaternion.LookRotation(tangent, Vector3.up));
+                Quaternion.LookRotation(radial, Vector3.up));
             CreateBox("S3_CitadelWallTrim_" + segment,
                 new Vector3(center.x, 13.8f, center.z),
                 new Vector3(13.0f, 0.35f, 2.45f), cyanGlowMaterial, false,
-                Quaternion.LookRotation(tangent, Vector3.up));
+                Quaternion.LookRotation(radial, Vector3.up));
         }
 
         // The huge top platform is built in four pieces, leaving an open shaft above the lift.
@@ -344,9 +348,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             float angle = i * 22.5f;
             Vector3 radial = DirectionAt(angle);
             CreateCylinder("S3_CylinderEnergyColumn", radial * 4.0f + Vector3.up * 12.6f,
-                new Vector3(0.20f, 25.2f, 0.20f), silverMaterial, false);
+                new Vector3(0.20f, 12.6f, 0.20f), silverMaterial, false);
             CreateCylinder("S3_CylinderInnerGlow", radial * 3.82f + Vector3.up * 12.6f,
-                new Vector3(0.07f, 25.2f, 0.07f), greenGlowMaterial, false);
+                new Vector3(0.07f, 12.6f, 0.07f), greenGlowMaterial, false);
         }
 
         liftPlatform = CreateCylinder("S3_CentralLiftPlatform", new Vector3(0f, 0.28f, 0f),
@@ -460,8 +464,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         if (liftPlatform == null || localPlayer == null)
             yield break;
 
-        Vector3 playerOffset = localPlayer.transform.position - liftPlatform.position;
-        playerOffset.y = 0.95f;
+        Vector3 playerOffset = Vector3.up * 0.95f;
         Vector3 platformStart = new Vector3(0f, 0.28f, 0f);
         Vector3 platformTop = new Vector3(0f, 24.1f, 0f);
         float elapsed = 0f;
@@ -475,12 +478,14 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             liftPlatform.position = platformPosition;
             localPlayer.transform.position = platformPosition + playerOffset;
             localPlayer.transform.rotation = Quaternion.identity;
+            FollowPlayerDuringCinematic();
             yield return null;
         }
 
         liftPlatform.position = platformTop;
         localPlayer.transform.position = platformTop + playerOffset;
         localPlayer.transform.position = new Vector3(localPlayer.transform.position.x, 25.2f, localPlayer.transform.position.z);
+        FollowPlayerDuringCinematic();
         StartupCheckpoint.Set("StageThreePlayerReachedUpperPlatform");
 
         // The uplink starts at the base and climbs the shaft. When it reaches the hero,
@@ -509,16 +514,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             carryElapsed += Time.unscaledDeltaTime;
             float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(carryElapsed / carryDuration));
             localPlayer.transform.position = liftStart + Vector3.up * (30f * t);
-            if (gameplayCamera != null)
-            {
-                Vector3 cameraTarget = localPlayer.transform.position + new Vector3(0f, 5.5f, -11f);
-                gameplayCamera.transform.position = Vector3.Lerp(
-                    gameplayCamera.transform.position, cameraTarget,
-                    1f - Mathf.Exp(-5f * Time.unscaledDeltaTime));
-                gameplayCamera.transform.rotation = Quaternion.LookRotation(
-                    localPlayer.transform.position + Vector3.up * 1.1f - gameplayCamera.transform.position,
-                    Vector3.up);
-            }
+            FollowPlayerDuringCinematic();
             yield return null;
         }
 
@@ -526,6 +522,18 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         IsCinematic = false;
         StartupCheckpoint.Set("StageThreeEndingComplete");
         GameSession.Instance?.EndMission(true);
+    }
+
+    private void FollowPlayerDuringCinematic()
+    {
+        if (gameplayCamera == null || localPlayer == null) return;
+        Vector3 cameraTarget = localPlayer.transform.position + new Vector3(0f, 7.5f, -15f);
+        gameplayCamera.transform.position = Vector3.Lerp(
+            gameplayCamera.transform.position, cameraTarget,
+            1f - Mathf.Exp(-5f * Time.unscaledDeltaTime));
+        Vector3 lookDirection = localPlayer.transform.position + Vector3.up * 1.1f - gameplayCamera.transform.position;
+        if (lookDirection.sqrMagnitude > 0.001f)
+            gameplayCamera.transform.rotation = Quaternion.LookRotation(lookDirection, Vector3.up);
     }
 
     private void ClearWorldAndRestorePrevious()
@@ -559,6 +567,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             gameplayCamera.backgroundColor = savedCameraBackground;
             gameplayCamera.transform.position = savedCameraPosition;
             gameplayCamera.transform.rotation = savedCameraRotation;
+        }
+        if (ambientCaptured)
+        {
+            RenderSettings.ambientLight = savedAmbientLight;
+            ambientCaptured = false;
         }
 
         hovercrafts.Clear();
