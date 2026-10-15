@@ -29,6 +29,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Material cyanGlowMaterial;
     private Material greenGlowMaterial;
     private Material warningMaterial;
+    private Material uplinkOrbMaterial;
+    private readonly Material[] alienBodyMaterials = new Material[3];
     private readonly List<HovercraftPatrol> hovercrafts = new List<HovercraftPatrol>();
     private readonly List<GroundAlien> groundAliens = new List<GroundAlien>();
     private readonly List<TargetHealth> hostileHealth = new List<TargetHealth>();
@@ -141,6 +143,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         cyanGlowMaterial = CreateMaterial("S3_CyanEnergy", new Color(0.12f, 0.88f, 1f), new Color(0.08f, 0.86f, 1f));
         greenGlowMaterial = CreateMaterial("S3_UplinkEnergy", new Color(0.34f, 1f, 0.73f), new Color(0.18f, 1f, 0.67f));
         warningMaterial = CreateMaterial("S3_HazardWarning", new Color(1f, 0.24f, 0.10f), new Color(1f, 0.10f, 0.035f));
+        // Deep blue-silver: substantially darker than the surrounding silver walls
+        // while keeping the orb visually in the same architectural color family.
+        uplinkOrbMaterial = CreateMaterial("S3_UplinkOrbDeepBlueSilver", new Color(0.13f, 0.20f, 0.28f));
+        alienBodyMaterials[0] = CreateMaterial("S3_AlienChitin_Teal", new Color(0.075f, 0.30f, 0.34f));
+        alienBodyMaterials[1] = CreateMaterial("S3_AlienChitin_Violet", new Color(0.25f, 0.15f, 0.36f));
+        alienBodyMaterials[2] = CreateMaterial("S3_AlienChitin_Olive", new Color(0.24f, 0.31f, 0.12f));
 
         try
         {
@@ -448,11 +456,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         // A large energy sphere sits above the deck. The final beam begins inside it
         // and erupts vertically beyond the top of the screen.
         uplinkOrb = CreateSphere("S3_UplinkOrb", new Vector3(0f, 29.5f, 0f),
-            new Vector3(5.5f, 5.5f, 5.5f), greenGlowMaterial, false).transform;
+            new Vector3(5.5f, 5.5f, 5.5f), uplinkOrbMaterial, false).transform;
         CreateCylinder("S3_UplinkOrbRing", new Vector3(0f, 29.5f, 0f),
             new Vector3(6.4f, 0.16f, 6.4f), silverMaterial, false);
         CreateSphere("S3_UplinkOrbCore", new Vector3(0f, 29.5f, 0f),
-            new Vector3(2.35f, 2.35f, 2.35f), cyanGlowMaterial, false);
+            new Vector3(2.35f, 2.35f, 2.35f), uplinkOrbMaterial, false);
 
         GameObject beam = CreateCylinder("S3_UplinkBeam", new Vector3(0f, 29.5f, 0f),
             new Vector3(1.55f, 0.1f, 1.55f), greenGlowMaterial, false);
@@ -469,24 +477,17 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     {
         // Six ships use three distinct silhouettes. Each travels back and forth
         // along one fixed lane rather than orbiting or steering toward the player.
-        Vector3[] starts =
+        // Six parallel street corridors never intersect. The old pair of north/south
+        // lanes crossed all four east/west lanes, allowing ships to meet head-on.
+        // Each row is offset inside an existing road gap and remains at firing height.
+        float[] laneZ = { -72f, -64f, -44f, 44f, 64f, 72f };
+        Vector3[] starts = new Vector3[laneZ.Length];
+        Vector3[] ends = new Vector3[laneZ.Length];
+        for (int i = 0; i < laneZ.Length; i++)
         {
-            new Vector3(-91f, 0f, -68f),
-            new Vector3(-91f, 0f, -40f),
-            new Vector3(-91f, 0f,  40f),
-            new Vector3(-91f, 0f,  68f),
-            new Vector3(-40f, 0f, -91f),
-            new Vector3( 40f, 0f, -91f)
-        };
-        Vector3[] ends =
-        {
-            new Vector3(91f, 0f, -68f),
-            new Vector3(91f, 0f, -40f),
-            new Vector3(91f, 0f,  40f),
-            new Vector3(91f, 0f,  68f),
-            new Vector3(-40f, 0f, 91f),
-            new Vector3( 40f, 0f, 91f)
-        };
+            starts[i] = new Vector3(-91f, 0f, laneZ[i]);
+            ends[i] = new Vector3(91f, 0f, laneZ[i]);
+        }
 
         for (int i = 0; i < starts.Length; i++)
         {
@@ -751,7 +752,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             {
                 Vector3 position = new Vector3(x, 0f, z);
                 if (new Vector2(position.x, position.z).magnitude < 36f ||
-                    IsNearAlienTower(position, 8f))
+                    IsPatrolLaneBlockedByAlienTower(position, 10f))
                     continue;
 
                 bool tooClose = false;
@@ -790,6 +791,19 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int attempt = 0; upperPatrols < 20 && attempt < 60; attempt++)
         {
             Vector3 position = new Vector3(-88f + (attempt % 18) * 9.5f, 0f, 96f - (attempt / 18) * 8f);
+            if (IsPatrolLaneBlockedByAlienTower(position, 10f))
+                continue;
+            bool fallbackTooClose = false;
+            for (int i = 0; i < occupied.Count; i++)
+            {
+                if (Vector3.Distance(occupied[i], position) < 10.5f)
+                {
+                    fallbackTooClose = true;
+                    break;
+                }
+            }
+            if (fallbackTooClose)
+                continue;
             occupied.Add(position);
             int guardIndex = 60 + upperPatrols;
             SpawnGroundAlien(guardIndex, position, true);
@@ -833,6 +847,32 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         return false;
     }
 
+    // Guards patrol ten metres in either direction along X. A spawn can look clear
+    // while its full patrol lane crosses a tower, so validate the entire swept lane.
+    private bool IsPatrolLaneBlockedByAlienTower(Vector3 patrolCenter, float patrolRadius)
+    {
+        float[] coordinates = { -82f, -54f, -26f, 26f, 54f, 82f };
+        const float towerHalfFootprint = 5.6f;
+        const float guardRadius = 0.55f;
+        for (int ix = 0; ix < coordinates.Length; ix++)
+        {
+            for (int iz = 0; iz < coordinates.Length; iz++)
+            {
+                float x = coordinates[ix];
+                float z = coordinates[iz];
+                if (new Vector2(x, z).magnitude < 37f)
+                    continue;
+                bool overlapsTowerDepth = Mathf.Abs(patrolCenter.z - z) <
+                    towerHalfFootprint + guardRadius;
+                bool patrolSweepsAcrossTower = Mathf.Abs(patrolCenter.x - x) <
+                    towerHalfFootprint + guardRadius + patrolRadius;
+                if (overlapsTowerDepth && patrolSweepsAcrossTower)
+                    return true;
+            }
+        }
+        return false;
+    }
+
     private void SpawnGroundAlien(int index, Vector3 position, bool guard)
     {
         int archetype = index % 3 + 1;
@@ -851,9 +891,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         MeshFilter alienFilter = alien.AddComponent<MeshFilter>();
         alienFilter.sharedMesh = sourceFilter.sharedMesh;
         MeshRenderer alienRenderer = alien.AddComponent<MeshRenderer>();
-        Color mobileBodyColor = archetype == 1 ? new Color(0.11f, 0.55f, 0.68f)
-            : (archetype == 2 ? new Color(0.18f, 0.70f, 0.53f) : new Color(0.36f, 0.37f, 0.78f));
-        alienRenderer.sharedMaterial = CreateMaterial("S3_AlienBody_" + archetype, mobileBodyColor);
+        alienRenderer.sharedMaterial = alienBodyMaterials[archetype - 1];
         alienRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         alienRenderer.receiveShadows = false;
         Collider temporaryCollider = meshSource.GetComponent<Collider>();
@@ -869,12 +907,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Renderer alienRenderer = alien.GetComponent<Renderer>();
         if (alienRenderer != null)
         {
-            Color bodyColor = archetype == 1 ? new Color(0.11f, 0.55f, 0.68f)
-                : (archetype == 2 ? new Color(0.18f, 0.70f, 0.53f) : new Color(0.36f, 0.37f, 0.78f));
-            alienRenderer.sharedMaterial = CreateMaterial("S3_AlienBody_" + archetype, bodyColor);
+            alienRenderer.sharedMaterial = alienBodyMaterials[archetype - 1];
         }
 #endif
         alien.transform.SetParent(worldRoot, true);
+        BuildAlienCreatureDetails(alien.transform, archetype, guard);
 
         TargetHealth health = alien.AddComponent<TargetHealth>();
         health.SetMaxHealth(archetype == 3 ? 150 : (archetype == 2 ? 115 : 90));
@@ -908,6 +945,56 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         };
         groundAliens.Add(data);
         hostileHealth.Add(health);
+    }
+
+    private void BuildAlienCreatureDetails(Transform alien, int archetype, bool guard)
+    {
+        Material chitin = alienBodyMaterials[Mathf.Clamp(archetype - 1, 0, alienBodyMaterials.Length - 1)];
+        Material eyes = archetype == 1 ? cyanGlowMaterial
+            : (archetype == 2 ? greenGlowMaterial : warningMaterial);
+
+        // Oversized alien cranium, jaw, armored chest, and non-human shoulder plates.
+        CreateSphereChild(alien, "S3_AlienCranium", new Vector3(0f, 0.70f, 0.16f),
+            new Vector3(0.72f, 0.54f, 0.58f), chitin);
+        CreateSphereChild(alien, "S3_AlienJaw", new Vector3(0f, 0.36f, 0.38f),
+            new Vector3(0.42f, 0.19f, 0.30f), darkMetalMaterial);
+        CreateBoxChild(alien, "S3_AlienChestArmor", new Vector3(0f, 0.05f, 0.35f),
+            new Vector3(0.46f, 0.34f, 0.18f), darkMetalMaterial);
+        CreateSphereChild(alien, "S3_AlienBackEnergyNode", new Vector3(0f, 0.46f, -0.38f),
+            new Vector3(0.24f, 0.30f, 0.20f), greenGlowMaterial);
+
+        for (int side = -1; side <= 1; side += 2)
+        {
+            CreateSphereChild(alien, "S3_AlienShoulderPlate",
+                new Vector3(side * 0.39f, 0.16f, 0.02f),
+                new Vector3(0.30f, 0.23f, 0.34f), silverMaterial);
+            CreateBoxChild(alien, "S3_AlienMandible",
+                new Vector3(side * 0.16f, 0.30f, 0.55f),
+                new Vector3(0.10f, 0.20f, 0.12f), silverMaterial);
+            CreateCylinderChild(alien, "S3_AlienAntenna",
+                new Vector3(side * 0.24f, 1.10f, 0.13f),
+                new Vector3(0.07f, 0.29f, 0.07f), darkMetalMaterial);
+            CreateSphereChild(alien, "S3_AlienEye",
+                new Vector3(side * 0.19f, 0.69f, 0.47f),
+                new Vector3(0.13f, 0.13f, 0.08f), eyes);
+        }
+        CreateSphereChild(alien, "S3_AlienThirdEye", new Vector3(0f, 0.82f, 0.48f),
+            new Vector3(0.12f, 0.12f, 0.08f), eyes);
+
+        if (guard)
+        {
+            CreateBoxChild(alien, "S3_AlienSentryBackpack", new Vector3(0f, 0.43f, -0.34f),
+                new Vector3(0.38f, 0.50f, 0.20f), silverMaterial);
+            CreateBoxChild(alien, "S3_AlienEnergyRifle", new Vector3(0.29f, 0.16f, 0.53f),
+                new Vector3(0.12f, 0.12f, 0.48f), darkMetalMaterial);
+            CreateSphereChild(alien, "S3_AlienRifleEmitter", new Vector3(0.29f, 0.17f, 0.79f),
+                new Vector3(0.09f, 0.09f, 0.09f), eyes);
+        }
+        else
+        {
+            CreateBoxChild(alien, "S3_AlienRoverSpine", new Vector3(0f, 0.28f, -0.36f),
+                new Vector3(0.26f, 0.28f, 0.20f), silverMaterial);
+        }
     }
 
     private void UpdateUpperGuardPatrols()
