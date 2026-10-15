@@ -61,9 +61,12 @@ namespace PersiaWar.Unity2D5D
         private void BeginEnemyDeathSequence(EnemyChase enemy)
         {
             Vector3 deathPosition = enemy != null ? enemy.transform.position : transform.position;
+            bool isStageThreeCraft = enemy != null &&
+                enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal);
             if (enemy != null)
             {
-                // Disable combat and collision, but keep the rendered body visible while it falls.
+                // Disable combat and collision immediately, but let StageThreeWorldBuilder
+                // handle the craft's explosion and three-second grounded wreck lifetime.
                 enemy.enabled = false;
                 Collider[] colliders = enemy.GetComponentsInChildren<Collider>();
                 for (int i = 0; i < colliders.Length; i++)
@@ -73,7 +76,8 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < behaviours.Length; i++)
                     if (behaviours[i] != null && behaviours[i] != this) behaviours[i].enabled = false;
 
-                StartCoroutine(FallAndRemoveEnemy(enemy.transform));
+                if (!isStageThreeCraft)
+                    StartCoroutine(FallAndRemoveEnemy(enemy.transform));
             }
 
             // Alien bodies in Stage 3 use a falling-removal animation, not the
