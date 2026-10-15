@@ -1136,8 +1136,11 @@ namespace PersiaWar.Unity2D5D
         {
             if (stageTwoVictorySequence == null) return;
 
-            // Capture result text before disabling the stage systems.
+            // Keep the real evacuation ship alive for the campaign transition only.
+            // Stage-test runs must always clean up and must not leave a stale ship.
             string result = GetStageTwoResultMessage();
+            if (!stageTestRun)
+                stageTwoVictorySequence.PreserveShipForStageThree();
             stageTwoVictorySequence.FinishAndCleanup();
             Destroy(stageTwoVictorySequence);
             stageTwoVictorySequence = null;
