@@ -20,6 +20,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Camera gameplayCamera;
     private Transform liftPlatform;
     private Transform beamColumn;
+    private Transform beamCoreColumn;
+    private Transform uplinkOrb;
     private Material groundMaterial;
     private Material silverMaterial;
     private Material darkMetalMaterial;
@@ -28,32 +30,71 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Material greenGlowMaterial;
     private Material warningMaterial;
     private readonly List<HovercraftPatrol> hovercrafts = new List<HovercraftPatrol>();
+    private readonly List<GroundAlien> groundAliens = new List<GroundAlien>();
+    private readonly List<TargetHealth> hostileHealth = new List<TargetHealth>();
     private bool liftSequenceStarted;
     private bool isComplete;
     private bool worldBuilt;
-    private float nextHazardDamageTime;
+    private bool groundAliensSpawned;
+    private bool introStarted;
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
     private Color savedCameraBackground;
     private CameraClearFlags savedCameraClearFlags;
     private float savedCameraFarClip;
+    private float savedCameraFieldOfView;
     private Color savedAmbientLight;
     private bool ambientCaptured;
+    private Renderer[] savedPlayerRenderers;
+    private bool[] savedPlayerRendererStates;
 
     private sealed class HovercraftPatrol
     {
         public Transform Root;
-        public float Radius;
-        public float AngularSpeed;
-        public float Angle;
+        public Vector3 StartPoint;
+        public Vector3 EndPoint;
+        public float Progress;
+        public float TravelDirection = 1f;
+        public float Speed;
         public float Height;
-        public float DamageCooldown;
+        public float NextShotTime;
         public float NextDamageTime;
+        public int Archetype;
+        public TargetHealth Health;
+        public Vector3 Heading;
+    }
+
+    private sealed class GroundAlien
+    {
+        public Transform Root;
+        public TargetHealth Health;
+        public EnemyChase Chase;
+        public bool Guard;
+        public float NextShotTime;
+        public int Archetype;
     }
 
     public bool IsComplete => isComplete;
     public bool IsCinematic { get; private set; }
+    public bool IsIntroCinematic { get; private set; }
+    public bool IsEndingCinematic => IsCinematic && !IsIntroCinematic;
     public bool IsBuilt => worldBuilt;
+    public int TotalHostiles => hostileHealth.Count;
+    public int RemainingHostiles
+    {
+        get
+        {
+            int remaining = 0;
+            for (int i = 0; i < hostileHealth.Count; i++)
+            {
+                TargetHealth health = hostileHealth[i];
+                if (health != null && health.CurrentHealth > 0)
+                    remaining++;
+            }
+            return remaining;
+        }
+    }
+    public bool HostilesCleared => RemainingHostiles == 0;
 
     public static void ClearExistingWorld()
     {
@@ -86,13 +127,14 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         rootObject.transform.SetParent(transform, false);
         worldRoot = rootObject.transform;
 
-        groundMaterial = CreateMaterial("S3_ObsidianGround", new Color(0.055f, 0.068f, 0.085f));
-        silverMaterial = CreateMaterial("S3_BrushedAlienSilver", new Color(0.53f, 0.60f, 0.67f));
-        darkMetalMaterial = CreateMaterial("S3_DarkTitanium", new Color(0.115f, 0.145f, 0.18f));
-        windowMaterial = CreateMaterial("S3_DeepGlass", new Color(0.035f, 0.12f, 0.17f), new Color(0.015f, 0.20f, 0.27f));
-        cyanGlowMaterial = CreateMaterial("S3_CyanEnergy", new Color(0.12f, 0.85f, 1f), new Color(0.05f, 0.75f, 1f));
-        greenGlowMaterial = CreateMaterial("S3_UplinkEnergy", new Color(0.34f, 1f, 0.73f), new Color(0.10f, 0.9f, 0.55f));
-        warningMaterial = CreateMaterial("S3_HazardWarning", new Color(1f, 0.23f, 0.12f), new Color(1f, 0.08f, 0.025f));
+        // Readable warm sand contrasts with blue-silver architecture.
+        groundMaterial = CreateMaterial("S3_SandyAlienGround", new Color(0.57f, 0.43f, 0.27f));
+        silverMaterial = CreateMaterial("S3_BlueSilverAlienMetal", new Color(0.48f, 0.66f, 0.82f));
+        darkMetalMaterial = CreateMaterial("S3_BlueTitanium", new Color(0.17f, 0.25f, 0.35f));
+        windowMaterial = CreateMaterial("S3_DeepBlueGlass", new Color(0.055f, 0.19f, 0.28f), new Color(0.025f, 0.30f, 0.43f));
+        cyanGlowMaterial = CreateMaterial("S3_CyanEnergy", new Color(0.12f, 0.88f, 1f), new Color(0.08f, 0.86f, 1f));
+        greenGlowMaterial = CreateMaterial("S3_UplinkEnergy", new Color(0.34f, 1f, 0.73f), new Color(0.18f, 1f, 0.67f));
+        warningMaterial = CreateMaterial("S3_HazardWarning", new Color(1f, 0.24f, 0.10f), new Color(1f, 0.10f, 0.035f));
 
         try
         {
@@ -114,7 +156,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         isComplete = false;
         IsCinematic = false;
         liftSequenceStarted = false;
-        Debug.Log("PERSIA_STAGE3: alien world built; 9 routes, central lift, upper platform and patrol craft ready.");
+        Debug.Log("PERSIA_STAGE3: sandy alien world built; 9 routes, 60 ground aliens and 6 destructible linear-lane craft ready.");
         StartupCheckpoint.Set("StageThreeWorldBuilt_9Routes");
         return true;
     }
@@ -130,9 +172,20 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             savedCameraBackground = gameplayCamera.backgroundColor;
             savedCameraClearFlags = gameplayCamera.clearFlags;
             savedCameraFarClip = gameplayCamera.farClipPlane;
+            savedCameraFieldOfView = gameplayCamera.fieldOfView;
             gameplayCamera.clearFlags = CameraClearFlags.SolidColor;
-            gameplayCamera.backgroundColor = new Color(0.008f, 0.014f, 0.027f, 1f);
-            gameplayCamera.farClipPlane = Mathf.Max(gameplayCamera.farClipPlane, 280f);
+            gameplayCamera.backgroundColor = new Color(0.035f, 0.045f, 0.065f, 1f);
+            gameplayCamera.farClipPlane = Mathf.Max(gameplayCamera.farClipPlane, 320f);
+        }
+
+        if (localPlayer != null && !introStarted)
+        {
+            introStarted = true;
+            localPlayer.SetMovementEnabled(false);
+            if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = false;
+            if (localPlayer.Aim != null) localPlayer.Aim.enabled = false;
+            BuildStageThreeGroundAliens();
+            StartCoroutine(RunStageThreeIntro());
         }
     }
 
@@ -142,9 +195,17 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             return;
 
         UpdateHovercrafts();
+        if (IsIntroCinematic)
+            return;
+
+        UpdateHovercraftShooting();
+        UpdateStationaryGuardShooting();
         ApplyHovercraftThreat();
 
-        if (!liftSequenceStarted && localPlayer != null && !localPlayer.IsDefeated)
+        // The center lift remains locked until all ground aliens and flying craft
+        // are dead; entering the shaft early never starts the ascent.
+        if (!liftSequenceStarted && HostilesCleared &&
+            localPlayer != null && !localPlayer.IsDefeated)
         {
             Vector3 flatPlayer = localPlayer.transform.position;
             flatPlayer.y = 0f;
@@ -163,15 +224,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         lightObject.transform.rotation = Quaternion.Euler(48f, -28f, 0f);
         Light key = lightObject.AddComponent<Light>();
         key.type = LightType.Directional;
-        key.color = new Color(0.60f, 0.77f, 1f);
-        key.intensity = 0.88f;
+        key.color = new Color(0.83f, 0.88f, 1f);
+        key.intensity = 1.25f;
         key.shadows = LightShadows.None;
-        RenderSettings.ambientLight = new Color(0.16f, 0.20f, 0.28f);
+        RenderSettings.ambientLight = new Color(0.34f, 0.33f, 0.31f);
     }
 
     private void BuildGroundAndBoundary()
     {
-        CreateBox("S3_ObsidianGround", new Vector3(0f, -0.42f, 0f),
+        CreateBox("S3_SandyAlienGround", new Vector3(0f, -0.42f, 0f),
             new Vector3(WorldHalfSize * 2f, 0.8f, WorldHalfSize * 2f), groundMaterial, true);
 
         // Large angular basalt plates break up the ground without cluttering the routes.
@@ -186,7 +247,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 if (new Vector2(px, pz).magnitude < 31f)
                     continue;
                 CreateBox("S3_GroundPlate", new Vector3(px, 0.015f, pz),
-                    new Vector3(8.5f, 0.045f, 6.8f), darkMetalMaterial, false,
+                    new Vector3(8.5f, 0.045f, 6.8f), CreateMaterial("S3_SandPlate", new Color(0.44f, 0.32f, 0.20f)), false,
                     Quaternion.Euler(0f, (x * 17 + z * 11) % 35, 0f));
             }
         }
@@ -201,12 +262,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         CreateBox("S3_BoundaryWest", new Vector3(-edge, 3f, 0f),
             new Vector3(2f, 6f, WorldHalfSize * 2f), darkMetalMaterial, true);
 
-        // Arrival lane points the player directly toward the nine-door citadel.
-        CreateBox("S3_ApproachLane", new Vector3(0f, 0.025f, -55f),
-            new Vector3(13f, 0.06f, 65f), darkMetalMaterial, false);
-        for (int i = 0; i < 13; i++)
+        // The approach lane reaches the southern edge for the wide opening reveal.
+        CreateBox("S3_ApproachLane", new Vector3(0f, 0.025f, -59f),
+            new Vector3(16f, 0.06f, 80f), darkMetalMaterial, false);
+        for (int i = 0; i < 17; i++)
         {
-            float z = -84f + i * 4.5f;
+            float z = -100f + i * 4.7f;
             CreateBox("S3_ApproachGuideLeft", new Vector3(-5.7f, 0.08f, z),
                 new Vector3(0.13f, 0.07f, 1.65f), cyanGlowMaterial, false);
             CreateBox("S3_ApproachGuideRight", new Vector3(5.7f, 0.08f, z),
@@ -371,50 +432,129 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         CreateCylinder("S3_LiftPlatformGlow", new Vector3(0f, 0.49f, 0f),
             new Vector3(4.5f, 0.08f, 4.5f), greenGlowMaterial, false);
 
-        GameObject beam = CreateCylinder("S3_UplinkBeam", new Vector3(0f, 0.1f, 0f),
-            new Vector3(1.35f, 0.1f, 1.35f), greenGlowMaterial, false);
+        CreateCylinder("S3_TopUplinkReceiver", new Vector3(0f, 26.1f, 0f),
+            new Vector3(7.8f, 0.22f, 7.8f), greenGlowMaterial, false);
+
+        // A large energy sphere sits above the deck. The final beam begins inside it
+        // and erupts vertically beyond the top of the screen.
+        uplinkOrb = CreateSphere("S3_UplinkOrb", new Vector3(0f, 29.5f, 0f),
+            new Vector3(5.5f, 5.5f, 5.5f), greenGlowMaterial, false).transform;
+        CreateCylinder("S3_UplinkOrbRing", new Vector3(0f, 29.5f, 0f),
+            new Vector3(6.4f, 0.16f, 6.4f), silverMaterial, false);
+        CreateSphere("S3_UplinkOrbCore", new Vector3(0f, 29.5f, 0f),
+            new Vector3(2.35f, 2.35f, 2.35f), cyanGlowMaterial, false);
+
+        GameObject beam = CreateCylinder("S3_UplinkBeam", new Vector3(0f, 29.5f, 0f),
+            new Vector3(1.55f, 0.1f, 1.55f), greenGlowMaterial, false);
         beamColumn = beam.transform;
         beamColumn.gameObject.SetActive(false);
 
-        CreateCylinder("S3_TopUplinkReceiver", new Vector3(0f, 26.1f, 0f),
-            new Vector3(7.8f, 0.22f, 7.8f), greenGlowMaterial, false);
+        GameObject beamCore = CreateCylinder("S3_UplinkBeamCore", new Vector3(0f, 29.5f, 0f),
+            new Vector3(0.42f, 0.1f, 0.42f), cyanGlowMaterial, false);
+        beamCoreColumn = beamCore.transform;
+        beamCoreColumn.gameObject.SetActive(false);
     }
 
     private void BuildHovercraftPatrols()
     {
-        float[] radii = { 37f, 45f, 54f, 63f };
-        for (int i = 0; i < radii.Length; i++)
+        // Six ships use three distinct silhouettes. Each travels back and forth
+        // along one fixed lane rather than orbiting or steering toward the player.
+        Vector3[] starts =
         {
-            GameObject craft = new GameObject("S3_HostileHovercraft_" + i);
+            new Vector3(-91f, 0f, -68f),
+            new Vector3(-91f, 0f, -40f),
+            new Vector3(-91f, 0f,  40f),
+            new Vector3(-91f, 0f,  68f),
+            new Vector3(-40f, 0f, -91f),
+            new Vector3( 40f, 0f, -91f)
+        };
+        Vector3[] ends =
+        {
+            new Vector3(91f, 0f, -68f),
+            new Vector3(91f, 0f, -40f),
+            new Vector3(91f, 0f,  40f),
+            new Vector3(91f, 0f,  68f),
+            new Vector3(-40f, 0f, 91f),
+            new Vector3( 40f, 0f, 91f)
+        };
+
+        for (int i = 0; i < starts.Length; i++)
+        {
+            int model = i % 3;
+            GameObject craft = new GameObject("S3_HostileHovercraft_" + model + "_" + i);
             craft.transform.SetParent(worldRoot, false);
-            CreateBoxChild(craft.transform, "CraftArmoredBody", new Vector3(0f, 0f, 0f),
-                new Vector3(4.2f, 0.78f, 2.7f), darkMetalMaterial);
-            CreateBoxChild(craft.transform, "CraftSilverTop", new Vector3(0f, 0.48f, 0f),
-                new Vector3(2.5f, 0.38f, 1.55f), silverMaterial);
-            CreateBoxChild(craft.transform, "CraftFrontBlade", new Vector3(0f, 0.02f, 1.55f),
-                new Vector3(2.5f, 0.16f, 0.24f), silverMaterial);
-            CreateBoxChild(craft.transform, "CraftRedWarning", new Vector3(0f, 0.64f, 0.18f),
-                new Vector3(0.78f, 0.13f, 0.18f), warningMaterial);
-            for (int side = -1; side <= 1; side += 2)
-            {
-                CreateCylinderChild(craft.transform, "CraftThruster", new Vector3(side * 1.6f, -0.32f, -0.55f),
-                    new Vector3(0.45f, 0.24f, 0.45f), cyanGlowMaterial);
-                CreateCylinderChild(craft.transform, "CraftDownwash", new Vector3(side * 1.6f, -0.62f, -0.55f),
-                    new Vector3(0.18f, 0.5f, 0.18f), greenGlowMaterial);
-            }
+            float height = 1.8f + (i % 3) * 0.18f;
+            craft.transform.position = starts[i] + Vector3.up * height;
+            BuildHovercraftModel(craft.transform, model);
+
+            BoxCollider hitbox = craft.AddComponent<BoxCollider>();
+            hitbox.size = model == 2
+                ? new Vector3(5.3f, 1.2f, 5.3f)
+                : (model == 1 ? new Vector3(6.2f, 1.0f, 4.1f) : new Vector3(3.4f, 1.0f, 4.1f));
+
+            TargetHealth health = craft.AddComponent<TargetHealth>();
+            health.SetMaxHealth(model == 0 ? 90 : (model == 1 ? 125 : 165));
+            EnemyChase chase = craft.AddComponent<EnemyChase>();
+            chase.enabled = false;
+            hostileHealth.Add(health);
 
             HovercraftPatrol patrol = new HovercraftPatrol
             {
                 Root = craft.transform,
-                Radius = radii[i],
-                AngularSpeed = (i % 2 == 0 ? 1f : -1f) * (0.15f + i * 0.018f),
-                Angle = i * 83f,
-                Height = 1.8f + (i % 2) * 0.28f,
-                DamageCooldown = 1.25f
+                StartPoint = starts[i],
+                EndPoint = ends[i],
+                Progress = (i % 2 == 0) ? 0f : 1f,
+                TravelDirection = (i % 2 == 0) ? 1f : -1f,
+                Speed = 8.0f + model * 1.35f,
+                Height = height,
+                NextShotTime = Time.time + 1.7f + i * 0.37f,
+                NextDamageTime = Time.time + 1.0f,
+                Archetype = model,
+                Health = health,
+                Heading = (ends[i] - starts[i]).normalized * ((i % 2 == 0) ? 1f : -1f)
             };
             hovercrafts.Add(patrol);
-            UpdateHovercraftPosition(patrol);
+            craft.transform.rotation = Quaternion.LookRotation(patrol.Heading, Vector3.up);
         }
+    }
+
+    private void BuildHovercraftModel(Transform craft, int model)
+    {
+        if (model == 0)
+        {
+            // Scout: slim body, short wings and a bright sensor nose.
+            CreateBoxChild(craft, "ScoutArmoredBody", Vector3.zero, new Vector3(1.8f, 0.62f, 3.0f), darkMetalMaterial);
+            CreateBoxChild(craft, "ScoutBlueHull", new Vector3(0f, 0.25f, 0.15f), new Vector3(1.25f, 0.22f, 2.45f), silverMaterial);
+            CreateBoxChild(craft, "ScoutLeftWing", new Vector3(-1.35f, -0.04f, -0.2f), new Vector3(1.15f, 0.16f, 1.5f), silverMaterial);
+            CreateBoxChild(craft, "ScoutRightWing", new Vector3(1.35f, -0.04f, -0.2f), new Vector3(1.15f, 0.16f, 1.5f), silverMaterial);
+            CreateSphereChild(craft, "ScoutSensor", new Vector3(0f, 0.27f, 1.18f), new Vector3(0.42f, 0.30f, 0.42f), cyanGlowMaterial);
+        }
+        else if (model == 1)
+        {
+            // Interceptor: broader wings and two obvious gun pods.
+            CreateBoxChild(craft, "InterceptorBody", Vector3.zero, new Vector3(1.55f, 0.72f, 3.4f), darkMetalMaterial);
+            CreateBoxChild(craft, "InterceptorCenterSpine", new Vector3(0f, 0.36f, 0.0f), new Vector3(0.88f, 0.26f, 2.7f), silverMaterial);
+            CreateBoxChild(craft, "InterceptorLeftWing", new Vector3(-2.05f, -0.07f, -0.35f), new Vector3(2.1f, 0.20f, 1.8f), silverMaterial);
+            CreateBoxChild(craft, "InterceptorRightWing", new Vector3(2.05f, -0.07f, -0.35f), new Vector3(2.1f, 0.20f, 1.8f), silverMaterial);
+            CreateBoxChild(craft, "InterceptorLeftCannon", new Vector3(-0.82f, -0.02f, 1.65f), new Vector3(0.24f, 0.22f, 0.95f), warningMaterial);
+            CreateBoxChild(craft, "InterceptorRightCannon", new Vector3(0.82f, -0.02f, 1.65f), new Vector3(0.24f, 0.22f, 0.95f), warningMaterial);
+        }
+        else
+        {
+            // Heavy saucer: circular chassis, raised cockpit and engine pods.
+            CreateCylinderChild(craft, "HeavySaucerDisc", new Vector3(0f, -0.06f, 0f), new Vector3(5.0f, 0.68f, 5.0f), silverMaterial);
+            CreateCylinderChild(craft, "HeavySaucerDarkCore", new Vector3(0f, 0.34f, 0f), new Vector3(2.5f, 0.62f, 2.5f), darkMetalMaterial);
+            CreateSphereChild(craft, "HeavySaucerCockpit", new Vector3(0f, 0.55f, 0.18f), new Vector3(1.55f, 0.95f, 1.55f), cyanGlowMaterial);
+            for (int side = -1; side <= 1; side += 2)
+                CreateCylinderChild(craft, "HeavySaucerEngine", new Vector3(side * 1.8f, -0.24f, -1.0f),
+                    new Vector3(0.52f, 0.36f, 0.52f), greenGlowMaterial);
+        }
+
+        CreateBoxChild(craft, "CraftForwardLight", new Vector3(0f, 0.15f, 1.78f),
+            new Vector3(model == 2 ? 0.9f : 0.52f, 0.12f, 0.16f), cyanGlowMaterial);
+        for (int side = -1; side <= 1; side += 2)
+            CreateCylinderChild(craft, "CraftThruster", new Vector3(side * (model == 2 ? 1.9f : 1.0f), -0.38f, -1.05f),
+                new Vector3(0.42f, 0.24f, 0.42f), greenGlowMaterial);
     }
 
     private void UpdateHovercrafts()
@@ -422,18 +562,48 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int i = 0; i < hovercrafts.Count; i++)
         {
             HovercraftPatrol patrol = hovercrafts[i];
-            if (patrol.Root == null) continue;
-            patrol.Angle = Mathf.Repeat(patrol.Angle + patrol.AngularSpeed * Time.deltaTime * Mathf.Rad2Deg, 360f);
-            UpdateHovercraftPosition(patrol);
+            if (patrol.Root == null || patrol.Health == null || patrol.Health.CurrentHealth <= 0)
+                continue;
+
+            float length = Vector3.Distance(patrol.StartPoint, patrol.EndPoint);
+            if (length > 0.01f)
+            {
+                patrol.Progress += patrol.TravelDirection * patrol.Speed * Time.deltaTime / length;
+                if (patrol.Progress >= 1f)
+                {
+                    patrol.Progress = 1f;
+                    patrol.TravelDirection = -1f;
+                }
+                else if (patrol.Progress <= 0f)
+                {
+                    patrol.Progress = 0f;
+                    patrol.TravelDirection = 1f;
+                }
+            }
+
+            Vector3 point = Vector3.Lerp(patrol.StartPoint, patrol.EndPoint, patrol.Progress);
+            point.y = patrol.Height + Mathf.Sin(Time.time * 1.8f + patrol.Progress * 6.28f) * 0.09f;
+            patrol.Root.position = point;
+            patrol.Heading = (patrol.EndPoint - patrol.StartPoint).normalized * patrol.TravelDirection;
+            patrol.Root.rotation = Quaternion.LookRotation(patrol.Heading, Vector3.up);
         }
     }
 
-    private static void UpdateHovercraftPosition(HovercraftPatrol patrol)
+    private void UpdateHovercraftShooting()
     {
-        Vector3 position = DirectionAt(patrol.Angle) * patrol.Radius;
-        position.y = patrol.Height + Mathf.Sin(Time.time * 1.6f + patrol.Angle) * 0.22f;
-        patrol.Root.position = position;
-        patrol.Root.rotation = Quaternion.Euler(0f, patrol.Angle + (patrol.AngularSpeed > 0f ? 90f : -90f), 0f);
+        for (int i = 0; i < hovercrafts.Count; i++)
+        {
+            HovercraftPatrol craft = hovercrafts[i];
+            if (craft.Root == null || craft.Health == null || craft.Health.CurrentHealth <= 0 ||
+                Time.time < craft.NextShotTime)
+                continue;
+
+            // A bolt is fired straight forward in the ship's direction of travel.
+            Vector3 origin = craft.Root.position + craft.Heading * 2.1f + Vector3.up * 0.12f;
+            CreateHostileProjectile(origin, craft.Heading, craft.Root, 10, 72f, warningMaterial);
+            craft.NextShotTime = Time.time + 2.25f + craft.Archetype * 0.25f;
+            StartupCheckpoint.Set("StageThreeHovercraftFired");
+        }
     }
 
     private void ApplyHovercraftThreat()
@@ -445,26 +615,354 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int i = 0; i < hovercrafts.Count; i++)
         {
             HovercraftPatrol craft = hovercrafts[i];
-            if (craft.Root == null) continue;
+            if (craft.Root == null || craft.Health == null || craft.Health.CurrentHealth <= 0)
+                continue;
+
             Vector2 playerFlat = new Vector2(playerPosition.x, playerPosition.z);
             Vector2 craftFlat = new Vector2(craft.Root.position.x, craft.Root.position.z);
             if (Vector2.Distance(playerFlat, craftFlat) > 2.7f ||
-                Mathf.Abs(playerPosition.y - craft.Root.position.y) > 2.5f)
-                continue;
-
-            if (Time.time < craft.NextDamageTime)
+                Mathf.Abs(playerPosition.y - craft.Root.position.y) > 2.5f ||
+                Time.time < craft.NextDamageTime)
                 continue;
 
             if (localPlayer.Health != null)
                 localPlayer.Health.ApplyDamage(12, craft.Root);
-            craft.NextDamageTime = Time.time + craft.DamageCooldown;
+            craft.NextDamageTime = Time.time + 1.4f;
             StartupCheckpoint.Set("StageThreeHovercraftThreatHit");
         }
     }
 
-    private IEnumerator RunCentralLiftEnding()
+    private void BuildStageThreeGroundAliens()
+    {
+        if (groundAliensSpawned || localPlayer == null)
+            return;
+        groundAliensSpawned = true;
+
+        List<Vector3> occupied = new List<Vector3>();
+        // Eighteen fixed sentries stand at perimeter posts around the fortress.
+        for (int i = 0; i < 18; i++)
+        {
+            float angle = i * 360f / 18f;
+            Vector3 position = DirectionAt(angle) * (34.5f + (i % 2) * 4.5f);
+            position.y = 0f;
+            occupied.Add(position);
+            SpawnGroundAlien(i, position, true);
+        }
+
+        // The rest are spread through open streets and outer ground, avoiding building footprints.
+        int spawned = 18;
+        for (int attempt = 0; attempt < 800 && spawned < 60; attempt++)
+        {
+            float angle = attempt * 137.50776f;
+            float radius = 43f + (attempt % 6) * 9.2f;
+            Vector3 position = DirectionAt(angle) * radius;
+            position.y = 0f;
+
+            if (Mathf.Abs(position.x) < 9.5f && position.z < -22f)
+                continue;
+            if (IsNearAlienTower(position, 9f))
+                continue;
+
+            bool tooClose = false;
+            for (int i = 0; i < occupied.Count; i++)
+            {
+                if (Vector3.Distance(occupied[i], position) < 7.2f)
+                {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (tooClose)
+                continue;
+
+            occupied.Add(position);
+            SpawnGroundAlien(spawned, position, false);
+            spawned++;
+        }
+
+        // Deterministic fallback prevents a partial roster if terrain exclusions change.
+        for (int attempt = 0; spawned < 60 && attempt < 120; attempt++)
+        {
+            float angle = attempt * 31.7f;
+            float radius = 74f + (attempt % 3) * 5f;
+            Vector3 position = DirectionAt(angle) * radius;
+            position.y = 0f;
+            occupied.Add(position);
+            SpawnGroundAlien(spawned, position, false);
+            spawned++;
+        }
+
+        Debug.Log("PERSIA_STAGE3: spawned " + groundAliens.Count + " ground aliens across guard posts and outer streets.");
+        StartupCheckpoint.Set("StageThree_60GroundAliensSpawned");
+    }
+
+    private bool IsNearAlienTower(Vector3 position, float padding)
+    {
+        float[] coordinates = { -82f, -54f, -26f, 26f, 54f, 82f };
+        for (int ix = 0; ix < coordinates.Length; ix++)
+        {
+            for (int iz = 0; iz < coordinates.Length; iz++)
+            {
+                float x = coordinates[ix];
+                float z = coordinates[iz];
+                if (new Vector2(x, z).magnitude < 37f)
+                    continue;
+                float safeDistance = 5.8f + padding * 0.15f;
+                if (Mathf.Abs(position.x - x) < safeDistance &&
+                    Mathf.Abs(position.z - z) < safeDistance)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private void SpawnGroundAlien(int index, Vector3 position, bool guard)
+    {
+        int archetype = index % 3 + 1;
+        GameObject alien;
+#if UNITY_ANDROID
+        alien = new GameObject((guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00"));
+        alien.transform.position = position;
+        alien.transform.localScale = new Vector3(0.88f, 0.88f, 0.88f);
+        CapsuleCollider capsule = alien.AddComponent<CapsuleCollider>();
+        capsule.radius = 0.55f;
+        capsule.height = 1.8f;
+        capsule.center = new Vector3(0f, 0.9f, 0f);
+
+        GameObject meshSource = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        MeshFilter sourceFilter = meshSource.GetComponent<MeshFilter>();
+        MeshFilter alienFilter = alien.AddComponent<MeshFilter>();
+        alienFilter.sharedMesh = sourceFilter.sharedMesh;
+        MeshRenderer alienRenderer = alien.AddComponent<MeshRenderer>();
+        Color mobileBodyColor = archetype == 1 ? new Color(0.11f, 0.55f, 0.68f)
+            : (archetype == 2 ? new Color(0.18f, 0.70f, 0.53f) : new Color(0.36f, 0.37f, 0.78f));
+        alienRenderer.sharedMaterial = CreateMaterial("S3_AlienBody_" + archetype, mobileBodyColor);
+        alienRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        alienRenderer.receiveShadows = false;
+        Collider temporaryCollider = meshSource.GetComponent<Collider>();
+        if (temporaryCollider != null) Destroy(temporaryCollider);
+        Renderer temporaryRenderer = meshSource.GetComponent<Renderer>();
+        if (temporaryRenderer != null) temporaryRenderer.enabled = false;
+        Destroy(meshSource);
+#else
+        alien = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        alien.name = (guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00");
+        alien.transform.position = position;
+        alien.transform.localScale = new Vector3(0.88f, 0.95f, 0.88f);
+        Renderer alienRenderer = alien.GetComponent<Renderer>();
+        if (alienRenderer != null)
+        {
+            Color bodyColor = archetype == 1 ? new Color(0.11f, 0.55f, 0.68f)
+                : (archetype == 2 ? new Color(0.18f, 0.70f, 0.53f) : new Color(0.36f, 0.37f, 0.78f));
+            alienRenderer.sharedMaterial = CreateMaterial("S3_AlienBody_" + archetype, bodyColor);
+        }
+#endif
+        alien.transform.SetParent(worldRoot, true);
+
+        TargetHealth health = alien.AddComponent<TargetHealth>();
+        health.SetMaxHealth(archetype == 3 ? 150 : (archetype == 2 ? 115 : 90));
+        alien.AddComponent<EnemyHealthBar>();
+        EnemyChase chase = alien.AddComponent<EnemyChase>();
+        if (guard)
+        {
+            chase.SetTarget(localPlayer.transform);
+            chase.enabled = false;
+            CreateSphereChild(alien.transform, "S3_GuardEyeLeft", new Vector3(-0.16f, 0.55f, 0.38f),
+                new Vector3(0.13f, 0.13f, 0.08f), cyanGlowMaterial);
+            CreateSphereChild(alien.transform, "S3_GuardEyeRight", new Vector3(0.16f, 0.55f, 0.38f),
+                new Vector3(0.13f, 0.13f, 0.08f), cyanGlowMaterial);
+        }
+        else
+        {
+            chase.Configure(localPlayer.transform, archetype);
+            // Enemy movement and aiming begin only after the wide intro completes.
+            chase.enabled = false;
+        }
+
+        GroundAlien data = new GroundAlien
+        {
+            Root = alien.transform,
+            Health = health,
+            Chase = chase,
+            Guard = guard,
+            Archetype = archetype,
+            NextShotTime = Time.time + 1.4f + (index % 5) * 0.35f
+        };
+        groundAliens.Add(data);
+        hostileHealth.Add(health);
+    }
+
+    private void UpdateStationaryGuardShooting()
+    {
+        if (localPlayer == null || localPlayer.IsDefeated)
+            return;
+
+        for (int i = 0; i < groundAliens.Count; i++)
+        {
+            GroundAlien alien = groundAliens[i];
+            if (!alien.Guard || alien.Root == null || alien.Health == null ||
+                alien.Health.CurrentHealth <= 0 || Time.time < alien.NextShotTime)
+                continue;
+
+            Vector3 origin = alien.Root.position + Vector3.up * 1.0f +
+                alien.Root.forward * 0.22f;
+            Vector3 direction = localPlayer.transform.position + Vector3.up * 0.72f - origin;
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 0.01f)
+                continue;
+            float distance = direction.magnitude;
+            if (distance > 58f)
+            {
+                alien.NextShotTime = Time.time + 0.7f;
+                continue;
+            }
+
+            CreateHostileProjectile(origin, direction.normalized, alien.Root, 7, 62f, warningMaterial);
+            alien.NextShotTime = Time.time + 2.6f + (alien.Archetype - 1) * 0.35f;
+        }
+    }
+
+    private void CreateHostileProjectile(Vector3 origin, Vector3 direction, Transform owner,
+        int damage, float range, Material projectileMaterial)
+    {
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+        direction.Normalize();
+        GameObject projectile;
+#if UNITY_ANDROID
+        projectile = AndroidSafeRuntimeFactory.CreateProjectile(
+            "S3_HostileBolt", origin, Quaternion.LookRotation(direction, Vector3.up),
+            new Vector3(0.075f, 0.075f, 0.075f), new Color(1f, 0.20f, 0.10f));
+        if (projectile == null)
+            return;
+#else
+        projectile = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        projectile.name = "S3_HostileBolt";
+        projectile.transform.position = origin;
+        projectile.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+        projectile.transform.localScale = new Vector3(0.075f, 0.26f, 0.075f);
+        SphereCollider sphere = projectile.GetComponent<SphereCollider>();
+        if (sphere != null) Destroy(sphere);
+        CapsuleCollider capsule = projectile.GetComponent<CapsuleCollider>();
+        if (capsule != null)
+        {
+            capsule.isTrigger = true;
+            capsule.radius = 0.5f;
+            capsule.height = 2f;
+            capsule.direction = 1;
+        }
+        Rigidbody body = projectile.AddComponent<Rigidbody>();
+        body.isKinematic = true;
+        body.useGravity = false;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        Renderer renderer = projectile.GetComponent<Renderer>();
+        if (renderer != null) renderer.sharedMaterial = projectileMaterial;
+#endif
+        EnemyProjectile enemyShot = projectile.AddComponent<EnemyProjectile>();
+        enemyShot.Configure(direction, damage, owner, range);
+    }
+
+    private IEnumerator RunStageThreeIntro()
     {
         IsCinematic = true;
+        IsIntroCinematic = true;
+        StartupCheckpoint.Set("StageThreeIntroStarted");
+
+        if (localPlayer != null)
+        {
+            localPlayer.SetMovementEnabled(false);
+            localPlayer.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
+            if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = false;
+            if (localPlayer.Aim != null) localPlayer.Aim.enabled = false;
+        }
+
+        if (gameplayCamera == null || localPlayer == null)
+        {
+            IsIntroCinematic = false;
+            IsCinematic = false;
+            yield break;
+        }
+
+        Vector3 playerStart = localPlayer.transform.position;
+        Vector3 playerFinish = playerStart + Vector3.forward * 6f;
+        Vector3 overviewPosition = new Vector3(0f, 48f, -116f);
+        Vector3 overviewTarget = new Vector3(0f, 13f, 0f);
+        gameplayCamera.transform.position = overviewPosition;
+        gameplayCamera.transform.rotation = Quaternion.LookRotation(overviewTarget - overviewPosition, Vector3.up);
+        gameplayCamera.fieldOfView = Mathf.Max(savedCameraFieldOfView, 62f);
+
+        // Hold a wide reveal long enough to read the citadel, skyline, sand-colored
+        // terrain, three craft silhouettes and the guards on their posts.
+        float holdElapsed = 0f;
+        const float revealHold = 1.65f;
+        while (holdElapsed < revealHold)
+        {
+            holdElapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        float entranceElapsed = 0f;
+        const float entranceDuration = 1.25f;
+        while (entranceElapsed < entranceDuration)
+        {
+            entranceElapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(entranceElapsed / entranceDuration));
+            localPlayer.transform.position = Vector3.Lerp(playerStart, playerFinish, t);
+            Vector3 cameraPosition = Vector3.Lerp(overviewPosition, new Vector3(0f, 38f, -91f), t);
+            Vector3 cameraTarget = Vector3.Lerp(overviewTarget, new Vector3(0f, 12f, -7f), t);
+            gameplayCamera.transform.position = cameraPosition;
+            gameplayCamera.transform.rotation = Quaternion.LookRotation(cameraTarget - cameraPosition, Vector3.up);
+            yield return null;
+        }
+        localPlayer.transform.position = playerFinish;
+
+        // Match Stage 2's actual chase-camera angle and distance for continuity.
+        Quaternion stageTwoOrbit = Quaternion.Euler(37f, 32f, 0f);
+        Quaternion yawOnly = Quaternion.Euler(0f, 32f, 0f);
+        Vector3 finalCameraPosition = localPlayer.transform.position + stageTwoOrbit * Vector3.back * 16.63f;
+        Vector3 finalLookTarget = localPlayer.transform.position + yawOnly * Vector3.forward * 4.5f +
+            Vector3.up * 0.90f;
+        Vector3 cameraStartPosition = gameplayCamera.transform.position;
+        Quaternion cameraStartRotation = gameplayCamera.transform.rotation;
+        float cameraElapsed = 0f;
+        const float cameraBlendDuration = 1.35f;
+        while (cameraElapsed < cameraBlendDuration)
+        {
+            cameraElapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(cameraElapsed / cameraBlendDuration));
+            gameplayCamera.transform.position = Vector3.Lerp(cameraStartPosition, finalCameraPosition, t);
+            Quaternion finalRotation = Quaternion.LookRotation(finalLookTarget - finalCameraPosition, Vector3.up);
+            gameplayCamera.transform.rotation = Quaternion.Slerp(cameraStartRotation, finalRotation, t);
+            gameplayCamera.fieldOfView = Mathf.Lerp(Mathf.Max(savedCameraFieldOfView, 62f),
+                savedCameraFieldOfView, t);
+            yield return null;
+        }
+
+        gameplayCamera.transform.position = finalCameraPosition;
+        gameplayCamera.transform.rotation = Quaternion.LookRotation(finalLookTarget - finalCameraPosition, Vector3.up);
+        gameplayCamera.fieldOfView = savedCameraFieldOfView;
+        IsIntroCinematic = false;
+        IsCinematic = false;
+        if (localPlayer != null)
+        {
+            localPlayer.enabled = true;
+            localPlayer.SetMovementEnabled(true);
+            if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = true;
+            if (localPlayer.Aim != null) localPlayer.Aim.enabled = true;
+        }
+        for (int i = 0; i < groundAliens.Count; i++)
+            if (!groundAliens[i].Guard && groundAliens[i].Chase != null &&
+                groundAliens[i].Health != null && groundAliens[i].Health.CurrentHealth > 0)
+                groundAliens[i].Chase.enabled = true;
+
+        StartupCheckpoint.Set("StageThreeIntroComplete");
+    }
+
+    private IEnumerator RunCentralLiftEnding()
+    {
+        // This coroutine can only begin once RemainingHostiles reaches zero.
+        IsCinematic = true;
+        IsIntroCinematic = false;
         StartupCheckpoint.Set("StageThreeCentralLiftStarted");
         if (localPlayer != null)
         {
@@ -482,7 +980,6 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Vector3 platformTop = new Vector3(0f, 24.65f, 0f);
         float elapsed = 0f;
         const float elevatorDuration = 4.0f;
-
         while (elapsed < elevatorDuration)
         {
             elapsed += Time.unscaledDeltaTime;
@@ -496,38 +993,52 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         liftPlatform.position = platformTop;
-        localPlayer.transform.position = platformTop + playerOffset;
-        localPlayer.transform.position = new Vector3(localPlayer.transform.position.x, 25.2f, localPlayer.transform.position.z);
+        localPlayer.transform.position = new Vector3(0f, 25.6f, 0f);
         FollowPlayerDuringCinematic();
         StartupCheckpoint.Set("StageThreePlayerReachedUpperPlatform");
 
-        // The uplink starts at the base and climbs the shaft. When it reaches the hero,
-        // the beam carries them beyond the roofline and the stage ends.
-        if (beamColumn != null)
+        float orbRevealElapsed = 0f;
+        while (orbRevealElapsed < 0.65f)
         {
-            beamColumn.gameObject.SetActive(true);
-            float beamElapsed = 0f;
-            const float beamDuration = 2.4f;
-            while (beamElapsed < beamDuration)
-            {
-                beamElapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(beamElapsed / beamDuration);
-                float beamHeight = Mathf.Lerp(0.25f, 25.5f, t);
-                beamColumn.position = new Vector3(0f, beamHeight * 0.5f, 0f);
-                beamColumn.localScale = new Vector3(1.35f, beamHeight * 0.5f, 1.35f);
-                yield return null;
-            }
+            orbRevealElapsed += Time.unscaledDeltaTime;
+            FollowPlayerDuringCinematic();
+            yield return null;
         }
 
-        Vector3 liftStart = localPlayer.transform.position;
-        float carryElapsed = 0f;
-        const float carryDuration = 2.0f;
-        while (carryElapsed < carryDuration)
+        // The avatar disappears into the orb; only its fast, rising signal remains.
+        HidePlayerForUplink();
+        if (beamColumn != null) beamColumn.gameObject.SetActive(true);
+        if (beamCoreColumn != null) beamCoreColumn.gameObject.SetActive(true);
+
+        float beamElapsed = 0f;
+        const float beamDuration = 1.45f;
+        const float beamBaseY = 29.45f;
+        const float beamMaximumHeight = 84f;
+        while (beamElapsed < beamDuration)
         {
-            carryElapsed += Time.unscaledDeltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(carryElapsed / carryDuration));
-            localPlayer.transform.position = liftStart + Vector3.up * (30f * t);
-            FollowPlayerDuringCinematic();
+            beamElapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(beamElapsed / beamDuration);
+            float beamHeight = Mathf.Lerp(0.3f, beamMaximumHeight, t * t);
+            Vector3 beamPosition = new Vector3(0f, beamBaseY + beamHeight * 0.5f, 0f);
+            if (beamColumn != null)
+            {
+                beamColumn.position = beamPosition;
+                beamColumn.localScale = new Vector3(1.55f, beamHeight * 0.5f, 1.55f);
+            }
+            if (beamCoreColumn != null)
+            {
+                beamCoreColumn.position = beamPosition;
+                beamCoreColumn.localScale = new Vector3(0.40f, beamHeight * 0.5f, 0.40f);
+            }
+            FollowLaunchBeamDuringCinematic(beamBaseY + beamHeight);
+            yield return null;
+        }
+
+        float afterglowElapsed = 0f;
+        while (afterglowElapsed < 0.45f)
+        {
+            afterglowElapsed += Time.unscaledDeltaTime;
+            FollowLaunchBeamDuringCinematic(beamBaseY + beamMaximumHeight);
             yield return null;
         }
 
@@ -537,14 +1048,59 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         GameSession.Instance?.EndMission(true);
     }
 
+    private void HidePlayerForUplink()
+    {
+        if (localPlayer == null)
+            return;
+        savedPlayerRenderers = localPlayer.GetComponentsInChildren<Renderer>(true);
+        savedPlayerRendererStates = new bool[savedPlayerRenderers.Length];
+        for (int i = 0; i < savedPlayerRenderers.Length; i++)
+        {
+            savedPlayerRendererStates[i] = savedPlayerRenderers[i] != null && savedPlayerRenderers[i].enabled;
+            if (savedPlayerRenderers[i] != null)
+                savedPlayerRenderers[i].enabled = false;
+        }
+    }
+
+    private void RestorePlayerVisibility()
+    {
+        if (savedPlayerRenderers != null && savedPlayerRendererStates != null)
+        {
+            for (int i = 0; i < savedPlayerRenderers.Length && i < savedPlayerRendererStates.Length; i++)
+                if (savedPlayerRenderers[i] != null)
+                    savedPlayerRenderers[i].enabled = savedPlayerRendererStates[i];
+        }
+        savedPlayerRenderers = null;
+        savedPlayerRendererStates = null;
+    }
+
+    private void FollowLaunchBeamDuringCinematic(float beamTopY)
+    {
+        if (gameplayCamera == null)
+            return;
+
+        float t = Mathf.InverseLerp(30f, 112f, beamTopY);
+        Vector3 cameraTarget = new Vector3(0f, 31f + 4f * t, -16f + 2.5f * t);
+        Vector3 lookTarget = new Vector3(0f, Mathf.Max(33f, beamTopY * 0.88f), 0f);
+        gameplayCamera.transform.position = Vector3.Lerp(gameplayCamera.transform.position,
+            cameraTarget, 1f - Mathf.Exp(-7f * Time.unscaledDeltaTime));
+        Vector3 direction = lookTarget - gameplayCamera.transform.position;
+        if (direction.sqrMagnitude > 0.001f)
+            gameplayCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+    }
+
     private void FollowPlayerDuringCinematic()
     {
         if (gameplayCamera == null || localPlayer == null) return;
-        Vector3 cameraTarget = localPlayer.transform.position + new Vector3(0f, 7.5f, -15f);
+        Quaternion orbit = Quaternion.Euler(37f, 32f, 0f);
+        Quaternion yawOnly = Quaternion.Euler(0f, 32f, 0f);
+        Vector3 cameraTarget = localPlayer.transform.position + orbit * Vector3.back * 16.63f;
+        Vector3 lookTarget = localPlayer.transform.position + yawOnly * Vector3.forward * 4.5f +
+            Vector3.up * 0.90f;
         gameplayCamera.transform.position = Vector3.Lerp(
             gameplayCamera.transform.position, cameraTarget,
             1f - Mathf.Exp(-5f * Time.unscaledDeltaTime));
-        Vector3 lookDirection = localPlayer.transform.position + Vector3.up * 1.1f - gameplayCamera.transform.position;
+        Vector3 lookDirection = lookTarget - gameplayCamera.transform.position;
         if (lookDirection.sqrMagnitude > 0.001f)
             gameplayCamera.transform.rotation = Quaternion.LookRotation(lookDirection, Vector3.up);
     }
@@ -575,11 +1131,20 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         if (legacyCityRoot != null && legacyCityRoot.gameObject != null)
             legacyCityRoot.gameObject.SetActive(true);
 
+        RestorePlayerVisibility();
+        if (localPlayer != null && !localPlayer.IsDefeated)
+        {
+            localPlayer.enabled = true;
+            localPlayer.SetMovementEnabled(true);
+            if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = true;
+            if (localPlayer.Aim != null) localPlayer.Aim.enabled = true;
+        }
         if (gameplayCamera != null)
         {
             gameplayCamera.backgroundColor = savedCameraBackground;
             gameplayCamera.clearFlags = savedCameraClearFlags;
             gameplayCamera.farClipPlane = savedCameraFarClip;
+            gameplayCamera.fieldOfView = savedCameraFieldOfView;
             gameplayCamera.transform.position = savedCameraPosition;
             gameplayCamera.transform.rotation = savedCameraRotation;
         }
@@ -590,10 +1155,20 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         hovercrafts.Clear();
+        groundAliens.Clear();
+        hostileHealth.Clear();
         worldBuilt = false;
         isComplete = false;
         IsCinematic = false;
+        IsIntroCinematic = false;
         liftSequenceStarted = false;
+        groundAliensSpawned = false;
+        introStarted = false;
+        beamColumn = null;
+        beamCoreColumn = null;
+        uplinkOrb = null;
+        localPlayer = null;
+        gameplayCamera = null;
     }
 
     private static GameObject FindSceneObject(string objectName)
@@ -639,6 +1214,20 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         return cylinder;
     }
 
+    private GameObject CreateSphere(string objectName, Vector3 position, Vector3 scale,
+        Material material, bool collider)
+    {
+        GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        sphere.name = objectName;
+        sphere.transform.SetParent(worldRoot, false);
+        sphere.transform.position = position;
+        sphere.transform.localScale = scale;
+        SetRenderer(sphere, material);
+        if (!collider)
+            RemoveCollider(sphere);
+        return sphere;
+    }
+
     private static void CreateBoxChild(Transform parent, string objectName, Vector3 position,
         Vector3 scale, Material material)
     {
@@ -655,6 +1244,18 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Vector3 scale, Material material)
     {
         GameObject part = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        part.name = objectName;
+        part.transform.SetParent(parent, false);
+        part.transform.localPosition = position;
+        part.transform.localScale = scale;
+        SetRenderer(part, material);
+        RemoveCollider(part);
+    }
+
+    private static void CreateSphereChild(Transform parent, string objectName, Vector3 position,
+        Vector3 scale, Material material)
+    {
+        GameObject part = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         part.name = objectName;
         part.transform.SetParent(parent, false);
         part.transform.localPosition = position;
