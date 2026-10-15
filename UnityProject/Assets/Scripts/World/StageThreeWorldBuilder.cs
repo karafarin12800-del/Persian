@@ -503,9 +503,14 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             BuildHovercraftModel(craft.transform, model);
 
             BoxCollider hitbox = craft.AddComponent<BoxCollider>();
+            // Player bullets travel horizontally at muzzle height. The original
+            // thin collider sat too high above that trajectory, so shots visibly
+            // passed under the craft even though auto-aim had selected them.
+            // Extend the hitbox downward while keeping it centered on the hull.
+            hitbox.center = new Vector3(0f, -0.35f, 0f);
             hitbox.size = model == 2
-                ? new Vector3(5.3f, 1.2f, 5.3f)
-                : (model == 1 ? new Vector3(6.2f, 1.0f, 4.1f) : new Vector3(3.4f, 1.0f, 4.1f));
+                ? new Vector3(5.3f, 2.6f, 5.3f)
+                : (model == 1 ? new Vector3(6.2f, 2.6f, 4.1f) : new Vector3(3.4f, 2.6f, 4.1f));
 
             TargetHealth health = craft.AddComponent<TargetHealth>();
             // Four hits for scouts/interceptors and five for the heavy saucer
