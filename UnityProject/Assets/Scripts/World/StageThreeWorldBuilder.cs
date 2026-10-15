@@ -621,7 +621,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.85f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(3.5f, 8.5f);
         main.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.32f);
-        main.startColor = new ParticleSystem.MinMaxCurve(
+        main.startColor = new ParticleSystem.MinMaxGradient(
             new Color(0.25f, 0.95f, 1f, 1f), new Color(0.35f, 1f, 0.68f, 0.95f));
         main.maxParticles = 36;
         var emission = particles.emission;
