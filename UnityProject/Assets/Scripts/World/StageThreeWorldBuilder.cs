@@ -1284,7 +1284,6 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Transform pilot = localPlayer.transform;
         Transform originalPlayerParent = pilot.parent;
         Vector3 originalPlayerLocalScale = pilot.localScale;
-        Quaternion originalPlayerRotation = pilot.rotation;
         Renderer[] pilotRenderers = pilot.GetComponentsInChildren<Renderer>(true);
         bool[] pilotRendererWasEnabled = new bool[pilotRenderers.Length];
         for (int i = 0; i < pilotRenderers.Length; i++)
@@ -1402,7 +1401,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         pilot.position = exitFinish;
-        pilot.rotation = originalPlayerRotation;
+        pilot.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
         localPlayer.SetGroundedPosition(exitFinish);
         Vector3 finalCameraPosition = exitFinish + tacticalOrbit * Vector3.back * 16.63f;
         Vector3 finalLookTarget = exitFinish + yawOnly * Vector3.forward * 4.5f + Vector3.up * 0.90f;
