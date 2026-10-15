@@ -430,7 +430,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         // This is a lift pad, not a blocking pillar: ground stays walkable at its centre.
         // The ending cinematic moves the platform and the player explicitly.
         liftPlatform = CreateCylinder("S3_CentralLiftPlatform", new Vector3(0f, 0.28f, 0f),
-            new Vector3(5.4f, 0.36f, 5.4f), silverMaterial, false).transform;
+            new Vector3(5.4f, 0.55f, 5.4f), silverMaterial, false).transform;
         CreateCylinder("S3_LiftPlatformGlow", new Vector3(0f, 0.49f, 0f),
             new Vector3(4.5f, 0.08f, 4.5f), greenGlowMaterial, false);
 
@@ -977,7 +977,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         if (liftPlatform == null || localPlayer == null)
             yield break;
 
-        Vector3 playerOffset = Vector3.up * 0.95f;
+        Vector3 playerOffset = Vector3.up * 0.55f;
         Vector3 platformStart = new Vector3(0f, 0.28f, 0f);
         Vector3 platformTop = new Vector3(0f, 24.65f, 0f);
         float elapsed = 0f;
@@ -995,7 +995,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         liftPlatform.position = platformTop;
-        localPlayer.transform.position = new Vector3(0f, 25.6f, 0f);
+        localPlayer.transform.position = new Vector3(0f, 25.2f, 0f);
         FollowPlayerDuringCinematic();
         StartupCheckpoint.Set("StageThreePlayerReachedUpperPlatform");
 
