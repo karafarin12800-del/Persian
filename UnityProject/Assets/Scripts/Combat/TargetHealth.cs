@@ -76,7 +76,13 @@ namespace PersiaWar.Unity2D5D
                 StartCoroutine(FallAndRemoveEnemy(enemy.transform));
             }
 
-            SpawnBloodEffect(deathPosition);
+            // Alien bodies in Stage 3 use a falling-removal animation, not the
+            // six-mesh blood pool used by human enemies. Avoid hundreds of
+            // short-lived primitives/materials accumulating during the long wave.
+            bool isStageThreeAlien = enemy != null &&
+                enemy.gameObject.name.StartsWith("S3_Alien", System.StringComparison.Ordinal);
+            if (!isStageThreeAlien)
+                SpawnBloodEffect(deathPosition);
         }
 
         private System.Collections.IEnumerator FallAndRemoveEnemy(Transform body)
