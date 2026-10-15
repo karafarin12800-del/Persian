@@ -61,7 +61,7 @@ namespace PersiaWar.Unity2D5D
         private void BeginEnemyDeathSequence(EnemyChase enemy)
         {
             Vector3 deathPosition = enemy != null ? enemy.transform.position : transform.position;
-            bool isStageThreeCraft = enemy != null &&
+            bool deferCraftRemoval = enemy != null &&
                 enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal);
             if (enemy != null)
             {
@@ -76,7 +76,7 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < behaviours.Length; i++)
                     if (behaviours[i] != null && behaviours[i] != this) behaviours[i].enabled = false;
 
-                if (!isStageThreeCraft)
+                if (!deferCraftRemoval)
                     StartCoroutine(FallAndRemoveEnemy(enemy.transform));
             }
 
