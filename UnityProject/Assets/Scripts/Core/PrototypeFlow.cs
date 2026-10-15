@@ -857,7 +857,7 @@ namespace PersiaWar.Unity2D5D
             {
                 "PLAY / CONTINUE CAMPAIGN",
                 "PLAYER PROFILE",
-                "STORE / WEAPON LOADOUT",
+                "STORE / LOADOUT",
                 "SETTINGS",
                 "TEST STAGE 1",
                 "TEST STAGE 2",
