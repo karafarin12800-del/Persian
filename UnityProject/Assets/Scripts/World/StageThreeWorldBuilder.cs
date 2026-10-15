@@ -617,6 +617,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                     patrol.Root.position = wreckPosition;
                     patrol.Root.rotation = patrol.Root.rotation * Quaternion.Euler(72f, 0f, 18f);
                     patrol.Root.name = "S3_DestroyedHovercraftWreck";
+                    // Keep the wreck visible on the ground for three seconds, then clear it.
+                    Destroy(patrol.Root.gameObject, 3f);
                 }
                 continue;
             }
@@ -921,7 +923,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         capsule.height = 1.8f;
         capsule.center = new Vector3(0f, 0.9f, 0f);
 
-        GameObject meshSource = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        GameObject meshSource = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         MeshFilter sourceFilter = meshSource.GetComponent<MeshFilter>();
         MeshFilter alienFilter = alien.AddComponent<MeshFilter>();
         alienFilter.sharedMesh = sourceFilter.sharedMesh;
@@ -935,7 +937,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         if (temporaryRenderer != null) temporaryRenderer.enabled = false;
         Destroy(meshSource);
 #else
-        alien = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        alien = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         alien.name = (guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00");
         alien.transform.position = position;
         alien.transform.localScale = GetAlienModelScale(archetype);
@@ -1009,9 +1011,24 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             new Vector3(0.46f, 0.34f, 0.18f), darkMetalMaterial);
         CreateSphereChild(alien, "S3_AlienBackEnergyNode", new Vector3(0f, 0.46f, -0.38f),
             new Vector3(0.24f, 0.30f, 0.20f), greenGlowMaterial);
-
+        // A segmented insect abdomen and six jointed legs make the silhouette
+        // unmistakably extraterrestrial instead of a human wearing armor.
+        CreateSphereChild(alien, "S3_AlienSegmentedAbdomen", new Vector3(0f, -0.12f, -0.46f),
+            new Vector3(0.48f, 0.38f, 0.62f), chitin);
+        CreateSphereChild(alien, "S3_AlienForeheadCrest", new Vector3(0f, 1.02f * tallScale, 0.23f),
+            new Vector3(0.28f, 0.22f, 0.30f), silverMaterial);
         for (int side = -1; side <= 1; side += 2)
         {
+            for (int leg = 0; leg < 3; leg++)
+            {
+                float legZ = 0.24f - leg * 0.31f;
+                CreateCylinderChild(alien, "S3_AlienInsectLeg",
+                    new Vector3(side * (0.43f + (leg == 1 ? 0.10f : 0f)), -0.36f, legZ),
+                    new Vector3(0.10f, 0.34f, 0.10f), chitin);
+                CreateSphereChild(alien, "S3_AlienLegJoint",
+                    new Vector3(side * 0.53f, -0.43f, legZ),
+                    new Vector3(0.13f, 0.13f, 0.13f), eyes);
+            }
             CreateSphereChild(alien, "S3_AlienShoulderPlate",
                 new Vector3(side * 0.39f, 0.16f, 0.02f),
                 new Vector3(0.30f, 0.23f, 0.34f), silverMaterial);
