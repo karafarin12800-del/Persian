@@ -65,6 +65,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         public TargetHealth Health;
         public Vector3 Heading;
         public bool ExplosionStarted;
+        public bool Hidden;
+        public float ReappearAt;
     }
 
     private sealed class GroundAlien
@@ -170,7 +172,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         isComplete = false;
         IsCinematic = false;
         liftSequenceStarted = false;
-        Debug.Log("PERSIA_STAGE3: sandy alien world built; 9 routes, 60 ground aliens and 6 destructible linear-lane craft ready.");
+        Debug.Log("PERSIA_STAGE3: sandy alien world built; 9 routes, 60 ground aliens (including 20 tall area-patrol guards) and 5 looping destructible craft ready.");
         StartupCheckpoint.Set("StageThreeWorldBuilt_9Routes");
         return true;
     }
@@ -480,13 +482,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         // Six parallel street corridors never intersect. The old pair of north/south
         // lanes crossed all four east/west lanes, allowing ships to meet head-on.
         // Each row is offset inside an existing road gap and remains at firing height.
-        float[] laneZ = { -72f, -64f, -44f, 44f, 64f, 72f };
+        float[] laneZ = { -72f, -44f, 44f, 64f, 72f };
         Vector3[] starts = new Vector3[laneZ.Length];
         Vector3[] ends = new Vector3[laneZ.Length];
         for (int i = 0; i < laneZ.Length; i++)
         {
-            starts[i] = new Vector3(-91f, 0f, laneZ[i]);
-            ends[i] = new Vector3(91f, 0f, laneZ[i]);
+            // Patrol endpoints lie beyond the map boundary. Ships disappear there,
+            // then respawn just outside the opposite edge and fly back across the world.
+            starts[i] = new Vector3(-118f, 0f, laneZ[i]);
+            ends[i] = new Vector3(118f, 0f, laneZ[i]);
         }
 
         for (int i = 0; i < starts.Length; i++)
@@ -504,8 +508,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 : (model == 1 ? new Vector3(6.2f, 1.0f, 4.1f) : new Vector3(3.4f, 1.0f, 4.1f));
 
             TargetHealth health = craft.AddComponent<TargetHealth>();
-            // 6 / 8 / 10 standard rifle hits (22 damage) for scout/interceptor/heavy craft.
-            health.SetMaxHealth(model == 0 ? 132 : (model == 1 ? 176 : 220));
+            // Four hits for scouts/interceptors and five for the heavy saucer
+            // when the standard player shot deals 22 damage.
+            health.SetMaxHealth(model == 2 ? 110 : 88);
             EnemyChase chase = craft.AddComponent<EnemyChase>();
             chase.enabled = false;
             hostileHealth.Add(health);
@@ -576,6 +581,17 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             HovercraftPatrol patrol = hovercrafts[i];
             if (patrol.Root == null || patrol.Health == null)
                 continue;
+            if (patrol.Hidden)
+            {
+                if (Time.time >= patrol.ReappearAt && patrol.Health.CurrentHealth > 0)
+                {
+                    patrol.Progress = patrol.TravelDirection > 0f ? 0f : 1f;
+                    patrol.Root.gameObject.SetActive(true);
+                    patrol.Hidden = false;
+                }
+                else
+                    continue;
+            }
             if (patrol.Health.CurrentHealth <= 0)
             {
                 if (!patrol.ExplosionStarted)
@@ -591,15 +607,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (length > 0.01f)
             {
                 patrol.Progress += patrol.TravelDirection * patrol.Speed * Time.deltaTime / length;
-                if (patrol.Progress >= 1f)
+                if (patrol.Progress >= 1f || patrol.Progress <= 0f)
                 {
-                    patrol.Progress = 1f;
-                    patrol.TravelDirection = -1f;
-                }
-                else if (patrol.Progress <= 0f)
-                {
-                    patrol.Progress = 0f;
-                    patrol.TravelDirection = 1f;
+                    // Do not turn around at the map edge: leave the playable map,
+                    // vanish briefly, then re-enter from the opposite edge.
+                    patrol.Progress = Mathf.Clamp01(patrol.Progress);
+                    patrol.Hidden = true;
+                    patrol.ReappearAt = Time.time + 1.15f;
+                    patrol.Root.gameObject.SetActive(false);
+                    continue;
                 }
             }
 
@@ -645,7 +661,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int i = 0; i < hovercrafts.Count; i++)
         {
             HovercraftPatrol craft = hovercrafts[i];
-            if (craft.Root == null || craft.Health == null || craft.Health.CurrentHealth <= 0 ||
+            if (craft.Root == null || craft.Hidden || craft.Health == null || craft.Health.CurrentHealth <= 0 ||
                 Time.time < craft.NextShotTime)
                 continue;
 
@@ -666,7 +682,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int i = 0; i < hovercrafts.Count; i++)
         {
             HovercraftPatrol craft = hovercrafts[i];
-            if (craft.Root == null || craft.Health == null || craft.Health.CurrentHealth <= 0)
+            if (craft.Root == null || craft.Hidden || craft.Health == null || craft.Health.CurrentHealth <= 0)
                 continue;
 
             Vector2 playerFlat = new Vector2(playerPosition.x, playerPosition.z);
@@ -690,10 +706,10 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         groundAliensSpawned = true;
 
         List<Vector3> occupied = new List<Vector3>();
-        // Eighteen fixed sentries stand at perimeter posts around the fortress.
-        for (int i = 0; i < 18; i++)
+        // Twelve regular sentries stand at perimeter posts around the fortress.
+        for (int i = 0; i < 12; i++)
         {
-            float angle = i * 360f / 18f;
+            float angle = i * 360f / 12f;
             Vector3 position = DirectionAt(angle) * (34.5f + (i % 2) * 4.5f);
             position.y = 0f;
             occupied.Add(position);
@@ -701,8 +717,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         // The rest are spread through open streets and outer ground, avoiding building footprints.
-        int spawned = 18;
-        for (int attempt = 0; attempt < 800 && spawned < 60; attempt++)
+        int spawned = 12;
+        const int groundRosterBeforeTallGuards = 40;
+        for (int attempt = 0; attempt < 800 && spawned < groundRosterBeforeTallGuards; attempt++)
         {
             float angle = attempt * 137.50776f;
             float radius = 43f + (attempt % 6) * 9.2f;
@@ -731,8 +748,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             spawned++;
         }
 
-        // Deterministic fallback prevents a partial 60-rover roster if terrain exclusions change.
-        for (int attempt = 0; spawned < 60 && attempt < 120; attempt++)
+        // Deterministic fallback completes the first 40 aliens before the 20 tall guards.
+        for (int attempt = 0; spawned < groundRosterBeforeTallGuards && attempt < 120; attempt++)
         {
             float angle = attempt * 31.7f;
             float radius = 74f + (attempt % 3) * 5f;
@@ -743,8 +760,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             spawned++;
         }
 
-        // Add twenty elite guards in the northern half of the map. Each patrols
-        // a short, fixed 20m lane (10m either side) and uses a stronger weapon.
+        // Twenty tall alien guards bring the ground roster to exactly 60.
+        // Each has its own 20m patrol area and pursues the player only while nearby.
         int upperPatrols = 0;
         for (float z = 42f; z <= 102f && upperPatrols < 20; z += 8f)
         {
@@ -768,7 +785,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                     continue;
 
                 occupied.Add(position);
-                int guardIndex = 60 + upperPatrols;
+                int guardIndex = 40 + upperPatrols;
                 SpawnGroundAlien(guardIndex, position, true);
                 GroundAlien guard = groundAliens[groundAliens.Count - 1];
                 guard.UpperPatrol = true;
@@ -805,7 +822,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (fallbackTooClose)
                 continue;
             occupied.Add(position);
-            int guardIndex = 60 + upperPatrols;
+            int guardIndex = 40 + upperPatrols;
             SpawnGroundAlien(guardIndex, position, true);
             GroundAlien guard = groundAliens[groundAliens.Count - 1];
             guard.UpperPatrol = true;
@@ -823,8 +840,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         Debug.Log("PERSIA_STAGE3: spawned " + groundAliens.Count +
-            " ground aliens (60 base hostiles + 20 northern elite patrols).");
-        StartupCheckpoint.Set("StageThree_80GroundAliensSpawned");
+            " ground aliens total (40 regular aliens + 20 tall area-patrol guards).");
+        StartupCheckpoint.Set("StageThree_60GroundAliensSpawned");
     }
 
     private bool IsNearAlienTower(Vector3 position, float padding)
@@ -911,7 +928,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 #endif
         alien.transform.SetParent(worldRoot, true);
-        bool eliteGuard = guard && index >= 60;
+        bool eliteGuard = guard && index >= 40;
+        if (eliteGuard)
+            alien.transform.localScale = new Vector3(1.12f, 1.62f, 1.12f);
         BuildAlienCreatureDetails(alien.transform, archetype, guard, eliteGuard);
 
         TargetHealth health = alien.AddComponent<TargetHealth>();
@@ -950,9 +969,10 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Material eyes = archetype == 1 ? cyanGlowMaterial
             : (archetype == 2 ? greenGlowMaterial : warningMaterial);
 
-        // Oversized alien cranium, jaw, armored chest, and non-human shoulder plates.
-        CreateSphereChild(alien, "S3_AlienCranium", new Vector3(0f, 0.70f, 0.16f),
-            new Vector3(0.72f, 0.54f, 0.58f), chitin);
+        // Tall guards have an elongated alien skull and broader, more insectoid armor.
+        float tallScale = eliteGuard ? 1.22f : 1f;
+        CreateSphereChild(alien, "S3_AlienCranium", new Vector3(0f, 0.76f * tallScale, 0.16f),
+            new Vector3(0.78f, 0.62f, 0.62f), chitin);
         CreateSphereChild(alien, "S3_AlienJaw", new Vector3(0f, 0.36f, 0.38f),
             new Vector3(0.42f, 0.19f, 0.30f), darkMetalMaterial);
         CreateBoxChild(alien, "S3_AlienChestArmor", new Vector3(0f, 0.05f, 0.35f),
@@ -1007,13 +1027,37 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 continue;
 
             float phase = Time.time * alien.PatrolSpeed + alien.PatrolPhase;
-            Vector3 position = alien.PatrolCenter + Vector3.right * (Mathf.Sin(phase) * alien.PatrolRadius);
+            Vector3 patrolPoint = alien.PatrolCenter +
+                Vector3.right * (Mathf.Sin(phase) * alien.PatrolRadius);
+            Vector3 position = patrolPoint;
+            Vector3 toPlayer = localPlayer != null
+                ? localPlayer.transform.position - alien.Root.position
+                : Vector3.zero;
+            toPlayer.y = 0f;
+
+            // Tall guards hunt only inside their own assigned patrol circle.
+            // If the player comes within 16m, pursue them but never leave that zone.
+            if (toPlayer.sqrMagnitude <= 16f * 16f)
+            {
+                Vector3 pursued = Vector3.MoveTowards(alien.Root.position,
+                    new Vector3(localPlayer.transform.position.x, 0f, localPlayer.transform.position.z),
+                    alien.PatrolSpeed * 2.2f * Time.deltaTime);
+                Vector3 offset = pursued - alien.PatrolCenter;
+                offset.y = 0f;
+                if (offset.magnitude > alien.PatrolRadius)
+                    pursued = alien.PatrolCenter + offset.normalized * alien.PatrolRadius;
+                position = pursued;
+            }
+
             position.y = 0f;
             alien.Root.position = position;
 
-            // Keep the sentry facing its patrol direction; aiming uses a separate vector.
-            float heading = Mathf.Cos(phase) >= 0f ? 1f : -1f;
-            alien.Root.rotation = Quaternion.LookRotation(Vector3.right * heading, Vector3.up);
+            Vector3 facing = position - alien.PatrolCenter;
+            if (toPlayer.sqrMagnitude > 0.01f)
+                facing = toPlayer;
+            facing.y = 0f;
+            if (facing.sqrMagnitude > 0.01f)
+                alien.Root.rotation = Quaternion.LookRotation(facing.normalized, Vector3.up);
         }
     }
 
