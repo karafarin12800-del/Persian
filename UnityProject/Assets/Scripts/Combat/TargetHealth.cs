@@ -81,7 +81,13 @@ namespace PersiaWar.Unity2D5D
             // short-lived primitives/materials accumulating during the long wave.
             bool isStageThreeAlien = enemy != null &&
                 enemy.gameObject.name.StartsWith("S3_Alien", System.StringComparison.Ordinal);
-            if (!isStageThreeAlien)
+            bool isStageThreeCraft = enemy != null &&
+                (enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal) ||
+                 enemy.gameObject.name.StartsWith("S3_DestroyedHovercraftWreck", System.StringComparison.Ordinal));
+
+            // All Stage 3 hostiles are extraterrestrial: no blood pools or blood
+            // particles for aliens or their spacecraft.
+            if (!isStageThreeAlien && !isStageThreeCraft)
                 SpawnBloodEffect(deathPosition);
         }
 
