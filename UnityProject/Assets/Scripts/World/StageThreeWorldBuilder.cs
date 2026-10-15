@@ -694,11 +694,19 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 Time.time < craft.NextShotTime)
                 continue;
 
-            // A bolt is fired straight forward in the ship's direction of travel.
-            Vector3 origin = craft.Root.position + craft.Heading * 2.1f + Vector3.up * 0.12f;
-            CreateHostileProjectile(origin, craft.Heading, craft.Root, 10, 72f, warningMaterial);
+            // Hostile transports lead their shots toward the pilot instead of
+            // firing harmlessly along the patrol lane.
+            Vector3 origin = craft.Root.position + craft.Heading * 1.7f + Vector3.up * 0.12f;
+            Vector3 direction = localPlayer.transform.position + Vector3.up * 0.88f - origin;
+            float distance = direction.magnitude;
+            if (distance < 0.01f || distance > 72f)
+            {
+                craft.NextShotTime = Time.time + 0.65f;
+                continue;
+            }
+            CreateHostileProjectile(origin, direction.normalized, craft.Root, 10, 72f, warningMaterial);
             craft.NextShotTime = Time.time + 2.25f + craft.Archetype * 0.25f;
-            StartupCheckpoint.Set("StageThreeHovercraftFired");
+            StartupCheckpoint.Set("StageThreeHovercraftFiredAtPilot");
         }
     }
 
@@ -1214,6 +1222,18 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(5.6f, 0.36f, 6.1f), darkMetalMaterial);
             CreateBoxChild(ship, "TransportCabinFloor", new Vector3(0f, -0.72f, -1.85f),
                 new Vector3(3.35f, 0.14f, 4.65f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportCabinPortWall", new Vector3(-1.72f, 0.12f, -1.85f),
+                new Vector3(0.18f, 1.72f, 4.65f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportCabinStarboardWall", new Vector3(1.72f, 0.12f, -1.85f),
+                new Vector3(0.18f, 1.72f, 4.65f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportCabinForwardBulkhead", new Vector3(0f, 0.12f, 0.43f),
+                new Vector3(3.35f, 1.72f, 0.18f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportRearEntryRamp", new Vector3(0f, -0.72f, -5.20f),
+                new Vector3(3.8f, 0.14f, 2.65f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportPortDeck", new Vector3(-4.35f, 0.48f, 0.15f),
+                new Vector3(3.1f, 0.34f, 4.6f), silverMaterial);
+            CreateBoxChild(ship, "TransportStarboardDeck", new Vector3(4.35f, 0.48f, 0.15f),
+                new Vector3(3.1f, 0.34f, 4.6f), silverMaterial);
             CreateBoxChild(ship, "TransportPortWing", new Vector3(-7.2f, -0.12f, 0.4f),
                 new Vector3(5.3f, 0.52f, 2.4f), darkMetalMaterial);
             CreateBoxChild(ship, "TransportStarboardWing", new Vector3(7.2f, -0.12f, 0.4f),
