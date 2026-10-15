@@ -12,6 +12,7 @@ namespace PersiaWar.Unity2D5D
         private float remainingLife;
         private Transform owner;
         private float remainingDistance;
+        private static readonly RaycastHit[] SweepHitBuffer = new RaycastHit[96];
 
         public void SetDefaults(float projectileSpeed, float projectileLifetime, int projectileDamage)
         {
@@ -58,49 +59,46 @@ namespace PersiaWar.Unity2D5D
 
         private bool TryResolveSweep(float distance)
         {
-            RaycastHit[] hits = Physics.SphereCastAll(
-                transform.position,
-                0.12f,
-                direction,
-                distance,
-                ~0,
+            int hitCount = Physics.SphereCastNonAlloc(
+                transform.position, 0.12f, direction, SweepHitBuffer, distance, ~0,
                 QueryTriggerInteraction.Collide);
-
-            if (hits == null || hits.Length == 0)
+            if (hitCount <= 0)
                 return false;
 
-            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-
-            foreach (RaycastHit hit in hits)
+            // Sort only the populated prefix of a reusable buffer. SphereCastAll
+            // allocated a new array for every projectile on every frame.
+            for (int i = 1; i < hitCount; i++)
             {
-                Collider collider = hit.collider;
+                RaycastHit key = SweepHitBuffer[i];
+                int j = i - 1;
+                while (j >= 0 && SweepHitBuffer[j].distance > key.distance)
+                {
+                    SweepHitBuffer[j + 1] = SweepHitBuffer[j];
+                    j--;
+                }
+                SweepHitBuffer[j + 1] = key;
+            }
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider collider = SweepHitBuffer[i].collider;
                 if (collider == null)
                     continue;
-
                 if (owner != null &&
                     (collider.transform == owner || collider.transform.IsChildOf(owner)))
                     continue;
-
                 if (collider.GetComponentInParent<Projectile>() != null ||
                     collider.GetComponentInParent<EnemyProjectile>() != null)
                     continue;
-
-                PlayerController player = collider.GetComponentInParent<PlayerController>();
-                if (player != null)
+                if (collider.GetComponentInParent<PlayerController>() != null)
                     continue;
 
                 TargetHealth target = collider.GetComponentInParent<TargetHealth>();
                 if (target != null && target.GetComponentInParent<EnemyChase>() != null)
-                {
                     target.ApplyDamage(damage, owner);
-                    Destroy(gameObject);
-                    return true;
-                }
-
                 Destroy(gameObject);
                 return true;
             }
-
             return false;
         }
 
