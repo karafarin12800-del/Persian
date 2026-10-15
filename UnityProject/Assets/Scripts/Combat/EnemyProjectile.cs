@@ -11,6 +11,7 @@ namespace PersiaWar.Unity2D5D
         private Vector3 direction;
         private Transform owner;
         private float remainingDistance;
+        private bool impactResolved;
         private static readonly RaycastHit[] SweepHitBuffer = new RaycastHit[96];
 
         public void Configure(Vector3 launchDirection, int damageAmount)
@@ -32,10 +33,12 @@ namespace PersiaWar.Unity2D5D
             // anything after travelling farther than the configured weapon range.
             remainingDistance = Mathf.Max(0f, maxRange);
             lifetime = Mathf.Max(0.05f, Mathf.Max(1f, maxRange) / Mathf.Max(1f, speed));
+            impactResolved = false;
         }
 
         private void Update()
         {
+            if (impactResolved) return;
             float step = Mathf.Min(speed * Time.deltaTime, remainingDistance);
 
             if (step <= 0.001f || remainingDistance <= 0.001f)
@@ -94,12 +97,9 @@ namespace PersiaWar.Unity2D5D
                     continue;
 
                 PlayerController player = collider.GetComponentInParent<PlayerController>();
+                impactResolved = true;
                 if (player != null)
-                {
                     player.ReceiveDamage(damage);
-                    Destroy(gameObject);
-                    return true;
-                }
                 Destroy(gameObject);
                 return true;
             }
@@ -108,7 +108,7 @@ namespace PersiaWar.Unity2D5D
 
         private void OnTriggerEnter(Collider other)
         {
-            if (other == null)
+            if (impactResolved || other == null)
                 return;
 
             if (owner != null &&
@@ -118,6 +118,7 @@ namespace PersiaWar.Unity2D5D
             PlayerController player = other.GetComponentInParent<PlayerController>();
             if (player != null)
             {
+                impactResolved = true;
                 player.ReceiveDamage(damage);
                 Destroy(gameObject);
                 return;
@@ -127,6 +128,7 @@ namespace PersiaWar.Unity2D5D
                 other.GetComponentInParent<Projectile>() != null)
                 return;
 
+            impactResolved = true;
             Destroy(gameObject);
         }
     }
