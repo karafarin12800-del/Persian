@@ -1176,12 +1176,17 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
+                // Seamless campaign hand-off: start Stage 3 immediately, carrying
+                // the exact ship preserved above into the Stage 3 landing cinematic.
                 stageNumber = 3;
                 PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
                 PlayerPrefs.Save();
-                mode = ScreenMode.MainMenu;
-                ShowLobbyNotice("STAGE 2 COMPLETE  •  NEXT: STAGE 3 (IN DEVELOPMENT)");
-                StartupCheckpoint.Set("StageTwoCutsceneComplete_MainMenu_Stage3Next_" + result);
+                spawnWorld = new Vector2(0f, -97f);
+                spawnChosen = true;
+                mode = ScreenMode.DropMap;
+                startupStatus = "Stage 3: transport ship approaching the alien planet...";
+                StartupCheckpoint.Set("StageTwoCutsceneComplete_AutoStartStage3Transport_" + result);
+                StartCoroutine(BeginMainGameAfterMenuFrame());
             }
         }
 
