@@ -22,6 +22,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Transform beamColumn;
     private Transform beamCoreColumn;
     private Transform uplinkOrb;
+    private Transform entryTransportShip;
     private Material groundMaterial;
     private Material silverMaterial;
     private Material darkMetalMaterial;
@@ -85,6 +86,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     }
 
     public bool IsComplete => isComplete;
+    public string IntroMessage { get; private set; } = "TRANSPORT SHIP INBOUND";
     public bool IsCinematic { get; private set; }
     public bool IsIntroCinematic { get; private set; }
     public bool IsEndingCinematic => IsCinematic && !IsIntroCinematic;
@@ -520,9 +522,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 : (model == 1 ? new Vector3(6.2f, 2.6f, 4.1f) : new Vector3(3.4f, 2.6f, 4.1f));
 
             TargetHealth health = craft.AddComponent<TargetHealth>();
-            // Four hits for scouts/interceptors and five for the heavy saucer
-            // when the standard player shot deals 22 damage.
-            health.SetMaxHealth(model == 2 ? 110 : 88);
+            // The normal Stage 3 weapon projectile deals 22 damage: every
+            // spacecraft therefore takes exactly four registered hits (88 HP).
+            health.SetMaxHealth(88);
             EnemyChase chase = craft.AddComponent<EnemyChase>();
             chase.enabled = false;
             hostileHealth.Add(health);
@@ -1128,8 +1130,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
             Vector3 origin = alien.Root.position + Vector3.up * 1.0f +
                 alien.Root.forward * 0.22f;
-            Vector3 direction = localPlayer.transform.position + Vector3.up * 0.72f - origin;
-            direction.y = 0f;
+            // Aim at the player's upper body in 3D. Flattening this vector made
+            // bolts skim beneath/over the player on sloped ground and ramps.
+            Vector3 direction = localPlayer.transform.position + Vector3.up * 0.88f - origin;
             if (direction.sqrMagnitude < 0.01f)
                 continue;
             float distance = direction.magnitude;
@@ -1143,12 +1146,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (alien.UpperPatrol)
             {
                 CreateHostileProjectile(origin, direction.normalized, alien.Root, 16, 86f, greenGlowMaterial);
-                alien.NextShotTime = Time.time + 1.55f + (alien.Archetype - 1) * 0.18f;
+                alien.NextShotTime = Time.time + 1.65f + (alien.Archetype - 1) * 0.18f;
             }
             else
             {
-                CreateHostileProjectile(origin, direction.normalized, alien.Root, 7, 62f, warningMaterial);
-                alien.NextShotTime = Time.time + 2.6f + (alien.Archetype - 1) * 0.35f;
+                CreateHostileProjectile(origin, direction.normalized, alien.Root, 9, 62f, warningMaterial);
+                alien.NextShotTime = Time.time + 2.25f + (alien.Archetype - 1) * 0.30f;
             }
         }
     }
@@ -1193,16 +1196,60 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         enemyShot.Configure(direction, damage, owner, range);
     }
 
+    private Transform PrepareStageThreeTransportShip()
+    {
+        // In the campaign, consume the exact GameObject created for the Stage 2
+        // evacuation. Direct Stage 3 test entry gets a visually matching fallback.
+        Transform ship = StageTwoVictorySequence.TakeRetainedShipForStageThree();
+        if (ship == null)
+        {
+            ship = new GameObject("StageThreeEntryTransportShip").transform;
+            CreateSphereChild(ship, "TransportPortHull", new Vector3(-6.5f, 0f, 0f),
+                new Vector3(8.8f, 1.45f, 9.0f), silverMaterial);
+            CreateSphereChild(ship, "TransportStarboardHull", new Vector3(6.5f, 0f, 0f),
+                new Vector3(8.8f, 1.45f, 9.0f), silverMaterial);
+            CreateBoxChild(ship, "TransportPortKeel", new Vector3(-3.8f, -0.58f, -0.15f),
+                new Vector3(5.6f, 0.36f, 6.1f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportStarboardKeel", new Vector3(3.8f, -0.58f, -0.15f),
+                new Vector3(5.6f, 0.36f, 6.1f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportCabinFloor", new Vector3(0f, -0.72f, -1.85f),
+                new Vector3(3.35f, 0.14f, 4.65f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportPortWing", new Vector3(-7.2f, -0.12f, 0.4f),
+                new Vector3(5.3f, 0.52f, 2.4f), darkMetalMaterial);
+            CreateBoxChild(ship, "TransportStarboardWing", new Vector3(7.2f, -0.12f, 0.4f),
+                new Vector3(5.3f, 0.52f, 2.4f), darkMetalMaterial);
+            CreateSphereChild(ship, "TransportCommandDome", new Vector3(0f, 0.92f, 1.0f),
+                new Vector3(5.4f, 1.15f, 3.5f), cyanGlowMaterial);
+            CreateBoxChild(ship, "TransportCentralSpine", new Vector3(0f, 0.90f, 2.0f),
+                new Vector3(7.2f, 0.52f, 1.2f), silverMaterial);
+            CreateSphereChild(ship, "TransportForwardNose", new Vector3(0f, -0.02f, 4.0f),
+                new Vector3(5.4f, 0.9f, 2.5f), silverMaterial);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                CreateCylinderChild(ship, "TransportEngine", new Vector3(side * 5.0f, -0.20f, -1.0f),
+                    new Vector3(1.0f, 0.34f, 1.0f), greenGlowMaterial);
+                CreateBoxChild(ship, "TransportDeckLight", new Vector3(side * 4.35f, 0.76f, 0f),
+                    new Vector3(0.16f, 0.12f, 4.2f), cyanGlowMaterial);
+            }
+        }
+
+        ship.name = "StageThreeEntryTransportShip";
+        ship.SetParent(worldRoot, true);
+        ship.localScale = Vector3.one;
+        ship.gameObject.SetActive(true);
+        return ship;
+    }
+
     private IEnumerator RunStageThreeIntro()
     {
         IsCinematic = true;
         IsIntroCinematic = true;
-        StartupCheckpoint.Set("StageThreeIntroStarted");
+        IntroMessage = "TRANSPORT SHIP INBOUND — SCANNING THE PLANET";
+        StartupCheckpoint.Set("StageThreeIntroStarted_TransportArrival");
 
         if (localPlayer != null)
         {
             localPlayer.SetMovementEnabled(false);
-            localPlayer.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
             if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = false;
             if (localPlayer.Aim != null) localPlayer.Aim.enabled = false;
         }
@@ -1214,66 +1261,140 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             yield break;
         }
 
-        Vector3 playerStart = localPlayer.transform.position;
-        Vector3 playerFinish = playerStart + Vector3.forward * 6f;
-        Vector3 overviewPosition = new Vector3(0f, 48f, -116f);
-        Vector3 overviewTarget = new Vector3(0f, 13f, 0f);
+        Transform pilot = localPlayer.transform;
+        Transform originalPlayerParent = pilot.parent;
+        Vector3 originalPlayerLocalScale = pilot.localScale;
+        Quaternion originalPlayerRotation = pilot.rotation;
+        Renderer[] pilotRenderers = pilot.GetComponentsInChildren<Renderer>(true);
+        bool[] pilotRendererWasEnabled = new bool[pilotRenderers.Length];
+        for (int i = 0; i < pilotRenderers.Length; i++)
+        {
+            pilotRendererWasEnabled[i] = pilotRenderers[i] != null && pilotRenderers[i].enabled;
+            if (pilotRenderers[i] != null)
+                pilotRenderers[i].enabled = false;
+        }
+
+        Vector3 selectedLandingPoint = pilot.position;
+        selectedLandingPoint.y = 0f;
+        selectedLandingPoint.x = Mathf.Clamp(selectedLandingPoint.x, -92f, 92f);
+        selectedLandingPoint.z = Mathf.Clamp(selectedLandingPoint.z, -98f, 98f);
+
+        entryTransportShip = PrepareStageThreeTransportShip();
+        Quaternion shipRotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
+        Vector3 shipLandingPosition = selectedLandingPoint + Vector3.forward * 9f;
+        shipLandingPosition.y = 0.92f;
+        Vector3 shipStartPosition = shipLandingPosition + Vector3.up * 82f + Vector3.back * 48f;
+        entryTransportShip.rotation = shipRotation;
+        entryTransportShip.position = shipStartPosition;
+
+        // Hide the pilot inside the actual ship while it descends. The same
+        // ship instance from Stage 2 is animated, not a replacement model.
+        pilot.SetParent(entryTransportShip, true);
+        pilot.localPosition = new Vector3(0f, -0.40f, -1.8f);
+        pilot.localRotation = Quaternion.identity;
+
+        Vector3 overviewPosition = new Vector3(0f, 250f, -155f);
+        Vector3 overviewTarget = new Vector3(0f, 0f, 0f);
+        Vector3 landingCameraPosition = shipLandingPosition + new Vector3(0f, 36f, -58f);
+        Vector3 landingCameraTarget = shipLandingPosition + Vector3.up * 1.0f;
+        gameplayCamera.farClipPlane = Mathf.Max(savedCameraFarClip, 520f);
+        gameplayCamera.fieldOfView = Mathf.Max(savedCameraFieldOfView, 72f);
         gameplayCamera.transform.position = overviewPosition;
         gameplayCamera.transform.rotation = Quaternion.LookRotation(overviewTarget - overviewPosition, Vector3.up);
-        gameplayCamera.fieldOfView = Mathf.Max(savedCameraFieldOfView, 62f);
 
-        // Hold a wide reveal long enough to read the citadel, skyline, sand-colored
-        // terrain, three craft silhouettes and the guards on their posts.
-        float holdElapsed = 0f;
-        const float revealHold = 1.65f;
-        while (holdElapsed < revealHold)
+        // Give the player a true map-wide aerial view before the transport begins
+        // its descent, then bring the camera down at the same time as the ship.
+        float overviewElapsed = 0f;
+        const float overviewHold = 1.25f;
+        while (overviewElapsed < overviewHold)
         {
-            holdElapsed += Time.unscaledDeltaTime;
+            overviewElapsed += Time.unscaledDeltaTime;
             yield return null;
         }
 
-        float entranceElapsed = 0f;
-        const float entranceDuration = 1.25f;
-        while (entranceElapsed < entranceDuration)
+        IntroMessage = "TRANSPORT DESCENDING — LANDING ZONE CONFIRMED";
+        float descentElapsed = 0f;
+        const float descentDuration = 4.6f;
+        while (descentElapsed < descentDuration)
         {
-            entranceElapsed += Time.unscaledDeltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(entranceElapsed / entranceDuration));
-            localPlayer.transform.position = Vector3.Lerp(playerStart, playerFinish, t);
-            Vector3 cameraPosition = Vector3.Lerp(overviewPosition, new Vector3(0f, 38f, -91f), t);
-            Vector3 cameraTarget = Vector3.Lerp(overviewTarget, new Vector3(0f, 12f, -7f), t);
-            gameplayCamera.transform.position = cameraPosition;
-            gameplayCamera.transform.rotation = Quaternion.LookRotation(cameraTarget - cameraPosition, Vector3.up);
+            descentElapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(descentElapsed / descentDuration));
+            entryTransportShip.position = Vector3.Lerp(shipStartPosition, shipLandingPosition, t);
+            gameplayCamera.transform.position = Vector3.Lerp(overviewPosition, landingCameraPosition, t);
+            Vector3 cameraTarget = Vector3.Lerp(overviewTarget, landingCameraTarget, t);
+            gameplayCamera.transform.rotation = Quaternion.LookRotation(
+                cameraTarget - gameplayCamera.transform.position, Vector3.up);
             yield return null;
         }
-        localPlayer.transform.position = playerFinish;
 
-        // Match Stage 2's actual chase-camera angle and distance for continuity.
-        Quaternion stageTwoOrbit = Quaternion.Euler(37f, 32f, 0f);
+        entryTransportShip.position = shipLandingPosition;
+        gameplayCamera.transform.position = landingCameraPosition;
+        gameplayCamera.transform.rotation = Quaternion.LookRotation(
+            landingCameraTarget - landingCameraPosition, Vector3.up);
+        StartupCheckpoint.Set("StageThreeTransportShipLanded");
+        IntroMessage = "LANDING COMPLETE — PILOT DEPLOYING";
+        float landingPause = 0f;
+        while (landingPause < 0.45f)
+        {
+            landingPause += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        // The rear ramp is at the negative-Z end of the ship. Reveal the same pilot
+        // there and animate the walk clear of the ramp before arming combat controls.
+        Vector3 exitStart = entryTransportShip.TransformPoint(new Vector3(0f, 0f, -5.7f));
+        Vector3 exitFinish = entryTransportShip.TransformPoint(new Vector3(0f, 0f, -11.3f));
+        exitStart.y = 0f;
+        exitFinish.y = 0f;
+        pilot.SetParent(originalPlayerParent, true);
+        pilot.localScale = originalPlayerLocalScale;
+        pilot.position = exitStart;
+        pilot.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
+        localPlayer.SetGroundedPosition(exitStart);
+        for (int i = 0; i < pilotRenderers.Length; i++)
+        {
+            if (pilotRenderers[i] != null)
+                pilotRenderers[i].enabled = pilotRendererWasEnabled[i];
+        }
+
+        IntroMessage = "PILOT ON FOOT — PREPARING FOR COMBAT";
+        Quaternion tacticalOrbit = Quaternion.Euler(37f, 32f, 0f);
         Quaternion yawOnly = Quaternion.Euler(0f, 32f, 0f);
-        Vector3 finalCameraPosition = localPlayer.transform.position + stageTwoOrbit * Vector3.back * 16.63f;
-        Vector3 finalLookTarget = localPlayer.transform.position + yawOnly * Vector3.forward * 4.5f +
-            Vector3.up * 0.90f;
         Vector3 cameraStartPosition = gameplayCamera.transform.position;
+        Vector3 cameraStartRotationForward = gameplayCamera.transform.forward;
         Quaternion cameraStartRotation = gameplayCamera.transform.rotation;
-        float cameraElapsed = 0f;
-        const float cameraBlendDuration = 1.35f;
-        while (cameraElapsed < cameraBlendDuration)
+        float exitElapsed = 0f;
+        const float exitDuration = 1.85f;
+        while (exitElapsed < exitDuration)
         {
-            cameraElapsed += Time.unscaledDeltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(cameraElapsed / cameraBlendDuration));
-            gameplayCamera.transform.position = Vector3.Lerp(cameraStartPosition, finalCameraPosition, t);
-            Quaternion finalRotation = Quaternion.LookRotation(finalLookTarget - finalCameraPosition, Vector3.up);
-            gameplayCamera.transform.rotation = Quaternion.Slerp(cameraStartRotation, finalRotation, t);
-            gameplayCamera.fieldOfView = Mathf.Lerp(Mathf.Max(savedCameraFieldOfView, 62f),
-                savedCameraFieldOfView, t);
+            exitElapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(exitElapsed / exitDuration));
+            Vector3 currentPlayerPosition = Vector3.Lerp(exitStart, exitFinish, t);
+            pilot.position = currentPlayerPosition;
+            Vector3 desiredCameraPosition = currentPlayerPosition + tacticalOrbit * Vector3.back * 16.63f;
+            Vector3 desiredLookTarget = currentPlayerPosition + yawOnly * Vector3.forward * 4.5f +
+                Vector3.up * 0.90f;
+            gameplayCamera.transform.position = Vector3.Lerp(cameraStartPosition, desiredCameraPosition, t);
+            Vector3 blendedLookTarget = Vector3.Lerp(landingCameraTarget, desiredLookTarget, t);
+            Quaternion desiredRotation = Quaternion.LookRotation(
+                blendedLookTarget - gameplayCamera.transform.position, Vector3.up);
+            gameplayCamera.transform.rotation = Quaternion.Slerp(cameraStartRotation, desiredRotation, t);
             yield return null;
         }
 
+        pilot.position = exitFinish;
+        pilot.rotation = originalPlayerRotation;
+        localPlayer.SetGroundedPosition(exitFinish);
+        Vector3 finalCameraPosition = exitFinish + tacticalOrbit * Vector3.back * 16.63f;
+        Vector3 finalLookTarget = exitFinish + yawOnly * Vector3.forward * 4.5f + Vector3.up * 0.90f;
         gameplayCamera.transform.position = finalCameraPosition;
-        gameplayCamera.transform.rotation = Quaternion.LookRotation(finalLookTarget - finalCameraPosition, Vector3.up);
+        gameplayCamera.transform.rotation = Quaternion.LookRotation(
+            finalLookTarget - finalCameraPosition, Vector3.up);
         gameplayCamera.fieldOfView = savedCameraFieldOfView;
+
         IsIntroCinematic = false;
         IsCinematic = false;
+        IntroMessage = "MISSION LIVE — ELIMINATE ALL ALIENS";
         if (localPlayer != null)
         {
             localPlayer.enabled = true;
@@ -1281,12 +1402,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = true;
             if (localPlayer.Aim != null) localPlayer.Aim.enabled = true;
         }
-        // Stage 3 intentionally avoids the shared smart-chase/target-search AI:
-        // enabling dozens of EnemyChase instances here caused severe frame stalls
-        // on mobile after combat began. Keep them disabled; sentries and upper
-        // patrols are driven by this builder's lightweight fixed-update logic.
-
-        StartupCheckpoint.Set("StageThreeIntroComplete");
+        StartupCheckpoint.Set("StageThreeTransportDisembarkComplete_CombatReady");
     }
 
     private IEnumerator RunCentralLiftEnding()
@@ -1487,6 +1603,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
         hovercrafts.Clear();
         groundAliens.Clear();
+        entryTransportShip = null;
         hostileHealth.Clear();
         worldBuilt = false;
         isComplete = false;
