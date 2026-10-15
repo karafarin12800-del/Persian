@@ -11,6 +11,8 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int shield = 0;
         [SerializeField] private float spawnMovementLockSeconds = 0.45f;
 
+        // Reusable movement query buffer avoids allocating a Collider[] every frame.
+        private static readonly Collider[] MovementCollisionBuffer = new Collider[128];
         private Vector3 input;
         private Vector3 aimDirection;
         private bool hasAimDirection;
@@ -247,14 +249,17 @@ namespace PersiaWar.Unity2D5D
 
         private bool WouldCollide(Vector3 position)
         {
-            Collider[] hits = Physics.OverlapSphere(
+            int hitCount = Physics.OverlapSphereNonAlloc(
                 position + Vector3.up * 0.7f,
                 collisionRadius,
+                MovementCollisionBuffer,
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
-            foreach (Collider hit in hits)
+            for (int i = 0; i < hitCount; i++)
             {
+                Collider hit = MovementCollisionBuffer[i];
+                if (hit == null) continue;
                 if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
                 if (hit.GetComponentInParent<EnemyChase>() != null) continue;
                 if (hit.GetComponentInParent<Projectile>() != null) continue;
