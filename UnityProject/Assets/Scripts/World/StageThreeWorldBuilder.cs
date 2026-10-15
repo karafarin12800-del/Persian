@@ -815,10 +815,10 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             guard.PatrolSpeed = 0.62f + (upperPatrols % 4) * 0.08f;
             guard.NextShotTime = Time.time + 1.0f + (upperPatrols % 6) * 0.18f;
             guard.Health.SetMaxHealth(guard.Archetype == 3 ? 250 : (guard.Archetype == 2 ? 210 : 180));
-            CreateBoxChild(guard.Root, "S3_EliteHeavyRifle", new Vector3(0.28f, 0.78f, 0.43f),
-                new Vector3(0.18f, 0.17f, 0.92f), darkMetalMaterial);
-            CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.28f, 0.80f, 0.98f),
-                new Vector3(0.10f, 0.10f, 0.48f), greenGlowMaterial);
+            CreateBoxChild(guard.Root, "S3_EliteHeavyRifle", new Vector3(0.48f, 0.10f, 0.48f),
+                new Vector3(0.16f, 0.15f, 0.90f), darkMetalMaterial);
+            CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.48f, 0.12f, 0.94f),
+                new Vector3(0.10f, 0.10f, 0.46f), greenGlowMaterial);
             upperPatrols++;
         }
 
