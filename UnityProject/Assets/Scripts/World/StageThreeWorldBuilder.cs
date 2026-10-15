@@ -1206,50 +1206,78 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
     private Transform PrepareStageThreeTransportShip()
     {
-        // In the campaign, consume the exact GameObject created for the Stage 2
-        // evacuation. Direct Stage 3 test entry gets a visually matching fallback.
+        // Prefer the exact ship object used by the Stage 2 ending. This preserves
+        // the same hull, engine layout, cabin, ramp, and materials across stages.
         Transform ship = StageTwoVictorySequence.TakeRetainedShipForStageThree();
         if (ship == null)
         {
+            // Direct Stage 3 test entry has no Stage 2 cutscene instance to reuse.
+            // Build a geometry-for-geometry match of StageTwoVictorySequence.BuildShip,
+            // not the older simplified look-alike.
             ship = new GameObject("StageThreeEntryTransportShip").transform;
-            CreateSphereChild(ship, "TransportPortHull", new Vector3(-6.5f, 0f, 0f),
-                new Vector3(8.8f, 1.45f, 9.0f), silverMaterial);
-            CreateSphereChild(ship, "TransportStarboardHull", new Vector3(6.5f, 0f, 0f),
-                new Vector3(8.8f, 1.45f, 9.0f), silverMaterial);
-            CreateBoxChild(ship, "TransportPortKeel", new Vector3(-3.8f, -0.58f, -0.15f),
-                new Vector3(5.6f, 0.36f, 6.1f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportStarboardKeel", new Vector3(3.8f, -0.58f, -0.15f),
-                new Vector3(5.6f, 0.36f, 6.1f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportCabinFloor", new Vector3(0f, -0.72f, -1.85f),
-                new Vector3(3.35f, 0.14f, 4.65f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportCabinPortWall", new Vector3(-1.72f, 0.12f, -1.85f),
-                new Vector3(0.18f, 1.72f, 4.65f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportCabinStarboardWall", new Vector3(1.72f, 0.12f, -1.85f),
-                new Vector3(0.18f, 1.72f, 4.65f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportCabinForwardBulkhead", new Vector3(0f, 0.12f, 0.43f),
-                new Vector3(3.35f, 1.72f, 0.18f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportRearEntryRamp", new Vector3(0f, -0.72f, -5.20f),
-                new Vector3(3.8f, 0.14f, 2.65f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportPortDeck", new Vector3(-4.35f, 0.48f, 0.15f),
-                new Vector3(3.1f, 0.34f, 4.6f), silverMaterial);
-            CreateBoxChild(ship, "TransportStarboardDeck", new Vector3(4.35f, 0.48f, 0.15f),
-                new Vector3(3.1f, 0.34f, 4.6f), silverMaterial);
-            CreateBoxChild(ship, "TransportPortWing", new Vector3(-7.2f, -0.12f, 0.4f),
-                new Vector3(5.3f, 0.52f, 2.4f), darkMetalMaterial);
-            CreateBoxChild(ship, "TransportStarboardWing", new Vector3(7.2f, -0.12f, 0.4f),
-                new Vector3(5.3f, 0.52f, 2.4f), darkMetalMaterial);
-            CreateSphereChild(ship, "TransportCommandDome", new Vector3(0f, 0.92f, 1.0f),
-                new Vector3(5.4f, 1.15f, 3.5f), cyanGlowMaterial);
-            CreateBoxChild(ship, "TransportCentralSpine", new Vector3(0f, 0.90f, 2.0f),
-                new Vector3(7.2f, 0.52f, 1.2f), silverMaterial);
-            CreateSphereChild(ship, "TransportForwardNose", new Vector3(0f, -0.02f, 4.0f),
-                new Vector3(5.4f, 0.9f, 2.5f), silverMaterial);
+            Material stageTwoHull = CreateMaterial("S3_TransportHull_MatchStageTwo",
+                new Color(0.62f, 0.72f, 0.80f));
+            Material stageTwoDark = CreateMaterial("S3_TransportDark_MatchStageTwo",
+                new Color(0.075f, 0.14f, 0.22f));
+            Color engineColor = new Color(0.32f, 1f, 0.47f);
+            Material stageTwoEngine = CreateMaterial("S3_TransportEngineGlow_MatchStageTwo",
+                engineColor, engineColor);
+
+            // Twin rounded hulls and twin keels leave the open central passage visible.
+            CreateSphereChild(ship, "PortHull", new Vector3(-6.5f, 0f, 0f),
+                new Vector3(8.8f, 1.45f, 9.0f), stageTwoHull);
+            CreateSphereChild(ship, "StarboardHull", new Vector3(6.5f, 0f, 0f),
+                new Vector3(8.8f, 1.45f, 9.0f), stageTwoHull);
+            CreateBoxChild(ship, "PortKeel", new Vector3(-3.8f, -0.58f, -0.15f),
+                new Vector3(5.6f, 0.36f, 6.1f), stageTwoDark);
+            CreateBoxChild(ship, "StarboardKeel", new Vector3(3.8f, -0.58f, -0.15f),
+                new Vector3(5.6f, 0.36f, 6.1f), stageTwoDark);
+
+            // Match the same open-stern passenger cabin and rear ramp from Stage 2.
+            CreateBoxChild(ship, "PassengerCabinFloor", new Vector3(0f, -0.72f, -1.85f),
+                new Vector3(3.35f, 0.14f, 4.65f), stageTwoDark);
+            CreateBoxChild(ship, "PassengerCabinPortWall", new Vector3(-1.72f, 0.12f, -1.85f),
+                new Vector3(0.18f, 1.72f, 4.65f), stageTwoDark);
+            CreateBoxChild(ship, "PassengerCabinStarboardWall", new Vector3(1.72f, 0.12f, -1.85f),
+                new Vector3(0.18f, 1.72f, 4.65f), stageTwoDark);
+            CreateBoxChild(ship, "PassengerCabinForwardBulkhead", new Vector3(0f, 0.12f, 0.43f),
+                new Vector3(3.35f, 1.72f, 0.18f), stageTwoDark);
+            CreateBoxChild(ship, "RearEntryRamp", new Vector3(0f, -0.72f, -5.20f),
+                new Vector3(3.8f, 0.14f, 2.65f), stageTwoDark);
+
+            CreateBoxChild(ship, "PortDeck", new Vector3(-4.35f, 0.48f, 0.15f),
+                new Vector3(3.1f, 0.34f, 4.6f), stageTwoHull);
+            CreateBoxChild(ship, "StarboardDeck", new Vector3(4.35f, 0.48f, 0.15f),
+                new Vector3(3.1f, 0.34f, 4.6f), stageTwoHull);
+            CreateSphereChild(ship, "CommandDome", new Vector3(0f, 0.92f, 1.0f),
+                new Vector3(5.4f, 1.15f, 3.5f), stageTwoHull);
+            CreateBoxChild(ship, "CentralSpine", new Vector3(0f, 0.90f, 2.0f),
+                new Vector3(7.2f, 0.52f, 1.2f), stageTwoDark);
+            CreateBoxChild(ship, "PortWing", new Vector3(-7.2f, -0.12f, 0.4f),
+                new Vector3(5.3f, 0.52f, 2.4f), stageTwoDark);
+            CreateBoxChild(ship, "StarboardWing", new Vector3(7.2f, -0.12f, 0.4f),
+                new Vector3(5.3f, 0.52f, 2.4f), stageTwoDark);
+            CreateSphereChild(ship, "FrontNose", new Vector3(0f, -0.02f, 4.0f),
+                new Vector3(5.4f, 0.9f, 2.5f), stageTwoHull);
+
+            // Six engine glows and fourteen deck lights match the Stage 2 silhouette.
             for (int side = -1; side <= 1; side += 2)
             {
-                CreateCylinderChild(ship, "TransportEngine", new Vector3(side * 5.0f, -0.20f, -1.0f),
-                    new Vector3(1.0f, 0.34f, 1.0f), greenGlowMaterial);
-                CreateBoxChild(ship, "TransportDeckLight", new Vector3(side * 4.35f, 0.76f, 0f),
-                    new Vector3(0.16f, 0.12f, 4.2f), cyanGlowMaterial);
+                for (int engine = 0; engine < 3; engine++)
+                {
+                    float z = -3.0f + engine * 2.2f;
+                    CreateSphereChild(ship, "EngineGlow",
+                        new Vector3(side * (5.0f + (engine == 1 ? 1.2f : 0f)), -0.20f, z),
+                        new Vector3(1.0f, 0.34f, 1.0f), stageTwoEngine);
+                }
+
+                for (int window = -3; window <= 3; window++)
+                {
+                    float z = window * 1.05f;
+                    CreateBoxChild(ship, "DeckLight",
+                        new Vector3(side * 4.35f, 0.76f, z),
+                        new Vector3(0.16f, 0.12f, 0.42f), stageTwoEngine);
+                }
             }
         }
 
@@ -1302,7 +1330,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Quaternion shipRotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
         Vector3 shipLandingPosition = selectedLandingPoint + Vector3.forward * 9f;
         shipLandingPosition.y = 0.92f;
-        Vector3 shipStartPosition = shipLandingPosition + Vector3.up * 82f + Vector3.back * 48f;
+        // Bring the ship down from a nearby, readable height instead of starting
+        // with the player-sized city-wide aerial shot.
+        Vector3 shipStartPosition = shipLandingPosition + Vector3.up * 44f + Vector3.back * 6f;
         entryTransportShip.rotation = shipRotation;
         entryTransportShip.position = shipStartPosition;
 
@@ -1312,35 +1342,26 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         pilot.localPosition = new Vector3(0f, -0.40f, -1.8f);
         pilot.localRotation = Quaternion.identity;
 
-        Vector3 overviewPosition = new Vector3(0f, 250f, -155f);
-        Vector3 overviewTarget = new Vector3(0f, 0f, 0f);
-        Vector3 landingCameraPosition = shipLandingPosition + new Vector3(0f, 36f, -58f);
+        Vector3 landingCameraPosition = shipLandingPosition + new Vector3(0f, 14f, -26f);
         Vector3 landingCameraTarget = shipLandingPosition + Vector3.up * 1.0f;
-        gameplayCamera.farClipPlane = Mathf.Max(savedCameraFarClip, 520f);
-        gameplayCamera.fieldOfView = Mathf.Max(savedCameraFieldOfView, 72f);
-        gameplayCamera.transform.position = overviewPosition;
-        gameplayCamera.transform.rotation = Quaternion.LookRotation(overviewTarget - overviewPosition, Vector3.up);
+        gameplayCamera.farClipPlane = Mathf.Max(savedCameraFarClip, 320f);
+        // A tighter lens and grounded camera position keep the ship readable on a phone.
+        gameplayCamera.fieldOfView = Mathf.Clamp(savedCameraFieldOfView, 52f, 60f);
+        gameplayCamera.transform.position = landingCameraPosition;
+        gameplayCamera.transform.rotation = Quaternion.LookRotation(
+            shipStartPosition - gameplayCamera.transform.position, Vector3.up);
 
-        // Give the player a true map-wide aerial view before the transport begins
-        // its descent, then bring the camera down at the same time as the ship.
-        float overviewElapsed = 0f;
-        const float overviewHold = 1.25f;
-        while (overviewElapsed < overviewHold)
-        {
-            overviewElapsed += Time.unscaledDeltaTime;
-            yield return null;
-        }
-
+        // Start directly at the close shot: the camera does not dive from a
+        // map-wide overview. It pans to follow the transport down to the surface.
         IntroMessage = "TRANSPORT DESCENDING — LANDING ZONE CONFIRMED";
         float descentElapsed = 0f;
-        const float descentDuration = 4.6f;
+        const float descentDuration = 4.2f;
         while (descentElapsed < descentDuration)
         {
             descentElapsed += Time.unscaledDeltaTime;
             float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(descentElapsed / descentDuration));
             entryTransportShip.position = Vector3.Lerp(shipStartPosition, shipLandingPosition, t);
-            gameplayCamera.transform.position = Vector3.Lerp(overviewPosition, landingCameraPosition, t);
-            Vector3 cameraTarget = Vector3.Lerp(overviewTarget, landingCameraTarget, t);
+            Vector3 cameraTarget = Vector3.Lerp(shipStartPosition, landingCameraTarget, t);
             gameplayCamera.transform.rotation = Quaternion.LookRotation(
                 cameraTarget - gameplayCamera.transform.position, Vector3.up);
             yield return null;
