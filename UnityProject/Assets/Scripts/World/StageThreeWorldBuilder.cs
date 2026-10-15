@@ -735,6 +735,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 guard.PatrolPhase = upperPatrols * 0.83f;
                 guard.PatrolSpeed = 0.62f + (upperPatrols % 4) * 0.08f;
                 guard.NextShotTime = Time.time + 1.0f + (upperPatrols % 6) * 0.18f;
+                guard.Health.SetMaxHealth(guard.Archetype == 3 ? 250 : (guard.Archetype == 2 ? 210 : 180));
+                CreateBoxChild(guard.Root, "S3_EliteHeavyRifle", new Vector3(0.28f, 0.78f, 0.43f),
+                    new Vector3(0.18f, 0.17f, 0.92f), darkMetalMaterial);
+                CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.28f, 0.80f, 0.98f),
+                    new Vector3(0.10f, 0.10f, 0.48f), greenGlowMaterial);
                 upperPatrols++;
             }
         }
@@ -754,11 +759,16 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             guard.PatrolPhase = upperPatrols * 0.83f;
             guard.PatrolSpeed = 0.62f + (upperPatrols % 4) * 0.08f;
             guard.NextShotTime = Time.time + 1.0f + (upperPatrols % 6) * 0.18f;
+            guard.Health.SetMaxHealth(guard.Archetype == 3 ? 250 : (guard.Archetype == 2 ? 210 : 180));
+            CreateBoxChild(guard.Root, "S3_EliteHeavyRifle", new Vector3(0.28f, 0.78f, 0.43f),
+                new Vector3(0.18f, 0.17f, 0.92f), darkMetalMaterial);
+            CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.28f, 0.80f, 0.98f),
+                new Vector3(0.10f, 0.10f, 0.48f), greenGlowMaterial);
             upperPatrols++;
         }
 
         Debug.Log("PERSIA_STAGE3: spawned " + groundAliens.Count +
-            " ground aliens (60 roaming + 18 perimeter guards + 20 northern elite patrols).");
+            " ground aliens (60 base hostiles + 20 northern elite patrols).");
         StartupCheckpoint.Set("StageThree_80GroundAliensSpawned");
     }
 
