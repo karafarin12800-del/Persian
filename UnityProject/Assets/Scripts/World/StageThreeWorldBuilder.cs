@@ -1361,7 +1361,6 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Quaternion tacticalOrbit = Quaternion.Euler(37f, 32f, 0f);
         Quaternion yawOnly = Quaternion.Euler(0f, 32f, 0f);
         Vector3 cameraStartPosition = gameplayCamera.transform.position;
-        Vector3 cameraStartRotationForward = gameplayCamera.transform.forward;
         Quaternion cameraStartRotation = gameplayCamera.transform.rotation;
         float exitElapsed = 0f;
         const float exitDuration = 1.85f;
