@@ -603,7 +603,20 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 {
                     patrol.ExplosionStarted = true;
                     SpawnHovercraftExplosion(patrol.Root.position);
-                    Destroy(patrol.Root.gameObject, 0.30f);
+
+                    // Keep the destroyed saucer as a grounded wreck instead of
+                    // deleting it immediately. Disable collision so the wreck
+                    // cannot block the player or receive more shots.
+                    Collider[] wreckColliders = patrol.Root.GetComponentsInChildren<Collider>(true);
+                    for (int c = 0; c < wreckColliders.Length; c++)
+                        if (wreckColliders[c] != null)
+                            wreckColliders[c].enabled = false;
+
+                    Vector3 wreckPosition = patrol.Root.position;
+                    wreckPosition.y = 0.22f;
+                    patrol.Root.position = wreckPosition;
+                    patrol.Root.rotation = patrol.Root.rotation * Quaternion.Euler(72f, 0f, 18f);
+                    patrol.Root.name = "S3_DestroyedHovercraftWreck";
                 }
                 continue;
             }
