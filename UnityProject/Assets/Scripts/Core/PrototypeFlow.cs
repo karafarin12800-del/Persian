@@ -1086,8 +1086,12 @@ namespace PersiaWar.Unity2D5D
             Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.20f, 0.95f, 1f, 0.95f));
             GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 4f * scale, panel.width - 22f * scale, 25f * scale),
                 "STAGE 3  •  THE ALIEN FORTRESS", menuSmallStyle);
+            string introMessage = stageThreeWorldBuilder != null &&
+                !string.IsNullOrEmpty(stageThreeWorldBuilder.IntroMessage)
+                    ? stageThreeWorldBuilder.IntroMessage
+                    : "CLEAR ALL HOSTILES TO UNLOCK THE UPLINK";
             GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 31f * scale, panel.width - 22f * scale, 24f * scale),
-                "CLEAR ALL HOSTILES TO UNLOCK THE UPLINK", menuSmallStyle);
+                introMessage, menuSmallStyle);
         }
 
         private void DrawStageThreeCinematicOverlay()
