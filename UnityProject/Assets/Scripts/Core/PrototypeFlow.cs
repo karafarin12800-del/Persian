@@ -857,7 +857,7 @@ namespace PersiaWar.Unity2D5D
             {
                 "PLAY / CONTINUE CAMPAIGN",
                 "PLAYER PROFILE",
-                "STORE",
+                "STORE / WEAPON LOADOUT",
                 "SETTINGS",
                 "TEST STAGE 1",
                 "TEST STAGE 2",
@@ -1185,7 +1185,8 @@ namespace PersiaWar.Unity2D5D
             resultOverlayStartTime = -1f;
             RestoreCampaignProgressAfterTest();
             mode = ScreenMode.MainMenu;
-            StartupCheckpoint.Set("ResultOverlay_ReturnToMainMenu");
+            ShowLobbyNotice("STAGE 3 COMPLETE  •  VISIT STORE / LOADOUT TO PREPARE FOR THE NEXT STAGE");
+            StartupCheckpoint.Set("StageThreeResult_ReturnToMenu_LoadoutAvailable");
         }
 
         private void DrawProfileScreen()
