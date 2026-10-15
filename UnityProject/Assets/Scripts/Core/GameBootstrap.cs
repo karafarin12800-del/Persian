@@ -228,7 +228,18 @@ namespace PersiaWar.Unity2D5D
             androidSidewalkMaterial = MakeMaterial("AndroidSidewalk", new Color(0.38f, 0.36f, 0.31f));
             BuildAndroidTerrain3D(groundMaterial);
             BuildAndroidRoadGrid();
-            BuildAndroidCityPresentation();
+
+            // Prefer the optional SimplePoly City set when it has been imported.
+            // If the Asset Store package is not present, keep the proven procedural
+            // Android city as the safe fallback.
+            bool simplePolyBuilt = SimplePolyCityAdapter.TryBuild(worldRoot, worldSize, seed);
+            StartupCheckpoint.Set(simplePolyBuilt
+                ? "SimplePolyCitySelected"
+                : "SimplePolyCityFallbackProcedural");
+
+            if (!simplePolyBuilt)
+                BuildAndroidCityPresentation();
+
             return;
 #else
             buildingMaterial = MakeMaterial("Building", new Color(0.88f, 0.76f, 0.30f));
