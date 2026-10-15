@@ -427,8 +427,10 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(0.07f, 12.6f, 0.07f), greenGlowMaterial, false);
         }
 
+        // This is a lift pad, not a blocking pillar: ground stays walkable at its centre.
+        // The ending cinematic moves the platform and the player explicitly.
         liftPlatform = CreateCylinder("S3_CentralLiftPlatform", new Vector3(0f, 0.28f, 0f),
-            new Vector3(5.4f, 0.36f, 5.4f), silverMaterial, true).transform;
+            new Vector3(5.4f, 0.36f, 5.4f), silverMaterial, false).transform;
         CreateCylinder("S3_LiftPlatformGlow", new Vector3(0f, 0.49f, 0f),
             new Vector3(4.5f, 0.08f, 4.5f), greenGlowMaterial, false);
 
