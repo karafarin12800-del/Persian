@@ -99,11 +99,21 @@ namespace PersiaWar.Unity2D5D
                 impactResolved = true;
                 TargetHealth target = collider.GetComponentInParent<TargetHealth>();
                 if (target != null && target.GetComponentInParent<EnemyChase>() != null)
-                    target.ApplyDamage(damage, owner);
+                    target.ApplyDamage(GetDamageForTarget(target), owner);
                 Destroy(gameObject);
                 return true;
             }
             return false;
+        }
+
+        private int GetDamageForTarget(TargetHealth target)
+        {
+            // Treat each successful bullet impact as one quarter of a Stage 3
+            // transport's life, even when the player changes weapon profiles.
+            if (target != null && target.gameObject.name.StartsWith(
+                "S3_HostileHovercraft_", System.StringComparison.Ordinal))
+                return Mathf.Max(1, Mathf.CeilToInt(target.MaxHealth / 4f));
+            return damage;
         }
 
         private void OnTriggerEnter(Collider other)
@@ -123,7 +133,7 @@ namespace PersiaWar.Unity2D5D
             impactResolved = true;
             TargetHealth target = other.GetComponentInParent<TargetHealth>();
             if (target != null && target.GetComponentInParent<EnemyChase>() != null)
-                target.ApplyDamage(damage, owner);
+                target.ApplyDamage(GetDamageForTarget(target), owner);
 
             Destroy(gameObject);
         }
