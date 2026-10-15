@@ -181,6 +181,13 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     {
         localPlayer = player;
         gameplayCamera = camera;
+        if (localPlayer != null)
+        {
+            // Stage 3 starts with a clear, visible survival baseline.
+            if (localPlayer.Health != null)
+                localPlayer.Health.SetMaxHealth(150);
+            localPlayer.SetShield(100);
+        }
         if (gameplayCamera != null)
         {
             savedCameraPosition = gameplayCamera.transform.position;
@@ -712,8 +719,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 Time.time < craft.NextDamageTime)
                 continue;
 
-            if (localPlayer.Health != null)
-                localPlayer.Health.ApplyDamage(12, craft.Root);
+            localPlayer.ReceiveDamage(12);
             craft.NextDamageTime = Time.time + 1.4f;
             StartupCheckpoint.Set("StageThreeHovercraftThreatHit");
         }
