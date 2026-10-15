@@ -915,7 +915,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 #if UNITY_ANDROID
         alien = new GameObject((guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00"));
         alien.transform.position = position;
-        alien.transform.localScale = new Vector3(0.88f, 0.88f, 0.88f);
+        alien.transform.localScale = GetAlienModelScale(archetype);
         CapsuleCollider capsule = alien.AddComponent<CapsuleCollider>();
         capsule.radius = 0.55f;
         capsule.height = 1.8f;
@@ -938,7 +938,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         alien = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         alien.name = (guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00");
         alien.transform.position = position;
-        alien.transform.localScale = new Vector3(0.88f, 0.95f, 0.88f);
+        alien.transform.localScale = GetAlienModelScale(archetype);
         Renderer alienRenderer = alien.GetComponent<Renderer>();
         if (alienRenderer != null)
         {
@@ -979,6 +979,18 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         };
         groundAliens.Add(data);
         hostileHealth.Add(health);
+    }
+
+    private static Vector3 GetAlienModelScale(int archetype)
+    {
+        // Three clearly readable alien silhouettes: slender scout, broad brute,
+        // and compact armored hunter. Elite guards receive their own tall override.
+        switch (archetype)
+        {
+            case 1: return new Vector3(0.78f, 1.10f, 0.80f);
+            case 2: return new Vector3(1.12f, 0.88f, 1.08f);
+            default: return new Vector3(0.94f, 1.02f, 0.78f);
+        }
     }
 
     private void BuildAlienCreatureDetails(Transform alien, int archetype, bool guard, bool eliteGuard)
