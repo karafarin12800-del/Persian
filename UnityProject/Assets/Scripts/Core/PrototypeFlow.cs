@@ -322,7 +322,10 @@ namespace PersiaWar.Unity2D5D
 
                 if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
                 {
-                    DrawStageThreeCinematicOverlay();
+                    if (stageThreeWorldBuilder.IsIntroCinematic)
+                        DrawStageThreeIntroOverlay();
+                    else
+                        DrawStageThreeCinematicOverlay();
                     return;
                 }
 
@@ -1005,7 +1008,7 @@ namespace PersiaWar.Unity2D5D
                 stageTwoLobbyReady = false;
                 stageTwoLobbyPlayers = 1;
                 forceStageOneWorldRebuildForTest = false;
-                spawnWorld = new Vector2(0f, -84f);
+                spawnWorld = new Vector2(0f, -97f);
                 spawnChosen = true;
                 if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
                 if (activeCamera != null) activeCamera.enabled = false;
@@ -1041,13 +1044,35 @@ namespace PersiaWar.Unity2D5D
         private void DrawStageThreeHUD()
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
-            Rect panel = new Rect(14f * scale, 14f * scale, Mathf.Min(Screen.width - 28f * scale, 390f * scale), 66f * scale);
-            Fill(panel, new Color(0.015f, 0.028f, 0.05f, 0.84f));
-            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.22f, 0.91f, 1f, 0.95f));
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 6f * scale, panel.width - 22f * scale, 25f * scale),
-                "ALIEN PLANET  •  STAGE 3", menuHeaderStyle);
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 34f * scale, panel.width - 22f * scale, 24f * scale),
-                "ENTER ONE OF 9 GATES  •  REACH THE CENTRAL LIFT", menuSmallStyle);
+            float width = Mathf.Min(Screen.width - 28f * scale, 430f * scale);
+            Rect panel = new Rect(14f * scale, 14f * scale, width, 96f * scale);
+            Fill(panel, new Color(0.015f, 0.028f, 0.05f, 0.88f));
+            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.22f, 0.91f, 1f, 0.98f));
+            int remaining = stageThreeWorldBuilder != null ? stageThreeWorldBuilder.RemainingHostiles : 66;
+            int total = stageThreeWorldBuilder != null ? stageThreeWorldBuilder.TotalHostiles : 66;
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 4f * scale, panel.width - 22f * scale, 25f * scale),
+                "ALIEN PLANET  •  STAGE 3", menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 31f * scale, panel.width - 22f * scale, 24f * scale),
+                "HOSTILES LEFT: " + remaining + " / " + total, menuSmallStyle);
+            string objective = remaining > 0
+                ? "UPLINK LOCKED — ELIMINATE ALL HOSTILES"
+                : "HOSTILES CLEARED — REACH THE CENTRAL LIFT";
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 60f * scale, panel.width - 22f * scale, 28f * scale),
+                objective, menuSmallStyle);
+        }
+
+        private void DrawStageThreeIntroOverlay()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float width = Screen.width * 0.76f;
+            float height = 62f * scale;
+            Rect panel = new Rect(Screen.width * 0.12f, Screen.height * 0.83f - height, width, height);
+            Fill(panel, new Color(0.012f, 0.035f, 0.055f, 0.72f));
+            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.20f, 0.95f, 1f, 0.95f));
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 4f * scale, panel.width - 22f * scale, 25f * scale),
+                "STAGE 3  •  THE ALIEN FORTRESS", menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 31f * scale, panel.width - 22f * scale, 24f * scale),
+                "CLEAR ALL HOSTILES TO UNLOCK THE UPLINK", menuSmallStyle);
         }
 
         private void DrawStageThreeCinematicOverlay()
