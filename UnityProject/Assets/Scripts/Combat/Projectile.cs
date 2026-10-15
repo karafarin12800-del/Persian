@@ -12,6 +12,7 @@ namespace PersiaWar.Unity2D5D
         private float remainingLife;
         private Transform owner;
         private float remainingDistance;
+        private bool impactResolved;
         private static readonly RaycastHit[] SweepHitBuffer = new RaycastHit[96];
 
         public void SetDefaults(float projectileSpeed, float projectileLifetime, int projectileDamage)
@@ -31,6 +32,7 @@ namespace PersiaWar.Unity2D5D
             direction = worldDirection.normalized;
             remainingLife = lifetime;
             remainingDistance = Mathf.Max(0f, speed * lifetime);
+            impactResolved = false;
 
             if (direction.sqrMagnitude > 0.001f)
                 transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
@@ -38,6 +40,7 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (impactResolved) return;
             float step = Mathf.Min(speed * Time.deltaTime, remainingDistance);
 
             if (step <= 0.001f || remainingDistance <= 0.001f)
@@ -93,6 +96,7 @@ namespace PersiaWar.Unity2D5D
                 if (collider.GetComponentInParent<PlayerController>() != null)
                     continue;
 
+                impactResolved = true;
                 TargetHealth target = collider.GetComponentInParent<TargetHealth>();
                 if (target != null && target.GetComponentInParent<EnemyChase>() != null)
                     target.ApplyDamage(damage, owner);
@@ -104,7 +108,7 @@ namespace PersiaWar.Unity2D5D
 
         private void OnTriggerEnter(Collider other)
         {
-            if (other == null)
+            if (impactResolved || other == null)
                 return;
 
             if (owner != null &&
@@ -116,6 +120,7 @@ namespace PersiaWar.Unity2D5D
                 other.GetComponentInParent<EnemyProjectile>() != null)
                 return;
 
+            impactResolved = true;
             TargetHealth target = other.GetComponentInParent<TargetHealth>();
             if (target != null && target.GetComponentInParent<EnemyChase>() != null)
                 target.ApplyDamage(damage, owner);
