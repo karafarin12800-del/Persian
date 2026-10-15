@@ -165,6 +165,11 @@ namespace PersiaWar.Unity2D5D
             shield = Mathf.Clamp(shield + Mathf.Max(0, amount), 0, 100);
         }
 
+        public void SetShield(int amount)
+        {
+            shield = Mathf.Clamp(amount, 0, 100);
+        }
+
         public void AddQuickDashCharges(int amount) { quickDashCharges = Mathf.Clamp(quickDashCharges + Mathf.Max(0, amount), 0, 12); }
         public bool TryQuickDash()
         {
