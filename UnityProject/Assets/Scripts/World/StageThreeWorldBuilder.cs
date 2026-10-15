@@ -778,10 +778,10 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 guard.PatrolSpeed = 0.62f + (upperPatrols % 4) * 0.08f;
                 guard.NextShotTime = Time.time + 1.0f + (upperPatrols % 6) * 0.18f;
                 guard.Health.SetMaxHealth(guard.Archetype == 3 ? 250 : (guard.Archetype == 2 ? 210 : 180));
-                CreateBoxChild(guard.Root, "S3_EliteHeavyRifle", new Vector3(0.28f, 0.78f, 0.43f),
-                    new Vector3(0.18f, 0.17f, 0.92f), darkMetalMaterial);
-                CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.28f, 0.80f, 0.98f),
-                    new Vector3(0.10f, 0.10f, 0.48f), greenGlowMaterial);
+                CreateBoxChild(guard.Root, "S3_EliteHeavyRifle", new Vector3(0.48f, 0.10f, 0.48f),
+                    new Vector3(0.16f, 0.15f, 0.90f), darkMetalMaterial);
+                CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.48f, 0.12f, 0.94f),
+                    new Vector3(0.10f, 0.10f, 0.46f), greenGlowMaterial);
                 upperPatrols++;
             }
         }
@@ -911,7 +911,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 #endif
         alien.transform.SetParent(worldRoot, true);
-        BuildAlienCreatureDetails(alien.transform, archetype, guard);
+        bool eliteGuard = guard && index >= 60;
+        BuildAlienCreatureDetails(alien.transform, archetype, guard, eliteGuard);
 
         TargetHealth health = alien.AddComponent<TargetHealth>();
         health.SetMaxHealth(archetype == 3 ? 150 : (archetype == 2 ? 115 : 90));
@@ -922,10 +923,6 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         {
             chase.SetTarget(localPlayer.transform);
             chase.enabled = false;
-            CreateSphereChild(alien.transform, "S3_GuardEyeLeft", new Vector3(-0.16f, 0.55f, 0.38f),
-                new Vector3(0.13f, 0.13f, 0.08f), cyanGlowMaterial);
-            CreateSphereChild(alien.transform, "S3_GuardEyeRight", new Vector3(0.16f, 0.55f, 0.38f),
-                new Vector3(0.13f, 0.13f, 0.08f), cyanGlowMaterial);
         }
         else
         {
@@ -947,7 +944,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         hostileHealth.Add(health);
     }
 
-    private void BuildAlienCreatureDetails(Transform alien, int archetype, bool guard)
+    private void BuildAlienCreatureDetails(Transform alien, int archetype, bool guard, bool eliteGuard)
     {
         Material chitin = alienBodyMaterials[Mathf.Clamp(archetype - 1, 0, alienBodyMaterials.Length - 1)];
         Material eyes = archetype == 1 ? cyanGlowMaterial
@@ -985,10 +982,13 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         {
             CreateBoxChild(alien, "S3_AlienSentryBackpack", new Vector3(0f, 0.43f, -0.34f),
                 new Vector3(0.38f, 0.50f, 0.20f), silverMaterial);
-            CreateBoxChild(alien, "S3_AlienEnergyRifle", new Vector3(0.29f, 0.16f, 0.53f),
-                new Vector3(0.12f, 0.12f, 0.48f), darkMetalMaterial);
-            CreateSphereChild(alien, "S3_AlienRifleEmitter", new Vector3(0.29f, 0.17f, 0.79f),
-                new Vector3(0.09f, 0.09f, 0.09f), eyes);
+            if (!eliteGuard)
+            {
+                CreateBoxChild(alien, "S3_AlienEnergyRifle", new Vector3(0.47f, 0.06f, 0.45f),
+                    new Vector3(0.10f, 0.10f, 0.44f), darkMetalMaterial);
+                CreateSphereChild(alien, "S3_AlienRifleEmitter", new Vector3(0.47f, 0.07f, 0.70f),
+                    new Vector3(0.07f, 0.07f, 0.07f), eyes);
+            }
         }
         else
         {
