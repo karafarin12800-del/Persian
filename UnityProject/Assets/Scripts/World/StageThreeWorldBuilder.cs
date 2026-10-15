@@ -62,6 +62,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         public int Archetype;
         public TargetHealth Health;
         public Vector3 Heading;
+        public bool ExplosionStarted;
     }
 
     private sealed class GroundAlien
@@ -571,8 +572,18 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int i = 0; i < hovercrafts.Count; i++)
         {
             HovercraftPatrol patrol = hovercrafts[i];
-            if (patrol.Root == null || patrol.Health == null || patrol.Health.CurrentHealth <= 0)
+            if (patrol.Root == null || patrol.Health == null)
                 continue;
+            if (patrol.Health.CurrentHealth <= 0)
+            {
+                if (!patrol.ExplosionStarted)
+                {
+                    patrol.ExplosionStarted = true;
+                    SpawnHovercraftExplosion(patrol.Root.position);
+                    Destroy(patrol.Root.gameObject, 0.30f);
+                }
+                continue;
+            }
 
             float length = Vector3.Distance(patrol.StartPoint, patrol.EndPoint);
             if (length > 0.01f)
@@ -596,6 +607,35 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             patrol.Heading = (patrol.EndPoint - patrol.StartPoint).normalized * patrol.TravelDirection;
             patrol.Root.rotation = Quaternion.LookRotation(patrol.Heading, Vector3.up);
         }
+    }
+
+    private void SpawnHovercraftExplosion(Vector3 position)
+    {
+        GameObject burst = new GameObject("S3_HovercraftExplosion");
+        burst.transform.SetParent(worldRoot, true);
+        burst.transform.position = position;
+        ParticleSystem particles = burst.AddComponent<ParticleSystem>();
+        var main = particles.main;
+        main.duration = 0.42f;
+        main.loop = false;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.85f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(3.5f, 8.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.32f);
+        main.startColor = new ParticleSystem.MinMaxCurve(
+            new Color(0.25f, 0.95f, 1f, 1f), new Color(0.35f, 1f, 0.68f, 0.95f));
+        main.maxParticles = 36;
+        var emission = particles.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 30) });
+        var shape = particles.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.38f;
+        var particleRenderer = particles.GetComponent<ParticleSystemRenderer>();
+        particleRenderer.material = RuntimeMaterialFactory.Create(
+            "S3_HovercraftExplosionMaterial", new Color(0.25f, 0.95f, 1f));
+        particles.Play();
+        Destroy(burst, 1.2f);
+        StartupCheckpoint.Set("StageThreeHovercraftExploded");
     }
 
     private void UpdateHovercraftShooting()
