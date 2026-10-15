@@ -47,7 +47,10 @@ namespace PersiaWar.Unity2D5D
                     GameSession.Instance.AddScore(scoreBonus);
                 }
 
-                SpawnDroppedWeapon(enemy);
+                bool isStageThreeCraft = enemy.gameObject.name.StartsWith(
+                    "S3_HostileHovercraft_", System.StringComparison.Ordinal);
+                if (!isStageThreeCraft)
+                    SpawnDroppedWeapon(enemy);
                 BeginEnemyDeathSequence(enemy);
                 return;
             }
