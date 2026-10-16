@@ -28,6 +28,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     public bool IsCinematic => introRunning;
     public string IntroMessage { get; private set; } = "GREEN UPLINK DETECTED";
+    public string BuildStatus { get; private set; } = "Stage 4: waiting to build orbital megabase...";
     public bool IsBuilt => built;
 
     public static void ClearExistingWorld()
@@ -36,44 +37,132 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         foreach (var b in builders) if (b != null) b.ClearWorld();
     }
 
-    public bool BuildWorld()
+    /// <summary>
+    /// Constructs Stage 4 over multiple frames. Large sets of runtime primitives must
+    /// not all be created in one Android frame, otherwise the battlefield loading UI
+    /// remains frozen for an unbounded-looking time.
+    /// </summary>
+    public IEnumerator BuildWorldRoutine(System.Action<bool> completed)
     {
-        ClearWorld();
-        savedAmbient = RenderSettings.ambientLight;
-        ambientCaptured = true;
-        GameObject oldRoot = GameObject.Find(RootName);
-        if (oldRoot != null) Destroy(oldRoot);
-        GameObject city = GameObject.Find("BattleRoyaleCity");
-        if (city != null) { legacyCity = city.transform; legacyCity.gameObject.SetActive(false); }
+        if (!PrepareWorldBuild())
+        {
+            completed?.Invoke(false);
+            yield break;
+        }
 
-        var go = new GameObject(RootName);
-        go.transform.SetParent(transform, false);
-        root = go.transform;
-        dark = MakeMaterial("S4_ObsidianAlloy", new Color(0.035f, 0.055f, 0.085f));
-        metal = MakeMaterial("S4_BlueTitanium", new Color(0.16f, 0.24f, 0.34f));
-        brightMetal = MakeMaterial("S4_SilverHull", new Color(0.52f, 0.65f, 0.76f));
-        glass = MakeMaterial("S4_DarkGlass", new Color(0.025f, 0.12f, 0.18f), new Color(0.01f, 0.28f, 0.34f));
-        green = MakeMaterial("S4_GreenUplink", new Color(0.12f, 1f, 0.35f), new Color(0.06f, 1f, 0.28f));
-        cyan = MakeMaterial("S4_CyanDockLights", new Color(0.12f, 0.8f, 1f), new Color(0.04f, 0.5f, 1f));
-        floor = MakeMaterial("S4_HangarFloor", new Color(0.085f, 0.11f, 0.15f));
+        System.Exception phaseFailure = null;
+        BuildStatus = "Stage 4: assembling orbital districts...";
+        yield return RunBuildStep(BuildExteriorMegabaseRoutine(), ex => phaseFailure = ex);
+        if (phaseFailure != null)
+        {
+            FailWorldBuild(phaseFailure);
+            completed?.Invoke(false);
+            yield break;
+        }
+
+        BuildStatus = "Stage 4: positioning docked spacecraft...";
+        yield return RunBuildStep(BuildDockedShipsRoutine(), ex => phaseFailure = ex);
+        if (phaseFailure != null)
+        {
+            FailWorldBuild(phaseFailure);
+            completed?.Invoke(false);
+            yield break;
+        }
+
+        BuildStatus = "Stage 4: constructing mothership hangar...";
+        yield return RunBuildStep(BuildMothershipAndInteriorRoutine(), ex => phaseFailure = ex);
+        if (phaseFailure != null)
+        {
+            FailWorldBuild(phaseFailure);
+            completed?.Invoke(false);
+            yield break;
+        }
 
         try
         {
-            BuildExteriorMegabase();
-            BuildDockedShips();
-            BuildMothershipAndInterior();
             BuildGreenUplink();
             BuildLighting();
+            built = true;
+            BuildStatus = "Stage 4: megabase ready; preparing arrival...";
+            StartupCheckpoint.Set("StageFourMegabaseBuilt_CityScaleExteriorAndMothershipInterior");
         }
         catch (System.Exception ex)
         {
-            Debug.LogError("PERSIA_STAGE4: build failed: " + ex);
+            FailWorldBuild(ex);
+            completed?.Invoke(false);
+            yield break;
+        }
+
+        completed?.Invoke(true);
+    }
+
+    private bool PrepareWorldBuild()
+    {
+        try
+        {
             ClearWorld();
+            savedAmbient = RenderSettings.ambientLight;
+            ambientCaptured = true;
+            GameObject oldRoot = GameObject.Find(RootName);
+            if (oldRoot != null) Destroy(oldRoot);
+            GameObject city = GameObject.Find("BattleRoyaleCity");
+            if (city != null) { legacyCity = city.transform; legacyCity.gameObject.SetActive(false); }
+
+            var go = new GameObject(RootName);
+            go.transform.SetParent(transform, false);
+            root = go.transform;
+            dark = MakeMaterial("S4_ObsidianAlloy", new Color(0.035f, 0.055f, 0.085f));
+            metal = MakeMaterial("S4_BlueTitanium", new Color(0.16f, 0.24f, 0.34f));
+            brightMetal = MakeMaterial("S4_SilverHull", new Color(0.52f, 0.65f, 0.76f));
+            glass = MakeMaterial("S4_DarkGlass", new Color(0.025f, 0.12f, 0.18f), new Color(0.01f, 0.28f, 0.34f));
+            green = MakeMaterial("S4_GreenUplink", new Color(0.12f, 1f, 0.35f), new Color(0.06f, 1f, 0.28f));
+            cyan = MakeMaterial("S4_CyanDockLights", new Color(0.12f, 0.8f, 1f), new Color(0.04f, 0.5f, 1f));
+            floor = MakeMaterial("S4_HangarFloor", new Color(0.085f, 0.11f, 0.15f));
+            return true;
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError("PERSIA_STAGE4: build initialization failed: " + ex);
+            FailWorldBuild(ex);
             return false;
         }
-        built = true;
-        StartupCheckpoint.Set("StageFourMegabaseBuilt_CityScaleExteriorAndMothershipInterior");
-        return true;
+    }
+
+    // Iterator exception handling is isolated from yield statements so Unity can
+    // report a failed phase instead of leaving the generic loading panel indefinitely.
+    private IEnumerator RunBuildStep(IEnumerator step, System.Action<System.Exception> onError)
+    {
+        while (true)
+        {
+            bool moved = false;
+            object current = null;
+            System.Exception failure = null;
+            try
+            {
+                moved = step.MoveNext();
+                if (moved) current = step.Current;
+            }
+            catch (System.Exception ex)
+            {
+                failure = ex;
+            }
+
+            if (failure != null)
+            {
+                onError?.Invoke(failure);
+                yield break;
+            }
+            if (!moved) yield break;
+            yield return current;
+        }
+    }
+
+    private void FailWorldBuild(System.Exception ex)
+    {
+        Debug.LogError("PERSIA_STAGE4: world build failed: " + ex);
+        StartupCheckpoint.Set("StageFourWorldBuildFailed_" + ex.GetType().Name);
+        BuildStatus = "Stage 4 construction failed. Returning to menu...";
+        ClearWorld();
     }
 
     public void ConfigurePlayer(PlayerController p, Camera cam)
@@ -180,7 +269,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         StartupCheckpoint.Set("StageFourArrivalCinematicComplete_PlayerInsideMothership");
     }
 
-    private void BuildExteriorMegabase()
+    private IEnumerator BuildExteriorMegabaseRoutine()
     {
         // A broad orbital platform suggests a city-scale base (not a small station).
         Box("S4_OrbitalFoundation", new Vector3(0f, -22f, 120f), new Vector3(980f, 36f, 980f), dark);
@@ -199,6 +288,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
                 Box("S4_DistrictLight_" + x + "_" + z + "_" + w,
                     new Vector3(px + w * 12f, h + 0.15f, pz - 25f),
                     new Vector3(3.2f, 0.7f, 0.5f), cyan);
+            if (z == 4) yield return null; // keep Android rendering responsive during district generation
         }
         for (int arm = 0; arm < 8; arm++)
         {
@@ -212,6 +302,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
                 Box("S4_DockRunwayLight_" + arm + "_" + light,
                     pos + dir * (60f + (light + 3) * 20f) + Vector3.up * 15f + Vector3.right * light * 7f,
                     new Vector3(3f, 1f, 3f), green);
+            yield return null;
         }
         // Ring pylons are tall enough to read in the far establishing shot.
         for (int i = 0; i < 24; i++)
@@ -220,10 +311,11 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             Vector3 p = new Vector3(Mathf.Cos(a) * 430f, 48f, 120f + Mathf.Sin(a) * 430f);
             Box("S4_RingPylon_" + i, p, new Vector3(18f, 92f + (i % 3) * 22f, 18f), brightMetal);
             Box("S4_RingPylonBeacon_" + i, p + Vector3.up * 55f, new Vector3(5f, 3f, 5f), cyan);
+            if (i % 3 == 2) yield return null;
         }
     }
 
-    private void BuildDockedShips()
+    private IEnumerator BuildDockedShipsRoutine()
     {
         // Sixteen visibly distinct docked craft attached to the perimeter docks.
         for (int i = 0; i < 16; i++)
@@ -232,10 +324,11 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
             Vector3 p = new Vector3(dir.x * 360f, 19f + (i % 3) * 8f, 120f + dir.z * 360f);
             BuildShip("S4_DockedShip_" + i, p, Quaternion.LookRotation(dir), 0.78f + (i % 4) * 0.16f);
+            yield return null;
         }
     }
 
-    private void BuildMothershipAndInterior()
+    private IEnumerator BuildMothershipAndInteriorRoutine()
     {
         // Central mothership hull and bridge crown, with an open, playable interior.
         Box("S4_MothershipKeel", new Vector3(0f, 12f, 120f), new Vector3(210f, 26f, 320f), dark);
@@ -257,6 +350,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             Box("S4_HangarFloorStripe_" + i, new Vector3(i * 8f, 0.04f, 3f),
                 new Vector3(0.55f, 0.08f, 70f), i == 0 ? green : cyan);
         }
+        yield return null;
         for (int i = 0; i < 6; i++)
         {
             float z = -32f + i * 13f;
@@ -264,6 +358,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             Box("S4_InteriorPillarR_" + i, new Vector3(39f, 6.5f, z), new Vector3(3f, 13f, 3f), brightMetal);
             Box("S4_InteriorPanelL_" + i, new Vector3(-37f, 7f, z), new Vector3(0.5f, 4f, 5f), green);
             Box("S4_InteriorPanelR_" + i, new Vector3(37f, 7f, z), new Vector3(0.5f, 4f, 5f), cyan);
+            yield return null;
         }
         // Side passages give the hangar a sense of depth and scale.
         Box("S4_InteriorSideHallL", new Vector3(-68f, 0f, 0f), new Vector3(42f, 0.5f, 24f), floor);
