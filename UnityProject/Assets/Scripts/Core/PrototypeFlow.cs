@@ -2250,28 +2250,56 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("StageFourWorldBuildStarted");
                 bool stageFourBuildCompleted = false;
                 bool stageFourBuildSucceeded = false;
-                StartCoroutine(stageFourWorldBuilder.BuildWorldRoutine(success =>
+                float stageFourBuildStartedAt = Time.realtimeSinceStartup;
+                const float stageFourBuildTimeoutSeconds = 60f;
+                Coroutine stageFourBuildCoroutine = StartCoroutine(stageFourWorldBuilder.BuildWorldRoutine(success =>
                 {
                     stageFourBuildSucceeded = success;
                     stageFourBuildCompleted = true;
                 }));
 
                 // Keep the loading presentation responsive while the megabase is
-                // generated in batches across frames instead of blocking Android.
+                // generated in batches. Never wait forever if Unity stops the child
+                // coroutine or a device-specific runtime exception interrupts it.
+                if (stageFourBuildCoroutine == null)
+                {
+                    stageFourBuildCompleted = true;
+                    stageFourBuildSucceeded = false;
+                    StartupCheckpoint.Set("StageFourBuildCoroutineFailedToStart");
+                }
+
                 while (!stageFourBuildCompleted)
                 {
-                    startupStatus = stageFourWorldBuilder != null
-                        ? stageFourWorldBuilder.BuildStatus
-                        : "Stage 4: waiting for world builder...";
+                    if (stageFourWorldBuilder == null)
+                    {
+                        stageFourBuildCompleted = true;
+                        stageFourBuildSucceeded = false;
+                        StartupCheckpoint.Set("StageFourBuilderLostDuringBuild");
+                        break;
+                    }
+
+                    startupStatus = stageFourWorldBuilder.BuildStatus;
+                    if (Time.realtimeSinceStartup - stageFourBuildStartedAt >= stageFourBuildTimeoutSeconds)
+                    {
+                        StopCoroutine(stageFourBuildCoroutine);
+                        stageFourWorldBuilder.AbortBuild("Stage 4 world construction exceeded 60 seconds.");
+                        stageFourBuildCompleted = true;
+                        stageFourBuildSucceeded = false;
+                        StartupCheckpoint.Set("StageFourBuildTimedOut_60Seconds");
+                        break;
+                    }
                     yield return null;
                 }
 
                 if (!stageFourBuildSucceeded)
                 {
-                    startupStatus = "Stage 4 construction failed. Returning to menu...";
+                    startupStatus = stageFourWorldBuilder != null
+                        ? stageFourWorldBuilder.BuildStatus
+                        : "Stage 4 builder stopped unexpectedly.";
                     StartupCheckpoint.Set("StageFourWorldBuildFailed");
                     startingMatch = false;
                     mode = ScreenMode.MainMenu;
+                    ShowLobbyNotice("STAGE 4 LOAD FAILED. PLEASE TRY AGAIN.");
                     yield break;
                 }
                 StartupCheckpoint.Set("StageFourWorldBuildCompleted");
