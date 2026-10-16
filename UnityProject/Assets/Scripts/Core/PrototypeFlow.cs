@@ -2246,15 +2246,35 @@ namespace PersiaWar.Unity2D5D
                     stageFourWorldBuilder = gameRoot.AddComponent<StageFourWorldBuilder>();
                 if (GameSession.Instance != null)
                     GameSession.Instance.ResetMatch();
-                startupStatus = "Stage 4: constructing the orbital megabase and mothership interior...";
-                if (!stageFourWorldBuilder.BuildWorld())
+                startupStatus = "Stage 4: starting orbital megabase construction...";
+                StartupCheckpoint.Set("StageFourWorldBuildStarted");
+                bool stageFourBuildCompleted = false;
+                bool stageFourBuildSucceeded = false;
+                StartCoroutine(stageFourWorldBuilder.BuildWorldRoutine(success =>
                 {
-                    startupStatus = "Stage 4 world construction failed.";
+                    stageFourBuildSucceeded = success;
+                    stageFourBuildCompleted = true;
+                }));
+
+                // Keep the loading presentation responsive while the megabase is
+                // generated in batches across frames instead of blocking Android.
+                while (!stageFourBuildCompleted)
+                {
+                    startupStatus = stageFourWorldBuilder != null
+                        ? stageFourWorldBuilder.BuildStatus
+                        : "Stage 4: waiting for world builder...";
+                    yield return null;
+                }
+
+                if (!stageFourBuildSucceeded)
+                {
+                    startupStatus = "Stage 4 construction failed. Returning to menu...";
                     StartupCheckpoint.Set("StageFourWorldBuildFailed");
                     startingMatch = false;
                     mode = ScreenMode.MainMenu;
                     yield break;
                 }
+                StartupCheckpoint.Set("StageFourWorldBuildCompleted");
             }
             else
             {
