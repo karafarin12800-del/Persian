@@ -165,6 +165,19 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         ClearWorld();
     }
 
+    /// <summary>
+    /// Explicit recovery path for a build coroutine that stops making progress.
+    /// The menu flow owns the timeout so a failed Stage 4 load can never trap the
+    /// player on the loading screen indefinitely.
+    /// </summary>
+    public void AbortBuild(string reason)
+    {
+        var timeout = new System.TimeoutException(string.IsNullOrEmpty(reason)
+            ? "Stage 4 world construction timed out."
+            : reason);
+        FailWorldBuild(timeout);
+    }
+
     public void ConfigurePlayer(PlayerController p, Camera cam)
     {
         controller = p;
