@@ -23,6 +23,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private Color savedBackground;
     private CameraClearFlags savedClearFlags;
     private Transform legacyCity;
+    private Color savedAmbient;
+    private bool ambientCaptured;
 
     public bool IsCinematic => introRunning;
     public string IntroMessage { get; private set; } = "GREEN UPLINK DETECTED";
@@ -37,6 +39,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     public bool BuildWorld()
     {
         ClearWorld();
+        savedAmbient = RenderSettings.ambientLight;
+        ambientCaptured = true;
         GameObject oldRoot = GameObject.Find(RootName);
         if (oldRoot != null) Destroy(oldRoot);
         GameObject city = GameObject.Find("BattleRoyaleCity");
@@ -135,6 +139,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         while (t < 5.2f)
         {
             t += Time.unscaledDeltaTime;
+            if (greenBeam != null)
+            {
+                float beamHeight = Mathf.Lerp(0.1f, 280f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 1.8f)));
+                greenBeam.position = new Vector3(0f, beamHeight, 120f);
+                greenBeam.localScale = new Vector3(15f, beamHeight, 15f);
+            }
             float a = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 5.2f));
             gameplayCamera.transform.position = Vector3.Lerp(farPos, nearPos, a);
             Vector3 target = Vector3.Lerp(stationCenter, new Vector3(0f, 4f, 22f), a);
@@ -270,8 +280,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         var beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         beam.name = "S4_GreenUplinkSkyColumn";
         beam.transform.SetParent(root, false);
-        beam.transform.position = new Vector3(0f, 280f, 120f);
-        beam.transform.localScale = new Vector3(15f, 280f, 15f);
+        beam.transform.position = new Vector3(0f, 0.1f, 120f);
+        beam.transform.localScale = new Vector3(15f, 0.1f, 15f);
         beam.GetComponent<Renderer>().sharedMaterial = green;
         Collider c = beam.GetComponent<Collider>(); if (c != null) Destroy(c);
         greenBeam = beam.transform;
@@ -357,6 +367,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             if (city != null) legacyCity = city.transform;
         }
         if (legacyCity != null && legacyCity.gameObject != null) legacyCity.gameObject.SetActive(true);
+        if (ambientCaptured) { RenderSettings.ambientLight = savedAmbient; ambientCaptured = false; }
         if (gameplayCamera != null)
         {
             gameplayCamera.farClipPlane = savedFarClip > 0f ? savedFarClip : gameplayCamera.farClipPlane;
