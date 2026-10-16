@@ -699,13 +699,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             Vector3 origin = craft.Root.position + craft.Heading * 1.7f + Vector3.up * 0.12f;
             Vector3 direction = localPlayer.transform.position + Vector3.up * 0.88f - origin;
             float distance = direction.magnitude;
-            if (distance < 0.01f || distance > 72f)
+            // Craft fire is a mid-range threat; it must not snipe the player
+            // from the opposite side of the map.
+            if (distance < 0.01f || distance > 28f)
             {
-                craft.NextShotTime = Time.time + 0.65f;
+                craft.NextShotTime = Time.time + 0.9f;
                 continue;
             }
-            CreateHostileProjectile(origin, direction.normalized, craft.Root, 10, 72f, warningMaterial);
-            craft.NextShotTime = Time.time + 2.25f + craft.Archetype * 0.25f;
+            CreateHostileProjectile(origin, direction.normalized, craft.Root, 6, 30f, warningMaterial);
+            craft.NextShotTime = Time.time + 3.0f + craft.Archetype * 0.35f;
             StartupCheckpoint.Set("StageThreeHovercraftFiredAtPilot");
         }
     }
@@ -729,8 +731,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 Time.time < craft.NextDamageTime)
                 continue;
 
-            localPlayer.ReceiveDamage(12);
-            craft.NextDamageTime = Time.time + 1.4f;
+            // Collision damage is a close-range scrape, not a one-touch kill.
+            localPlayer.ReceiveDamage(7);
+            craft.NextDamageTime = Time.time + 1.8f;
             StartupCheckpoint.Set("StageThreeHovercraftThreatHit");
         }
     }
@@ -1144,7 +1147,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (direction.sqrMagnitude < 0.01f)
                 continue;
             float distance = direction.magnitude;
-            float maxRange = alien.UpperPatrol ? 82f : 62f;
+            // Keep alien fire within a readable combat distance. The old 62-82m
+            // ranges let multiple squads focus-fire the player from across the map.
+            float maxRange = alien.UpperPatrol ? 24f : 18f;
             if (distance > maxRange)
             {
                 alien.NextShotTime = Time.time + 0.7f;
@@ -1153,13 +1158,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
             if (alien.UpperPatrol)
             {
-                CreateHostileProjectile(origin, direction.normalized, alien.Root, 16, 86f, greenGlowMaterial);
-                alien.NextShotTime = Time.time + 1.65f + (alien.Archetype - 1) * 0.18f;
+                // Elite guards still hit harder, but slower and only at close-mid range.
+                CreateHostileProjectile(origin, direction.normalized, alien.Root, 6, 27f, greenGlowMaterial);
+                alien.NextShotTime = Time.time + 3.0f + (alien.Archetype - 1) * 0.35f;
             }
             else
             {
-                CreateHostileProjectile(origin, direction.normalized, alien.Root, 9, 62f, warningMaterial);
-                alien.NextShotTime = Time.time + 2.25f + (alien.Archetype - 1) * 0.30f;
+                // Standard sentries are a low-pressure threat rather than a long-range sniper.
+                CreateHostileProjectile(origin, direction.normalized, alien.Root, 4, 20f, warningMaterial);
+                alien.NextShotTime = Time.time + 3.4f + (alien.Archetype - 1) * 0.45f;
             }
         }
     }
