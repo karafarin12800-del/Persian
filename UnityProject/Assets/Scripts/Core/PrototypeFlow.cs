@@ -909,7 +909,7 @@ namespace PersiaWar.Unity2D5D
             if (stageTestRun)
                 RestoreCampaignProgressAfterTest();
 
-            if (stageNumber > 3)
+            if (stageNumber > 4)
             {
                 ShowLobbyNotice("NO FURTHER STAGE IS AVAILABLE YET.");
                 return;
@@ -2007,7 +2007,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (!spawnChosen || startingMatch || stageTwoLobbyRunning)
                 return;
-            if (stageNumber > 3)
+            if (stageNumber > 4)
             {
                 ShowLobbyNotice("NO FURTHER STAGE IS AVAILABLE YET.");
                 mode = ScreenMode.MainMenu;
@@ -2418,6 +2418,8 @@ namespace PersiaWar.Unity2D5D
                 return;
             if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
                 return;
+            if (stageNumber == 4 && stageFourWorldBuilder != null && stageFourWorldBuilder.IsCinematic)
+                return;
 
 #if UNITY_ANDROID
             if (androidRuntimeCamera == null || player == null)
@@ -2590,7 +2592,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                if (stageNumber == 3)
+                if (stageNumber == 3 || stageNumber == 4)
                 {
                     enemySpawner.enabled = false;
                 }
@@ -2639,7 +2641,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null)
             {
-                if (stageNumber == 3)
+                if (stageNumber == 3 || stageNumber == 4)
                 {
                     enemySpawner.enabled = false;
                 }
