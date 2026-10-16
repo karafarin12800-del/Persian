@@ -104,10 +104,14 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private void Update()
     {
-        if (introRunning && gameplayCamera != null && player != null)
+        if (!introRunning) return;
+        // Match-service startup can re-enable the player while the cutscene is running;
+        // keep controls gated until the green-beam arrival finishes.
+        if (controller != null)
         {
-            // Keep the camera animation smooth even when the gameplay follow camera
-            // has been gated during match activation.
+            controller.SetMovementEnabled(false);
+            if (controller.Weapon != null) controller.Weapon.enabled = false;
+            if (controller.Aim != null) controller.Aim.enabled = false;
         }
     }
 
