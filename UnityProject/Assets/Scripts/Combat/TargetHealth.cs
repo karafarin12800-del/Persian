@@ -47,7 +47,10 @@ namespace PersiaWar.Unity2D5D
                     GameSession.Instance.AddScore(scoreBonus);
                 }
 
-                SpawnDroppedWeapon(enemy);
+                bool isStageThreeCraft = enemy.gameObject.name.StartsWith(
+                    "S3_HostileHovercraft_", System.StringComparison.Ordinal);
+                if (!isStageThreeCraft)
+                    SpawnDroppedWeapon(enemy);
                 BeginEnemyDeathSequence(enemy);
                 return;
             }
@@ -58,9 +61,12 @@ namespace PersiaWar.Unity2D5D
         private void BeginEnemyDeathSequence(EnemyChase enemy)
         {
             Vector3 deathPosition = enemy != null ? enemy.transform.position : transform.position;
+            bool deferCraftRemoval = enemy != null &&
+                enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal);
             if (enemy != null)
             {
-                // Disable combat and collision, but keep the rendered body visible while it falls.
+                // Disable combat and collision immediately, but let StageThreeWorldBuilder
+                // handle the craft's explosion and three-second grounded wreck lifetime.
                 enemy.enabled = false;
                 Collider[] colliders = enemy.GetComponentsInChildren<Collider>();
                 for (int i = 0; i < colliders.Length; i++)
@@ -70,10 +76,23 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < behaviours.Length; i++)
                     if (behaviours[i] != null && behaviours[i] != this) behaviours[i].enabled = false;
 
-                StartCoroutine(FallAndRemoveEnemy(enemy.transform));
+                if (!deferCraftRemoval)
+                    StartCoroutine(FallAndRemoveEnemy(enemy.transform));
             }
 
-            SpawnBloodEffect(deathPosition);
+            // Alien bodies in Stage 3 use a falling-removal animation, not the
+            // six-mesh blood pool used by human enemies. Avoid hundreds of
+            // short-lived primitives/materials accumulating during the long wave.
+            bool isStageThreeAlien = enemy != null &&
+                enemy.gameObject.name.StartsWith("S3_Alien", System.StringComparison.Ordinal);
+            bool isStageThreeCraft = enemy != null &&
+                (enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal) ||
+                 enemy.gameObject.name.StartsWith("S3_DestroyedHovercraftWreck", System.StringComparison.Ordinal));
+
+            // All Stage 3 hostiles are extraterrestrial: no blood pools or blood
+            // particles for aliens or their spacecraft.
+            if (!isStageThreeAlien && !isStageThreeCraft)
+                SpawnBloodEffect(deathPosition);
         }
 
         private System.Collections.IEnumerator FallAndRemoveEnemy(Transform body)

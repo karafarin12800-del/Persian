@@ -46,6 +46,8 @@ namespace PersiaWar.Unity2D5D
         private readonly List<ActorState> actors = new List<ActorState>();
         private readonly List<Material> effectMaterials = new List<Material>();
         private Transform shipRoot;
+        private static Transform retainedStageThreeShip;
+        private bool preserveShipForStageThree;
         private Camera cinematicCamera;
         private Vector3 originalCameraPosition;
         private Quaternion originalCameraRotation;
@@ -82,6 +84,25 @@ namespace PersiaWar.Unity2D5D
 
         public bool IsRunning { get; private set; }
         public bool IsComplete { get; private set; }
+
+        /// <summary>
+        /// Preserve the exact evacuation ship instance from Stage 2 so Stage 3 can
+        /// bring it back down from orbit and let the player disembark.
+        /// </summary>
+        public void PreserveShipForStageThree()
+        {
+            if (shipRoot != null)
+                preserveShipForStageThree = true;
+        }
+
+        public static Transform TakeRetainedShipForStageThree()
+        {
+            Transform ship = retainedStageThreeShip;
+            retainedStageThreeShip = null;
+            if (ship != null)
+                ship.gameObject.SetActive(true);
+            return ship;
+        }
         public SequencePhase Phase { get; private set; } = SequencePhase.Idle;
         public float FlashAlpha
         {
@@ -978,10 +999,36 @@ namespace PersiaWar.Unity2D5D
 
             if (greenSparks != null) Destroy(greenSparks.gameObject);
             if (whiteSparks != null) Destroy(whiteSparks.gameObject);
-            if (shipRoot != null) Destroy(shipRoot.gameObject);
-            if (hullMaterial != null) Destroy(hullMaterial);
-            if (darkMaterial != null) Destroy(darkMaterial);
-            if (cyanMaterial != null) Destroy(cyanMaterial);
+            // The decloak rings belong to the ship hierarchy; remove them before
+            // handing the same ship instance to Stage 3.
+            if (greenRing != null) Destroy(greenRing.gameObject);
+            if (whiteRing != null) Destroy(whiteRing.gameObject);
+
+            if (shipRoot != null)
+            {
+                if (preserveShipForStageThree)
+                {
+                    if (retainedStageThreeShip != null && retainedStageThreeShip != shipRoot)
+                        Destroy(retainedStageThreeShip.gameObject);
+                    shipRoot.SetParent(null, true);
+                    shipRoot.name = "StageThreeEntryTransportShip";
+                    shipRoot.gameObject.SetActive(false);
+                    retainedStageThreeShip = shipRoot;
+                }
+                else
+                {
+                    Destroy(shipRoot.gameObject);
+                }
+            }
+
+            // Ship materials remain alive only when the exact ship is being passed
+            // into Stage 3. All cutscene-only materials are still released.
+            if (!preserveShipForStageThree)
+            {
+                if (hullMaterial != null) Destroy(hullMaterial);
+                if (darkMaterial != null) Destroy(darkMaterial);
+                if (cyanMaterial != null) Destroy(cyanMaterial);
+            }
             for (int i = 0; i < effectMaterials.Count; i++)
                 if (effectMaterials[i] != null) Destroy(effectMaterials[i]);
             effectMaterials.Clear();

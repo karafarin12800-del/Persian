@@ -12,6 +12,8 @@ namespace PersiaWar.Unity2D5D
         private float remainingLife;
         private Transform owner;
         private float remainingDistance;
+        private bool impactResolved;
+        private static readonly RaycastHit[] SweepHitBuffer = new RaycastHit[96];
 
         public void SetDefaults(float projectileSpeed, float projectileLifetime, int projectileDamage)
         {
@@ -30,6 +32,7 @@ namespace PersiaWar.Unity2D5D
             direction = worldDirection.normalized;
             remainingLife = lifetime;
             remainingDistance = Mathf.Max(0f, speed * lifetime);
+            impactResolved = false;
 
             if (direction.sqrMagnitude > 0.001f)
                 transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
@@ -37,6 +40,7 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (impactResolved) return;
             float step = Mathf.Min(speed * Time.deltaTime, remainingDistance);
 
             if (step <= 0.001f || remainingDistance <= 0.001f)
@@ -58,55 +62,63 @@ namespace PersiaWar.Unity2D5D
 
         private bool TryResolveSweep(float distance)
         {
-            RaycastHit[] hits = Physics.SphereCastAll(
-                transform.position,
-                0.12f,
-                direction,
-                distance,
-                ~0,
+            int hitCount = Physics.SphereCastNonAlloc(
+                transform.position, 0.12f, direction, SweepHitBuffer, distance, ~0,
                 QueryTriggerInteraction.Collide);
-
-            if (hits == null || hits.Length == 0)
+            if (hitCount <= 0)
                 return false;
 
-            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-
-            foreach (RaycastHit hit in hits)
+            // Sort only the populated prefix of a reusable buffer. SphereCastAll
+            // allocated a new array for every projectile on every frame.
+            for (int i = 1; i < hitCount; i++)
             {
-                Collider collider = hit.collider;
+                RaycastHit key = SweepHitBuffer[i];
+                int j = i - 1;
+                while (j >= 0 && SweepHitBuffer[j].distance > key.distance)
+                {
+                    SweepHitBuffer[j + 1] = SweepHitBuffer[j];
+                    j--;
+                }
+                SweepHitBuffer[j + 1] = key;
+            }
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider collider = SweepHitBuffer[i].collider;
                 if (collider == null)
                     continue;
-
                 if (owner != null &&
                     (collider.transform == owner || collider.transform.IsChildOf(owner)))
                     continue;
-
                 if (collider.GetComponentInParent<Projectile>() != null ||
                     collider.GetComponentInParent<EnemyProjectile>() != null)
                     continue;
-
-                PlayerController player = collider.GetComponentInParent<PlayerController>();
-                if (player != null)
+                if (collider.GetComponentInParent<PlayerController>() != null)
                     continue;
 
+                impactResolved = true;
                 TargetHealth target = collider.GetComponentInParent<TargetHealth>();
                 if (target != null && target.GetComponentInParent<EnemyChase>() != null)
-                {
-                    target.ApplyDamage(damage, owner);
-                    Destroy(gameObject);
-                    return true;
-                }
-
+                    target.ApplyDamage(GetDamageForTarget(target), owner);
                 Destroy(gameObject);
                 return true;
             }
-
             return false;
+        }
+
+        private int GetDamageForTarget(TargetHealth target)
+        {
+            // Treat each successful bullet impact as one quarter of a Stage 3
+            // transport's life, even when the player changes weapon profiles.
+            if (target != null && target.gameObject.name.StartsWith(
+                "S3_HostileHovercraft_", System.StringComparison.Ordinal))
+                return Mathf.Max(1, Mathf.CeilToInt(target.MaxHealth / 4f));
+            return damage;
         }
 
         private void OnTriggerEnter(Collider other)
         {
-            if (other == null)
+            if (impactResolved || other == null)
                 return;
 
             if (owner != null &&
@@ -118,9 +130,10 @@ namespace PersiaWar.Unity2D5D
                 other.GetComponentInParent<EnemyProjectile>() != null)
                 return;
 
+            impactResolved = true;
             TargetHealth target = other.GetComponentInParent<TargetHealth>();
             if (target != null && target.GetComponentInParent<EnemyChase>() != null)
-                target.ApplyDamage(damage, owner);
+                target.ApplyDamage(GetDamageForTarget(target), owner);
 
             Destroy(gameObject);
         }
