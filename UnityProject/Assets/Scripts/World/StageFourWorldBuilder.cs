@@ -291,7 +291,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             new Vector3(275f, 240f, 60f),  // dive along the right side of the mothership
             new Vector3(190f, 75f, -60f),  // arc around the starboard aft quarter
             new Vector3(65f, 25f, -67f),   // line up with the rear hangar entrance
-            new Vector3(30f, 12f, -38f),   // descend through the hangar opening
+            new Vector3(0f, 12f, -42f),   // align with the centered rear doorway
             new Vector3(0f, 5.7f, -18.5f)  // settle behind the player
         };
         Vector3[] lookPath =
