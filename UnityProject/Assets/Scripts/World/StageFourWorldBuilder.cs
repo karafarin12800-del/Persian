@@ -276,7 +276,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             new Vector3(0f, 390f, 730f),
             new Vector3(0f, 145f, 390f),
             new Vector3(0f, 48f, 225f),
-            new Vector3(0f, 16f, 92f),
+            new Vector3(0f, 12f, 92f),
             new Vector3(0f, 8f, 20f)
         };
         Vector3[] lookPath =
