@@ -21,6 +21,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private Transform impactPulse;
     private Transform interiorTransferPulse;
     private readonly List<EnemyChase> interiorHostiles = new List<EnemyChase>();
+    private readonly List<Transform> escapeShuttles = new List<Transform>();
     private Material dark, metal, brightMetal, glass, green, cyan, floor, planetSurface, planetLand;
     private Material alienArmor, alienDark, alienEye;
     private bool built, introRunning;
@@ -37,6 +38,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     public string IntroMessage { get; private set; } = "GREEN UPLINK DETECTED";
     public string BuildStatus { get; private set; } = "Stage 4: waiting to build orbital megabase...";
     public bool IsBuilt => built;
+    public int DockedEscapeShuttleCount => escapeShuttles.Count;
+    public Transform GetDockedEscapeShuttle(int index) =>
+        index >= 0 && index < escapeShuttles.Count ? escapeShuttles[index] : null;
     public int TotalHostiles => interiorHostiles.Count;
     public int RemainingHostiles
     {
@@ -246,14 +250,25 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private void Update()
     {
-        if (!introRunning) return;
-        // Match-service startup can re-enable the player while the cutscene is running;
-        // keep controls gated until the green-beam arrival finishes.
-        if (controller != null)
+        if (introRunning)
         {
-            controller.SetMovementEnabled(false);
-            if (controller.Weapon != null) controller.Weapon.enabled = false;
-            if (controller.Aim != null) controller.Aim.enabled = false;
+            if (controller != null)
+            {
+                controller.SetMovementEnabled(false);
+                if (controller.Weapon != null) controller.Weapon.enabled = false;
+                if (controller.Aim != null) controller.Aim.enabled = false;
+            }
+            return;
+        }
+
+        // Defend against a late match-start callback re-gating Stage 4 movement after
+        // the cutscene. Do not interfere with defeat handling or a new cinematic.
+        if (built && controller != null && !controller.IsDefeated &&
+            !controller.IsMovementEnabled && Time.time > 1f)
+        {
+            controller.enabled = true;
+            controller.SetMovementEnabled(true);
+            StartupCheckpoint.Set("StageFourMovementWatchdogRearmed");
         }
     }
 
@@ -447,32 +462,55 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private IEnumerator BuildDockedShipsRoutine()
     {
-        // Sixteen small spacecraft sit along docking collars on the mothership's arms.
-        for (int i = 0; i < 16; i++)
+        // Exactly eight escape shuttles dock directly to the port and starboard rails.
+        escapeShuttles.Clear();
+        int shuttleIndex = 0;
+        for (int sideIndex = 0; sideIndex < 2; sideIndex++)
         {
-            float a = i * Mathf.PI * 2f / 16f;
-            Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-            Vector3 p = dir * (212f + (i % 2) * 12f) + Vector3.up * (17f + (i % 3) * 5f);
-            BuildShip("S4_DockedShip_" + i, p, Quaternion.LookRotation(dir), 0.78f + (i % 4) * 0.16f);
-            yield return null;
+            int side = sideIndex == 0 ? -1 : 1;
+            for (int berth = 0; berth < 4; berth++)
+            {
+                float z = -94f + berth * 62.5f;
+                float y = 16f + ((berth + sideIndex) % 3) * 2.4f;
+                Vector3 outward = new Vector3(side, 0f, 0f);
+                Vector3 shuttlePosition = new Vector3(side * 133f, y, z);
+                CreateVisualCylinder("S4_EscapeShuttleDockTube_" + shuttleIndex,
+                    new Vector3(side * 113f, y, z), outward, 30f, 2.7f,
+                    shuttleIndex % 2 == 0 ? brightMetal : metal);
+                Box("S4_EscapeShuttleDockCollar_" + shuttleIndex,
+                    new Vector3(side * 102f, y, z), new Vector3(9f, 5f, 13f),
+                    cyan, Quaternion.Euler(0f, side * 90f, 0f));
+
+                GameObject shuttle = BuildShip("S4_MothershipEscapeShuttle_" + shuttleIndex,
+                    shuttlePosition, Quaternion.LookRotation(outward, Vector3.up),
+                    0.58f + ((berth + sideIndex) % 3) * 0.045f);
+                if (shuttle != null) escapeShuttles.Add(shuttle.transform);
+                shuttleIndex++;
+                yield return null;
+            }
         }
+        StartupCheckpoint.Set("StageFourEightDockedEscapeShuttlesReady");
     }
 
     private IEnumerator BuildMothershipAndInteriorRoutine()
     {
+        BuildMothershipCoreAssembly();
+
         // Layered outer shell around a hollow playable vessel; only room geometry collides.
-        Box("S4_MothershipKeel", new Vector3(0f, -3.9f, 0f), new Vector3(28f, 7.5f, 278f), dark);
-        // Leave a 30m-wide dorsal insertion bay over the corridor. The hull is built
-        // as port/starboard wings so the camera and uplink can enter without clipping
-        // through a solid slab; glowing bay lips frame the opening from outside.
-        Box("S4_MothershipUpperHullPortWing", new Vector3(-46f, 21f, 0f), new Vector3(62f, 10f, 264f), brightMetal);
-        Box("S4_MothershipUpperHullStarboardWing", new Vector3(46f, 21f, 0f), new Vector3(62f, 10f, 264f), brightMetal);
+        Box("S4_MothershipKeel", new Vector3(0f, -3.9f, 0f), new Vector3(24f, 7f, 278f), dark);
+        // Segmented port/starboard plating narrows toward both the bow and aft end.
+        Box("S4_MothershipMidHullPort", new Vector3(-44f, 21f, -2f), new Vector3(58f, 10f, 142f), brightMetal);
+        Box("S4_MothershipMidHullStarboard", new Vector3(44f, 21f, -2f), new Vector3(58f, 10f, 142f), brightMetal);
+        Box("S4_MothershipBowHullPort", new Vector3(-30f, 19.5f, 91f), new Vector3(34f, 8f, 66f), brightMetal);
+        Box("S4_MothershipBowHullStarboard", new Vector3(30f, 19.5f, 91f), new Vector3(34f, 8f, 66f), brightMetal);
+        Box("S4_MothershipAftHullPort", new Vector3(-28f, 18.5f, -93f), new Vector3(30f, 7f, 62f), metal);
+        Box("S4_MothershipAftHullStarboard", new Vector3(28f, 18.5f, -93f), new Vector3(30f, 7f, 62f), metal);
         Box("S4_MothershipDorsalBayLipPort", new Vector3(-13f, 18f, 64f), new Vector3(4f, 3f, 130f), metal);
         Box("S4_MothershipDorsalBayLipStarboard", new Vector3(13f, 18f, 64f), new Vector3(4f, 3f, 130f), metal);
-        Box("S4_MothershipPortHull", new Vector3(-102f, 8.5f, 0f), new Vector3(12f, 17f, 270f), dark);
-        Box("S4_MothershipStarboardHull", new Vector3(102f, 8.5f, 0f), new Vector3(12f, 17f, 270f), dark);
-        Box("S4_MothershipProwArmor", new Vector3(0f, 9f, 139f), new Vector3(190f, 18f, 12f), metal);
-        Box("S4_MothershipAftArmor", new Vector3(0f, 8f, -139f), new Vector3(190f, 16f, 12f), metal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipPortKeelPod", new Vector3(-91f, 11f, 0f), new Vector3(20f, 13f, 245f), dark);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipStarboardKeelPod", new Vector3(91f, 11f, 0f), new Vector3(20f, 13f, 245f), dark);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipProwArmor", new Vector3(0f, 11f, 137f), new Vector3(56f, 12f, 33f), metal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipAftArmor", new Vector3(0f, 10f, -137f), new Vector3(58f, 12f, 31f), metal);
         Box("S4_MothershipBridge", new Vector3(0f, 38f, 57f), new Vector3(86f, 18f, 56f), metal);
         Box("S4_MothershipBridgeGlass", new Vector3(0f, 39f, 87f), new Vector3(68f, 10f, 18f), glass);
         Box("S4_MothershipBridgePortFin", new Vector3(-52f, 31f, 62f), new Vector3(20f, 9f, 58f), brightMetal);
@@ -569,6 +607,82 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         BuildShip("S4_InteriorServiceCraft", new Vector3(0f, 1.2f, 25f), Quaternion.identity, 0.36f);
         Box("S4_InteriorConsole", new Vector3(0f, 1.3f, -34f), new Vector3(14f, 2.6f, 4f), brightMetal);
         Box("S4_InteriorConsoleGlow", new Vector3(0f, 2.7f, -34f), new Vector3(10f, 0.18f, 2.2f), green);
+    }
+
+    private void BuildMothershipCoreAssembly()
+    {
+        // Five overlapping egg-shaped hull modules create a connected central spine.
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipEgg_Aft",
+            new Vector3(0f, 33f, -99f), new Vector3(30f, 11f, 44f), metal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipEgg_AftCore",
+            new Vector3(0f, 35f, -57f), new Vector3(43f, 15f, 53f), brightMetal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipEgg_Central",
+            new Vector3(0f, 36f, -8f), new Vector3(52f, 18f, 58f), metal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipEgg_Forward",
+            new Vector3(0f, 35f, 43f), new Vector3(43f, 15f, 51f), brightMetal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipEgg_Nose",
+            new Vector3(0f, 32f, 87f), new Vector3(26f, 10f, 36f), metal);
+
+        // Long and short cylinders physically link the modules.
+        CreateVisualCylinder("S4_MothershipCentralSpine", new Vector3(0f, 35f, -6f),
+            Vector3.forward, 222f, 5.5f, brightMetal);
+        CreateVisualCylinder("S4_MothershipAxialTube_Aft", new Vector3(0f, 35f, -116f),
+            Vector3.forward, 24f, 3.2f, cyan);
+        CreateVisualCylinder("S4_MothershipAxialTube_Nose", new Vector3(0f, 34f, 108f),
+            Vector3.forward, 20f, 2.8f, green);
+        CreateVisualCylinder("S4_MothershipLargeLink_A", new Vector3(0f, 35f, -66f),
+            Vector3.forward, 27f, 7.5f, metal);
+        CreateVisualCylinder("S4_MothershipLargeLink_B", new Vector3(0f, 36f, 12f),
+            Vector3.forward, 36f, 8.5f, brightMetal);
+        CreateVisualCylinder("S4_MothershipSmallLink_C", new Vector3(0f, 35f, 61f),
+            Vector3.forward, 24f, 3.0f, cyan);
+
+        // Structural rings are made of tube segments, leaving hollow centers.
+        BuildMothershipRing("S4_MothershipRing_Aft", new Vector3(0f, 62f, -70f), 25f, 2.8f, 24, cyan);
+        BuildMothershipRing("S4_MothershipRing_CoreA", new Vector3(0f, 62f, -22f), 37f, 3.2f, 28, brightMetal);
+        BuildMothershipRing("S4_MothershipRing_CoreB", new Vector3(0f, 62f, 34f), 33f, 3.0f, 28, cyan);
+        BuildMothershipRing("S4_MothershipRing_Nose", new Vector3(0f, 58f, 80f), 21f, 2.5f, 24, green);
+
+        // Cubes and cuboids around the round core are tied in with short cross-tubes.
+        Box("S4_MothershipTechCube_PortA", new Vector3(-60f, 31f, -52f),
+            new Vector3(20f, 14f, 24f), metal, Quaternion.Euler(0f, -12f, 0f));
+        Box("S4_MothershipTechCube_StarboardA", new Vector3(60f, 31f, -52f),
+            new Vector3(20f, 14f, 24f), metal, Quaternion.Euler(0f, 12f, 0f));
+        Box("S4_MothershipTechCuboid_PortB", new Vector3(-63f, 32f, 26f),
+            new Vector3(28f, 12f, 36f), brightMetal, Quaternion.Euler(0f, -10f, 0f));
+        Box("S4_MothershipTechCuboid_StarboardB", new Vector3(63f, 32f, 26f),
+            new Vector3(28f, 12f, 36f), brightMetal, Quaternion.Euler(0f, 10f, 0f));
+
+        CreateVisualCylinder("S4_MothershipCrossTube_PortA", new Vector3(-45f, 31f, -52f),
+            Vector3.left, 34f, 4.5f, cyan);
+        CreateVisualCylinder("S4_MothershipCrossTube_StarboardA", new Vector3(45f, 31f, -52f),
+            Vector3.right, 34f, 4.5f, cyan);
+        CreateVisualCylinder("S4_MothershipCrossTube_PortB", new Vector3(-48f, 32f, 26f),
+            Vector3.left, 34f, 4.0f, metal);
+        CreateVisualCylinder("S4_MothershipCrossTube_StarboardB", new Vector3(48f, 32f, 26f),
+            Vector3.right, 34f, 4.0f, metal);
+
+        CreateVisualCylinder("S4_MothershipRingSpoke_Port", new Vector3(-21f, 62f, -22f),
+            Vector3.right, 42f, 1.8f, cyan);
+        CreateVisualCylinder("S4_MothershipRingSpoke_Starboard", new Vector3(21f, 62f, -22f),
+            Vector3.left, 42f, 1.8f, cyan);
+    }
+
+    private void BuildMothershipRing(string name, Vector3 center, float radius, float tubeRadius, int segments, Material material)
+    {
+        segments = Mathf.Max(12, segments);
+        for (int i = 0; i < segments; i++)
+        {
+            float a0 = i * Mathf.PI * 2f / segments;
+            float a1 = (i + 1) * Mathf.PI * 2f / segments;
+            Vector3 p0 = center + new Vector3(Mathf.Cos(a0) * radius, Mathf.Sin(a0) * radius, 0f);
+            Vector3 p1 = center + new Vector3(Mathf.Cos(a1) * radius, Mathf.Sin(a1) * radius, 0f);
+            Vector3 tangent = p1 - p0;
+            GameObject segment = CreateVisualPrimitive(PrimitiveType.Cylinder, name + "_" + i, material);
+            segment.transform.position = (p0 + p1) * 0.5f;
+            segment.transform.rotation = Quaternion.FromToRotation(Vector3.up, tangent.normalized);
+            segment.transform.localScale = new Vector3(tubeRadius * 2f, tangent.magnitude * 0.5f, tubeRadius * 2f);
+        }
     }
 
     private void BuildSideCompartment(int side)
@@ -672,20 +786,60 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         RenderSettings.ambientLight = new Color(0.22f, 0.27f, 0.35f);
     }
 
-    private void BuildShip(string name, Vector3 position, Quaternion rotation, float scale)
+    private GameObject BuildShip(string name, Vector3 position, Quaternion rotation, float scale)
     {
         var ship = new GameObject(name);
         ship.transform.SetParent(root, false);
         ship.transform.position = position;
         ship.transform.rotation = rotation;
         ship.transform.localScale = Vector3.one * scale;
-        Part(ship.transform, "Hull", Vector3.zero, new Vector3(8f, 2.3f, 18f), brightMetal);
-        Part(ship.transform, "Nose", new Vector3(0f, 0.2f, 11f), new Vector3(4.5f, 1.5f, 8f), metal);
-        Part(ship.transform, "Cockpit", new Vector3(0f, 1.5f, 3f), new Vector3(3.5f, 1.7f, 5f), glass);
-        Part(ship.transform, "LeftWing", new Vector3(-7f, -0.2f, -1f), new Vector3(8f, 0.7f, 8f), metal);
-        Part(ship.transform, "RightWing", new Vector3(7f, -0.2f, -1f), new Vector3(8f, 0.7f, 8f), metal);
-        Part(ship.transform, "EngineGlowL", new Vector3(-2f, 0f, -10f), new Vector3(1.3f, 1.3f, 1.3f), cyan);
-        Part(ship.transform, "EngineGlowR", new Vector3(2f, 0f, -10f), new Vector3(1.3f, 1.3f, 1.3f), green);
+        PartPrimitive(ship.transform, PrimitiveType.Sphere, "HullEgg", Vector3.zero,
+            new Vector3(8.5f, 2.5f, 19f), brightMetal);
+        PartPrimitive(ship.transform, PrimitiveType.Sphere, "TaperedNose",
+            new Vector3(0f, 0.18f, 12f), new Vector3(4.4f, 1.4f, 10f), metal);
+        PartPrimitive(ship.transform, PrimitiveType.Sphere, "NoseTip",
+            new Vector3(0f, 0.12f, 17.8f), new Vector3(2.1f, 0.8f, 4.4f), brightMetal);
+        PartPrimitive(ship.transform, PrimitiveType.Sphere, "CockpitCanopy",
+            new Vector3(0f, 1.35f, 3.5f), new Vector3(3.6f, 1.6f, 4.8f), glass);
+        Part(ship.transform, "SweptWingPort", new Vector3(-6.1f, -0.18f, -1.4f),
+            new Vector3(7.6f, 0.55f, 8.8f), metal);
+        Part(ship.transform, "SweptWingStarboard", new Vector3(6.1f, -0.18f, -1.4f),
+            new Vector3(7.6f, 0.55f, 8.8f), metal);
+        PartPrimitive(ship.transform, PrimitiveType.Cylinder, "EngineTubePort",
+            new Vector3(-2.25f, -0.1f, -12f), new Vector3(1.4f, 5.5f, 1.4f),
+            brightMetal, Quaternion.Euler(90f, 0f, 0f));
+        PartPrimitive(ship.transform, PrimitiveType.Cylinder, "EngineTubeStarboard",
+            new Vector3(2.25f, -0.1f, -12f), new Vector3(1.4f, 5.5f, 1.4f),
+            brightMetal, Quaternion.Euler(90f, 0f, 0f));
+        PartPrimitive(ship.transform, PrimitiveType.Sphere, "EngineGlowPort",
+            new Vector3(-2.25f, -0.1f, -17.2f), new Vector3(1.5f, 1.1f, 1.5f), cyan);
+        PartPrimitive(ship.transform, PrimitiveType.Sphere, "EngineGlowStarboard",
+            new Vector3(2.25f, -0.1f, -17.2f), new Vector3(1.5f, 1.1f, 1.5f), green);
+        return ship;
+    }
+
+    private void PartPrimitive(Transform parent, PrimitiveType primitiveType, string name,
+        Vector3 localPosition, Vector3 localScale, Material material, Quaternion localRotation = default(Quaternion))
+    {
+        GameObject part = GameObject.CreatePrimitive(primitiveType);
+        part.name = name;
+        part.transform.SetParent(parent, false);
+        part.transform.localPosition = localPosition;
+        part.transform.localScale = localScale;
+        if (localRotation != default(Quaternion)) part.transform.localRotation = localRotation;
+        Renderer renderer = part.GetComponent<Renderer>();
+        if (renderer != null) renderer.sharedMaterial = material;
+        Collider collider = part.GetComponent<Collider>();
+        if (collider != null) Destroy(collider);
+    }
+
+    private void CreateVisualCylinder(string name, Vector3 center, Vector3 axis, float length, float radius, Material material)
+    {
+        GameObject cylinder = CreateVisualPrimitive(PrimitiveType.Cylinder, name, material);
+        cylinder.transform.position = center;
+        Vector3 direction = axis.sqrMagnitude > 0.0001f ? axis.normalized : Vector3.forward;
+        cylinder.transform.rotation = Quaternion.FromToRotation(Vector3.up, direction);
+        cylinder.transform.localScale = new Vector3(radius * 2f, Mathf.Max(0.05f, length * 0.5f), radius * 2f);
     }
 
     private void Part(Transform parent, string name, Vector3 localPos, Vector3 size, Material mat)
@@ -814,8 +968,14 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         go.transform.localScale = size;
         if (rotation != default(Quaternion)) go.transform.rotation = rotation;
         var r = go.GetComponent<Renderer>(); if (r != null) r.sharedMaterial = mat;
-        // Architecture is solid only at the playable interior, keeping the huge distant base lightweight.
-        bool interior = name.StartsWith("S4_Interior") || name.StartsWith("S4_Hangar");
+        // Only architecture is solid. Decorative stripes and glow panels must never
+        // touch the player's movement sphere; these colliders can block the whole lane.
+        bool decorative = name.StartsWith("S4_HangarFloorStripe_") ||
+            name.Contains("ConsoleGlow") || name.Contains("Panel_") ||
+            name.Contains("EngineCoilGlow") || name.Contains("SideBeacon") ||
+            name.Contains("AftEngineGlow") || name.Contains("DistrictLight") ||
+            name.Contains("RunwayLight") || name.Contains("PylonBeacon");
+        bool interior = (name.StartsWith("S4_Interior") || name.StartsWith("S4_Hangar")) && !decorative;
         if (!interior) { var c = go.GetComponent<Collider>(); if (c != null) Destroy(c); }
     }
 
@@ -881,6 +1041,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (alienArmor != null) Destroy(alienArmor); if (alienDark != null) Destroy(alienDark);
         if (alienEye != null) Destroy(alienEye);
         interiorHostiles.Clear();
+        escapeShuttles.Clear();
         built = false; introRunning = false; controller = null; player = null; gameplayCamera = null;
         greenBeam = null; greenBeamCore = null; impactPulse = null; interiorTransferPulse = null;
     }
