@@ -1085,9 +1085,66 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             chase.Configure(controller.transform, archetype);
             chase.enabled = false;
             interiorHostiles.Add(chase);
+
+            StageFourAlienPatrol patrol = alien.AddComponent<StageFourAlienPatrol>();
+            patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));
             BuildAlienTrooperDetails(alien.transform, archetype);
         }
         StartupCheckpoint.Set("StageFourInteriorAliensSpawned_" + interiorHostiles.Count);
+        StartupCheckpoint.Set("StageFourAlienCorridorPatrolsConfigured_" + interiorHostiles.Count);
+    }
+
+    private Vector3[] GetInteriorPatrolRoute(int index)
+    {
+        // All route points lie along the already-built corridor and room floors.
+        // Side-wing sentries remain in their own wing rather than crossing sealed walls.
+        switch (index)
+        {
+            case 0:
+                return new[] {
+                    new Vector3(-7f, 0f, 24f), new Vector3(-7f, 0f, 48f),
+                    new Vector3(-4f, 0f, 69f), new Vector3(-12f, 0f, 86f),
+                    new Vector3(10f, 0f, 86f), new Vector3(7f, 0f, 62f)
+                };
+            case 1:
+                return new[] {
+                    new Vector3(7f, 0f, 35f), new Vector3(7f, 0f, 56f),
+                    new Vector3(4f, 0f, 72f), new Vector3(16f, 0f, 86f),
+                    new Vector3(-15f, 0f, 86f), new Vector3(-7f, 0f, 60f)
+                };
+            case 2:
+            case 3:
+                return new[] {
+                    new Vector3(-69f, 0f, 5f), new Vector3(-78f, 0f, -15f),
+                    new Vector3(-69f, 0f, -28f), new Vector3(-58f, 0f, -15f),
+                    new Vector3(-58f, 0f, 12f), new Vector3(-69f, 0f, 25f)
+                };
+            case 4:
+            case 5:
+                return new[] {
+                    new Vector3(69f, 0f, 5f), new Vector3(78f, 0f, -15f),
+                    new Vector3(69f, 0f, -28f), new Vector3(58f, 0f, -15f),
+                    new Vector3(58f, 0f, 12f), new Vector3(69f, 0f, 25f)
+                };
+            case 6:
+                return new[] {
+                    new Vector3(0f, 0f, -50f), new Vector3(0f, 0f, -70f),
+                    new Vector3(-14f, 0f, -87f), new Vector3(0f, 0f, -92f),
+                    new Vector3(14f, 0f, -87f), new Vector3(0f, 0f, -70f)
+                };
+            case 7:
+                return new[] {
+                    new Vector3(21f, 0f, -88f), new Vector3(14f, 0f, -79f),
+                    new Vector3(0f, 0f, -86f), new Vector3(-14f, 0f, -92f),
+                    new Vector3(-20f, 0f, -84f), new Vector3(0f, 0f, -70f)
+                };
+            default:
+                return new[] {
+                    new Vector3(9f, 0f, 87f), new Vector3(16f, 0f, 93f),
+                    new Vector3(0f, 0f, 96f), new Vector3(-16f, 0f, 87f),
+                    new Vector3(-9f, 0f, 80f), new Vector3(0f, 0f, 78f)
+                };
+        }
     }
 
     private void BuildAlienTrooperDetails(Transform alien, int archetype)
