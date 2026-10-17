@@ -570,13 +570,14 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         Box("S4_Interior" + label + "RearWall", new Vector3(x, 6.5f, -26f), new Vector3(42f, 13f, 1.5f), metal);
         Box("S4_Interior" + label + "InnerWallFront", new Vector3(sign * 53f, 6.5f, 17f), new Vector3(1.5f, 13f, 18f), metal);
         Box("S4_Interior" + label + "InnerWallRear", new Vector3(sign * 53f, 6.5f, -17f), new Vector3(1.5f, 13f, 18f), metal);
+
+        // Cargo lockers are kept against the outer wall; the center remains a clear combat lane.
         for (int i = -1; i <= 1; i++)
         {
             float z = i * 13f;
             Box("S4_Interior" + label + "Locker_" + i, new Vector3(sign * 86f, 1.1f, z), new Vector3(8f, 2.2f, 7f), brightMetal);
             CreateVisualBox("S4_Interior" + label + "Panel_" + i, new Vector3(sign * 54.5f, 8.1f, z),
                 new Vector3(0.22f, 3.8f, 6.8f), side < 0 ? green : cyan);
-            yield return null;
         }
     }
 
