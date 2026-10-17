@@ -615,8 +615,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
         BuildSideCompartment(-1);
         BuildSideCompartment(1);
-        BuildExpandedWing(-1);
-        BuildExpandedWing(1);
+        yield return BuildExpandedWing(-1);
+        yield return BuildExpandedWing(1);
         CreateVisualBox("S4_InteriorUplinkConduit", new Vector3(0f, 0.035f, 0f), new Vector3(0.85f, 0.07f, 198f), green);
 
         for (int i = -4; i <= 4; i++)
@@ -745,7 +745,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     /// Port becomes the tactical command/control center; starboard becomes crew,
     /// medical and equipment support. Open doorways keep every room traversable.
     /// </summary>
-    private void BuildExpandedWing(int side)
+    private IEnumerator BuildExpandedWing(int side)
     {
         string label = side < 0 ? "Port" : "Starboard";
         float s = side;
