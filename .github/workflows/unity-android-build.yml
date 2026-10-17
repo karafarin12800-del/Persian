@@ -148,10 +148,10 @@ jobs:
           assert 'if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)' in prototype_flow, 'Stage 4 must start with a firearm if the saved loadout is melee-only.'
           assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
           escape_finale = Path('UnityProject/Assets/Scripts/World/StageFourEscapeSequence.cs').read_text(encoding='utf-8')
-          assert 'S4_BlueEscapeDoor' in escape_finale and 'OpenBlueDoor();' in escape_finale, 'Stage 4 escape route must have an opening blue door.'
-          assert 'Vector3.Distance(player.position, lastBombPosition) >= 10f' in escape_finale, 'Stage 4 must plant a timed bomb for each 10 metres travelled.'
-          assert 'DetonateBomb' in escape_finale and 'PlayEscapeFinale' in escape_finale, 'Stage 4 must detonate timed bombs and run the escape finale.'
-          assert 'S4_MothershipDetonation_' in escape_finale and 'i < blasts.Length' in escape_finale, 'Stage 4 finale must show sequential mothership/base detonations.'
+          assert 'S4_RedEscapeDoor' in escape_finale and 'OpenRedDoor();' in escape_finale, 'Stage 4 escape route must have a visible red door that opens.'
+          assert 'Vector3.Distance(player.position, lastBombPosition) >= 10f' in escape_finale and 'plantedBombs.Count >= 6' in escape_finale, 'Stage 4 must plant and cap the six visible charges.'
+          assert 'EXPLOSIVE CHARGES: ' in escape_finale and 'S4_ChargeDetonation_' in escape_finale and 'nextChargeTime' in escape_finale, 'Stage 4 must show the planted charge counter and detonate charges during shuttle escape.'
+          assert 'PlayEscapeFinale' in escape_finale and 'S4_MothershipDetonation_' in escape_finale and 'i < blasts.Length' in escape_finale, 'Stage 4 finale must show sequential mothership/base detonations.'
           patrol = Path('UnityProject/Assets/Scripts/World/StageFourAlienPatrol.cs').read_text(encoding='utf-8')
           assert 'patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));' in stage4, 'Stage 4 aliens must receive explicit corridor patrol routes.'
           assert 'StageFourAlienCorridorPatrolsConfigured_' in stage4, 'Stage 4 must report its patrol initialization checkpoint.'
