@@ -287,29 +287,38 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
         Vector3[] cameraPath =
         {
-            new Vector3(0f, 650f, 1120f),
-            new Vector3(0f, 390f, 730f),
-            new Vector3(0f, 145f, 390f),
-            new Vector3(0f, 48f, 225f),
-            new Vector3(0f, 12f, 92f),
-            new Vector3(0f, 8f, 20f)
+            new Vector3(360f, 600f, 130f), // high starboard-side establishing shot
+            new Vector3(275f, 240f, 60f),  // dive along the right side of the mothership
+            new Vector3(190f, 75f, -60f),  // arc around the starboard aft quarter
+            new Vector3(65f, 25f, -67f),   // line up with the rear hangar entrance
+            new Vector3(30f, 12f, -38f),   // descend through the hangar opening
+            new Vector3(0f, 5.7f, -18.5f)  // settle behind the player
         };
         Vector3[] lookPath =
         {
-            new Vector3(0f, 24f, 0f),
-            new Vector3(0f, 30f, 28f),
-            new Vector3(0f, 38f, 56f),
-            new Vector3(0f, 20f, 58f),
-            new Vector3(0f, 8f, 38f),
-            new Vector3(0f, 3f, 6f)
+            new Vector3(0f, 35f, 42f),
+            new Vector3(0f, 32f, 16f),
+            new Vector3(0f, 23f, -10f),
+            new Vector3(0f, 11f, -12f),
+            new Vector3(0f, 4f, -8f),
+            new Vector3(0f, 2.3f, -6.5f)
         };
 
-        const float duration = 8.0f;
+        const float duration = 6.0f;
         const float beamTopY = 320f;
         const float beamImpactY = 44f;
         float maxBeamHalfHeight = (beamTopY - beamImpactY) * 0.5f;
         float t = 0f;
         bool interiorPulseShown = false;
+        Renderer beamRenderer = greenBeam != null ? greenBeam.GetComponent<Renderer>() : null;
+        Renderer beamCoreRenderer = greenBeamCore != null ? greenBeamCore.GetComponent<Renderer>() : null;
+        Renderer impactRenderer = impactPulse != null ? impactPulse.GetComponent<Renderer>() : null;
+        Renderer transferRenderer = interiorTransferPulse != null
+            ? interiorTransferPulse.GetComponent<Renderer>() : null;
+        if (beamRenderer != null) beamRenderer.enabled = true;
+        if (beamCoreRenderer != null) beamCoreRenderer.enabled = true;
+        if (impactRenderer != null) impactRenderer.enabled = false;
+        if (transferRenderer != null) transferRenderer.enabled = false;
         while (t < duration)
         {
             t += Time.unscaledDeltaTime;
@@ -321,9 +330,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             if (direction.sqrMagnitude > 0.001f)
                 gameplayCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
 
-            float grow = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 2.05f));
-            float collapse = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 3.0f) / 1.15f));
-            float beamHalfHeight = Mathf.Lerp(0.12f, maxBeamHalfHeight, grow) * (1f - 0.96f * collapse);
+            float grow = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.72f));
+            float collapse = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 0.92f) / 0.46f));
+            float beamHalfHeight = Mathf.Lerp(0.12f, maxBeamHalfHeight, grow) * (1f - collapse);
             if (greenBeam != null)
             {
                 greenBeam.position = new Vector3(0f, beamTopY - beamHalfHeight, 48f);
@@ -335,28 +344,40 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
                 greenBeamCore.localScale = new Vector3(4.2f, Mathf.Max(0.12f, beamHalfHeight), 4.2f);
             }
 
+            // Hide both beam renderers completely once the energy retracts into space.
+            bool externalBeamVisible = t < 1.42f;
+            if (beamRenderer != null) beamRenderer.enabled = externalBeamVisible;
+            if (beamCoreRenderer != null) beamCoreRenderer.enabled = externalBeamVisible;
+
             if (impactPulse != null)
             {
-                float impact = Mathf.Clamp01((t - 1.7f) / 0.55f);
-                float pulse = 11f + Mathf.Sin(t * 8.5f) * 2.5f;
+                float impactIn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 0.45f) / 0.20f));
+                float impactOut = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 1.18f) / 0.42f));
+                float pulse = (11f + Mathf.Sin(t * 18f) * 1.5f) * impactIn * impactOut;
                 impactPulse.position = new Vector3(0f, beamImpactY, 48f);
-                impactPulse.localScale = Vector3.one * Mathf.Lerp(0.25f, pulse, impact);
+                impactPulse.localScale = Vector3.one * Mathf.Max(0.05f, pulse);
+                if (impactRenderer != null) impactRenderer.enabled = t >= 0.45f && t < 1.65f;
             }
 
-            if (interiorTransferPulse != null && t >= 3.15f)
+            if (interiorTransferPulse != null && t >= 1.05f)
             {
                 if (!interiorPulseShown)
                 {
                     interiorPulseShown = true;
-                    Renderer pulseRenderer = interiorTransferPulse.GetComponent<Renderer>();
-                    if (pulseRenderer != null) pulseRenderer.enabled = true;
+                    if (transferRenderer != null) transferRenderer.enabled = true;
                     StartupCheckpoint.Set("StageFourUplinkEnteredMothership");
                 }
-                float feed = Mathf.Clamp01((t - 3.15f) / 4.25f);
+                float feed = Mathf.Clamp01((t - 1.05f) / 1.55f);
                 interiorTransferPulse.position = new Vector3(0f, 1.45f, Mathf.Lerp(82f, -12f, feed));
-                interiorTransferPulse.localScale = Vector3.one * (1.2f + Mathf.Sin(t * 12f) * 0.15f);
+                interiorTransferPulse.localScale = Vector3.one * (1.2f + Mathf.Sin(t * 15f) * 0.12f);
+                if (transferRenderer != null) transferRenderer.enabled = t < 2.85f;
             }
 
+            IntroMessage = t < 0.95f ? "GREEN UPLINK DESCENDING FAST" :
+                t < 1.55f ? "UPLINK IMPACT • MOTHERSHIP HULL" :
+                t < 2.85f ? "ENERGY TRANSFER ENTERING THE SHIP" :
+                t < 4.65f ? "CAMERA SWEEPING INTO THE HANGAR" :
+                "INSIDE THE MOTHERSHIP • HOSTILES DETECTED";
             IntroMessage = t < 1.8f ? "GREEN BEAM DESCENDING FROM SPACE" :
                 t < 3.0f ? "UPLINK IMPACT • MOTHERSHIP HULL" :
                 t < 4.6f ? "ENERGY TRANSFER ENTERING THE SHIP" :
@@ -406,7 +427,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (points.Length == 1) return points[0];
         float scaled = Mathf.Clamp01(t) * (points.Length - 1);
         int index = Mathf.Min(points.Length - 2, Mathf.FloorToInt(scaled));
-        return Vector3.Lerp(points[index], points[index + 1], scaled - index);
+        float segmentT = scaled - index;
+        segmentT = segmentT * segmentT * (3f - 2f * segmentT);
+        return Vector3.Lerp(points[index], points[index + 1], segmentT);
     }
 
     private IEnumerator BuildExteriorMegabaseRoutine()
@@ -496,37 +519,46 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     {
         BuildMothershipCoreAssembly();
 
-        // Layered outer shell around a hollow playable vessel; only room geometry collides.
+        // The main shell is widest at its central body and narrows at the bow and stern.
         Box("S4_MothershipKeel", new Vector3(0f, -3.9f, 0f), new Vector3(24f, 7f, 278f), dark);
-        // Segmented port/starboard plating narrows toward both the bow and aft end.
-        Box("S4_MothershipMidHullPort", new Vector3(-44f, 21f, -2f), new Vector3(58f, 10f, 142f), brightMetal);
-        Box("S4_MothershipMidHullStarboard", new Vector3(44f, 21f, -2f), new Vector3(58f, 10f, 142f), brightMetal);
-        Box("S4_MothershipBowHullPort", new Vector3(-30f, 19.5f, 91f), new Vector3(34f, 8f, 66f), brightMetal);
-        Box("S4_MothershipBowHullStarboard", new Vector3(30f, 19.5f, 91f), new Vector3(34f, 8f, 66f), brightMetal);
-        Box("S4_MothershipAftHullPort", new Vector3(-28f, 18.5f, -93f), new Vector3(30f, 7f, 62f), metal);
-        Box("S4_MothershipAftHullStarboard", new Vector3(28f, 18.5f, -93f), new Vector3(30f, 7f, 62f), metal);
-        Box("S4_MothershipDorsalBayLipPort", new Vector3(-13f, 18f, 64f), new Vector3(4f, 3f, 130f), metal);
-        Box("S4_MothershipDorsalBayLipStarboard", new Vector3(13f, 18f, 64f), new Vector3(4f, 3f, 130f), metal);
-        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipPortKeelPod", new Vector3(-91f, 11f, 0f), new Vector3(20f, 13f, 245f), dark);
-        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipStarboardKeelPod", new Vector3(91f, 11f, 0f), new Vector3(20f, 13f, 245f), dark);
-        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipProwArmor", new Vector3(0f, 11f, 137f), new Vector3(56f, 12f, 33f), metal);
-        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipAftArmor", new Vector3(0f, 10f, -137f), new Vector3(58f, 12f, 31f), metal);
-        Box("S4_MothershipBridge", new Vector3(0f, 38f, 57f), new Vector3(86f, 18f, 56f), metal);
-        Box("S4_MothershipBridgeGlass", new Vector3(0f, 39f, 87f), new Vector3(68f, 10f, 18f), glass);
-        Box("S4_MothershipBridgePortFin", new Vector3(-52f, 31f, 62f), new Vector3(20f, 9f, 58f), brightMetal);
-        Box("S4_MothershipBridgeStarboardFin", new Vector3(52f, 31f, 62f), new Vector3(20f, 9f, 58f), brightMetal);
+        Box("S4_MothershipMidHullPort", new Vector3(-34f, 20f, -2f), new Vector3(50f, 9f, 104f), brightMetal);
+        Box("S4_MothershipMidHullStarboard", new Vector3(34f, 20f, -2f), new Vector3(50f, 9f, 104f), brightMetal);
+        Box("S4_MothershipBowHullPort", new Vector3(-22f, 19.5f, 89f), new Vector3(26f, 7f, 48f), brightMetal);
+        Box("S4_MothershipBowHullStarboard", new Vector3(22f, 19.5f, 89f), new Vector3(26f, 7f, 48f), brightMetal);
+        Box("S4_MothershipAftHullPort", new Vector3(-20f, 18.5f, -91f), new Vector3(24f, 6f, 48f), metal);
+        Box("S4_MothershipAftHullStarboard", new Vector3(20f, 18.5f, -91f), new Vector3(24f, 6f, 48f), metal);
+        Box("S4_MothershipDorsalBayLipPort", new Vector3(-12f, 18f, 58f), new Vector3(3f, 3f, 106f), metal);
+        Box("S4_MothershipDorsalBayLipStarboard", new Vector3(12f, 18f, 58f), new Vector3(3f, 3f, 106f), metal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipPortKeelPod",
+            new Vector3(-64f, 11f, 0f), new Vector3(14f, 9f, 158f), dark);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipStarboardKeelPod",
+            new Vector3(64f, 11f, 0f), new Vector3(14f, 9f, 158f), dark);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipProwArmor",
+            new Vector3(0f, 11f, 126f), new Vector3(34f, 9f, 27f), metal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipProwTip",
+            new Vector3(0f, 10.5f, 149f), new Vector3(15f, 5.5f, 24f), brightMetal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipAftArmor",
+            new Vector3(0f, 10f, -125f), new Vector3(30f, 8f, 25f), metal);
+        CreateVisualPrimitive(PrimitiveType.Sphere, "S4_MothershipSternTip",
+            new Vector3(0f, 9.8f, -148f), new Vector3(14f, 5.5f, 24f), brightMetal);
+        Box("S4_MothershipBridge", new Vector3(0f, 37f, 49f), new Vector3(66f, 16f, 44f), metal);
+        Box("S4_MothershipBridgeGlass", new Vector3(0f, 38f, 73f), new Vector3(52f, 9f, 14f), glass);
+        Box("S4_MothershipBridgePortFin", new Vector3(-40f, 30f, 53f), new Vector3(14f, 7f, 42f), brightMetal);
+        Box("S4_MothershipBridgeStarboardFin", new Vector3(40f, 30f, 53f), new Vector3(14f, 7f, 42f), brightMetal);
 
-        for (int i = -3; i <= 3; i++)
+        // Keep the rear engines aligned inside the tapered stern instead of forming a wide block.
+        for (int i = -2; i <= 2; i++)
         {
-            float x = i * 22f;
-            Box("S4_MothershipAftEngine_" + i, new Vector3(x, 5f, -151f), new Vector3(13f, 12f, 28f), metal);
-            Box("S4_MothershipAftEngineGlow_" + i, new Vector3(x, 5f, -166f), new Vector3(7f, 7f, 3f), i % 2 == 0 ? green : cyan);
+            float x = i * 15f;
+            Box("S4_MothershipAftEngine_" + i, new Vector3(x, 5f, -146f), new Vector3(10f, 9f, 22f), metal);
+            Box("S4_MothershipAftEngineGlow_" + i, new Vector3(x, 5f, -159f),
+                new Vector3(6f, 6f, 3f), i % 2 == 0 ? green : cyan);
         }
         for (int i = -4; i <= 4; i++)
         {
-            float z = -105f + i * 26f;
-            Box("S4_MothershipSideBeaconL_" + i, new Vector3(-96f, 13f, z), new Vector3(3f, 2f, 8f), cyan);
-            Box("S4_MothershipSideBeaconR_" + i, new Vector3(96f, 13f, z), new Vector3(3f, 2f, 8f), green);
+            float z = i * 30f;
+            Box("S4_MothershipSideBeaconL_" + i, new Vector3(-65f, 13f, z), new Vector3(3f, 2f, 8f), cyan);
+            Box("S4_MothershipSideBeaconR_" + i, new Vector3(65f, 13f, z), new Vector3(3f, 2f, 8f), green);
             if (i % 2 == 0) yield return null;
         }
 
