@@ -137,6 +137,8 @@ jobs:
           assert 'S4_InteriorForwardCorridorFloor' in stage4 and 'S4_InteriorEngineRoomFloor' in stage4 and 'S4_InteriorCommandRoomFloor' in stage4, 'Stage 4 must provide connected interior corridors and rooms.'
           assert 'S4_MothershipUpperHullPortWing' in stage4 and 'S4_MothershipUpperHullStarboardWing' in stage4 and 'S4_MothershipDorsalBayLipPort' in stage4, 'The ship must retain a visible dorsal bay opening for the cinematic entry.'
           assert 'S4_HangarCeilingPort' in stage4 and 'S4_HangarCeilingStarboard' in stage4 and 'S4_InteriorCommandRoomCeilingPort' in stage4, 'Stage 4 camera path must have a real ceiling aperture into the interior.'
+          prototype_flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+          assert 'if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)' in prototype_flow, 'Stage 4 must start with a firearm if the saved loadout is melee-only.'
           assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
           side_room = stage4[stage4.index('private void BuildSideCompartment(int side)'):stage4.index('private void BuildGreenUplink()')]
           assert 'yield return' not in side_room, 'Side compartment helper must be a synchronous method.' 
