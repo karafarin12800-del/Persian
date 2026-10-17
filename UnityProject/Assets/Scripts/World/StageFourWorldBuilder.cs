@@ -781,10 +781,15 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             // Outer wall and end walls are split to leave clear doors into each room.
             Box("S4_Interior" + label + roomName + "OuterWall",
                 new Vector3(s * 177f, 6.5f, z), new Vector3(1.5f, 13f, 30f), metal);
-            Box("S4_Interior" + label + roomName + "EndWallA",
-                new Vector3(roomX, 6.5f, z - 15f), new Vector3(48f, 13f, 1.5f), metal);
-            Box("S4_Interior" + label + roomName + "EndWallB",
-                new Vector3(roomX, 6.5f, z + 15f), new Vector3(48f, 13f, 1.5f), metal);
+            // Leave central openings in both end walls so adjoining rooms and loop corridors connect.
+            Box("S4_Interior" + label + roomName + "EndWallA_Left",
+                new Vector3(roomX - 16.5f, 6.5f, z - 15f), new Vector3(15f, 13f, 1.5f), metal);
+            Box("S4_Interior" + label + roomName + "EndWallA_Right",
+                new Vector3(roomX + 16.5f, 6.5f, z - 15f), new Vector3(15f, 13f, 1.5f), metal);
+            Box("S4_Interior" + label + roomName + "EndWallB_Left",
+                new Vector3(roomX - 16.5f, 6.5f, z + 15f), new Vector3(15f, 13f, 1.5f), metal);
+            Box("S4_Interior" + label + roomName + "EndWallB_Right",
+                new Vector3(roomX + 16.5f, 6.5f, z + 15f), new Vector3(15f, 13f, 1.5f), metal);
 
             // Inner wall panels flank a wide doorway facing the connector corridor.
             Box("S4_Interior" + label + roomName + "InnerWallFront",
