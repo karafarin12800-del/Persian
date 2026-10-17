@@ -71,14 +71,16 @@ namespace PersiaWar.Unity2D5D
                 if (seesPlayer)
                     lastSeenTime = Time.time;
 
-                if (distance > disengageRange || Time.time - lastSeenTime > lostContactGrace)
+                if (!seesPlayer || distance > disengageRange || Time.time - lastSeenTime > lostContactGrace)
                 {
+                    // Do not let the chase controller keep pushing an alien through a
+                    // wall after line of sight is broken. Resume the corridor route.
                     DisengageToPatrol();
                 }
                 else
                 {
-                    // EnemyChase owns shooting, obstacle avoidance, and tactical pursuit
-                    // once the target has been positively detected.
+                    // Chase is permitted only while the player remains visible through
+                    // a clear corridor; blocked sight immediately returns to patrol.
                     if (!chase.enabled) chase.enabled = true;
                     return;
                 }
@@ -175,11 +177,51 @@ namespace PersiaWar.Unity2D5D
             transform.rotation = Quaternion.RotateTowards(
                 transform.rotation, desiredRotation, turnSpeed * Time.deltaTime);
 
-            // Routes are deliberately placed along Stage 4's connected, open halls
-            // and room centers so sentries do not cut through sealed wall panels.
+            // Use three horizontal probes at body height before moving. The old direct
+            // transform translation could cross a thin wall in a single patrol update.
+            float step = Mathf.Min(patrolSpeed * Time.deltaTime, delta.magnitude);
+            if (IsBlockedByWall(direction, step + 0.18f))
+            {
+                SetVisualMoving(false, direction);
+                pauseUntil = Time.time + 0.25f;
+                return;
+            }
+
             transform.position = Vector3.MoveTowards(
-                transform.position, destination, patrolSpeed * Time.deltaTime);
+                transform.position, destination, step);
             SetVisualMoving(true, direction);
+        }
+
+        private bool IsBlockedByWall(Vector3 direction, float distance)
+        {
+            Vector3[] heights =
+            {
+                transform.position + Vector3.up * 0.42f,
+                transform.position + Vector3.up * 0.95f,
+                transform.position + Vector3.up * 1.42f
+            };
+
+            for (int i = 0; i < heights.Length; i++)
+            {
+                RaycastHit[] hits = Physics.RaycastAll(
+                    heights[i], direction, distance,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                for (int j = 0; j < hits.Length; j++)
+                {
+                    Collider hitCollider = hits[j].collider;
+                    if (hitCollider == null ||
+                        hitCollider.transform == transform ||
+                        hitCollider.transform.IsChildOf(transform) ||
+                        hitCollider.GetComponentInParent<PlayerController>() != null)
+                        continue;
+
+                    if (hitCollider.GetComponentInParent<EnemyChase>() != null)
+                        continue;
+
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void SetVisualMoving(bool moving, Vector3 facing)
