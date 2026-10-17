@@ -145,6 +145,24 @@ namespace PersiaWar.Unity2D5D
                 hit.collider.GetComponentInParent<PlayerController>() == player;
         }
 
+        private void LateUpdate()
+        {
+            if (!configured || builder == null || !builder.IsBuilt)
+                return;
+
+            // Keep both patrol and chase movement inside the ship's walkable interior.
+            // Room-specific horizontal limits match the built floor plan.
+            Vector3 p = transform.position;
+            p.z = Mathf.Clamp(p.z, -100f, 127f);
+            if (p.z < -77f)          p.x = Mathf.Clamp(p.x, -25f, 25f); // engine room
+            else if (p.z < -47f)     p.x = Mathf.Clamp(p.x, -10f, 10f); // aft corridor
+            else if (p.z < 47f)      p.x = Mathf.Clamp(p.x, -44f, 44f); // hangar
+            else if (p.z < 78f)      p.x = Mathf.Clamp(p.x, -10f, 10f); // forward corridor
+            else if (p.z < 103f)     p.x = Mathf.Clamp(p.x, -24f, 24f); // command room
+            else                     p.x = Mathf.Clamp(p.x, -10f, 10f); // exit corridor
+            transform.position = p;
+        }
+
         private void PatrolCorridor()
         {
             if (route == null || route.Length == 0)
