@@ -865,6 +865,15 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         return go;
     }
 
+    private GameObject CreateVisualPrimitive(
+        PrimitiveType primitiveType, string name, Vector3 position, Vector3 size, Material material)
+    {
+        GameObject go = CreateVisualPrimitive(primitiveType, name, material);
+        go.transform.position = position;
+        go.transform.localScale = size;
+        return go;
+    }
+
     private GameObject CreateVisualBox(string name, Vector3 position, Vector3 size, Material material)
     {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
