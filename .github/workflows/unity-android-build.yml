@@ -471,6 +471,19 @@ jobs:
                   );
                   PlayerSettings.colorSpace = ColorSpace.Gamma;
 
+                  // Apply the Persia War launcher artwork to every legacy Android icon size.
+                  // The texture lives in the Unity project so it is also available to local builds.
+                  const string appIconPath = "Assets/Branding/PersiaWarIcon.jpg";
+                  var appIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(appIconPath);
+                  if (appIcon == null)
+                      throw new Exception("Required Android app icon asset is missing: " + appIconPath);
+                  var iconSizes = PlayerSettings.GetIconSizes(NamedBuildTarget.Android, IconKind.Application);
+                  var appIcons = new Texture2D[iconSizes.Length];
+                  for (int i = 0; i < appIcons.Length; i++)
+                      appIcons[i] = appIcon;
+                  PlayerSettings.SetIcons(NamedBuildTarget.Android, appIcons, IconKind.Application);
+                  Debug.Log("PERSIA_APP_ICON_APPLIED:" + appIconPath + ":" + appIcons.Length);
+
                   var graphicsApis = PlayerSettings.GetGraphicsAPIs(BuildTarget.Android);
                   Console.WriteLine("UNITY_ANDROID_GRAPHICS_API:" + string.Join(",", graphicsApis));
                   if (graphicsApis.Length != 1 || graphicsApis[0] != GraphicsDeviceType.OpenGLES3)
