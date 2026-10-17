@@ -72,6 +72,18 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private void BuildEscapeHallAndDoor()
     {
         if (worldRoot == null) return;
+        // Open the center of the command-room rear wall so the escape corridor is reachable.
+        Transform commandRear = worldRoot.Find("S4_InteriorCommandRearWall");
+        if (commandRear != null)
+        {
+            var wallRenderer = commandRear.GetComponent<Renderer>();
+            var wallCollider = commandRear.GetComponent<Collider>();
+            if (wallRenderer != null) wallRenderer.enabled = false;
+            if (wallCollider != null) wallCollider.enabled = false;
+        }
+        var wallMat = MakeMaterial("S4_EscapeWall", new Color(0.2f, 0.3f, 0.4f));
+        MakeBox("S4_EscapeCommandWallLeft", new Vector3(-20f, 6.5f, 103f), new Vector3(12f, 13f, 1.5f), wallMat);
+        MakeBox("S4_EscapeCommandWallRight", new Vector3(20f, 6.5f, 103f), new Vector3(12f, 13f, 1.5f), wallMat);
         MakeBox("S4_EscapeCorridorFloor", new Vector3(0f, -0.35f, 112f), new Vector3(24f, 0.7f, 32f), MakeMaterial("S4_EscapeFloor", new Color(0.07f, 0.1f, 0.15f)));
         MakeBox("S4_EscapeCorridorLeft", new Vector3(-12f, 6f, 112f), new Vector3(1.4f, 12f, 32f), MakeMaterial("S4_EscapeWall", new Color(0.2f, 0.3f, 0.4f)));
         MakeBox("S4_EscapeCorridorRight", new Vector3(12f, 6f, 112f), new Vector3(1.4f, 12f, 32f), MakeMaterial("S4_EscapeWall", new Color(0.2f, 0.3f, 0.4f)));
@@ -283,17 +295,19 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         return m;
     }
 
-    private sealed class StageFourEscapeBootstrap : MonoBehaviour
-    {
-        private void Update()
-        {
-            var builders = FindObjectsByType<StageFourWorldBuilder>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            foreach (var builder in builders)
-            {
-                if (builder == null || !builder.IsBuilt || builder.GetComponent<StageFourEscapeSequence>() != null) continue;
-                builder.gameObject.AddComponent<StageFourEscapeSequence>();
-            }
-            if (active != null && active.gameObject == null) active = null;
-        }
-    }
 }
+
+ 
+ public sealed class StageFourEscapeBootstrap : MonoBehaviour
+ {
+     private void Update()
+     {
+         var builders = FindObjectsByType<StageFourWorldBuilder>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+         foreach (var builder in builders)
+         {
+             if (builder == null || !builder.IsBuilt || builder.GetComponent<StageFourEscapeSequence>() != null) continue;
+             builder.gameObject.AddComponent<StageFourEscapeSequence>();
+         }
+     }
+ }
+ 
