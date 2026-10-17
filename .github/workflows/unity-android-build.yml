@@ -12,6 +12,7 @@ on:
     branches:
       - unity-2.5d
       - fix/android-multitouch-pointer-zones
+      - feature/stage4-mothership-megabase-20261016
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
@@ -145,7 +146,7 @@ jobs:
           prototype_flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
           assert 'if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)' in prototype_flow, 'Stage 4 must start with a firearm if the saved loadout is melee-only.'
           assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
-          side_room = stage4[stage4.index('private void BuildSideCompartment(int side)'):stage4.index('private void BuildGreenUplink()')]
+          side_room = stage4[stage4.index('private void BuildSideCompartment(int side)'):stage4.index('private IEnumerator BuildExpandedWing(int side)')]
           assert 'yield return' not in side_room, 'Side compartment helper must be a synchronous method.' 
           target_health = Path('UnityProject/Assets/Scripts/Combat/TargetHealth.cs').read_text(encoding='utf-8')
           assert 'isStageFourAlien' in target_health and '&& !isStageFourAlien' in target_health, 'Stage 4 aliens must not trigger human blood effects.'
