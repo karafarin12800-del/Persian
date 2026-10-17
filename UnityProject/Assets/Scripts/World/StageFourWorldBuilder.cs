@@ -1066,17 +1066,18 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (controller == null || root == null || interiorHostiles.Count > 0)
             return;
 
+        // Eighteen sentries are distributed through the engine room, rear corridor,
+        // hangar, forward corridor, command room, and the escape corridor.
+        // Every spawn stays on a built interior floor, not on the exterior hull.
         Vector3[] positions =
         {
-            new Vector3(-6f, 0f, 27f),
-            new Vector3(7f, 0f, 38f),
-            new Vector3(-69f, 0f, 5f),
-            new Vector3(-78f, 0f, -15f),
-            new Vector3(69f, 0f, 5f),
-            new Vector3(78f, 0f, -15f),
-            new Vector3(0f, 0f, -62f),
-            new Vector3(21f, 0f, -88f),
-            new Vector3(9f, 0f, 87f)
+            new Vector3(-17f, 0f, -88f), new Vector3(0f, 0f, -94f), new Vector3(17f, 0f, -86f),
+            new Vector3(-5f, 0f, -68f), new Vector3(5f, 0f, -57f), new Vector3(0f, 0f, -49f),
+            new Vector3(-30f, 0f, -20f), new Vector3(30f, 0f, -20f),
+            new Vector3(-30f, 0f, 15f), new Vector3(30f, 0f, 15f), new Vector3(0f, 0f, 38f),
+            new Vector3(-5f, 0f, 55f), new Vector3(5f, 0f, 72f),
+            new Vector3(-18f, 0f, 84f), new Vector3(18f, 0f, 84f), new Vector3(0f, 0f, 97f),
+            new Vector3(-5f, 0f, 108f), new Vector3(5f, 0f, 118f)
         };
 
         for (int i = 0; i < positions.Length; i++)
@@ -1113,55 +1114,63 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private Vector3[] GetInteriorPatrolRoute(int index)
     {
-        // All route points lie along the already-built corridor and room floors.
-        // Side-wing sentries remain in their own wing rather than crossing sealed walls.
-        switch (index)
+        // Each route stays inside the walkable bounds of its own room/corridor.
+        if (index <= 2)
         {
-            case 0:
-                return new[] {
-                    new Vector3(-7f, 0f, 24f), new Vector3(-7f, 0f, 48f),
-                    new Vector3(-4f, 0f, 69f), new Vector3(-12f, 0f, 86f),
-                    new Vector3(10f, 0f, 86f), new Vector3(7f, 0f, 62f)
-                };
-            case 1:
-                return new[] {
-                    new Vector3(7f, 0f, 35f), new Vector3(7f, 0f, 56f),
-                    new Vector3(4f, 0f, 72f), new Vector3(16f, 0f, 86f),
-                    new Vector3(-15f, 0f, 86f), new Vector3(-7f, 0f, 60f)
-                };
-            case 2:
-            case 3:
-                return new[] {
-                    new Vector3(-69f, 0f, 5f), new Vector3(-78f, 0f, -15f),
-                    new Vector3(-69f, 0f, -28f), new Vector3(-58f, 0f, -15f),
-                    new Vector3(-58f, 0f, 12f), new Vector3(-69f, 0f, 25f)
-                };
-            case 4:
-            case 5:
-                return new[] {
-                    new Vector3(69f, 0f, 5f), new Vector3(78f, 0f, -15f),
-                    new Vector3(69f, 0f, -28f), new Vector3(58f, 0f, -15f),
-                    new Vector3(58f, 0f, 12f), new Vector3(69f, 0f, 25f)
-                };
-            case 6:
-                return new[] {
-                    new Vector3(0f, 0f, -50f), new Vector3(0f, 0f, -70f),
-                    new Vector3(-14f, 0f, -87f), new Vector3(0f, 0f, -92f),
-                    new Vector3(14f, 0f, -87f), new Vector3(0f, 0f, -70f)
-                };
-            case 7:
-                return new[] {
-                    new Vector3(21f, 0f, -88f), new Vector3(14f, 0f, -79f),
-                    new Vector3(0f, 0f, -86f), new Vector3(-14f, 0f, -92f),
-                    new Vector3(-20f, 0f, -84f), new Vector3(0f, 0f, -70f)
-                };
-            default:
-                return new[] {
-                    new Vector3(9f, 0f, 87f), new Vector3(16f, 0f, 93f),
-                    new Vector3(0f, 0f, 96f), new Vector3(-16f, 0f, 87f),
-                    new Vector3(-9f, 0f, 80f), new Vector3(0f, 0f, 78f)
-                };
+            float side = index == 0 ? -17f : (index == 1 ? 0f : 17f);
+            return new[] {
+                new Vector3(side, 0f, -96f), new Vector3(side, 0f, -81f),
+                new Vector3(index == 1 ? -12f : side, 0f, -78f),
+                new Vector3(index == 1 ? 12f : side, 0f, -91f)
+            };
         }
+        if (index <= 5)
+        {
+            float side = index % 2 == 0 ? 5f : -5f;
+            return new[] {
+                new Vector3(side, 0f, -74f), new Vector3(side, 0f, -64f),
+                new Vector3(-side, 0f, -53f), new Vector3(-side, 0f, -49f)
+            };
+        }
+        if (index <= 10)
+        {
+            switch (index % 5)
+            {
+                case 1:
+                    return new[] { new Vector3(-31f,0f,-30f), new Vector3(-15f,0f,-30f), new Vector3(-15f,0f,-5f), new Vector3(-31f,0f,-5f) };
+                case 2:
+                    return new[] { new Vector3(31f,0f,-30f), new Vector3(15f,0f,-30f), new Vector3(15f,0f,-5f), new Vector3(31f,0f,-5f) };
+                case 3:
+                    return new[] { new Vector3(-31f,0f,5f), new Vector3(-15f,0f,5f), new Vector3(-15f,0f,30f), new Vector3(-31f,0f,30f) };
+                case 4:
+                    return new[] { new Vector3(31f,0f,5f), new Vector3(15f,0f,5f), new Vector3(15f,0f,30f), new Vector3(31f,0f,30f) };
+                default:
+                    return new[] { new Vector3(-8f,0f,34f), new Vector3(8f,0f,34f), new Vector3(8f,0f,43f), new Vector3(-8f,0f,43f) };
+            }
+        }
+        if (index <= 12)
+        {
+            float side = index == 11 ? -5f : 5f;
+            return new[] {
+                new Vector3(side, 0f, 50f), new Vector3(side, 0f, 61f),
+                new Vector3(-side, 0f, 75f), new Vector3(-side, 0f, 52f)
+            };
+        }
+        if (index <= 15)
+        {
+            float side = index == 13 ? -19f : (index == 14 ? 19f : 0f);
+            return new[] {
+                new Vector3(side, 0f, 80f), new Vector3(side, 0f, 91f),
+                new Vector3(side == 0f ? -20f : -side, 0f, 99f),
+                new Vector3(side == 0f ? 20f : side, 0f, 91f)
+            };
+        }
+
+        float exitSide = index == 16 ? -5f : 5f;
+        return new[] {
+            new Vector3(exitSide, 0f, 105f), new Vector3(exitSide, 0f, 115f),
+            new Vector3(-exitSide, 0f, 123f), new Vector3(-exitSide, 0f, 106f)
+        };
     }
 
     private void BuildAlienTrooperDetails(Transform alien, int archetype)
