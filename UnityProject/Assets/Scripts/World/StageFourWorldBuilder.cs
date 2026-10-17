@@ -243,6 +243,23 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (built && controller != null && gameplayCamera != null)
         {
             SpawnInteriorAliens();
+
+            // Install Stage 4-only escape logic after the player and world are ready.
+            // Do not run a global scene-load bootstrap on Stages 1-3; attach once here.
+            if (GetComponent<StageFourEscapeSequence>() == null)
+            {
+                try
+                {
+                    gameObject.AddComponent<StageFourEscapeSequence>();
+                    StartupCheckpoint.Set("StageFourEscapeSequenceInstalled");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError("PERSIA_STAGE4: escape setup failed: " + ex);
+                    StartupCheckpoint.Set("StageFourEscapeSequenceInstallFailed");
+                }
+            }
+
             if (!introRunning)
                 StartCoroutine(PlayArrivalCinematic());
         }
