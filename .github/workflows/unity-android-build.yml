@@ -126,6 +126,11 @@ jobs:
           assert 'Resources.Load<Shader>("PersiaWarAndroidFlat")' in factory, 'Android does not prefer the bundled flat shader.'
           assert factory.index('Resources.Load<Shader>("PersiaWarAndroidFlat")') < factory.index('Shader.Find("Unlit/Texture")'), 'Built-in lookup runs before the bundled Android shader.'
           assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
+          stage4 = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
+          assert 'Shader shader = RuntimeMaterialFactory.GetShader();' in stage4, 'Stage 4 must prefer the Resources-backed shader to avoid Android shader stripping.'
+          assert 'm.mainTexture = Texture2D.whiteTexture;' in stage4, 'Stage 4 flat materials must supply the white base texture.'
+          assert 'No compatible runtime shader found for Stage 4 materials.' in stage4, 'Stage 4 must fail with an explicit shader error instead of constructing a null material.'
+          assert 'BuildFailureCode = ex != null ? ex.GetType().Name : "UnknownError";' in stage4, 'Stage 4 runtime build failures must retain a diagnostic code.'
           assert 'DisableLegacyWorldBuilderPath();' in bootstrap, 'Android does not disable the retired gray-ground/dark-road generator.'
           legacy_world = Path('UnityProject/Assets/Scripts/World/WorldBuilder.cs').read_text(encoding='utf-8')
           assert 'new Color(0.12f, 0.46f, 0.08f)' in legacy_world and 'new Color(0.52f, 0.54f, 0.57f)' in legacy_world, 'Legacy fallback colors regress.'
