@@ -31,6 +31,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     public string IntroMessage { get; private set; } = "GREEN UPLINK DETECTED";
     public string BuildStatus { get; private set; } = "Stage 4: waiting to build orbital megabase...";
     public bool IsBuilt => built;
+    public string BuildFailureCode { get; private set; } = string.Empty;
 
     public static void ClearExistingWorld()
     {
@@ -99,6 +100,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private bool PrepareWorldBuild()
     {
+        BuildFailureCode = string.Empty;
         try
         {
             ClearWorld();
@@ -162,9 +164,11 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private void FailWorldBuild(System.Exception ex)
     {
+        BuildFailureCode = ex != null ? ex.GetType().Name : "UnknownError";
+        string details = ex != null ? ex.Message : "No exception details were available.";
         Debug.LogError("PERSIA_STAGE4: world build failed: " + ex);
-        StartupCheckpoint.Set("StageFourWorldBuildFailed_" + ex.GetType().Name);
-        BuildStatus = "Stage 4 construction failed. Returning to menu...";
+        StartupCheckpoint.Set("StageFourWorldBuildFailed_" + BuildFailureCode);
+        BuildStatus = "Stage 4 construction failed (" + BuildFailureCode + "): " + details;
         ClearWorld();
     }
 
@@ -497,10 +501,26 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private Material MakeMaterial(string name, Color color, Color? emission = null)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        // Use the project's Resources-backed shader first. Shader.Find fallbacks can
+        // be stripped from Android players when no serialized material references them.
+        Shader shader = RuntimeMaterialFactory.GetShader();
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
         if (shader == null) shader = Shader.Find("Standard");
+        if (shader == null)
+            throw new System.InvalidOperationException(
+                "No compatible runtime shader found for Stage 4 materials.");
+
         var m = new Material(shader) { name = name, color = color };
-        if (emission.HasValue)
+        if (m.HasProperty("_Color"))
+            m.SetColor("_Color", color);
+        if (m.HasProperty("_BaseColor"))
+            m.SetColor("_BaseColor", color);
+        if (m.HasProperty("_MainTex") && m.mainTexture == null)
+            m.mainTexture = Texture2D.whiteTexture;
+
+        // The Android flat shader has no emission properties; its explicit colors
+        // still keep green/cyan markers visible without emitting unsupported keywords.
+        if (emission.HasValue && m.HasProperty("_EmissionColor"))
         {
             m.EnableKeyword("_EMISSION");
             m.SetColor("_EmissionColor", emission.Value);
