@@ -340,6 +340,8 @@ namespace PersiaWar.Unity2D5D
                     DrawStageThreeHUD();
                 else
                     DrawAndroidPresentationHUD();
+                if (stageNumber == 4)
+                    DrawStageFourObjective();
                 DrawAndroidPauseControl();
                 if (stageNumber != 3 && stageNumber != 4)
                     DrawGirlRescueNotice();
@@ -1064,6 +1066,27 @@ namespace PersiaWar.Unity2D5D
                 "STAGE 4  •  ORBITAL MOTHERSHIP", menuSmallStyle);
             GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 31f * scale, panel.width - 24f * scale, 34f * scale),
                 stageFourWorldBuilder != null ? stageFourWorldBuilder.IntroMessage : "ENTERING THE MEGABASE", menuHeaderStyle);
+        }
+
+        private void DrawStageFourObjective()
+        {
+            if (stageFourWorldBuilder == null)
+                return;
+
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.70f, 1.2f);
+            Rect panel = new Rect(14f * scale, 48f * scale, 246f * scale, 48f * scale);
+            Fill(panel, new Color(0.015f, 0.035f, 0.055f, 0.82f));
+            Fill(new Rect(panel.x, panel.y, 3.5f * scale, panel.height),
+                new Color(0.10f, 1f, 0.42f, 0.95f));
+
+            int remaining = stageFourWorldBuilder.RemainingHostiles;
+            int total = stageFourWorldBuilder.TotalHostiles;
+            string objective = remaining > 0
+                ? "HOSTILES  " + remaining + " / " + total
+                : "MOTHERSHIP SECURED";
+            GUI.Label(new Rect(panel.x + 10f * scale, panel.y + 5f * scale,
+                panel.width - 16f * scale, panel.height - 8f * scale),
+                objective, menuSmallStyle);
         }
 
         private void DrawStageThreeHUD()
