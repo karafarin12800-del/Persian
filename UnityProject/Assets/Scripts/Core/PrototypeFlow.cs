@@ -2301,7 +2301,11 @@ namespace PersiaWar.Unity2D5D
                     StartupCheckpoint.Set("StageFourWorldBuildFailed");
                     startingMatch = false;
                     mode = ScreenMode.MainMenu;
-                    ShowLobbyNotice("STAGE 4 LOAD FAILED. PLEASE TRY AGAIN.");
+                    string stageFourFailureCode = stageFourWorldBuilder != null &&
+                        !string.IsNullOrEmpty(stageFourWorldBuilder.BuildFailureCode)
+                        ? stageFourWorldBuilder.BuildFailureCode
+                        : "UNKNOWN";
+                    ShowLobbyNotice("STAGE 4 FAILED: " + stageFourFailureCode);
                     yield break;
                 }
                 StartupCheckpoint.Set("StageFourWorldBuildCompleted");
