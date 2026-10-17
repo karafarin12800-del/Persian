@@ -798,7 +798,9 @@ namespace PersiaWar.Unity2D5D
                 Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
                 if (mode == ScreenMode.MainMenu)
                 {
-                    for (int button = 0; button < 7; button++)
+                    // Keep native touch hit-testing aligned with all eight menu buttons.
+                    // Stage 4 is index 7; excluding it makes the visible Android button inert.
+                    for (int button = 0; button < 8; button++)
                     {
                         if (!GetLobbyButtonRect(button).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
