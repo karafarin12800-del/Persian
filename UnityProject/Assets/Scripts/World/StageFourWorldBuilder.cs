@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using PersiaWar.Unity2D5D;
 
@@ -16,7 +17,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private Camera gameplayCamera;
     private PlayerController controller;
     private Transform greenBeam;
+    private Transform greenBeamCore;
+    private Transform impactPulse;
+    private Transform interiorTransferPulse;
+    private readonly List<EnemyChase> interiorHostiles = new List<EnemyChase>();
     private Material dark, metal, brightMetal, glass, green, cyan, floor, planetSurface, planetLand;
+    private Material alienArmor, alienDark, alienEye;
     private bool built, introRunning;
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
@@ -31,6 +37,22 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     public string IntroMessage { get; private set; } = "GREEN UPLINK DETECTED";
     public string BuildStatus { get; private set; } = "Stage 4: waiting to build orbital megabase...";
     public bool IsBuilt => built;
+    public int TotalHostiles => interiorHostiles.Count;
+    public int RemainingHostiles
+    {
+        get
+        {
+            int remaining = 0;
+            for (int i = 0; i < interiorHostiles.Count; i++)
+            {
+                EnemyChase hostile = interiorHostiles[i];
+                TargetHealth health = hostile != null ? hostile.GetComponent<TargetHealth>() : null;
+                if (hostile != null && health != null && health.CurrentHealth > 0)
+                    remaining++;
+            }
+            return remaining;
+        }
+    }
     public string BuildFailureCode { get; private set; } = string.Empty;
 
     public static void ClearExistingWorld()
@@ -121,6 +143,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             green = MakeMaterial("S4_GreenUplink", new Color(0.12f, 1f, 0.35f), new Color(0.06f, 1f, 0.28f));
             cyan = MakeMaterial("S4_CyanDockLights", new Color(0.12f, 0.8f, 1f), new Color(0.04f, 0.5f, 1f));
             floor = MakeMaterial("S4_HangarFloor", new Color(0.085f, 0.11f, 0.15f));
+            alienArmor = MakeMaterial("S4_AlienArmor", new Color(0.14f, 0.27f, 0.32f));
+            alienDark = MakeMaterial("S4_AlienChitin", new Color(0.035f, 0.075f, 0.09f));
+            alienEye = MakeMaterial("S4_AlienBioluminescence", new Color(0.18f, 1f, 0.32f));
             planetSurface = MakeMaterial("S4_PlanetOcean", new Color(0.025f, 0.13f, 0.25f), new Color(0.005f, 0.025f, 0.06f));
             planetLand = MakeMaterial("S4_PlanetContinents", new Color(0.12f, 0.31f, 0.17f), new Color(0.015f, 0.045f, 0.012f));
             return true;
@@ -211,8 +236,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             gameplayCamera.backgroundColor = new Color(0.005f, 0.012f, 0.03f);
             gameplayCamera.farClipPlane = Mathf.Max(savedFarClip, 2600f);
         }
-        if (built && controller != null && gameplayCamera != null && !introRunning)
-            StartCoroutine(PlayArrivalCinematic());
+        if (built && controller != null && gameplayCamera != null)
+        {
+            SpawnInteriorAliens();
+            if (!introRunning)
+                StartCoroutine(PlayArrivalCinematic());
+        }
     }
 
     private void Update()
@@ -231,9 +260,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private IEnumerator PlayArrivalCinematic()
     {
         introRunning = true;
-        IntroMessage = "STAGE 4 • ORBITAL MEGABASE APPROACH";
+        IntroMessage = "STAGE 4 • ORBITAL UPLINK DETECTED";
         Transform pilot = player;
-        Renderer[] renderers = pilot.GetComponentsInChildren<Renderer>(true);
+        Renderer[] renderers = pilot != null ? pilot.GetComponentsInChildren<Renderer>(true) : new Renderer[0];
         bool[] wasEnabled = new bool[renderers.Length];
         for (int i = 0; i < renderers.Length; i++)
         {
@@ -241,96 +270,175 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             if (renderers[i] != null) renderers[i].enabled = false;
         }
 
-        Vector3 stationCenter = new Vector3(0f, 0f, 120f);
-        Vector3 farPos = stationCenter + new Vector3(0f, 840f, -1120f);
-        Vector3 nearPos = new Vector3(0f, 90f, -145f);
+        Vector3[] cameraPath =
+        {
+            new Vector3(0f, 650f, 1120f),
+            new Vector3(0f, 390f, 730f),
+            new Vector3(0f, 145f, 390f),
+            new Vector3(0f, 48f, 225f),
+            new Vector3(0f, 16f, 92f),
+            new Vector3(0f, 8f, 20f)
+        };
+        Vector3[] lookPath =
+        {
+            new Vector3(0f, 24f, 0f),
+            new Vector3(0f, 30f, 28f),
+            new Vector3(0f, 38f, 56f),
+            new Vector3(0f, 20f, 58f),
+            new Vector3(0f, 8f, 38f),
+            new Vector3(0f, 3f, 6f)
+        };
+
+        const float duration = 8.0f;
+        const float beamTopY = 320f;
+        const float beamImpactY = 44f;
+        float maxBeamHalfHeight = (beamTopY - beamImpactY) * 0.5f;
         float t = 0f;
-        while (t < 5.2f)
+        bool interiorPulseShown = false;
+        while (t < duration)
         {
             t += Time.unscaledDeltaTime;
+            float normalized = Mathf.Clamp01(t / duration);
+            Vector3 cameraPosition = EvaluatePath(cameraPath, normalized);
+            Vector3 cameraTarget = EvaluatePath(lookPath, normalized);
+            gameplayCamera.transform.position = cameraPosition;
+            Vector3 direction = cameraTarget - cameraPosition;
+            if (direction.sqrMagnitude > 0.001f)
+                gameplayCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+
+            float grow = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 2.05f));
+            float collapse = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 3.0f) / 1.15f));
+            float beamHalfHeight = Mathf.Lerp(0.12f, maxBeamHalfHeight, grow) * (1f - 0.96f * collapse);
             if (greenBeam != null)
             {
-                // Grow the uplink from the planet's surface upward into the mothership.
-                // A Unity cylinder's full height is twice its Y scale.
-                float beamHalfHeight = Mathf.Lerp(0.1f, 140f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 1.8f)));
-                greenBeam.position = new Vector3(0f, PlanetSurfaceY + beamHalfHeight, 120f);
-                greenBeam.localScale = new Vector3(15f, beamHalfHeight, 15f);
+                greenBeam.position = new Vector3(0f, beamTopY - beamHalfHeight, 48f);
+                greenBeam.localScale = new Vector3(13f, Mathf.Max(0.12f, beamHalfHeight), 13f);
             }
-            float a = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 5.2f));
-            gameplayCamera.transform.position = Vector3.Lerp(farPos, nearPos, a);
-            Vector3 target = Vector3.Lerp(stationCenter, new Vector3(0f, 4f, 22f), a);
-            gameplayCamera.transform.rotation = Quaternion.LookRotation(target - gameplayCamera.transform.position, Vector3.up);
-            IntroMessage = a < 0.35f ? "GREEN UPLINK • ORBITAL BASE IN VIEW" :
-                a < 0.72f ? "APPROACHING THE MOTHERSHIP DOCK" : "ENTERING THE MOTHERSHIP HANGAR";
+            if (greenBeamCore != null)
+            {
+                greenBeamCore.position = new Vector3(0f, beamTopY - beamHalfHeight, 48f);
+                greenBeamCore.localScale = new Vector3(4.2f, Mathf.Max(0.12f, beamHalfHeight), 4.2f);
+            }
+
+            if (impactPulse != null)
+            {
+                float impact = Mathf.Clamp01((t - 1.7f) / 0.55f);
+                float pulse = 11f + Mathf.Sin(t * 8.5f) * 2.5f;
+                impactPulse.position = new Vector3(0f, beamImpactY, 48f);
+                impactPulse.localScale = Vector3.one * Mathf.Lerp(0.25f, pulse, impact);
+            }
+
+            if (interiorTransferPulse != null && t >= 3.15f)
+            {
+                if (!interiorPulseShown)
+                {
+                    interiorPulseShown = true;
+                    Renderer pulseRenderer = interiorTransferPulse.GetComponent<Renderer>();
+                    if (pulseRenderer != null) pulseRenderer.enabled = true;
+                    StartupCheckpoint.Set("StageFourUplinkEnteredMothership");
+                }
+                float feed = Mathf.Clamp01((t - 3.15f) / 4.25f);
+                interiorTransferPulse.position = new Vector3(0f, 1.45f, Mathf.Lerp(82f, -12f, feed));
+                interiorTransferPulse.localScale = Vector3.one * (1.2f + Mathf.Sin(t * 12f) * 0.15f);
+            }
+
+            IntroMessage = t < 1.8f ? "GREEN BEAM DESCENDING FROM SPACE" :
+                t < 3.0f ? "UPLINK IMPACT • MOTHERSHIP HULL" :
+                t < 4.6f ? "ENERGY TRANSFER ENTERING THE SHIP" :
+                t < 6.6f ? "FOLLOWING THE UPLINK THROUGH THE HANGAR" :
+                "INSIDE THE MOTHERSHIP • HOSTILES DETECTED";
             yield return null;
         }
 
-        // Short green scan flash at the hangar entrance, then cut to the player
-        // standing inside the mothership so the actual match begins indoors.
         IntroMessage = "TRANSFER COMPLETE • MOTHERSHIP INTERIOR";
-        yield return new WaitForSecondsRealtime(0.65f);
+        yield return new WaitForSecondsRealtime(0.35f);
         for (int i = 0; i < renderers.Length; i++)
             if (renderers[i] != null) renderers[i].enabled = wasEnabled[i];
 
-        Quaternion yaw = Quaternion.Euler(0f, pilot.eulerAngles.y, 0f);
-        Vector3 cameraTarget = pilot.position + Vector3.up * 2.1f;
-        gameplayCamera.transform.position = cameraTarget - yaw * Vector3.forward * 7.2f + Vector3.up * 3.2f;
-        gameplayCamera.transform.rotation = Quaternion.LookRotation(cameraTarget - gameplayCamera.transform.position, Vector3.up);
-        gameplayCamera.farClipPlane = Mathf.Max(savedFarClip, 900f);
-        gameplayCamera.clearFlags = CameraClearFlags.SolidColor;
-        gameplayCamera.backgroundColor = new Color(0.015f, 0.025f, 0.04f);
-        if (controller != null)
+        if (pilot != null && gameplayCamera != null)
         {
+            Quaternion yaw = Quaternion.Euler(0f, pilot.eulerAngles.y, 0f);
+            Vector3 cameraTarget = pilot.position + Vector3.up * 2.1f;
+            gameplayCamera.transform.position = cameraTarget - yaw * Vector3.forward * 7.2f + Vector3.up * 3.2f;
+            gameplayCamera.transform.rotation = Quaternion.LookRotation(cameraTarget - gameplayCamera.transform.position, Vector3.up);
+            gameplayCamera.farClipPlane = Mathf.Max(savedFarClip, 900f);
+            gameplayCamera.clearFlags = CameraClearFlags.SolidColor;
+            gameplayCamera.backgroundColor = new Color(0.015f, 0.025f, 0.04f);
+        }
+
+        // Unlock after dropping the cinematic gate; Update() disables these while
+        // introRunning is true, so unlocking before the final wait is undone each frame.
+        introRunning = false;
+        if (controller != null && !controller.IsDefeated)
+        {
+            controller.SetMoveInput(Vector2.zero);
+            controller.ClearAimDirection();
             controller.SetMovementEnabled(true);
             if (controller.Weapon != null) controller.Weapon.enabled = true;
             if (controller.Aim != null) controller.Aim.enabled = true;
         }
-        yield return new WaitForSecondsRealtime(0.55f);
-        introRunning = false;
+        for (int i = 0; i < interiorHostiles.Count; i++)
+            if (interiorHostiles[i] != null) interiorHostiles[i].enabled = true;
+
         IntroMessage = "STAGE 4 • SECURE THE MOTHERSHIP";
         StartupCheckpoint.Set("StageFourArrivalCinematicComplete_PlayerInsideMothership");
+        StartupCheckpoint.Set("StageFourControlsAndInteriorHostilesEnabled");
+    }
+
+    private static Vector3 EvaluatePath(Vector3[] points, float t)
+    {
+        if (points == null || points.Length == 0) return Vector3.zero;
+        if (points.Length == 1) return points[0];
+        float scaled = Mathf.Clamp01(t) * (points.Length - 1);
+        int index = Mathf.Min(points.Length - 2, Mathf.FloorToInt(scaled));
+        return Vector3.Lerp(points[index], points[index + 1], scaled - index);
     }
 
     private IEnumerator BuildExteriorMegabaseRoutine()
     {
-        // A broad orbital platform suggests a city-scale base (not a small station).
-        Box("S4_OrbitalFoundation", new Vector3(0f, -22f, 120f), new Vector3(980f, 36f, 980f), dark);
-        Box("S4_CentralSpine", new Vector3(0f, 4f, 120f), new Vector3(260f, 28f, 520f), metal);
-        Box("S4_MainTransitRing", new Vector3(0f, 5f, 120f), new Vector3(780f, 10f, 780f), dark);
-        // District blocks, towers, illuminated lanes, and multiple launch/docking arms.
+        // Orbital city platform stays below the playable deck so it never occludes combat inside.
+        Box("S4_OrbitalFoundation", new Vector3(0f, -22f, 0f), new Vector3(980f, 36f, 980f), dark);
+        Box("S4_CentralSpine", new Vector3(0f, -12f, 0f), new Vector3(260f, 8f, 520f), metal);
+        Box("S4_MainTransitRing", new Vector3(0f, -9f, 0f), new Vector3(780f, 4f, 780f), dark);
+
         for (int x = -4; x <= 4; x++)
         for (int z = -4; z <= 4; z++)
         {
             if (Mathf.Abs(x) < 2 && Mathf.Abs(z) < 2) continue;
-            float px = x * 92f, pz = 120f + z * 92f;
+            float px = x * 92f, pz = z * 92f;
             float h = 26f + ((x * 7 + z * 11 + 37) & 3) * 15f;
             Box("S4_CityDistrict_" + x + "_" + z, new Vector3(px, h * 0.5f - 2f, pz),
-                new Vector3(48f + Mathf.Abs(z % 3) * 9f, h, 52f + Mathf.Abs(x % 3) * 8f), (x + z) % 2 == 0 ? metal : brightMetal);
+                new Vector3(48f + Mathf.Abs(z % 3) * 9f, h, 52f + Mathf.Abs(x % 3) * 8f),
+                (x + z) % 2 == 0 ? metal : brightMetal);
             for (int w = -1; w <= 1; w++)
                 Box("S4_DistrictLight_" + x + "_" + z + "_" + w,
                     new Vector3(px + w * 12f, h + 0.15f, pz - 25f),
                     new Vector3(3.2f, 0.7f, 0.5f), cyan);
-            if (z == 4) yield return null; // keep Android rendering responsive during district generation
+            if (z == 4) yield return null;
         }
+
+        // Eight reinforced docking arms radiate from the central mothership.
         for (int arm = 0; arm < 8; arm++)
         {
             float angle = arm * 45f * Mathf.Deg2Rad;
             Vector3 dir = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
-            Vector3 pos = new Vector3(dir.x * 350f, 5f, 120f + dir.z * 350f);
-            Box("S4_DockingArm_" + arm, pos, new Vector3(74f, 12f, 210f), metal, Quaternion.LookRotation(dir));
-            Box("S4_DockPad_" + arm, pos + dir * 130f + Vector3.up * 9f,
-                new Vector3(112f, 5f, 88f), brightMetal, Quaternion.LookRotation(dir));
+            Vector3 pos = dir * 300f + Vector3.up * 5f;
+            Box("S4_DockingArm_" + arm, pos, new Vector3(66f, 12f, 300f), metal, Quaternion.LookRotation(dir));
+            Vector3 padPos = dir * 395f + Vector3.up * 10f;
+            Box("S4_DockPad_" + arm, padPos, new Vector3(102f, 5f, 78f), brightMetal, Quaternion.LookRotation(dir));
+            Vector3 collarPos = dir * 205f + Vector3.up * 11f;
+            Box("S4_DockingCollar_" + arm, collarPos, new Vector3(46f, 4f, 24f), cyan, Quaternion.LookRotation(dir));
             for (int light = -3; light <= 3; light++)
                 Box("S4_DockRunwayLight_" + arm + "_" + light,
-                    pos + dir * (60f + (light + 3) * 20f) + Vector3.up * 15f + Vector3.right * light * 7f,
-                    new Vector3(3f, 1f, 3f), green);
+                    pos + dir * ((light + 4) * 18f - 54f) + Vector3.up * 12f + Vector3.right * light * 7f,
+                    new Vector3(2.8f, 0.7f, 2.8f), green);
             yield return null;
         }
-        // Ring pylons are tall enough to read in the far establishing shot.
+
         for (int i = 0; i < 24; i++)
         {
             float a = i * Mathf.PI * 2f / 24f;
-            Vector3 p = new Vector3(Mathf.Cos(a) * 430f, 48f, 120f + Mathf.Sin(a) * 430f);
+            Vector3 p = new Vector3(Mathf.Cos(a) * 430f, 48f, Mathf.Sin(a) * 430f);
             Box("S4_RingPylon_" + i, p, new Vector3(18f, 92f + (i % 3) * 22f, 18f), brightMetal);
             Box("S4_RingPylonBeacon_" + i, p + Vector3.up * 55f, new Vector3(5f, 3f, 5f), cyan);
             if (i % 3 == 2) yield return null;
@@ -339,12 +447,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private IEnumerator BuildDockedShipsRoutine()
     {
-        // Sixteen visibly distinct docked craft attached to the perimeter docks.
+        // Sixteen small spacecraft sit along docking collars on the mothership's arms.
         for (int i = 0; i < 16; i++)
         {
             float a = i * Mathf.PI * 2f / 16f;
             Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-            Vector3 p = new Vector3(dir.x * 360f, 19f + (i % 3) * 8f, 120f + dir.z * 360f);
+            Vector3 p = dir * (212f + (i % 2) * 12f) + Vector3.up * (17f + (i % 3) * 5f);
             BuildShip("S4_DockedShip_" + i, p, Quaternion.LookRotation(dir), 0.78f + (i % 4) * 0.16f);
             yield return null;
         }
@@ -352,27 +460,90 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private IEnumerator BuildMothershipAndInteriorRoutine()
     {
-        // Central mothership hull and bridge crown, with an open, playable interior.
-        Box("S4_MothershipKeel", new Vector3(0f, 12f, 120f), new Vector3(210f, 26f, 320f), dark);
-        Box("S4_MothershipUpperHull", new Vector3(0f, 29f, 120f), new Vector3(178f, 16f, 260f), brightMetal);
-        Box("S4_MothershipBridge", new Vector3(0f, 45f, 172f), new Vector3(92f, 18f, 72f), metal);
-        Box("S4_MothershipBridgeGlass", new Vector3(0f, 48f, 176f), new Vector3(70f, 7f, 45f), glass);
-        // The hangar floor is centered on the gameplay origin; walls frame rather than block it.
+        // Layered outer shell around a hollow playable vessel; only room geometry collides.
+        Box("S4_MothershipKeel", new Vector3(0f, -3.9f, 0f), new Vector3(28f, 7.5f, 278f), dark);
+        Box("S4_MothershipUpperHull", new Vector3(0f, 21f, 0f), new Vector3(154f, 10f, 264f), brightMetal);
+        Box("S4_MothershipPortHull", new Vector3(-102f, 8.5f, 0f), new Vector3(12f, 17f, 270f), dark);
+        Box("S4_MothershipStarboardHull", new Vector3(102f, 8.5f, 0f), new Vector3(12f, 17f, 270f), dark);
+        Box("S4_MothershipProwArmor", new Vector3(0f, 9f, 139f), new Vector3(190f, 18f, 12f), metal);
+        Box("S4_MothershipAftArmor", new Vector3(0f, 8f, -139f), new Vector3(190f, 16f, 12f), metal);
+        Box("S4_MothershipBridge", new Vector3(0f, 38f, 57f), new Vector3(86f, 18f, 56f), metal);
+        Box("S4_MothershipBridgeGlass", new Vector3(0f, 39f, 87f), new Vector3(68f, 10f, 18f), glass);
+        Box("S4_MothershipBridgePortFin", new Vector3(-52f, 31f, 62f), new Vector3(20f, 9f, 58f), brightMetal);
+        Box("S4_MothershipBridgeStarboardFin", new Vector3(52f, 31f, 62f), new Vector3(20f, 9f, 58f), brightMetal);
+
+        for (int i = -3; i <= 3; i++)
+        {
+            float x = i * 22f;
+            Box("S4_MothershipAftEngine_" + i, new Vector3(x, 5f, -151f), new Vector3(13f, 12f, 28f), metal);
+            Box("S4_MothershipAftEngineGlow_" + i, new Vector3(x, 5f, -166f), new Vector3(7f, 7f, 3f), i % 2 == 0 ? green : cyan);
+        }
+        for (int i = -4; i <= 4; i++)
+        {
+            float z = -105f + i * 26f;
+            Box("S4_MothershipSideBeaconL_" + i, new Vector3(-96f, 13f, z), new Vector3(3f, 2f, 8f), cyan);
+            Box("S4_MothershipSideBeaconR_" + i, new Vector3(96f, 13f, z), new Vector3(3f, 2f, 8f), green);
+            if (i % 2 == 0) yield return null;
+        }
+
         Box("S4_InteriorHangarFloor", new Vector3(0f, -0.35f, 0f), new Vector3(94f, 0.7f, 94f), floor);
         Box("S4_HangarCeiling", new Vector3(0f, 15f, 0f), new Vector3(94f, 2f, 94f), dark);
-        Box("S4_HangarWallLeft", new Vector3(-47f, 7f, 0f), new Vector3(2f, 14f, 94f), metal);
-        Box("S4_HangarWallRight", new Vector3(47f, 7f, 0f), new Vector3(2f, 14f, 94f), metal);
-        Box("S4_HangarRearWall", new Vector3(0f, 7f, -47f), new Vector3(94f, 14f, 2f), metal);
-        // Wide forward blast door, with segmented pillars and an open central view toward the base.
+
+        // Open side portals from the hangar plus a rear hatch to keep branches connected.
+        Box("S4_HangarWallLeftFront", new Vector3(-47f, 7f, 34f), new Vector3(2f, 14f, 26f), metal);
+        Box("S4_HangarWallLeftRear", new Vector3(-47f, 7f, -34f), new Vector3(2f, 14f, 26f), metal);
+        Box("S4_HangarWallRightFront", new Vector3(47f, 7f, 34f), new Vector3(2f, 14f, 26f), metal);
+        Box("S4_HangarWallRightRear", new Vector3(47f, 7f, -34f), new Vector3(2f, 14f, 26f), metal);
+        Box("S4_HangarRearWallLeft", new Vector3(-31f, 7f, -47f), new Vector3(32f, 14f, 2f), metal);
+        Box("S4_HangarRearWallRight", new Vector3(31f, 7f, -47f), new Vector3(32f, 14f, 2f), metal);
+        Box("S4_HangarRearLintel", new Vector3(0f, 13.4f, -47f), new Vector3(30f, 1.2f, 2f), brightMetal);
+
         Box("S4_HangarDoorLeft", new Vector3(-36f, 7f, 47f), new Vector3(22f, 14f, 3f), brightMetal);
         Box("S4_HangarDoorRight", new Vector3(36f, 7f, 47f), new Vector3(22f, 14f, 3f), brightMetal);
         Box("S4_HangarDoorHeader", new Vector3(0f, 14f, 47f), new Vector3(50f, 2f, 3f), brightMetal);
+
+        Box("S4_InteriorForwardCorridorFloor", new Vector3(0f, -0.35f, 62.5f), new Vector3(24f, 0.7f, 31f), floor);
+        Box("S4_InteriorForwardCorridorLeft", new Vector3(-12f, 6.5f, 62.5f), new Vector3(1.5f, 13f, 31f), metal);
+        Box("S4_InteriorForwardCorridorRight", new Vector3(12f, 6.5f, 62.5f), new Vector3(1.5f, 13f, 31f), metal);
+        Box("S4_InteriorForwardCorridorCeiling", new Vector3(0f, 15f, 62.5f), new Vector3(24f, 2f, 31f), dark);
+        Box("S4_InteriorCommandRoomFloor", new Vector3(0f, -0.35f, 90f), new Vector3(52f, 0.7f, 26f), floor);
+        Box("S4_InteriorCommandRoomCeiling", new Vector3(0f, 15f, 90f), new Vector3(52f, 2f, 26f), dark);
+        Box("S4_InteriorCommandFrontLeft", new Vector3(-20f, 6.5f, 77f), new Vector3(16f, 13f, 1.5f), metal);
+        Box("S4_InteriorCommandFrontRight", new Vector3(20f, 6.5f, 77f), new Vector3(16f, 13f, 1.5f), metal);
+        Box("S4_InteriorCommandRearWall", new Vector3(0f, 6.5f, 103f), new Vector3(52f, 13f, 1.5f), metal);
+        Box("S4_InteriorCommandWallL", new Vector3(-26f, 6.5f, 90f), new Vector3(1.5f, 13f, 26f), metal);
+        Box("S4_InteriorCommandWallR", new Vector3(26f, 6.5f, 90f), new Vector3(1.5f, 13f, 26f), metal);
+        Box("S4_InteriorCommandConsole", new Vector3(0f, 1.2f, 96f), new Vector3(16f, 2.4f, 5f), brightMetal);
+        Box("S4_InteriorCommandConsoleGlow", new Vector3(0f, 2.45f, 96f), new Vector3(12f, 0.12f, 2.4f), green);
+
+        Box("S4_InteriorRearCorridorFloor", new Vector3(0f, -0.35f, -62.5f), new Vector3(24f, 0.7f, 31f), floor);
+        Box("S4_InteriorRearCorridorLeft", new Vector3(-12f, 6.5f, -62.5f), new Vector3(1.5f, 13f, 31f), metal);
+        Box("S4_InteriorRearCorridorRight", new Vector3(12f, 6.5f, -62.5f), new Vector3(1.5f, 13f, 31f), metal);
+        Box("S4_InteriorRearCorridorCeiling", new Vector3(0f, 15f, -62.5f), new Vector3(24f, 2f, 31f), dark);
+        Box("S4_InteriorEngineRoomFloor", new Vector3(0f, -0.35f, -89f), new Vector3(56f, 0.7f, 24f), floor);
+        Box("S4_InteriorEngineRoomCeiling", new Vector3(0f, 15f, -89f), new Vector3(56f, 2f, 24f), dark);
+        Box("S4_InteriorEngineDoorLeft", new Vector3(-20f, 6.5f, -77f), new Vector3(16f, 13f, 1.5f), metal);
+        Box("S4_InteriorEngineDoorRight", new Vector3(20f, 6.5f, -77f), new Vector3(16f, 13f, 1.5f), metal);
+        Box("S4_InteriorEngineRearWall", new Vector3(0f, 6.5f, -101f), new Vector3(56f, 13f, 1.5f), metal);
+        Box("S4_InteriorEngineWallL", new Vector3(-28f, 6.5f, -89f), new Vector3(1.5f, 13f, 24f), metal);
+        Box("S4_InteriorEngineWallR", new Vector3(28f, 6.5f, -89f), new Vector3(1.5f, 13f, 24f), metal);
+        for (int i = -2; i <= 2; i++)
+        {
+            float x = i * 8f;
+            Box("S4_InteriorEngineCoil_" + i, new Vector3(x, 3f, -88f), new Vector3(2.2f, 5.8f, 13f), brightMetal);
+            Box("S4_InteriorEngineCoilGlow_" + i, new Vector3(x, 6.05f, -88f), new Vector3(1.2f, 0.14f, 9f), i % 2 == 0 ? green : cyan);
+            yield return null;
+        }
+
+        BuildSideCompartment(-1);
+        BuildSideCompartment(1);
+        CreateVisualBox("S4_InteriorUplinkConduit", new Vector3(0f, 0.035f, 0f), new Vector3(0.85f, 0.07f, 198f), green);
+
         for (int i = -4; i <= 4; i++)
         {
             Box("S4_HangarFloorStripe_" + i, new Vector3(i * 8f, 0.04f, 3f),
                 new Vector3(0.55f, 0.08f, 70f), i == 0 ? green : cyan);
         }
-        yield return null;
         for (int i = 0; i < 6; i++)
         {
             float z = -32f + i * 13f;
@@ -382,31 +553,60 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             Box("S4_InteriorPanelR_" + i, new Vector3(37f, 7f, z), new Vector3(0.5f, 4f, 5f), cyan);
             yield return null;
         }
-        // Side passages give the hangar a sense of depth and scale.
-        Box("S4_InteriorSideHallL", new Vector3(-68f, 0f, 0f), new Vector3(42f, 0.5f, 24f), floor);
-        Box("S4_InteriorSideHallR", new Vector3(68f, 0f, 0f), new Vector3(42f, 0.5f, 24f), floor);
-        Box("S4_InteriorSideWallL", new Vector3(-68f, 6f, 13f), new Vector3(42f, 12f, 2f), metal);
-        Box("S4_InteriorSideWallR", new Vector3(68f, 6f, 13f), new Vector3(42f, 12f, 2f), metal);
         BuildShip("S4_InteriorServiceCraft", new Vector3(0f, 1.2f, 25f), Quaternion.identity, 0.36f);
         Box("S4_InteriorConsole", new Vector3(0f, 1.3f, -34f), new Vector3(14f, 2.6f, 4f), brightMetal);
         Box("S4_InteriorConsoleGlow", new Vector3(0f, 2.7f, -34f), new Vector3(10f, 0.18f, 2.2f), green);
     }
 
+    private void BuildSideCompartment(int side)
+    {
+        string label = side < 0 ? "Port" : "Starboard";
+        float sign = side;
+        float x = sign * 74f;
+        Box("S4_Interior" + label + "RoomFloor", new Vector3(x, -0.35f, 0f), new Vector3(42f, 0.7f, 52f), floor);
+        Box("S4_Interior" + label + "RoomCeiling", new Vector3(x, 15f, 0f), new Vector3(42f, 2f, 52f), dark);
+        Box("S4_Interior" + label + "OuterWall", new Vector3(sign * 95f, 6.5f, 0f), new Vector3(1.5f, 13f, 52f), metal);
+        Box("S4_Interior" + label + "FrontWall", new Vector3(x, 6.5f, 26f), new Vector3(42f, 13f, 1.5f), metal);
+        Box("S4_Interior" + label + "RearWall", new Vector3(x, 6.5f, -26f), new Vector3(42f, 13f, 1.5f), metal);
+        Box("S4_Interior" + label + "InnerWallFront", new Vector3(sign * 53f, 6.5f, 17f), new Vector3(1.5f, 13f, 18f), metal);
+        Box("S4_Interior" + label + "InnerWallRear", new Vector3(sign * 53f, 6.5f, -17f), new Vector3(1.5f, 13f, 18f), metal);
+        for (int i = -1; i <= 1; i++)
+        {
+            float z = i * 13f;
+            Box("S4_Interior" + label + "Locker_" + i, new Vector3(sign * 86f, 1.1f, z), new Vector3(8f, 2.2f, 7f), brightMetal);
+            CreateVisualBox("S4_Interior" + label + "Panel_" + i, new Vector3(sign * 54.5f, 8.1f, z),
+                new Vector3(0.22f, 3.8f, 6.8f), side < 0 ? green : cyan);
+            yield return null;
+        }
+    }
+
     private void BuildGreenUplink()
     {
         BuildTransferPlanet();
-
-        var beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        beam.name = "S4_GreenUplinkPlanetToMothership";
-        beam.transform.SetParent(root, false);
-        beam.transform.position = new Vector3(0f, PlanetSurfaceY + 0.1f, 120f);
-        beam.transform.localScale = new Vector3(15f, 0.1f, 15f);
-        var beamRenderer = beam.GetComponent<Renderer>();
-        if (beamRenderer != null) beamRenderer.sharedMaterial = green;
-        Collider c = beam.GetComponent<Collider>(); if (c != null) Destroy(c);
+        var beam = CreateVisualPrimitive(PrimitiveType.Cylinder, "S4_GreenUplinkFromSpace", green);
+        beam.transform.position = new Vector3(0f, 319.8f, 48f);
+        beam.transform.localScale = new Vector3(13f, 0.12f, 13f);
         greenBeam = beam.transform;
-        Box("S4_UplinkEmitter", new Vector3(0f, 18f, 120f), new Vector3(46f, 7f, 46f), green);
-        Box("S4_UplinkBaseRing", new Vector3(0f, 7f, 120f), new Vector3(92f, 4f, 92f), metal);
+
+        var core = CreateVisualPrimitive(PrimitiveType.Cylinder, "S4_GreenUplinkCore", cyan);
+        core.transform.position = new Vector3(0f, 319.8f, 48f);
+        core.transform.localScale = new Vector3(4.2f, 0.12f, 4.2f);
+        greenBeamCore = core.transform;
+
+        var pulse = CreateVisualPrimitive(PrimitiveType.Sphere, "S4_UplinkImpactPulse", green);
+        pulse.transform.position = new Vector3(0f, 44f, 48f);
+        pulse.transform.localScale = Vector3.one * 0.2f;
+        impactPulse = pulse.transform;
+
+        var transfer = CreateVisualPrimitive(PrimitiveType.Sphere, "S4_InteriorTransferPulse", cyan);
+        transfer.transform.position = new Vector3(0f, 1.45f, 82f);
+        transfer.transform.localScale = Vector3.one * 1.2f;
+        Renderer transferRenderer = transfer.GetComponent<Renderer>();
+        if (transferRenderer != null) transferRenderer.enabled = false;
+        interiorTransferPulse = transfer.transform;
+
+        Box("S4_UplinkImpactReceiver", new Vector3(0f, 26f, 48f), new Vector3(48f, 3f, 34f), green);
+        Box("S4_UplinkBridgeRing", new Vector3(0f, 48f, 48f), new Vector3(100f, 3f, 92f), metal);
     }
 
     private void BuildTransferPlanet()
@@ -416,7 +616,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         var planet = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         planet.name = "S4_TransferPlanet";
         planet.transform.SetParent(root, false);
-        planet.transform.position = new Vector3(0f, -1000f, 120f);
+        planet.transform.position = new Vector3(0f, -1000f, 0f);
         planet.transform.localScale = Vector3.one * 1800f;
         var oceanRenderer = planet.GetComponent<Renderer>();
         if (oceanRenderer != null) oceanRenderer.sharedMaterial = planetSurface;
@@ -485,6 +685,112 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         var c = go.GetComponent<Collider>(); if (c != null) Destroy(c);
     }
 
+    private GameObject CreateVisualPrimitive(PrimitiveType primitiveType, string name, Material material)
+    {
+        GameObject go = GameObject.CreatePrimitive(primitiveType);
+        go.name = name;
+        go.transform.SetParent(root, true);
+        Renderer renderer = go.GetComponent<Renderer>();
+        if (renderer != null) renderer.sharedMaterial = material;
+        Collider collider = go.GetComponent<Collider>();
+        if (collider != null) Destroy(collider);
+        return go;
+    }
+
+    private GameObject CreateVisualBox(string name, Vector3 position, Vector3 size, Material material)
+    {
+        GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = name;
+        go.transform.SetParent(root, false);
+        go.transform.position = position;
+        go.transform.localScale = size;
+        Renderer renderer = go.GetComponent<Renderer>();
+        if (renderer != null) renderer.sharedMaterial = material;
+        Collider collider = go.GetComponent<Collider>();
+        if (collider != null) Destroy(collider);
+        return go;
+    }
+
+    private void SpawnInteriorAliens()
+    {
+        if (controller == null || root == null || interiorHostiles.Count > 0)
+            return;
+
+        Vector3[] positions =
+        {
+            new Vector3(-6f, 0f, 27f),
+            new Vector3(7f, 0f, 38f),
+            new Vector3(-69f, 0f, 5f),
+            new Vector3(-78f, 0f, -15f),
+            new Vector3(69f, 0f, 5f),
+            new Vector3(78f, 0f, -15f),
+            new Vector3(0f, 0f, -62f),
+            new Vector3(21f, 0f, -88f),
+            new Vector3(9f, 0f, 87f)
+        };
+
+        for (int i = 0; i < positions.Length; i++)
+        {
+            int archetype = i % 3 + 1;
+            GameObject alien = new GameObject("S4_AlienTrooper_" + (i + 1).ToString("00"));
+            alien.transform.SetParent(root, false);
+            alien.transform.position = positions[i];
+            Vector3 toPlayer = controller.transform.position - alien.transform.position;
+            toPlayer.y = 0f;
+            if (toPlayer.sqrMagnitude > 0.01f)
+                alien.transform.rotation = Quaternion.LookRotation(toPlayer.normalized);
+
+            CapsuleCollider capsule = alien.AddComponent<CapsuleCollider>();
+            capsule.radius = 0.48f;
+            capsule.height = 1.95f;
+            capsule.center = new Vector3(0f, 0.97f, 0f);
+
+            TargetHealth health = alien.AddComponent<TargetHealth>();
+            health.SetMaxHealth(archetype == 2 ? 135 : (archetype == 3 ? 120 : 95));
+
+            EnemyChase chase = alien.AddComponent<EnemyChase>();
+            chase.Configure(controller.transform, archetype);
+            chase.enabled = false;
+            interiorHostiles.Add(chase);
+            BuildAlienTrooperDetails(alien.transform, archetype);
+        }
+        StartupCheckpoint.Set("StageFourInteriorAliensSpawned_" + interiorHostiles.Count);
+    }
+
+    private void BuildAlienTrooperDetails(Transform alien, int archetype)
+    {
+        Material armor = archetype == 2 ? brightMetal : alienArmor;
+        CreateAlienDetail(alien, "S4_AlienHead", new Vector3(0f, 1.48f, 0.04f),
+            new Vector3(0.62f, 0.53f, 0.52f), alienDark);
+        CreateAlienDetail(alien, "S4_AlienChestPlate", new Vector3(0f, 1.02f, 0.33f),
+            new Vector3(0.68f, 0.56f, 0.18f), armor);
+        CreateAlienDetail(alien, "S4_AlienShoulderL", new Vector3(-0.43f, 1.13f, 0.08f),
+            new Vector3(0.32f, 0.38f, 0.42f), armor);
+        CreateAlienDetail(alien, "S4_AlienShoulderR", new Vector3(0.43f, 1.13f, 0.08f),
+            new Vector3(0.32f, 0.38f, 0.42f), armor);
+        CreateAlienDetail(alien, "S4_AlienEyeL", new Vector3(-0.16f, 1.53f, 0.47f),
+            new Vector3(0.12f, 0.09f, 0.07f), alienEye);
+        CreateAlienDetail(alien, "S4_AlienEyeR", new Vector3(0.16f, 1.53f, 0.47f),
+            new Vector3(0.12f, 0.09f, 0.07f), alienEye);
+        CreateAlienDetail(alien, "S4_AlienAntennaL", new Vector3(-0.24f, 1.91f, 0.08f),
+            new Vector3(0.07f, 0.28f, 0.07f), alienEye);
+        CreateAlienDetail(alien, "S4_AlienAntennaR", new Vector3(0.24f, 1.91f, 0.08f),
+            new Vector3(0.07f, 0.28f, 0.07f), alienEye);
+    }
+
+    private void CreateAlienDetail(Transform parent, string name, Vector3 position, Vector3 size, Material material)
+    {
+        GameObject part = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        part.name = name;
+        part.transform.SetParent(parent, false);
+        part.transform.localPosition = position;
+        part.transform.localScale = size;
+        Renderer renderer = part.GetComponent<Renderer>();
+        if (renderer != null) renderer.sharedMaterial = material;
+        Collider collider = part.GetComponent<Collider>();
+        if (collider != null) Destroy(collider);
+    }
+
     private void Box(string name, Vector3 pos, Vector3 size, Material mat, Quaternion rotation = default(Quaternion))
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -495,7 +801,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (rotation != default(Quaternion)) go.transform.rotation = rotation;
         var r = go.GetComponent<Renderer>(); if (r != null) r.sharedMaterial = mat;
         // Architecture is solid only at the playable interior, keeping the huge distant base lightweight.
-        bool interior = name.StartsWith("S4_Interior") || name.StartsWith("S4_Hangar") || name.StartsWith("S4_Mothership");
+        bool interior = name.StartsWith("S4_Interior") || name.StartsWith("S4_Hangar");
         if (!interior) { var c = go.GetComponent<Collider>(); if (c != null) Destroy(c); }
     }
 
@@ -558,7 +864,10 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (brightMetal != null) Destroy(brightMetal); if (glass != null) Destroy(glass);
         if (green != null) Destroy(green); if (cyan != null) Destroy(cyan); if (floor != null) Destroy(floor);
         if (planetSurface != null) Destroy(planetSurface); if (planetLand != null) Destroy(planetLand);
+        if (alienArmor != null) Destroy(alienArmor); if (alienDark != null) Destroy(alienDark);
+        if (alienEye != null) Destroy(alienEye);
+        interiorHostiles.Clear();
         built = false; introRunning = false; controller = null; player = null; gameplayCamera = null;
-        greenBeam = null;
+        greenBeam = null; greenBeamCore = null; impactPulse = null; interiorTransferPulse = null;
     }
 }
