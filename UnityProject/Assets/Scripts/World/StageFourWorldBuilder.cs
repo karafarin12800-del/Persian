@@ -615,6 +615,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
         BuildSideCompartment(-1);
         BuildSideCompartment(1);
+        BuildExpandedWing(-1);
+        BuildExpandedWing(1);
         CreateVisualBox("S4_InteriorUplinkConduit", new Vector3(0f, 0.035f, 0f), new Vector3(0.85f, 0.07f, 198f), green);
 
         for (int i = -4; i <= 4; i++)
@@ -719,7 +721,10 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         float x = sign * 74f;
         Box("S4_Interior" + label + "RoomFloor", new Vector3(x, -0.35f, 0f), new Vector3(42f, 0.7f, 52f), floor);
         Box("S4_Interior" + label + "RoomCeiling", new Vector3(x, 15f, 0f), new Vector3(42f, 2f, 52f), dark);
-        Box("S4_Interior" + label + "OuterWall", new Vector3(sign * 95f, 6.5f, 0f), new Vector3(1.5f, 13f, 52f), metal);
+        // Split the outer wall around a wide doorway so the compartment links into the new wing.
+        Box("S4_Interior" + label + "OuterWallFront", new Vector3(sign * 95f, 6.5f, 19.5f), new Vector3(1.5f, 13f, 13f), metal);
+        Box("S4_Interior" + label + "OuterWallRear", new Vector3(sign * 95f, 6.5f, -19.5f), new Vector3(1.5f, 13f, 13f), metal);
+        Box("S4_Interior" + label + "OuterDoorHeader", new Vector3(sign * 95f, 13.1f, 0f), new Vector3(1.5f, 0.8f, 26f), brightMetal);
         Box("S4_Interior" + label + "FrontWall", new Vector3(x, 6.5f, 26f), new Vector3(42f, 13f, 1.5f), metal);
         Box("S4_Interior" + label + "RearWall", new Vector3(x, 6.5f, -26f), new Vector3(42f, 13f, 1.5f), metal);
         Box("S4_Interior" + label + "InnerWallFront", new Vector3(sign * 53f, 6.5f, 17f), new Vector3(1.5f, 13f, 18f), metal);
@@ -733,6 +738,125 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             CreateVisualBox("S4_Interior" + label + "Panel_" + i, new Vector3(sign * 54.5f, 8.1f, z),
                 new Vector3(0.22f, 3.8f, 6.8f), side < 0 ? green : cyan);
         }
+    }
+
+    /// <summary>
+    /// Adds two large, connected internal wings beyond the original hangar.
+    /// Port becomes the tactical command/control center; starboard becomes crew,
+    /// medical and equipment support. Open doorways keep every room traversable.
+    /// </summary>
+    private void BuildExpandedWing(int side)
+    {
+        string label = side < 0 ? "Port" : "Starboard";
+        float s = side;
+        float corridorX = s * 112f;
+        float roomX = s * 153f;
+
+        // Main connector from the side compartment into a long, enclosed wing corridor.
+        Box("S4_Interior" + label + "WingConnectorFloor",
+            new Vector3(s * 110f, -0.35f, 0f), new Vector3(31f, 0.7f, 17f), floor);
+        Box("S4_Interior" + label + "WingConnectorWallOuter",
+            new Vector3(s * 126f, 6.5f, 0f), new Vector3(1.5f, 13f, 17f), metal);
+        Box("S4_Interior" + label + "WingCorridorFloor",
+            new Vector3(corridorX, -0.35f, 0f), new Vector3(18f, 0.7f, 100f), floor);
+        Box("S4_Interior" + label + "WingCorridorWallL",
+            new Vector3(s * 103f, 6.5f, 0f), new Vector3(1.5f, 13f, 100f), metal);
+        Box("S4_Interior" + label + "WingCorridorWallR",
+            new Vector3(s * 121f, 6.5f, 0f), new Vector3(1.5f, 13f, 100f), metal);
+        Box("S4_Interior" + label + "WingCorridorRoofL",
+            new Vector3(s * 107.5f, 15f, 0f), new Vector3(8.5f, 2f, 100f), dark);
+        Box("S4_Interior" + label + "WingCorridorRoofR",
+            new Vector3(s * 116.5f, 15f, 0f), new Vector3(8.5f, 2f, 100f), dark);
+
+        // Three substantial rooms branch from the corridor at different depths.
+        for (int room = -1; room <= 1; room++)
+        {
+            float z = room * 34f;
+            string roomName = room < 0 ? "Rear" : (room > 0 ? "Forward" : "Central");
+            Box("S4_Interior" + label + roomName + "RoomFloor",
+                new Vector3(roomX, -0.35f, z), new Vector3(48f, 0.7f, 30f), floor);
+            Box("S4_Interior" + label + roomName + "RoomCeiling",
+                new Vector3(roomX, 15f, z), new Vector3(48f, 2f, 30f), dark);
+
+            // Outer wall and end walls are split to leave clear doors into each room.
+            Box("S4_Interior" + label + roomName + "OuterWall",
+                new Vector3(s * 177f, 6.5f, z), new Vector3(1.5f, 13f, 30f), metal);
+            Box("S4_Interior" + label + roomName + "EndWallA",
+                new Vector3(roomX, 6.5f, z - 15f), new Vector3(48f, 13f, 1.5f), metal);
+            Box("S4_Interior" + label + roomName + "EndWallB",
+                new Vector3(roomX, 6.5f, z + 15f), new Vector3(48f, 13f, 1.5f), metal);
+
+            // Inner wall panels flank a wide doorway facing the connector corridor.
+            Box("S4_Interior" + label + roomName + "InnerWallFront",
+                new Vector3(s * 129f, 6.5f, z + 11f), new Vector3(1.5f, 13f, 8f), metal);
+            Box("S4_Interior" + label + roomName + "InnerWallRear",
+                new Vector3(s * 129f, 6.5f, z - 11f), new Vector3(1.5f, 13f, 8f), metal);
+
+            // Control consoles and support stations are visual only and kept off walkways.
+            if (side < 0)
+            {
+                Box("S4_InteriorCommandControlDesk_" + room,
+                    new Vector3(s * 160f, 1.4f, z), new Vector3(14f, 2.8f, 5f), brightMetal);
+                Box("S4_InteriorCommandControlGlow_" + room,
+                    new Vector3(s * 160f, 2.9f, z), new Vector3(10f, 0.16f, 2.2f), green);
+                Box("S4_InteriorCommandDisplay_" + room,
+                    new Vector3(s * 175f, 8f, z), new Vector3(0.25f, 5f, 11f), cyan);
+            }
+            else
+            {
+                Box("S4_InteriorSupportStation_" + room,
+                    new Vector3(s * 160f, 1.25f, z), new Vector3(12f, 2.5f, 5f), brightMetal);
+                Box("S4_InteriorSupportGlow_" + room,
+                    new Vector3(s * 160f, 2.6f, z), new Vector3(8f, 0.16f, 2f), cyan);
+                for (int cabinet = -1; cabinet <= 1; cabinet++)
+                    Box("S4_InteriorSupportCabinet_" + room + "_" + cabinet,
+                        new Vector3(s * 174f, 2.2f, z + cabinet * 7f), new Vector3(3f, 4.4f, 4.5f), metal);
+            }
+            yield return null;
+        }
+
+        // Cross-links at both ends create a nested loop, so the player can circle back
+        // through the wing instead of reaching a dead-end corridor.
+        Box("S4_Interior" + label + "CrossLinkFloorRear",
+            new Vector3(s * 145f, -0.35f, -50f), new Vector3(48f, 0.7f, 14f), floor);
+        Box("S4_Interior" + label + "CrossLinkFloorFront",
+            new Vector3(s * 145f, -0.35f, 50f), new Vector3(48f, 0.7f, 14f), floor);
+        Box("S4_Interior" + label + "CrossLinkOuterRear",
+            new Vector3(s * 169f, 6.5f, -50f), new Vector3(1.5f, 13f, 14f), metal);
+        Box("S4_Interior" + label + "CrossLinkOuterFront",
+            new Vector3(s * 169f, 6.5f, 50f), new Vector3(1.5f, 13f, 14f), metal);
+
+        // A large command/support hub sits at the end of each wing, with two open
+        // side passages connecting it back to the room loop.
+        Box("S4_Interior" + label + "HubFloor",
+            new Vector3(s * 153f, -0.35f, 78f), new Vector3(48f, 0.7f, 34f), floor);
+        Box("S4_Interior" + label + "HubCeiling",
+            new Vector3(s * 153f, 15f, 78f), new Vector3(48f, 2f, 34f), dark);
+        Box("S4_Interior" + label + "HubOuterWall",
+            new Vector3(s * 177f, 6.5f, 78f), new Vector3(1.5f, 13f, 34f), metal);
+        Box("S4_Interior" + label + "HubEndWall",
+            new Vector3(s * 153f, 6.5f, 95f), new Vector3(48f, 13f, 1.5f), metal);
+        Box("S4_Interior" + label + "HubInnerWallRear",
+            new Vector3(s * 129f, 6.5f, 68f), new Vector3(1.5f, 13f, 14f), metal);
+        Box("S4_Interior" + label + "HubInnerWallFront",
+            new Vector3(s * 129f, 6.5f, 88f), new Vector3(1.5f, 13f, 14f), metal);
+        if (side < 0)
+        {
+            Box("S4_InteriorPrimaryCommandTable", new Vector3(-153f, 1.7f, 78f),
+                new Vector3(20f, 3.4f, 8f), brightMetal);
+            Box("S4_InteriorPrimaryCommandTableGlow", new Vector3(-153f, 3.5f, 78f),
+                new Vector3(16f, 0.18f, 4f), green);
+            Box("S4_InteriorPrimaryCommandDisplay", new Vector3(-175f, 8f, 78f),
+                new Vector3(0.25f, 6f, 20f), cyan);
+        }
+        else
+        {
+            Box("S4_InteriorPrimarySupportTable", new Vector3(153f, 1.5f, 78f),
+                new Vector3(18f, 3f, 7f), brightMetal);
+            Box("S4_InteriorPrimarySupportGlow", new Vector3(153f, 3.1f, 78f),
+                new Vector3(14f, 0.18f, 3f), green);
+        }
+        yield return null;
     }
 
     private void BuildGreenUplink()
