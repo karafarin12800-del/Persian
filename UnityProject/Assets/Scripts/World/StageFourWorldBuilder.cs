@@ -10,12 +10,13 @@ using PersiaWar.Unity2D5D;
 public sealed class StageFourWorldBuilder : MonoBehaviour
 {
     private const string RootName = "StageFourMothershipMegabase";
+    private const float PlanetSurfaceY = -100f;
     private Transform root;
     private Transform player;
     private Camera gameplayCamera;
     private PlayerController controller;
     private Transform greenBeam;
-    private Material dark, metal, brightMetal, glass, green, cyan, floor;
+    private Material dark, metal, brightMetal, glass, green, cyan, floor, planetSurface, planetLand;
     private bool built, introRunning;
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
@@ -118,6 +119,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             green = MakeMaterial("S4_GreenUplink", new Color(0.12f, 1f, 0.35f), new Color(0.06f, 1f, 0.28f));
             cyan = MakeMaterial("S4_CyanDockLights", new Color(0.12f, 0.8f, 1f), new Color(0.04f, 0.5f, 1f));
             floor = MakeMaterial("S4_HangarFloor", new Color(0.085f, 0.11f, 0.15f));
+            planetSurface = MakeMaterial("S4_PlanetOcean", new Color(0.025f, 0.13f, 0.25f), new Color(0.005f, 0.025f, 0.06f));
+            planetLand = MakeMaterial("S4_PlanetContinents", new Color(0.12f, 0.31f, 0.17f), new Color(0.015f, 0.045f, 0.012f));
             return true;
         }
         catch (System.Exception ex)
@@ -243,9 +246,11 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             t += Time.unscaledDeltaTime;
             if (greenBeam != null)
             {
-                float beamHeight = Mathf.Lerp(0.1f, 280f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 1.8f)));
-                greenBeam.position = new Vector3(0f, beamHeight, 120f);
-                greenBeam.localScale = new Vector3(15f, beamHeight, 15f);
+                // Grow the uplink from the planet's surface upward into the mothership.
+                // A Unity cylinder's full height is twice its Y scale.
+                float beamHalfHeight = Mathf.Lerp(0.1f, 140f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 1.8f)));
+                greenBeam.position = new Vector3(0f, PlanetSurfaceY + beamHalfHeight, 120f);
+                greenBeam.localScale = new Vector3(15f, beamHalfHeight, 15f);
             }
             float a = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 5.2f));
             gameplayCamera.transform.position = Vector3.Lerp(farPos, nearPos, a);
@@ -385,16 +390,55 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private void BuildGreenUplink()
     {
+        BuildTransferPlanet();
+
         var beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        beam.name = "S4_GreenUplinkSkyColumn";
+        beam.name = "S4_GreenUplinkPlanetToMothership";
         beam.transform.SetParent(root, false);
-        beam.transform.position = new Vector3(0f, 0.1f, 120f);
+        beam.transform.position = new Vector3(0f, PlanetSurfaceY + 0.1f, 120f);
         beam.transform.localScale = new Vector3(15f, 0.1f, 15f);
-        beam.GetComponent<Renderer>().sharedMaterial = green;
+        var beamRenderer = beam.GetComponent<Renderer>();
+        if (beamRenderer != null) beamRenderer.sharedMaterial = green;
         Collider c = beam.GetComponent<Collider>(); if (c != null) Destroy(c);
         greenBeam = beam.transform;
         Box("S4_UplinkEmitter", new Vector3(0f, 18f, 120f), new Vector3(46f, 7f, 46f), green);
         Box("S4_UplinkBaseRing", new Vector3(0f, 7f, 120f), new Vector3(92f, 4f, 92f), metal);
+    }
+
+    private void BuildTransferPlanet()
+    {
+        // A curved blue/green planetary horizon sits below the city-scale orbital base.
+        // It is visual-only: no planet collider can interfere with the playable hangar.
+        var planet = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        planet.name = "S4_TransferPlanet";
+        planet.transform.SetParent(root, false);
+        planet.transform.position = new Vector3(0f, -1000f, 120f);
+        planet.transform.localScale = Vector3.one * 1800f;
+        var oceanRenderer = planet.GetComponent<Renderer>();
+        if (oceanRenderer != null) oceanRenderer.sharedMaterial = planetSurface;
+        Collider planetCollider = planet.GetComponent<Collider>();
+        if (planetCollider != null) Destroy(planetCollider);
+
+        // Stylized continent shapes on the camera-facing hemisphere help the sphere
+        // read as a planet during the establishing shot without costly terrain meshes.
+        AddPlanetLand("S4_PlanetContinent_Northwest", new Vector3(-250f, -150f, -80f), new Vector3(260f, 18f, 170f), -18f);
+        AddPlanetLand("S4_PlanetContinent_Northeast", new Vector3(180f, -155f, -160f), new Vector3(220f, 16f, 140f), 24f);
+        AddPlanetLand("S4_PlanetContinent_West", new Vector3(-420f, -211f, -30f), new Vector3(190f, 16f, 130f), 38f);
+        AddPlanetLand("S4_PlanetContinent_East", new Vector3(355f, -171f, -10f), new Vector3(240f, 18f, 155f), -31f);
+    }
+
+    private void AddPlanetLand(string name, Vector3 position, Vector3 scale, float yaw)
+    {
+        var land = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        land.name = name;
+        land.transform.SetParent(root, false);
+        land.transform.position = position;
+        land.transform.localScale = scale;
+        land.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+        var landRenderer = land.GetComponent<Renderer>();
+        if (landRenderer != null) landRenderer.sharedMaterial = planetLand;
+        Collider landCollider = land.GetComponent<Collider>();
+        if (landCollider != null) Destroy(landCollider);
     }
 
     private void BuildLighting()
@@ -493,6 +537,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (dark != null) Destroy(dark); if (metal != null) Destroy(metal);
         if (brightMetal != null) Destroy(brightMetal); if (glass != null) Destroy(glass);
         if (green != null) Destroy(green); if (cyan != null) Destroy(cyan); if (floor != null) Destroy(floor);
+        if (planetSurface != null) Destroy(planetSurface); if (planetLand != null) Destroy(planetLand);
         built = false; introRunning = false; controller = null; player = null; gameplayCamera = null;
         greenBeam = null;
     }
