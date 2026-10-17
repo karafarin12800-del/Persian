@@ -21,6 +21,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Start()
         {
+            // The Android Activity is now available. Defer JNI/history-exit inspection
+            // until this safe scene lifecycle point instead of running it before splash.
+            StartupCheckpoint.InitializeDiagnostics();
             StartupCheckpoint.Set("BootSceneStarted");
             Debug.Log("PERSIA_BOOT: Starting direct gameplay scene load");
             StartCoroutine(LoadGameplayScene());

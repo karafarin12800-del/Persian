@@ -62,8 +62,18 @@ namespace PersiaWar.Unity2D5D
             PlayerPrefs.SetString(PreviousTimeKey, previousTime);
             PlayerPrefs.Save();
 
-            InitializeCrashDiagnostic();
+            // Do not call AndroidJava or write crash reports before the splash screen.
+            // Unity's Java Activity may not be ready yet at this lifecycle phase.
             Set("BeforeSplashScreen");
+        }
+
+        /// <summary>
+        /// Call from BootLoader.Start once Unity has created the Android Activity.
+        /// The method is idempotent and safe to call more than once.
+        /// </summary>
+        public static void InitializeDiagnostics()
+        {
+            InitializeCrashDiagnostic();
         }
 
         private static void InitializeCrashDiagnostic()

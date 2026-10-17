@@ -243,6 +243,23 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (built && controller != null && gameplayCamera != null)
         {
             SpawnInteriorAliens();
+
+            // Install Stage 4-only escape logic after the player and world are ready.
+            // Do not run a global scene-load bootstrap on Stages 1-3; attach once here.
+            if (GetComponent<StageFourEscapeSequence>() == null)
+            {
+                try
+                {
+                    gameObject.AddComponent<StageFourEscapeSequence>();
+                    StartupCheckpoint.Set("StageFourEscapeSequenceInstalled");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError("PERSIA_STAGE4: escape setup failed: " + ex);
+                    StartupCheckpoint.Set("StageFourEscapeSequenceInstallFailed");
+                }
+            }
+
             if (!introRunning)
                 StartCoroutine(PlayArrivalCinematic());
         }
@@ -1049,17 +1066,18 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (controller == null || root == null || interiorHostiles.Count > 0)
             return;
 
+        // Eighteen sentries are distributed through the engine room, rear corridor,
+        // hangar, forward corridor, command room, and the escape corridor.
+        // Every spawn stays on a built interior floor, not on the exterior hull.
         Vector3[] positions =
         {
-            new Vector3(-6f, 0f, 27f),
-            new Vector3(7f, 0f, 38f),
-            new Vector3(-69f, 0f, 5f),
-            new Vector3(-78f, 0f, -15f),
-            new Vector3(69f, 0f, 5f),
-            new Vector3(78f, 0f, -15f),
-            new Vector3(0f, 0f, -62f),
-            new Vector3(21f, 0f, -88f),
-            new Vector3(9f, 0f, 87f)
+            new Vector3(-17f, 0f, -88f), new Vector3(0f, 0f, -94f), new Vector3(17f, 0f, -86f),
+            new Vector3(-5f, 0f, -68f), new Vector3(5f, 0f, -57f), new Vector3(0f, 0f, -49f),
+            new Vector3(-30f, 0f, -20f), new Vector3(30f, 0f, -20f),
+            new Vector3(-30f, 0f, 15f), new Vector3(30f, 0f, 15f), new Vector3(0f, 0f, 38f),
+            new Vector3(-5f, 0f, 55f), new Vector3(5f, 0f, 72f),
+            new Vector3(-18f, 0f, 84f), new Vector3(18f, 0f, 84f), new Vector3(0f, 0f, 97f),
+            new Vector3(-5f, 0f, 108f), new Vector3(5f, 0f, 118f)
         };
 
         for (int i = 0; i < positions.Length; i++)
@@ -1085,9 +1103,74 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             chase.Configure(controller.transform, archetype);
             chase.enabled = false;
             interiorHostiles.Add(chase);
+
+            StageFourAlienPatrol patrol = alien.AddComponent<StageFourAlienPatrol>();
+            patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));
             BuildAlienTrooperDetails(alien.transform, archetype);
         }
         StartupCheckpoint.Set("StageFourInteriorAliensSpawned_" + interiorHostiles.Count);
+        StartupCheckpoint.Set("StageFourAlienCorridorPatrolsConfigured_" + interiorHostiles.Count);
+    }
+
+    private Vector3[] GetInteriorPatrolRoute(int index)
+    {
+        // Each route stays inside the walkable bounds of its own room/corridor.
+        if (index <= 2)
+        {
+            float side = index == 0 ? -17f : (index == 1 ? 0f : 17f);
+            return new[] {
+                new Vector3(side, 0f, -96f), new Vector3(side, 0f, -81f),
+                new Vector3(index == 1 ? -12f : side, 0f, -78f),
+                new Vector3(index == 1 ? 12f : side, 0f, -91f)
+            };
+        }
+        if (index <= 5)
+        {
+            float side = index % 2 == 0 ? 5f : -5f;
+            return new[] {
+                new Vector3(side, 0f, -74f), new Vector3(side, 0f, -64f),
+                new Vector3(-side, 0f, -53f), new Vector3(-side, 0f, -49f)
+            };
+        }
+        if (index <= 10)
+        {
+            switch (index % 5)
+            {
+                case 1:
+                    return new[] { new Vector3(-31f,0f,-30f), new Vector3(-15f,0f,-30f), new Vector3(-15f,0f,-5f), new Vector3(-31f,0f,-5f) };
+                case 2:
+                    return new[] { new Vector3(31f,0f,-30f), new Vector3(15f,0f,-30f), new Vector3(15f,0f,-5f), new Vector3(31f,0f,-5f) };
+                case 3:
+                    return new[] { new Vector3(-31f,0f,5f), new Vector3(-15f,0f,5f), new Vector3(-15f,0f,30f), new Vector3(-31f,0f,30f) };
+                case 4:
+                    return new[] { new Vector3(31f,0f,5f), new Vector3(15f,0f,5f), new Vector3(15f,0f,30f), new Vector3(31f,0f,30f) };
+                default:
+                    return new[] { new Vector3(-8f,0f,34f), new Vector3(8f,0f,34f), new Vector3(8f,0f,43f), new Vector3(-8f,0f,43f) };
+            }
+        }
+        if (index <= 12)
+        {
+            float side = index == 11 ? -5f : 5f;
+            return new[] {
+                new Vector3(side, 0f, 50f), new Vector3(side, 0f, 61f),
+                new Vector3(-side, 0f, 75f), new Vector3(-side, 0f, 52f)
+            };
+        }
+        if (index <= 15)
+        {
+            float side = index == 13 ? -19f : (index == 14 ? 19f : 0f);
+            return new[] {
+                new Vector3(side, 0f, 80f), new Vector3(side, 0f, 91f),
+                new Vector3(side == 0f ? -20f : -side, 0f, 99f),
+                new Vector3(side == 0f ? 20f : side, 0f, 91f)
+            };
+        }
+
+        float exitSide = index == 16 ? -5f : 5f;
+        return new[] {
+            new Vector3(exitSide, 0f, 105f), new Vector3(exitSide, 0f, 115f),
+            new Vector3(-exitSide, 0f, 123f), new Vector3(-exitSide, 0f, 106f)
+        };
     }
 
     private void BuildAlienTrooperDetails(Transform alien, int archetype)
