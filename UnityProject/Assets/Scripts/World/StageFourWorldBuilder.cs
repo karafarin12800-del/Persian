@@ -493,7 +493,11 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         }
 
         Box("S4_InteriorHangarFloor", new Vector3(0f, -0.35f, 0f), new Vector3(94f, 0.7f, 94f), floor);
-        Box("S4_HangarCeiling", new Vector3(0f, 15f, 0f), new Vector3(94f, 2f, 94f), dark);
+        // Keep an open 28m dorsal channel above the main combat lane. This lets
+        // the intro camera descend through the hull into the hangar without passing
+        // through an opaque ceiling slab; side roof panels still enclose the room.
+        Box("S4_HangarCeilingPort", new Vector3(-30.5f, 15f, 0f), new Vector3(33f, 2f, 94f), dark);
+        Box("S4_HangarCeilingStarboard", new Vector3(30.5f, 15f, 0f), new Vector3(33f, 2f, 94f), dark);
 
         // Open side portals from the hangar plus a rear hatch to keep branches connected.
         Box("S4_HangarWallLeftFront", new Vector3(-47f, 7f, 34f), new Vector3(2f, 14f, 26f), metal);
@@ -511,9 +515,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         Box("S4_InteriorForwardCorridorFloor", new Vector3(0f, -0.35f, 62.5f), new Vector3(24f, 0.7f, 31f), floor);
         Box("S4_InteriorForwardCorridorLeft", new Vector3(-12f, 6.5f, 62.5f), new Vector3(1.5f, 13f, 31f), metal);
         Box("S4_InteriorForwardCorridorRight", new Vector3(12f, 6.5f, 62.5f), new Vector3(1.5f, 13f, 31f), metal);
-        Box("S4_InteriorForwardCorridorCeiling", new Vector3(0f, 15f, 62.5f), new Vector3(24f, 2f, 31f), dark);
+        // Leave the centerline open overhead for the camera's continuous entry path.
+        Box("S4_InteriorForwardCorridorRoofPort", new Vector3(-8f, 15f, 62.5f), new Vector3(8f, 2f, 31f), dark);
+        Box("S4_InteriorForwardCorridorRoofStarboard", new Vector3(8f, 15f, 62.5f), new Vector3(8f, 2f, 31f), dark);
         Box("S4_InteriorCommandRoomFloor", new Vector3(0f, -0.35f, 90f), new Vector3(52f, 0.7f, 26f), floor);
-        Box("S4_InteriorCommandRoomCeiling", new Vector3(0f, 15f, 90f), new Vector3(52f, 2f, 26f), dark);
+        Box("S4_InteriorCommandRoomCeilingPort", new Vector3(-20f, 15f, 90f), new Vector3(12f, 2f, 26f), dark);
+        Box("S4_InteriorCommandRoomCeilingStarboard", new Vector3(20f, 15f, 90f), new Vector3(12f, 2f, 26f), dark);
         Box("S4_InteriorCommandFrontLeft", new Vector3(-20f, 6.5f, 77f), new Vector3(16f, 13f, 1.5f), metal);
         Box("S4_InteriorCommandFrontRight", new Vector3(20f, 6.5f, 77f), new Vector3(16f, 13f, 1.5f), metal);
         Box("S4_InteriorCommandRearWall", new Vector3(0f, 6.5f, 103f), new Vector3(52f, 13f, 1.5f), metal);
