@@ -152,6 +152,11 @@ jobs:
           assert 'Vector3.Distance(player.position, lastBombPosition) >= 10f' in escape_finale, 'Stage 4 must plant a timed bomb for each 10 metres travelled.'
           assert 'DetonateBomb' in escape_finale and 'PlayEscapeFinale' in escape_finale, 'Stage 4 must detonate timed bombs and run the escape finale.'
           assert 'S4_MothershipDetonation_' in escape_finale and 'i < blasts.Length' in escape_finale, 'Stage 4 finale must show sequential mothership/base detonations.'
+          patrol = Path('UnityProject/Assets/Scripts/World/StageFourAlienPatrol.cs').read_text(encoding='utf-8')
+          assert 'patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));' in stage4, 'Stage 4 aliens must receive explicit corridor patrol routes.'
+          assert 'StageFourAlienCorridorPatrolsConfigured_' in stage4, 'Stage 4 must report its patrol initialization checkpoint.'
+          assert 'HasClearSightToPlayer' in patrol and 'PatrolCorridor' in patrol, 'Stage 4 sentries must patrol and use line-of-sight detection.'
+          assert 'DisengageToPatrol' in patrol and 'EnemyChase' in patrol, 'Stage 4 sentries must return to patrol after losing contact.'
           side_room = stage4[stage4.index('private void BuildSideCompartment(int side)'):stage4.index('private IEnumerator BuildExpandedWing(int side)')]
           assert 'yield return' not in side_room, 'Side compartment helper must be a synchronous method.' 
           target_health = Path('UnityProject/Assets/Scripts/Combat/TargetHealth.cs').read_text(encoding='utf-8')
