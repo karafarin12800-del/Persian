@@ -149,15 +149,17 @@ jobs:
           assert 'if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)' in prototype_flow, 'Stage 4 must start with a firearm if the saved loadout is melee-only.'
           assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
           escape_finale = Path('UnityProject/Assets/Scripts/World/StageFourEscapeSequence.cs').read_text(encoding='utf-8')
-          assert 'S4_RedEscapeDoor' in escape_finale and 'OpenRedDoor();' in escape_finale, 'Stage 4 escape route must have a visible red door that opens.'
-          assert 'Vector3.Distance(player.position, lastBombPosition) >= 10f' in escape_finale and 'plantedBombs.Count >= 6' in escape_finale, 'Stage 4 must plant and cap the six visible charges.'
-          assert 'EXPLOSIVE CHARGES: ' in escape_finale and 'S4_ChargeDetonation_' in escape_finale and 'nextChargeTime' in escape_finale, 'Stage 4 must show the planted charge counter and detonate charges during shuttle escape.'
+          assert 'S4_RedEscapeDoorPanel' in escape_finale and 'S4_EscapeDoorFrameL' in escape_finale and 'OpenRedDoor();' in escape_finale, 'Stage 4 must have a dark exit panel surrounded by a red frame that opens.'
+          assert 'float[] stationZ = { -88f, -61f, -24f, 22f, 60f, 92f }' in escape_finale and 'PlantTimedBomb(int siteIndex)' in escape_finale and 'chargesInInventory = 6' in escape_finale and 'plantedBombs.Count >= 6' in escape_finale, 'Stage 4 must collect six charges and plant them at six fixed stations from aft to forward.'
+          assert 'S4_ChargeSupplyBox' in escape_finale and 'S4_ChargeStationGreenBeacon_' in escape_finale and 'PLANT CHARGE HERE' in escape_finale, 'Stage 4 must have a pickup crate, mobile planting action, and green indicators on armed red stations.'
+          assert '"BOMBS: "' in escape_finale and 'S4_ChargeDetonation_' in escape_finale and 'nextChargeTime' in escape_finale, 'Stage 4 must show the planted/carried charge counter and detonate charges during shuttle escape.'
           assert 'PlayEscapeFinale' in escape_finale and 'S4_MothershipDetonation_' in escape_finale and 'i < blasts.Length' in escape_finale, 'Stage 4 finale must show sequential mothership/base detonations.'
           patrol = Path('UnityProject/Assets/Scripts/World/StageFourAlienPatrol.cs').read_text(encoding='utf-8')
           assert 'patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));' in stage4, 'Stage 4 aliens must receive explicit corridor patrol routes.'
           assert 'StageFourAlienCorridorPatrolsConfigured_' in stage4, 'Stage 4 must report its patrol initialization checkpoint.'
           assert 'HasClearSightToPlayer' in patrol and 'PatrolCorridor' in patrol, 'Stage 4 sentries must patrol and use line-of-sight detection.'
           assert 'DisengageToPatrol' in patrol and 'EnemyChase' in patrol, 'Stage 4 sentries must return to patrol after losing contact.'
+          assert 'new Vector3(5f, 0f, 118f)' in stage4 and 'p.z = Mathf.Clamp(p.z, -100f, 127f)' in patrol, 'Stage 4 must double the guards and keep patrol/chase movement inside ship bounds.'
           side_room = stage4[stage4.index('private void BuildSideCompartment(int side)'):stage4.index('private IEnumerator BuildExpandedWing(int side)')]
           assert 'yield return' not in side_room, 'Side compartment helper must be a synchronous method.' 
           target_health = Path('UnityProject/Assets/Scripts/Combat/TargetHealth.cs').read_text(encoding='utf-8')
