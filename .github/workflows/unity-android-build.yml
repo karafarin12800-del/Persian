@@ -131,6 +131,15 @@ jobs:
           assert 'm.mainTexture = Texture2D.whiteTexture;' in stage4, 'Stage 4 flat materials must supply the white base texture.'
           assert 'No compatible runtime shader found for Stage 4 materials.' in stage4, 'Stage 4 must fail with an explicit shader error instead of constructing a null material.'
           assert 'BuildFailureCode = ex != null ? ex.GetType().Name : "UnknownError";' in stage4, 'Stage 4 runtime build failures must retain a diagnostic code.'
+          assert 'introRunning = false;\n        if (controller != null && !controller.IsDefeated)' in stage4, 'Stage 4 must unlock player controls after the cinematic gate is removed.'
+          assert 'controller.Weapon.enabled = true;' in stage4 and 'controller.Aim.enabled = true;' in stage4, 'Stage 4 cinematic completion must re-enable shooting and targeting.'
+          assert 'S4_GreenUplinkFromSpace' in stage4 and 'StageFourUplinkEnteredMothership' in stage4, 'Stage 4 must show the beam arriving from space and transferring inside.'
+          assert 'S4_InteriorForwardCorridorFloor' in stage4 and 'S4_InteriorEngineRoomFloor' in stage4 and 'S4_InteriorCommandRoomFloor' in stage4, 'Stage 4 must provide connected interior corridors and rooms.'
+          assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
+          side_room = stage4[stage4.index('private void BuildSideCompartment(int side)'):stage4.index('private void BuildGreenUplink()')]
+          assert 'yield return' not in side_room, 'Side compartment helper must be a synchronous method.' 
+          target_health = Path('UnityProject/Assets/Scripts/Combat/TargetHealth.cs').read_text(encoding='utf-8')
+          assert 'isStageFourAlien' in target_health and '&& !isStageFourAlien' in target_health, 'Stage 4 aliens must not trigger human blood effects.'
           assert 'DisableLegacyWorldBuilderPath();' in bootstrap, 'Android does not disable the retired gray-ground/dark-road generator.'
           legacy_world = Path('UnityProject/Assets/Scripts/World/WorldBuilder.cs').read_text(encoding='utf-8')
           assert 'new Color(0.12f, 0.46f, 0.08f)' in legacy_world and 'new Color(0.52f, 0.54f, 0.57f)' in legacy_world, 'Legacy fallback colors regress.'
