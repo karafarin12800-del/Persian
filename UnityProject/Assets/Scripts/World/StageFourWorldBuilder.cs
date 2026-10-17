@@ -378,11 +378,6 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
                 t < 2.85f ? "ENERGY TRANSFER ENTERING THE SHIP" :
                 t < 4.65f ? "CAMERA SWEEPING INTO THE HANGAR" :
                 "INSIDE THE MOTHERSHIP • HOSTILES DETECTED";
-            IntroMessage = t < 1.8f ? "GREEN BEAM DESCENDING FROM SPACE" :
-                t < 3.0f ? "UPLINK IMPACT • MOTHERSHIP HULL" :
-                t < 4.6f ? "ENERGY TRANSFER ENTERING THE SHIP" :
-                t < 6.6f ? "FOLLOWING THE UPLINK THROUGH THE HANGAR" :
-                "INSIDE THE MOTHERSHIP • HOSTILES DETECTED";
             yield return null;
         }
 
