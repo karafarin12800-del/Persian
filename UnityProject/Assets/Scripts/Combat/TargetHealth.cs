@@ -88,10 +88,11 @@ namespace PersiaWar.Unity2D5D
             bool isStageThreeCraft = enemy != null &&
                 (enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal) ||
                  enemy.gameObject.name.StartsWith("S3_DestroyedHovercraftWreck", System.StringComparison.Ordinal));
+            bool isStageFourAlien = enemy != null &&
+                enemy.gameObject.name.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
 
-            // All Stage 3 hostiles are extraterrestrial: no blood pools or blood
-            // particles for aliens or their spacecraft.
-            if (!isStageThreeAlien && !isStageThreeCraft)
+            // Space-stage aliens and craft do not create human blood effects.
+            if (!isStageThreeAlien && !isStageThreeCraft && !isStageFourAlien)
                 SpawnBloodEffect(deathPosition);
         }
 
