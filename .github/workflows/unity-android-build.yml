@@ -25,7 +25,8 @@ permissions:
   actions: read
 
 concurrency:
-  group: persiawar-unity-android-${{ github.workflow }}-${{ github.ref }}
+  # Isolate each source revision so a stalled Unity build cannot block its crash-fix successor.
+  group: persiawar-unity-android-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -387,6 +388,7 @@ jobs:
           echo 'Repository hygiene validation passed.'
 
   build-android:
+    if: github.event_name != 'pull_request'
     name: Build Android APK
     needs: validate
     runs-on: ubuntu-latest
