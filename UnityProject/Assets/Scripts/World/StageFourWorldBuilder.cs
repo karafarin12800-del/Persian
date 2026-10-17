@@ -462,7 +462,13 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     {
         // Layered outer shell around a hollow playable vessel; only room geometry collides.
         Box("S4_MothershipKeel", new Vector3(0f, -3.9f, 0f), new Vector3(28f, 7.5f, 278f), dark);
-        Box("S4_MothershipUpperHull", new Vector3(0f, 21f, 0f), new Vector3(154f, 10f, 264f), brightMetal);
+        // Leave a 30m-wide dorsal insertion bay over the corridor. The hull is built
+        // as port/starboard wings so the camera and uplink can enter without clipping
+        // through a solid slab; glowing bay lips frame the opening from outside.
+        Box("S4_MothershipUpperHullPortWing", new Vector3(-46f, 21f, 0f), new Vector3(62f, 10f, 264f), brightMetal);
+        Box("S4_MothershipUpperHullStarboardWing", new Vector3(46f, 21f, 0f), new Vector3(62f, 10f, 264f), brightMetal);
+        Box("S4_MothershipDorsalBayLipPort", new Vector3(-13f, 18f, 64f), new Vector3(4f, 3f, 130f), metal);
+        Box("S4_MothershipDorsalBayLipStarboard", new Vector3(13f, 18f, 64f), new Vector3(4f, 3f, 130f), metal);
         Box("S4_MothershipPortHull", new Vector3(-102f, 8.5f, 0f), new Vector3(12f, 17f, 270f), dark);
         Box("S4_MothershipStarboardHull", new Vector3(102f, 8.5f, 0f), new Vector3(12f, 17f, 270f), dark);
         Box("S4_MothershipProwArmor", new Vector3(0f, 9f, 139f), new Vector3(190f, 18f, 12f), metal);
