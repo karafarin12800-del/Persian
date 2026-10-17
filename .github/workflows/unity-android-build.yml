@@ -135,7 +135,7 @@ jobs:
           assert 'controller.Weapon.enabled = true;' in stage4 and 'controller.Aim.enabled = true;' in stage4, 'Stage 4 cinematic completion must re-enable shooting and targeting.'
           assert 'S4_GreenUplinkFromSpace' in stage4 and 'StageFourUplinkEnteredMothership' in stage4, 'Stage 4 must show the beam arriving from space and transferring inside.'
           assert 'S4_InteriorForwardCorridorFloor' in stage4 and 'S4_InteriorEngineRoomFloor' in stage4 and 'S4_InteriorCommandRoomFloor' in stage4, 'Stage 4 must provide connected interior corridors and rooms.'
-          assert 'S4_MothershipUpperHullPortWing' in stage4 and 'S4_MothershipUpperHullStarboardWing' in stage4 and 'S4_MothershipDorsalBayLipPort' in stage4, 'The ship must retain a visible dorsal bay opening for the cinematic entry.'
+          assert 'S4_MothershipBowHullPort' in stage4 and 'S4_MothershipBowHullStarboard' in stage4 and 'S4_MothershipDorsalBayLipPort' in stage4, 'The tapered ship must retain a visible dorsal bay opening for the cinematic entry.'
           assert 'S4_HangarCeilingPort' in stage4 and 'S4_HangarCeilingStarboard' in stage4 and 'S4_InteriorCommandRoomCeilingPort' in stage4, 'Stage 4 camera path must have a real ceiling aperture into the interior.'
           assert 'name.StartsWith("S4_HangarFloorStripe_")' in stage4 and 'bool decorative =' in stage4, 'Stage 4 floor markings must be non-solid so the player can move.'
           assert 'BuildMothershipCoreAssembly();' in stage4 and 'S4_MothershipEgg_Central' in stage4, 'Stage 4 must build the linked egg-shaped mothership core.'
