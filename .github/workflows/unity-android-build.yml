@@ -137,6 +137,11 @@ jobs:
           assert 'S4_InteriorForwardCorridorFloor' in stage4 and 'S4_InteriorEngineRoomFloor' in stage4 and 'S4_InteriorCommandRoomFloor' in stage4, 'Stage 4 must provide connected interior corridors and rooms.'
           assert 'S4_MothershipUpperHullPortWing' in stage4 and 'S4_MothershipUpperHullStarboardWing' in stage4 and 'S4_MothershipDorsalBayLipPort' in stage4, 'The ship must retain a visible dorsal bay opening for the cinematic entry.'
           assert 'S4_HangarCeilingPort' in stage4 and 'S4_HangarCeilingStarboard' in stage4 and 'S4_InteriorCommandRoomCeilingPort' in stage4, 'Stage 4 camera path must have a real ceiling aperture into the interior.'
+          assert 'name.StartsWith("S4_HangarFloorStripe_")' in stage4 and 'bool decorative =' in stage4, 'Stage 4 floor markings must be non-solid so the player can move.'
+          assert 'BuildMothershipCoreAssembly();' in stage4 and 'S4_MothershipEgg_Central' in stage4, 'Stage 4 must build the linked egg-shaped mothership core.'
+          assert 'BuildMothershipRing(' in stage4 and 'S4_MothershipRing_CoreA' in stage4, 'Stage 4 must build circular structural rings linked by cylinders.'
+          assert 'StageFourEightDockedEscapeShuttlesReady' in stage4 and 'S4_MothershipEscapeShuttle_' in stage4, 'Stage 4 must dock eight reusable escape shuttles on the sides.'
+          assert 'StageFourMovementWatchdogRearmed' in stage4, 'Stage 4 must recover movement if match initialization re-gates it.'
           prototype_flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
           assert 'if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)' in prototype_flow, 'Stage 4 must start with a firearm if the saved loadout is melee-only.'
           assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
