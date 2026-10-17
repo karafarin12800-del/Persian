@@ -72,10 +72,12 @@ namespace PersiaWar.Unity2D5D
         private float resultOverlayStartTime = -1f;
         private StageTwoVictorySequence stageTwoVictorySequence;
         private StageThreeWorldBuilder stageThreeWorldBuilder;
+        private StageFourWorldBuilder stageFourWorldBuilder;
         private bool forceStageOneWorldRebuildForTest;
         private bool stageTestRun;
         private int savedCampaignStageNumber = 1;
         private int savedStage3Unlocked;
+        private int savedStage4Unlocked;
         private string lobbyNotice = string.Empty;
         private float lobbyNoticeUntil;
         private string startupStatus = string.Empty;
@@ -329,12 +331,19 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
+                if (stageNumber == 4 && stageFourWorldBuilder != null && stageFourWorldBuilder.IsCinematic)
+                {
+                    DrawStageFourIntroOverlay();
+                    return;
+                }
                 if (stageNumber == 3)
                     DrawStageThreeHUD();
                 else
                     DrawAndroidPresentationHUD();
+                if (stageNumber == 4)
+                    DrawStageFourObjective();
                 DrawAndroidPauseControl();
-                if (stageNumber != 3)
+                if (stageNumber != 3 && stageNumber != 4)
                     DrawGirlRescueNotice();
 
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
@@ -758,11 +767,11 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
             float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
-            float heightLimit = Mathf.Max(30f, (Screen.height - 120f * scale) / 9f);
+            float heightLimit = Mathf.Max(28f, (Screen.height - 120f * scale) / 10f);
             float height = Mathf.Min(58f * scale, heightLimit);
-            float gapLimit = Mathf.Max(3f, (Screen.height - 100f * scale - height * 7f) / 6f);
+            float gapLimit = Mathf.Max(2f, (Screen.height - 100f * scale - height * 8f) / 7f);
             float gap = Mathf.Min(14f * scale, gapLimit);
-            float totalHeight = height * 7f + gap * 6f;
+            float totalHeight = height * 8f + gap * 7f;
             float topLimit = Mathf.Max(54f * scale, Screen.height - totalHeight - 8f);
             float top = Mathf.Clamp((Screen.height - totalHeight) * 0.48f, 54f * scale, topLimit);
             float left = Mathf.Max(Screen.width * 0.52f, Screen.width - width - 28f);
@@ -791,7 +800,9 @@ namespace PersiaWar.Unity2D5D
                 Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
                 if (mode == ScreenMode.MainMenu)
                 {
-                    for (int button = 0; button < 7; button++)
+                    // Keep native touch hit-testing aligned with all eight menu buttons.
+                    // Stage 4 is index 7; excluding it makes the visible Android button inert.
+                    for (int button = 0; button < 8; button++)
                     {
                         if (!GetLobbyButtonRect(button).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
@@ -861,7 +872,8 @@ namespace PersiaWar.Unity2D5D
                 "SETTINGS",
                 "TEST STAGE 1",
                 "TEST STAGE 2",
-                "TEST STAGE 3"
+                "TEST STAGE 3",
+                "TEST STAGE 4"
             };
 
             for (int i = 0; i < labels.Length; i++)
@@ -873,7 +885,7 @@ namespace PersiaWar.Unity2D5D
 
             if (!string.IsNullOrEmpty(lobbyNotice) && Time.unscaledTime < lobbyNoticeUntil)
             {
-                Rect lastButton = GetLobbyButtonRect(6);
+                Rect lastButton = GetLobbyButtonRect(7);
                 float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
                 float noticeHeight = 34f * scale;
                 float noticeY = Mathf.Min(lastButton.yMax + 6f * scale, Screen.height - 58f * scale - noticeHeight);
@@ -900,6 +912,7 @@ namespace PersiaWar.Unity2D5D
             else if (index == 4) BeginStageTestEntry(1);
             else if (index == 5) BeginStageTestEntry(2);
             else if (index == 6) BeginStageTestEntry(3);
+            else if (index == 7) BeginStageTestEntry(4);
 
             StartupCheckpoint.Set("LobbyNavigation_" + mode);
         }
@@ -909,7 +922,7 @@ namespace PersiaWar.Unity2D5D
             if (stageTestRun)
                 RestoreCampaignProgressAfterTest();
 
-            if (stageNumber > 3)
+            if (stageNumber > 4)
             {
                 ShowLobbyNotice("NO FURTHER STAGE IS AVAILABLE YET.");
                 return;
@@ -928,14 +941,16 @@ namespace PersiaWar.Unity2D5D
             if (stageTestRun) return;
             savedCampaignStageNumber = stageNumber;
             savedStage3Unlocked = PlayerPrefs.GetInt("PW.Stage3Unlocked", 0);
+            savedStage4Unlocked = PlayerPrefs.GetInt("PW.Stage4Unlocked", 0);
             stageTestRun = true;
         }
 
         private void RestoreCampaignProgressAfterTest()
         {
             if (!stageTestRun) return;
-            stageNumber = Mathf.Clamp(savedCampaignStageNumber, 1, 3);
+            stageNumber = Mathf.Clamp(savedCampaignStageNumber, 1, 4);
             PlayerPrefs.SetInt("PW.Stage3Unlocked", savedStage3Unlocked);
+            PlayerPrefs.SetInt("PW.Stage4Unlocked", savedStage4Unlocked);
             PlayerPrefs.Save();
             stageTestRun = false;
             forceStageOneWorldRebuildForTest = stageNumber == 1;
@@ -996,9 +1011,9 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            if (targetStage == 3)
+            if (targetStage == 3 || targetStage == 4)
             {
-                stageNumber = 3;
+                stageNumber = targetStage;
                 selectedHero = 0;
                 stageTwoOriginalHero = 0;
                 stageTwoLandingMode = 0;
@@ -1008,7 +1023,7 @@ namespace PersiaWar.Unity2D5D
                 stageTwoLobbyReady = false;
                 stageTwoLobbyPlayers = 1;
                 forceStageOneWorldRebuildForTest = false;
-                spawnWorld = new Vector2(0f, -97f);
+                spawnWorld = targetStage == 3 ? new Vector2(0f, -97f) : Vector2.zero;
                 spawnChosen = true;
                 if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
                 if (activeCamera != null) activeCamera.enabled = false;
@@ -1016,7 +1031,7 @@ namespace PersiaWar.Unity2D5D
                 GateGameplay(false);
                 mode = ScreenMode.DropMap;
                 StartCoroutine(BeginMainGameAfterMenuFrame());
-                StartupCheckpoint.Set("DirectStageTestEntry_3");
+                StartupCheckpoint.Set("DirectStageTestEntry_" + targetStage);
             }
         }
 
@@ -1039,6 +1054,39 @@ namespace PersiaWar.Unity2D5D
                 ? androidRuntimeCamera
                 : (activeCamera != null && activeCamera.isActiveAndEnabled ? activeCamera : Camera.main);
             stageTwoVictorySequence.Begin(localRoot, cinematicCamera);
+        }
+
+        private void DrawStageFourIntroOverlay()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            Rect panel = new Rect(Screen.width * 0.08f, Screen.height * 0.08f, Screen.width * 0.84f, 72f * scale);
+            Fill(panel, new Color(0.005f, 0.025f, 0.035f, 0.88f));
+            Fill(new Rect(panel.x, panel.y + panel.height - 4f * scale, panel.width, 4f * scale), new Color(0.10f, 1f, 0.42f, 0.95f));
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 6f * scale, panel.width - 24f * scale, 26f * scale),
+                "STAGE 4  •  ORBITAL MOTHERSHIP", menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 31f * scale, panel.width - 24f * scale, 34f * scale),
+                stageFourWorldBuilder != null ? stageFourWorldBuilder.IntroMessage : "ENTERING THE MEGABASE", menuHeaderStyle);
+        }
+
+        private void DrawStageFourObjective()
+        {
+            if (stageFourWorldBuilder == null)
+                return;
+
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.70f, 1.2f);
+            Rect panel = new Rect(14f * scale, 48f * scale, 246f * scale, 48f * scale);
+            Fill(panel, new Color(0.015f, 0.035f, 0.055f, 0.82f));
+            Fill(new Rect(panel.x, panel.y, 3.5f * scale, panel.height),
+                new Color(0.10f, 1f, 0.42f, 0.95f));
+
+            int remaining = stageFourWorldBuilder.RemainingHostiles;
+            int total = stageFourWorldBuilder.TotalHostiles;
+            string objective = remaining > 0
+                ? "HOSTILES  " + remaining + " / " + total
+                : "MOTHERSHIP SECURED";
+            GUI.Label(new Rect(panel.x + 10f * scale, panel.y + 5f * scale,
+                panel.width - 16f * scale, panel.height - 8f * scale),
+                objective, menuSmallStyle);
         }
 
         private void DrawStageThreeHUD()
@@ -1208,12 +1256,25 @@ namespace PersiaWar.Unity2D5D
             if (gameRoot != null) gameRoot.SetActive(false);
             startingMatch = false;
             matchPaused = false;
-            spawnChosen = false;
             resultOverlayStartTime = -1f;
-            RestoreCampaignProgressAfterTest();
-            mode = ScreenMode.MainMenu;
-            ShowLobbyNotice("STAGE 3 COMPLETE  •  VISIT STORE / LOADOUT TO PREPARE FOR THE NEXT STAGE");
-            StartupCheckpoint.Set("StageThreeResult_ReturnToMenu_LoadoutAvailable");
+            if (stageTestRun)
+            {
+                RestoreCampaignProgressAfterTest();
+                spawnChosen = false;
+                mode = ScreenMode.MainMenu;
+                ShowLobbyNotice("STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
+                StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
+                return;
+            }
+            stageNumber = 4;
+            PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
+            PlayerPrefs.Save();
+            spawnWorld = Vector2.zero;
+            spawnChosen = true;
+            mode = ScreenMode.DropMap;
+            startupStatus = "Stage 4: green uplink to the orbital mothership...";
+            StartupCheckpoint.Set("StageThreeComplete_AutoStartStageFour");
+            StartCoroutine(BeginMainGameAfterMenuFrame());
         }
 
         private void DrawProfileScreen()
@@ -2007,7 +2068,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (!spawnChosen || startingMatch || stageTwoLobbyRunning)
                 return;
-            if (stageNumber > 3)
+            if (stageNumber > 4)
             {
                 ShowLobbyNotice("NO FURTHER STAGE IS AVAILABLE YET.");
                 mode = ScreenMode.MainMenu;
@@ -2185,6 +2246,7 @@ namespace PersiaWar.Unity2D5D
             }
 
             StageThreeWorldBuilder.ClearExistingWorld();
+            StageFourWorldBuilder.ClearExistingWorld();
             if (stageNumber == 3)
             {
                 stageThreeWorldBuilder = gameRoot.GetComponent<StageThreeWorldBuilder>();
@@ -2201,6 +2263,75 @@ namespace PersiaWar.Unity2D5D
                     mode = ScreenMode.MainMenu;
                     yield break;
                 }
+            }
+            else if (stageNumber == 4)
+            {
+                stageFourWorldBuilder = gameRoot.GetComponent<StageFourWorldBuilder>();
+                if (stageFourWorldBuilder == null)
+                    stageFourWorldBuilder = gameRoot.AddComponent<StageFourWorldBuilder>();
+                if (GameSession.Instance != null)
+                    GameSession.Instance.ResetMatch();
+                startupStatus = "Stage 4: starting orbital megabase construction...";
+                StartupCheckpoint.Set("StageFourWorldBuildStarted");
+                bool stageFourBuildCompleted = false;
+                bool stageFourBuildSucceeded = false;
+                float stageFourBuildStartedAt = Time.realtimeSinceStartup;
+                const float stageFourBuildTimeoutSeconds = 60f;
+                Coroutine stageFourBuildCoroutine = StartCoroutine(stageFourWorldBuilder.BuildWorldRoutine(success =>
+                {
+                    stageFourBuildSucceeded = success;
+                    stageFourBuildCompleted = true;
+                }));
+
+                // Keep the loading presentation responsive while the megabase is
+                // generated in batches. Never wait forever if Unity stops the child
+                // coroutine or a device-specific runtime exception interrupts it.
+                if (stageFourBuildCoroutine == null)
+                {
+                    stageFourBuildCompleted = true;
+                    stageFourBuildSucceeded = false;
+                    StartupCheckpoint.Set("StageFourBuildCoroutineFailedToStart");
+                }
+
+                while (!stageFourBuildCompleted)
+                {
+                    if (stageFourWorldBuilder == null)
+                    {
+                        stageFourBuildCompleted = true;
+                        stageFourBuildSucceeded = false;
+                        StartupCheckpoint.Set("StageFourBuilderLostDuringBuild");
+                        break;
+                    }
+
+                    startupStatus = stageFourWorldBuilder.BuildStatus;
+                    if (Time.realtimeSinceStartup - stageFourBuildStartedAt >= stageFourBuildTimeoutSeconds)
+                    {
+                        StopCoroutine(stageFourBuildCoroutine);
+                        stageFourWorldBuilder.AbortBuild("Stage 4 world construction exceeded 60 seconds.");
+                        stageFourBuildCompleted = true;
+                        stageFourBuildSucceeded = false;
+                        StartupCheckpoint.Set("StageFourBuildTimedOut_60Seconds");
+                        break;
+                    }
+                    yield return null;
+                }
+
+                if (!stageFourBuildSucceeded)
+                {
+                    startupStatus = stageFourWorldBuilder != null
+                        ? stageFourWorldBuilder.BuildStatus
+                        : "Stage 4 builder stopped unexpectedly.";
+                    StartupCheckpoint.Set("StageFourWorldBuildFailed");
+                    startingMatch = false;
+                    mode = ScreenMode.MainMenu;
+                    string stageFourFailureCode = stageFourWorldBuilder != null &&
+                        !string.IsNullOrEmpty(stageFourWorldBuilder.BuildFailureCode)
+                        ? stageFourWorldBuilder.BuildFailureCode
+                        : "UNKNOWN";
+                    ShowLobbyNotice("STAGE 4 FAILED: " + stageFourFailureCode);
+                    yield break;
+                }
+                StartupCheckpoint.Set("StageFourWorldBuildCompleted");
             }
             else
             {
@@ -2291,6 +2422,13 @@ namespace PersiaWar.Unity2D5D
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
                 if (selectedKind == WeaponController.WeaponKind.AlienSword && !ownsAlienSword)
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
+
+                // Stage 4 opens with ranged combat inside the mothership. If a prior
+                // store choice left the melee-only alien sword selected, guarantee a
+                // firearm for the first encounter; the player can still swap later.
+                if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+
                 player.Weapon.SelectWeapon(selectedKind);
             }
 
@@ -2350,6 +2488,8 @@ namespace PersiaWar.Unity2D5D
 
             if (stageNumber == 3 && stageThreeWorldBuilder != null)
                 stageThreeWorldBuilder.ConfigurePlayer(player, activeCamera);
+            if (stageNumber == 4 && stageFourWorldBuilder != null)
+                stageFourWorldBuilder.ConfigurePlayer(player, activeCamera);
 
             if (activeCamera != null)
                 activeCamera.enabled = false;
@@ -2417,6 +2557,8 @@ namespace PersiaWar.Unity2D5D
             if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
                 return;
             if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
+                return;
+            if (stageNumber == 4 && stageFourWorldBuilder != null && stageFourWorldBuilder.IsCinematic)
                 return;
 
 #if UNITY_ANDROID
@@ -2590,7 +2732,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null && player != null)
             {
-                if (stageNumber == 3)
+                if (stageNumber == 3 || stageNumber == 4)
                 {
                     enemySpawner.enabled = false;
                 }
@@ -2639,7 +2781,7 @@ namespace PersiaWar.Unity2D5D
 
             if (enemySpawner != null)
             {
-                if (stageNumber == 3)
+                if (stageNumber == 3 || stageNumber == 4)
                 {
                     enemySpawner.enabled = false;
                 }
