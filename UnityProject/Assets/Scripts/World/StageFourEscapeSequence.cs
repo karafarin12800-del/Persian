@@ -28,15 +28,6 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private GUIStyle messageStyle;
     private string message = "FIND RED ESCAPE DOOR • PLANT 6 CHARGES";
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void InstallBootstrap()
-    {
-        if (GameObject.Find("StageFourEscapeSequenceBootstrap") != null) return;
-        var go = new GameObject("StageFourEscapeSequenceBootstrap");
-        DontDestroyOnLoad(go);
-        go.AddComponent<StageFourEscapeBootstrap>();
-    }
-
     private void Awake()
     {
         active = this;
@@ -326,10 +317,24 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
     private Material MakeMaterial(string name, Color color, Color? emission = null)
     {
-        Shader shader = Shader.Find("Standard");
+        // StageFourWorldBuilder uses the project's Android-safe shader lookup because
+        // Standard/URP shaders can be stripped from an IL2CPP player. Use the same
+        // fallback here: this component is created during Stage 4, so a missing shader
+        // must not leave the red exit, charge markers, and finale materials null.
+        Shader shader = RuntimeMaterialFactory.GetShader();
         if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        if (shader == null)
+            throw new System.InvalidOperationException("No compatible runtime shader found for Stage 4 escape effects.");
+
         var m = new Material(shader) { name = name, color = color };
-        if (emission.HasValue)
+        if (m.HasProperty("_Color"))
+            m.SetColor("_Color", color);
+        if (m.HasProperty("_BaseColor"))
+            m.SetColor("_BaseColor", color);
+        if (m.HasProperty("_MainTex") && m.mainTexture == null)
+            m.mainTexture = Texture2D.whiteTexture;
+        if (emission.HasValue && m.HasProperty("_EmissionColor"))
         {
             m.EnableKeyword("_EMISSION");
             m.SetColor("_EmissionColor", emission.Value);
@@ -339,17 +344,5 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
 }
 
- 
- public sealed class StageFourEscapeBootstrap : MonoBehaviour
- {
-     private void Update()
-     {
-         var builders = FindObjectsByType<StageFourWorldBuilder>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-         foreach (var builder in builders)
-         {
-             if (builder == null || !builder.IsBuilt || builder.GetComponent<StageFourEscapeSequence>() != null) continue;
-             builder.gameObject.AddComponent<StageFourEscapeSequence>();
-         }
-     }
- }
+
  
