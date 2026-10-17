@@ -200,20 +200,23 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         }
         yield return new WaitForSeconds(0.8f);
         message = "CHARGES ARMED: 6/6 • SHUTTLE RELEASED";
-        for (int i = 0; i < plantedBombs.Count; i++)
-        {
-            message = "CHARGE DETONATION • " + (i + 1) + "/6";
-            CreateBlast("S4_ChargeDetonation_" + (i + 1), bombPositions[i], 5.5f + i * 0.45f);
-            if (plantedBombs[i] != null) Destroy(plantedBombs[i]);
-            yield return new WaitForSeconds(0.42f);
-        }
         float t = 0f;
+        int nextCharge = 0;
+        float nextChargeTime = 0.25f;
         Vector3 start = escapeShuttle != null ? escapeShuttle.position : new Vector3(0f, 2f, 143f);
         while (t < 3.2f)
         {
             t += Time.deltaTime;
             float f = Mathf.Clamp01(t / 3.2f);
             if (escapeShuttle != null) escapeShuttle.position = start + new Vector3(0f, 1.5f * f, 55f * f);
+            if (nextCharge < plantedBombs.Count && t >= nextChargeTime)
+            {
+                message = "CHARGE DETONATION • " + (nextCharge + 1) + "/6";
+                CreateBlast("S4_ChargeDetonation_" + (nextCharge + 1), bombPositions[nextCharge], 5.5f + nextCharge * 0.45f);
+                if (plantedBombs[nextCharge] != null) Destroy(plantedBombs[nextCharge]);
+                nextCharge++;
+                nextChargeTime += 0.45f;
+            }
             if (sceneCamera != null && escapeShuttle != null)
             {
                 Vector3 target = escapeShuttle.position;
