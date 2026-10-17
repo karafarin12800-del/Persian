@@ -15,12 +15,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private Transform player;
     private Transform worldRoot;
     private Transform escapeShuttle;
-    private GameObject blueDoor;
     private readonly List<GameObject> plantedBombs = new List<GameObject>();
     private readonly List<Vector3> bombPositions = new List<Vector3>();
     private readonly List<Transform> bombSites = new List<Transform>();
     private readonly List<GameObject> bombSiteIndicators = new List<GameObject>();
-    private Vector3 lastBombPosition;
     private bool finaleStarted;
     private bool doorOpened;
     private bool boarded;
@@ -45,7 +43,6 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         redDoorMat = MakeMaterial("S4_EscapeRedWarning", new Color(1f, 0.035f, 0.015f), new Color(2.2f, 0.025f, 0.008f));
         bombMat = MakeMaterial("S4_TimedBomb", new Color(0.95f, 0.12f, 0.035f), new Color(1f, 0.025f, 0.005f));
         blastMat = MakeMaterial("S4_FinalBlast", new Color(1f, 0.48f, 0.08f), new Color(1f, 0.15f, 0.015f));
-        if (player != null) lastBombPosition = player.position;
         BuildEscapeHallAndDoor();
     }
 
@@ -208,7 +205,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         for (int side = -1; side <= 1; side += 2)
         {
             MakeChildBox(craft, "Wing" + side, new Vector3(side * 3.2f, 0f, -0.7f), new Vector3(2.4f, 0.35f, 4.8f), MakeMaterial("S4_ShuttleWing", new Color(0.25f, 0.35f, 0.45f)));
-            MakeChildBox(craft, "Engine" + side, new Vector3(side * 1.45f, 0.1f, -4.5f), new Vector3(0.9f, 1f, 1.4f), redDoorMat);
+            MakeChildBox(craft, "Engine" + side, new Vector3(side * 1.45f, 0.1f, -4.5f), new Vector3(0.9f, 1f, 1.4f), greenBeaconMat);
         }
         return craft;
     }
