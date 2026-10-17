@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using PersiaWar.Unity2D5D;
 
 /// <summary>
 /// Isolated Stage 4 escape finale. Runtime bootstrap attaches this only while
