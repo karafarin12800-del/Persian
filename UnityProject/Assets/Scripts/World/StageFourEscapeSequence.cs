@@ -24,9 +24,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private bool doorOpened;
     private bool boarded;
     private Camera sceneCamera;
-    private Material blueMat, bombMat, blastMat;
+    private Material redDoorMat, bombMat, blastMat;
     private GUIStyle messageStyle;
-    private string message = "REACH THE BLUE ESCAPE HATCH";
+    private string message = "FIND RED ESCAPE DOOR • PLANT 6 CHARGES";
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InstallBootstrap()
@@ -44,7 +44,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         var p = FindFirstObjectByType<PlayerController>();
         player = p != null ? p.transform : null;
         sceneCamera = Camera.main;
-        blueMat = MakeMaterial("S4_EscapeBlue", new Color(0.05f, 0.25f, 1f), new Color(0.08f, 0.3f, 1f));
+        redDoorMat = MakeMaterial("S4_EscapeRedWarning", new Color(1f, 0.035f, 0.015f), new Color(2.2f, 0.025f, 0.008f));
         bombMat = MakeMaterial("S4_TimedBomb", new Color(0.95f, 0.12f, 0.035f), new Color(1f, 0.025f, 0.005f));
         blastMat = MakeMaterial("S4_FinalBlast", new Color(1f, 0.48f, 0.08f), new Color(1f, 0.15f, 0.015f));
         if (player != null) lastBombPosition = player.position;
@@ -54,17 +54,26 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private void Update()
     {
         if (player == null || worldRoot == null || finaleStarted) return;
-        if (Vector3.Distance(player.position, lastBombPosition) >= 10f)
+        if (plantedBombs.Count < 6 && Vector3.Distance(player.position, lastBombPosition) >= 10f)
         {
             PlantTimedBomb(player.position);
             lastBombPosition = player.position;
+            message = "CHARGES PLANTED: " + plantedBombs.Count + "/6";
         }
 
-        // The blue hatch sits beyond the command room, on the forward (+Z) route.
-        if (!doorOpened && player.position.z >= 116f)
-            OpenBlueDoor();
-        if (doorOpened && !boarded && player.position.z >= 130f)
+        // The red escape hatch is deliberately visible until the player reaches it.
+        float doorDistance = blueDoor != null ? Vector3.Distance(player.position, blueDoor.transform.position) : float.MaxValue;
+        if (!doorOpened && doorDistance <= 11f)
+            OpenRedDoor();
+
+        float shuttleDistance = escapeShuttle != null ? Vector3.Distance(player.position, escapeShuttle.position) : float.MaxValue;
+        if (doorOpened && !boarded && shuttleDistance <= 8f)
         {
+            if (plantedBombs.Count < 6)
+            {
+                message = "PLANT ALL 6 CHARGES FIRST • " + plantedBombs.Count + "/6";
+                return;
+            }
             boarded = true;
             StartCoroutine(PlayEscapeFinale());
         }
@@ -89,10 +98,13 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         MakeBox("S4_EscapeCorridorLeft", new Vector3(-12f, 6f, 112f), new Vector3(1.4f, 12f, 32f), MakeMaterial("S4_EscapeWall", new Color(0.2f, 0.3f, 0.4f)));
         MakeBox("S4_EscapeCorridorRight", new Vector3(12f, 6f, 112f), new Vector3(1.4f, 12f, 32f), MakeMaterial("S4_EscapeWall", new Color(0.2f, 0.3f, 0.4f)));
         MakeBox("S4_EscapeCorridorCeiling", new Vector3(0f, 13f, 112f), new Vector3(24f, 1.2f, 32f), MakeMaterial("S4_EscapeCeiling", new Color(0.035f, 0.055f, 0.085f)));
-        blueDoor = MakeBox("S4_BlueEscapeDoor", new Vector3(0f, 6f, 127f), new Vector3(10f, 11f, 1.2f), blueMat);
-        MakeBox("S4_EscapeDoorFrameL", new Vector3(-5.7f, 6f, 127f), new Vector3(1f, 12f, 2f), blueMat);
-        MakeBox("S4_EscapeDoorFrameR", new Vector3(5.7f, 6f, 127f), new Vector3(1f, 12f, 2f), blueMat);
-        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 12f, 127f), new Vector3(12.5f, 1f, 2f), blueMat);
+        blueDoor = MakeBox("S4_RedEscapeDoor", new Vector3(0f, 6f, 127f), new Vector3(10f, 11f, 1.2f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameL", new Vector3(-5.7f, 6f, 127f), new Vector3(1f, 12f, 2f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameR", new Vector3(5.7f, 6f, 127f), new Vector3(1f, 12f, 2f), redDoorMat);
+        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 12f, 127f), new Vector3(12.5f, 1f, 2f), redDoorMat);
+        MakeBox("S4_EscapeDoorBeaconL", new Vector3(-7f, 6f, 127f), new Vector3(0.45f, 13f, 0.45f), redDoorMat);
+        MakeBox("S4_EscapeDoorBeaconR", new Vector3(7f, 6f, 127f), new Vector3(0.45f, 13f, 0.45f), redDoorMat);
+        CreateDoorLabel();
         escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.8f, 143f));
     }
 
@@ -107,15 +119,15 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         for (int side = -1; side <= 1; side += 2)
         {
             MakeChildBox(craft, "Wing" + side, new Vector3(side * 3.2f, 0f, -0.7f), new Vector3(2.4f, 0.35f, 4.8f), MakeMaterial("S4_ShuttleWing", new Color(0.25f, 0.35f, 0.45f)));
-            MakeChildBox(craft, "Engine" + side, new Vector3(side * 1.45f, 0.1f, -4.5f), new Vector3(0.9f, 1f, 1.4f), blueMat);
+            MakeChildBox(craft, "Engine" + side, new Vector3(side * 1.45f, 0.1f, -4.5f), new Vector3(0.9f, 1f, 1.4f), redDoorMat);
         }
         return craft;
     }
 
-    private void OpenBlueDoor()
+    private void OpenRedDoor()
     {
         doorOpened = true;
-        message = "ESCAPE HATCH OPEN • BOARD THE SHUTTLE";
+        message = "RED ESCAPE DOOR OPEN • PLANT 6 CHARGES • THEN BOARD SHUTTLE";
         if (blueDoor != null)
         {
             var renderer = blueDoor.GetComponent<Renderer>();
@@ -124,38 +136,50 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             if (collider != null) collider.enabled = false;
         }
         if (escapeShuttle != null) escapeShuttle.gameObject.SetActive(true);
+        StartupCheckpoint.Set("StageFourRedEscapeDoorOpened");
+    }
+
+    private void CreateDoorLabel()
+    {
+        var labelObject = new GameObject("S4_RedEscapeDoorLabel");
+        labelObject.transform.SetParent(worldRoot, false);
+        labelObject.transform.localPosition = new Vector3(0f, 14.1f, 126.2f);
+        var text = labelObject.AddComponent<TextMesh>();
+        text.text = "RED EXIT  /  SHUTTLE";
+        text.characterSize = 0.62f;
+        text.fontSize = 72;
+        text.anchor = TextAnchor.MiddleCenter;
+        text.alignment = TextAlignment.Center;
+        text.color = new Color(1f, 0.12f, 0.06f);
+        var renderer = labelObject.GetComponent<MeshRenderer>();
+        if (renderer != null) renderer.material = redDoorMat;
     }
 
     private void PlantTimedBomb(Vector3 position)
     {
-        Vector3 p = new Vector3(position.x, 0.35f, position.z);
-        var bomb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        bomb.name = "S4_TimedBomb_" + plantedBombs.Count;
+        if (plantedBombs.Count >= 6 || worldRoot == null) return;
+        Vector3 p = new Vector3(position.x, 0.6f, position.z);
+        var bomb = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        bomb.name = "S4_TimedCharge_" + (plantedBombs.Count + 1);
         bomb.transform.SetParent(worldRoot, false);
         bomb.transform.position = p;
-        bomb.transform.localScale = new Vector3(0.55f, 0.45f, 0.55f);
-        bomb.GetComponent<Renderer>().material = bombMat;
+        bomb.transform.localScale = new Vector3(0.72f, 0.28f, 0.72f);
+        var collider = bomb.GetComponent<Collider>();
+        if (collider != null) Destroy(collider);
+        var renderer = bomb.GetComponent<Renderer>();
+        if (renderer != null) renderer.material = bombMat;
+        var beacon = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        beacon.name = "S4_ChargeBlink_" + (plantedBombs.Count + 1);
+        beacon.transform.SetParent(bomb.transform, false);
+        beacon.transform.localPosition = new Vector3(0f, 1.3f, 0f);
+        beacon.transform.localScale = Vector3.one * 0.38f;
+        var beaconCollider = beacon.GetComponent<Collider>();
+        if (beaconCollider != null) Destroy(beaconCollider);
+        var beaconRenderer = beacon.GetComponent<Renderer>();
+        if (beaconRenderer != null) beaconRenderer.material = redDoorMat;
         plantedBombs.Add(bomb);
         bombPositions.Add(p);
-        StartCoroutine(DetonateBomb(bomb, plantedBombs.Count > 5 ? 5.5f : 7.5f));
-    }
-
-    private IEnumerator DetonateBomb(GameObject bomb, float delay)
-    {
-        float t = 0f;
-        var renderer = bomb != null ? bomb.GetComponent<Renderer>() : null;
-        while (t < delay && bomb != null)
-        {
-            t += Time.deltaTime;
-            if (renderer != null) renderer.enabled = Mathf.FloorToInt(t * 4f) % 2 == 0;
-            yield return null;
-        }
-        if (bomb != null)
-        {
-            Vector3 p = bomb.transform.position;
-            CreateBlast("S4_BombBlast", p, 2.8f);
-            Destroy(bomb);
-        }
+        StartupCheckpoint.Set("StageFourChargePlanted_" + plantedBombs.Count + "_of_6");
     }
 
     private IEnumerator PlayEscapeFinale()
@@ -175,7 +199,14 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             foreach (var r in renderers) if (r != null) r.enabled = false;
         }
         yield return new WaitForSeconds(0.8f);
-        message = "SHUTTLE RELEASED • MOTHERSHIP CRITICAL";
+        message = "CHARGES ARMED: 6/6 • SHUTTLE RELEASED";
+        for (int i = 0; i < plantedBombs.Count; i++)
+        {
+            message = "CHARGE DETONATION • " + (i + 1) + "/6";
+            CreateBlast("S4_ChargeDetonation_" + (i + 1), bombPositions[i], 5.5f + i * 0.45f);
+            if (plantedBombs[i] != null) Destroy(plantedBombs[i]);
+            yield return new WaitForSeconds(0.42f);
+        }
         float t = 0f;
         Vector3 start = escapeShuttle != null ? escapeShuttle.position : new Vector3(0f, 2f, 143f);
         while (t < 3.2f)
@@ -250,7 +281,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!finaleStarted && string.IsNullOrEmpty(message)) return;
+        if (string.IsNullOrEmpty(message)) return;
         if (messageStyle == null)
         {
             messageStyle = new GUIStyle(GUI.skin.label);
@@ -260,6 +291,13 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             messageStyle.normal.textColor = Color.white;
         }
         GUI.Label(new Rect(0, 20, Screen.width, 60), message, messageStyle);
+        if (!finaleStarted)
+        {
+            GUIStyle chargeStyle = new GUIStyle(messageStyle);
+            chargeStyle.fontSize = Mathf.Max(18, Screen.height / 34);
+            chargeStyle.normal.textColor = new Color(1f, 0.22f, 0.08f);
+            GUI.Label(new Rect(0, 82, Screen.width, 42), "EXPLOSIVE CHARGES: " + plantedBombs.Count + " / 6", chargeStyle);
+        }
     }
 
     private GameObject MakeBox(string name, Vector3 pos, Vector3 scale, Material material)
