@@ -264,7 +264,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         // Defend against a late match-start callback re-gating Stage 4 movement after
         // the cutscene. Do not interfere with defeat handling or a new cinematic.
         if (built && controller != null && !controller.IsDefeated &&
-            !controller.IsMovementEnabled && Time.time > 1f)
+            (!controller.enabled || !controller.IsMovementEnabled) && Time.time > 1f)
         {
             controller.enabled = true;
             controller.SetMovementEnabled(true);
