@@ -2422,6 +2422,13 @@ namespace PersiaWar.Unity2D5D
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
                 if (selectedKind == WeaponController.WeaponKind.AlienSword && !ownsAlienSword)
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
+
+                // Stage 4 opens with ranged combat inside the mothership. If a prior
+                // store choice left the melee-only alien sword selected, guarantee a
+                // firearm for the first encounter; the player can still swap later.
+                if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+
                 player.Weapon.SelectWeapon(selectedKind);
             }
 
