@@ -62,6 +62,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     {
         if (player == null || worldRoot == null || finaleStarted) return;
 
+        // Mobile gameplay disables touch-to-mouse synthesis. Route stage interactions
+        // from native finger IDs too, so opening the box/airlock never depends on IMGUI.
+        HandleDirectMobileInteractionTouches();
+
         bool nearSupplyBox = supplyCrate != null && supplyCrate.activeSelf &&
             Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f;
         if (requestOpenSupplyBox)
@@ -130,6 +134,46 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             }
             boarded = true;
             StartCoroutine(PlayEscapeFinale());
+        }
+    }
+
+    private Rect GetInteractionButtonRect()
+    {
+        float buttonW = Mathf.Min(Screen.width - 40f, 420f);
+        return new Rect((Screen.width - buttonW) * 0.5f, Screen.height - 142f, buttonW, 58f);
+    }
+
+    private void HandleDirectMobileInteractionTouches()
+    {
+        if (!Application.isMobilePlatform || Input.touchCount <= 0)
+            return;
+
+        bool nearCrate = !chargesPickedUp && supplyCrate != null && supplyCrate.activeSelf &&
+            Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f;
+        bool nearDoor = !doorOpened && redDoorPanel != null &&
+            Vector3.Distance(player.position, redDoorPanel.transform.position) <= 3.8f;
+        int site = FindNearbyBombSite();
+        bool nearEmptySite = site >= 0 && site < bombSiteIndicators.Count &&
+            bombSiteIndicators[site] != null && !bombSiteIndicators[site].activeSelf;
+        Rect buttonRect = GetInteractionButtonRect();
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase != TouchPhase.Began)
+                continue;
+            Vector2 guiPoint = new Vector2(touch.position.x, Screen.height - touch.position.y);
+            if (!buttonRect.Contains(guiPoint))
+                continue;
+
+            if (nearCrate && !supplyBoxOpened)
+                requestOpenSupplyBox = true;
+            else if (nearCrate && supplyBoxOpened)
+                requestPickup = true;
+            else if (nearEmptySite && chargesPickedUp && chargesInInventory > 0)
+                requestPlant = true;
+            else if (nearDoor)
+                requestOpenDoor = true;
         }
     }
 
@@ -865,8 +909,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             bombSiteIndicators[site] != null && !bombSiteIndicators[site].activeSelf;
         bool nearDoor = !doorOpened && redDoorPanel != null && player != null &&
             Vector3.Distance(player.position, redDoorPanel.transform.position) <= 3.8f;
-        float buttonW = Mathf.Min(Screen.width - 40, 420);
-        Rect buttonRect = new Rect((Screen.width - buttonW) * 0.5f, Screen.height - 142, buttonW, 58);
+        Rect buttonRect = GetInteractionButtonRect();
         if (nearCrate && !supplyBoxOpened && GUI.Button(buttonRect, "OPEN SUPPLY BOX"))
             requestOpenSupplyBox = true;
         else if (nearCrate && supplyBoxOpened && GUI.Button(buttonRect, "TAKE 6 CHARGES"))
