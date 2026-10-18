@@ -30,6 +30,7 @@ namespace PersiaWar.Unity2D5D
         private int dashPointerId = -1;
         private float musicVolume = 0.75f;
         private int volumePointerId = -1;
+        private int stageInteractionPointerId = -1;
         private float movePointerMissingSince = -1f;
         private float firePointerMissingSince = -1f;
         private float reloadPressedAt;
@@ -338,6 +339,16 @@ namespace PersiaWar.Unity2D5D
                     if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled) volumePointerId = -1;
                     continue;
                 }
+                if (stageInteractionPointerId == touch.fingerId)
+                {
+                    if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                    {
+                        stageInteractionPointerId = -1;
+                        lastTouchOwnershipEvent = "STAGE4 ACTION RELEASED id=" + touch.fingerId;
+                    }
+                    continue;
+                }
+
                 if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
                     continue;
 
@@ -359,6 +370,16 @@ namespace PersiaWar.Unity2D5D
                     touch.fingerId == reloadPointerId ||
                     touch.fingerId == dashPointerId)
                     continue;
+
+                // Stage 4 airlock/supply interactions are routed by the same
+                // native touch owner. Claim the finger before movement/fire can see it.
+                if (global::StageFourEscapeSequence.TryHandleInteractionTouch(touchStartScreen))
+                {
+                    MarkLateTouchRecovery(touch);
+                    stageInteractionPointerId = touch.fingerId;
+                    lastTouchOwnershipEvent = "STAGE4 ACTION captured id=" + touch.fingerId;
+                    continue;
+                }
 
                 if (volumeTouchRect.Contains(touchStartGui))
                 {
@@ -1054,6 +1075,7 @@ namespace PersiaWar.Unity2D5D
             grenadePointerId = -1;
             reloadPointerId = -1;
             dashPointerId = -1;
+            stageInteractionPointerId = -1;
             guiMoveMouseButton = -1;
             guiFireMouseButton = -1;
             guiMeleeMouseButton = -1;
