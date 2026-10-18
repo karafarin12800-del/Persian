@@ -539,7 +539,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         if (player != null && escapeShuttle != null)
         {
             Vector3 walkStart = player.position;
-            Vector3 boardingPoint = escapeShuttle.position + new Vector3(0f, 0.05f, -4.2f);
+            Vector3 boardingPoint = escapeShuttle.position + new Vector3(0f, 0.05f, 0.35f);
             Quaternion walkRotation = player.rotation;
             Vector3 facing = escapeShuttle.position - player.position;
             facing.y = 0f;
