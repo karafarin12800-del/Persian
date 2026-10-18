@@ -640,9 +640,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // The exterior shot opens on a real-looking connected configuration,
         // rather than beginning with the shuttle already floating away from the base.
         Vector3 closeCamera = new Vector3(18f, 122f, 365f);
-        Vector3 wideCamera = new Vector3(650f, 420f, 690f);
+        Vector3 wideCamera = new Vector3(300f, 205f, 510f);
         Vector3 closeLook = new Vector3(0f, 24f, 30f);
-        Vector3 wideLook = new Vector3(25f, 18f, 0f);
+        Vector3 wideLook = new Vector3(82f, 32f, 85f);
         if (sceneCamera != null)
         {
             sceneCamera.transform.position = closeCamera;
@@ -717,8 +717,6 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // The detached craft then breaks into six clearly separate sections, one after
         // another, with a distinct explosion at each break stage.
         Vector3 shuttleEnd = new Vector3(225f, 82f, 260f);
-        Vector3 wideCamera = new Vector3(300f, 205f, 510f);
-        Vector3 wideLook = new Vector3(82f, 32f, 85f);
         if (sceneCamera != null)
         {
             sceneCamera.transform.position = wideCamera;
@@ -874,6 +872,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                     n.StartsWith("S4_Hangar") ||
                     n.StartsWith("S4_EscapeCommand") ||
                     n.StartsWith("S4_EscapeCorridor") ||
+                    n.StartsWith("S4_ExteriorEscapeTunnel") ||
                     n.StartsWith("S4_EscapeDoor") ||
                     n.StartsWith("S4_RedEscapeDoor") ||
                     n.StartsWith("S4_Charge") ||
