@@ -665,8 +665,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         }
 
         bool landscape = Screen.width >= Screen.height;
-        float titleX = landscape ? Mathf.Min(350f, Screen.width * 0.22f) : 12f;
-        float rightReserve = landscape ? Mathf.Min(320f, Screen.width * 0.22f) : 12f;
+        float hudScale = Mathf.Clamp(Screen.height / 720f, 0.75f, 1.35f);
+        float titleX = landscape ? Mathf.Min(360f * hudScale, Screen.width * 0.28f) : 12f;
+        float rightReserve = landscape ? Mathf.Min(320f * hudScale, Screen.width * 0.22f) : 12f;
         float statusWidth = Mathf.Max(100f, Screen.width - titleX - rightReserve);
         float titleY = landscape ? 8f : 150f;
         float statusFont = Mathf.Clamp(Screen.height / 36f, 18f, 23f);
