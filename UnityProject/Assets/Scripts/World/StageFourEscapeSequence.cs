@@ -207,7 +207,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // Keep the supply box unlabelled; the interaction prompt appears only nearby.
 
         // Six fixed stations run from the aft engine room to the forward command/exit side.
-        float[] stationZ = { -88f, -61f, -24f, 22f, 60f, 92f };
+        float[] stationZ = { -88f, -61f, -24f, 22f, 46f, 56f };
         for (int i = 0; i < stationZ.Length; i++)
         {
             var site = MakeBox("S4_RedChargeStation_" + (i + 1), new Vector3(0f, 0.45f, stationZ[i]), new Vector3(2.2f, 0.9f, 1.8f), redDoorMat);
