@@ -518,25 +518,39 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // following unbroken exterior view clearly shows the whole mothership/base.
         HideInteriorForExteriorShot();
 
-        Vector3 shuttleStart = new Vector3(0f, 36f, 132f);
+        // The outside scene uses the same nose socket built on the mothership prow:
+        // the shuttle nose faces inward, into the open docking sleeve, before release.
+        Vector3 shuttleDockedPosition = new Vector3(0f, 14f, 156f);
+        Vector3 shuttleTravelStart = new Vector3(0f, 15.5f, 174f);
         Vector3 shuttleEnd = new Vector3(520f, 190f, 292f);
+        Quaternion shuttleDockedRotation = Quaternion.Euler(0f, 180f, 0f);
         Quaternion shuttleStartRotation = Quaternion.LookRotation(
-            new Vector3(0.78f, 0.13f, 0.60f), Vector3.up);
+            new Vector3(0.22f, 0.04f, 0.97f), Vector3.up);
         Quaternion shuttleEndRotation = Quaternion.LookRotation(
             new Vector3(0.94f, 0.20f, 0.28f), Vector3.up);
 
         if (escapeShuttle != null)
         {
-            escapeShuttle.position = shuttleStart;
-            escapeShuttle.rotation = shuttleStartRotation;
+            escapeShuttle.gameObject.SetActive(true);
+            escapeShuttle.position = shuttleDockedPosition;
+            escapeShuttle.rotation = shuttleDockedRotation;
             escapeShuttle.localScale = Vector3.one * 0.82f;
         }
+        if (exteriorDockConnection != null)
+        {
+            exteriorDockConnection.gameObject.SetActive(true);
+            exteriorDockConnection.localPosition = Vector3.zero;
+        }
+        if (exteriorDockClampPort != null)
+            exteriorDockClampPort.localPosition = new Vector3(-3.55f, 14f, 156f);
+        if (exteriorDockClampStarboard != null)
+            exteriorDockClampStarboard.localPosition = new Vector3(3.55f, 14f, 156f);
 
-        // Start with the shuttle visibly docked to the mothership nose, then pull back to a high diagonal reveal.
-        // The camera is no longer attached to the player or shuttle during detonations.
+        // The exterior shot opens on a real-looking connected configuration,
+        // rather than beginning with the shuttle already floating away from the base.
         Vector3 closeCamera = new Vector3(18f, 122f, 365f);
         Vector3 wideCamera = new Vector3(650f, 420f, 690f);
-        Vector3 closeLook = new Vector3(0f, 27f, 15f);
+        Vector3 closeLook = new Vector3(0f, 24f, 30f);
         Vector3 wideLook = new Vector3(25f, 18f, 0f);
         if (sceneCamera != null)
         {
@@ -544,7 +558,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             sceneCamera.transform.LookAt(closeLook);
         }
 
-        message = "EXTERIOR VIEW • ESCAPE SHUTTLE DETACHING";
+        message = "EXTERIOR VIEW • SHUTTLE DOCKED TO MOTHERSHIP";
         float revealTime = 0f;
         const float revealDuration = 1.35f;
         while (revealTime < revealDuration)
@@ -559,7 +573,53 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             yield return null;
         }
 
-        message = "ESCAPE SHUTTLE RELEASED • MOTHERSHIP IN VIEW";
+        // Release the clamps and retract the connector sleeve into the mothership.
+        // The shuttle remains in place until the hardware has visibly disengaged.
+        message = "DOCKING CLAMPS RELEASING";
+        Vector3 clampPortClosed = new Vector3(-3.55f, 14f, 156f);
+        Vector3 clampStarboardClosed = new Vector3(3.55f, 14f, 156f);
+        Vector3 clampPortOpen = new Vector3(-7.1f, 14f, 156f);
+        Vector3 clampStarboardOpen = new Vector3(7.1f, 14f, 156f);
+        Vector3 connectorClosed = Vector3.zero;
+        Vector3 connectorRetracted = new Vector3(0f, 0f, -8f);
+        float releaseHardwareTime = 0f;
+        const float releaseHardwareDuration = 0.72f;
+        while (releaseHardwareTime < releaseHardwareDuration)
+        {
+            releaseHardwareTime += Time.deltaTime;
+            float release = Mathf.SmoothStep(0f, 1f,
+                Mathf.Clamp01(releaseHardwareTime / releaseHardwareDuration));
+            if (exteriorDockClampPort != null)
+                exteriorDockClampPort.localPosition = Vector3.Lerp(clampPortClosed, clampPortOpen, release);
+            if (exteriorDockClampStarboard != null)
+                exteriorDockClampStarboard.localPosition = Vector3.Lerp(clampStarboardClosed, clampStarboardOpen, release);
+            if (exteriorDockConnection != null)
+                exteriorDockConnection.localPosition = Vector3.Lerp(connectorClosed, connectorRetracted, release);
+            if (sceneCamera != null)
+                sceneCamera.transform.LookAt(Vector3.Lerp(closeLook, wideLook, 0.35f));
+            yield return null;
+        }
+
+        // The shuttle backs clear of the socket, pivots toward open space, and only
+        // then accelerates away while the camera keeps both craft and blast sites in view.
+        message = "SHUTTLE DETACHING • MOTHERSHIP IN VIEW";
+        float detachmentTime = 0f;
+        const float detachmentDuration = 1.15f;
+        while (detachmentTime < detachmentDuration)
+        {
+            detachmentTime += Time.deltaTime;
+            float detach = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(detachmentTime / detachmentDuration));
+            if (escapeShuttle != null)
+            {
+                escapeShuttle.position = Vector3.Lerp(shuttleDockedPosition, shuttleTravelStart, detach);
+                escapeShuttle.rotation = Quaternion.Slerp(shuttleDockedRotation, shuttleStartRotation, detach);
+            }
+            if (sceneCamera != null)
+                sceneCamera.transform.LookAt(Vector3.Lerp(
+                    new Vector3(25f, 18f, 0f),
+                    new Vector3(40f, 22f, 6f), detach));
+            yield return null;
+        }
 
         // Six exterior blast locations move from the far/stern section toward the
         // central reactor. The final charge is deliberately much larger than the rest.
@@ -574,8 +634,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         };
 
         float elapsed = 0f;
-        const float shuttleFlightDuration = 6.4f;
-        float nextChargeTime = 0.75f;
+        const float shuttleFlightDuration = 7.2f;
+        float nextChargeTime = 0.55f;
         GameObject finalBlast = null;
 
         // Shuttle movement and the explosions run together. A fixed wide camera
@@ -590,7 +650,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
                 if (escapeShuttle != null)
                 {
-                    escapeShuttle.position = Vector3.Lerp(shuttleStart, shuttleEnd, flight);
+                    escapeShuttle.position = Vector3.Lerp(shuttleTravelStart, shuttleEnd, flight);
                     escapeShuttle.rotation = Quaternion.Slerp(shuttleStartRotation, shuttleEndRotation, flight);
                 }
 
@@ -628,7 +688,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 Mathf.Clamp01(elapsed / shuttleFlightDuration));
             if (escapeShuttle != null)
             {
-                escapeShuttle.position = Vector3.Lerp(shuttleStart, shuttleEnd, flight);
+                escapeShuttle.position = Vector3.Lerp(shuttleTravelStart, shuttleEnd, flight);
                 escapeShuttle.rotation = Quaternion.Slerp(shuttleStartRotation, shuttleEndRotation, flight);
             }
             if (sceneCamera != null)
