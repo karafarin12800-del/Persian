@@ -39,6 +39,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private GUIStyle messageStyle;
     private string message = "FIND THE CHARGE SUPPLY BOX";
 
+    public static bool IsFinaleActive => active != null && active.finaleStarted;
+
     private void Awake()
     {
         active = this;
@@ -163,14 +165,12 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
         // The door sits within the playable corridor, not beyond the map boundary.
         // Only its frame is red; the dark panel slides out after the player taps OPEN.
-        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 3.6f, 110f), new Vector3(9.8f, 7.2f, 0.8f), doorPanelMat);
-        MakeBox("S4_EscapeDoorFrameL", new Vector3(-5.7f, 3.8f, 109f), new Vector3(0.45f, 8f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorFrameR", new Vector3(5.7f, 3.8f, 109f), new Vector3(0.45f, 8f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 7.8f, 109f), new Vector3(11.8f, 0.45f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorBeaconL", new Vector3(-6.4f, 3.8f, 109f), new Vector3(0.22f, 8.5f, 0.22f), redDoorMat);
-        MakeBox("S4_EscapeDoorBeaconR", new Vector3(6.4f, 3.8f, 109f), new Vector3(0.22f, 8.5f, 0.22f), redDoorMat);
+        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 2.35f, 110f), new Vector3(7.8f, 4.7f, 0.8f), doorPanelMat);
+        MakeBox("S4_EscapeDoorFrameL", new Vector3(-4.5f, 2.55f, 109f), new Vector3(0.38f, 5.4f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameR", new Vector3(4.5f, 2.55f, 109f), new Vector3(0.38f, 5.4f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 5.1f, 109f), new Vector3(9.4f, 0.38f, 0.7f), redDoorMat);
         CreateDoorLabel();
-        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.8f, 118f));
+        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 124f));
         escapeShuttle.gameObject.SetActive(false);
 
         // The player must find the charge box in the side of the command room.
@@ -244,17 +244,35 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
     private Transform BuildEscapeShuttle(Vector3 pos)
     {
+        // A compact, streamlined craft that fits inside the boarding corridor.
         var craft = new GameObject("S4_FinalEscapeShuttle").transform;
         craft.SetParent(worldRoot, false);
         craft.localPosition = pos;
-        MakeChildBox(craft, "Hull", Vector3.zero, new Vector3(5f, 1.8f, 9f), MakeMaterial("S4_ShuttleHull", new Color(0.55f, 0.68f, 0.78f)));
-        MakeChildBox(craft, "Nose", new Vector3(0f, 0.1f, 4.4f), new Vector3(3.1f, 1.3f, 2.2f), MakeMaterial("S4_ShuttleNose", new Color(0.72f, 0.82f, 0.9f)));
-        MakeChildBox(craft, "Cockpit", new Vector3(0f, 1.05f, 0.9f), new Vector3(2.5f, 0.6f, 2.4f), MakeMaterial("S4_ShuttleGlass", new Color(0.02f, 0.25f, 0.38f), new Color(0.02f, 0.4f, 0.8f)));
+
+        MakeChildPrimitive(craft, PrimitiveType.Sphere, "ShuttleHull",
+            Vector3.zero, new Vector3(3.6f, 1.15f, 7.3f),
+            MakeMaterial("S4_ShuttleHull", new Color(0.58f, 0.70f, 0.80f)));
+        MakeChildPrimitive(craft, PrimitiveType.Sphere, "ShuttleNose",
+            new Vector3(0f, 0.02f, 3.25f), new Vector3(2.0f, 0.72f, 3.1f),
+            MakeMaterial("S4_ShuttleNose", new Color(0.78f, 0.86f, 0.92f)));
+        MakeChildPrimitive(craft, PrimitiveType.Sphere, "ShuttleCockpit",
+            new Vector3(0f, 0.68f, 0.72f), new Vector3(1.7f, 0.64f, 2.0f),
+            MakeMaterial("S4_ShuttleGlass", new Color(0.02f, 0.22f, 0.34f), new Color(0.02f, 0.35f, 0.8f)));
+
         for (int side = -1; side <= 1; side += 2)
         {
-            MakeChildBox(craft, "Wing" + side, new Vector3(side * 3.2f, 0f, -0.7f), new Vector3(2.4f, 0.35f, 4.8f), MakeMaterial("S4_ShuttleWing", new Color(0.25f, 0.35f, 0.45f)));
-            MakeChildBox(craft, "Engine" + side, new Vector3(side * 1.45f, 0.1f, -4.5f), new Vector3(0.9f, 1f, 1.4f), greenBeaconMat);
+            MakeChildBox(craft, "SweptWing" + side,
+                new Vector3(side * 2.15f, -0.12f, -0.65f),
+                new Vector3(1.65f, 0.22f, 3.6f),
+                MakeMaterial("S4_ShuttleWing", new Color(0.27f, 0.39f, 0.49f)));
+            MakeChildPrimitive(craft, PrimitiveType.Cylinder, "EngineTube" + side,
+                new Vector3(side * 0.9f, -0.03f, -3.35f), new Vector3(0.42f, 1.3f, 0.42f),
+                MakeMaterial("S4_ShuttleEngine", new Color(0.30f, 0.48f, 0.58f)),
+                Quaternion.Euler(90f, 0f, 0f));
+            MakeChildPrimitive(craft, PrimitiveType.Sphere, "EngineGlow" + side,
+                new Vector3(side * 0.9f, -0.03f, -4.0f), Vector3.one * 0.48f, greenBeaconMat);
         }
+
         return craft;
     }
 
@@ -339,78 +357,257 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private IEnumerator PlayEscapeFinale()
     {
         finaleStarted = true;
-        message = "ESCAPE SHUTTLE BOARDING";
-        if (player != null)
+        message = "ESCAPE ROUTE • BOARDING SHUTTLE";
+
+        PlayerController controller = player != null ? player.GetComponent<PlayerController>() : null;
+        if (controller != null)
         {
-            var controller = player.GetComponent<PlayerController>();
-            if (controller != null) controller.SetMovementEnabled(false);
+            controller.SetMovementEnabled(false);
+            controller.enabled = false;
+            if (controller.Weapon != null) controller.Weapon.enabled = false;
+            if (controller.Aim != null) controller.Aim.enabled = false;
         }
+
         if (sceneCamera == null) sceneCamera = Camera.main;
+        CameraFollow25D cameraFollow = FindFirstObjectByType<CameraFollow25D>();
+        if (cameraFollow != null) cameraFollow.enabled = false;
+
+        // Do not cut straight to an outside shot: first show the character
+        // automatically moving down the corridor and entering the little shuttle.
         if (player != null && escapeShuttle != null)
         {
-            player.position = escapeShuttle.position + new Vector3(0f, 0f, -1.5f);
-            var renderers = player.GetComponentsInChildren<Renderer>(true);
-            foreach (var r in renderers) if (r != null) r.enabled = false;
-        }
-        yield return new WaitForSeconds(0.8f);
-        message = "CHARGES ARMED: 6/6 • SHUTTLE RELEASED";
-        float t = 0f;
-        int nextCharge = 0;
-        float nextChargeTime = 0.25f;
-        Vector3 start = escapeShuttle != null ? escapeShuttle.position : new Vector3(0f, 2f, 143f);
-        while (t < 3.2f)
-        {
-            t += Time.deltaTime;
-            float f = Mathf.Clamp01(t / 3.2f);
-            if (escapeShuttle != null) escapeShuttle.position = start + new Vector3(0f, 1.5f * f, 55f * f);
-            if (nextCharge < plantedBombs.Count && t >= nextChargeTime)
+            Vector3 walkStart = player.position;
+            Vector3 boardingPoint = escapeShuttle.position + new Vector3(0f, 0.05f, -1.65f);
+            Quaternion walkRotation = player.rotation;
+            Vector3 facing = escapeShuttle.position - player.position;
+            facing.y = 0f;
+            Quaternion boardingRotation = facing.sqrMagnitude > 0.01f
+                ? Quaternion.LookRotation(facing.normalized, Vector3.up)
+                : walkRotation;
+
+            float walkTime = 0f;
+            const float walkDuration = 1.25f;
+            while (walkTime < walkDuration)
             {
-                message = "CHARGE DETONATION • " + (nextCharge + 1) + "/6";
-                CreateBlast("S4_ChargeDetonation_" + (nextCharge + 1), bombPositions[nextCharge], 5.5f + nextCharge * 0.45f);
-                if (plantedBombs[nextCharge] != null) Destroy(plantedBombs[nextCharge]);
-                nextCharge++;
-                nextChargeTime += 0.45f;
+                walkTime += Time.deltaTime;
+                float step = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(walkTime / walkDuration));
+                player.position = Vector3.Lerp(walkStart, boardingPoint, step);
+                player.rotation = Quaternion.Slerp(walkRotation, boardingRotation, step);
+
+                if (sceneCamera != null)
+                {
+                    Vector3 cameraTarget = player.position + Vector3.up * 1.1f;
+                    sceneCamera.transform.position = Vector3.Lerp(
+                        sceneCamera.transform.position,
+                        player.position + new Vector3(8f, 6f, -12f), 0.18f);
+                    sceneCamera.transform.LookAt(cameraTarget);
+                }
+                yield return null;
             }
-            if (sceneCamera != null && escapeShuttle != null)
+
+            player.position = boardingPoint;
+            Renderer[] playerRenderers = player.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer r in playerRenderers)
+                if (r != null) r.enabled = false;
+        }
+
+        message = "SHUTTLE AIRLOCK SEALED";
+        yield return new WaitForSeconds(0.45f);
+
+        // The interior is now behind us. Remove its visible geometry so the
+        // following unbroken exterior view clearly shows the whole mothership/base.
+        HideInteriorForExteriorShot();
+
+        Vector3 shuttleStart = new Vector3(0f, 36f, 184f);
+        Vector3 shuttleEnd = new Vector3(520f, 190f, 292f);
+        Quaternion shuttleStartRotation = Quaternion.LookRotation(
+            new Vector3(0.78f, 0.13f, 0.60f), Vector3.up);
+        Quaternion shuttleEndRotation = Quaternion.LookRotation(
+            new Vector3(0.94f, 0.20f, 0.28f), Vector3.up);
+
+        if (escapeShuttle != null)
+        {
+            escapeShuttle.position = shuttleStart;
+            escapeShuttle.rotation = shuttleStartRotation;
+            escapeShuttle.localScale = Vector3.one * 0.82f;
+        }
+
+        // Start just outside the bow, then pull back to a high diagonal reveal.
+        // The camera is no longer attached to the player or shuttle during detonations.
+        Vector3 closeCamera = new Vector3(18f, 122f, 438f);
+        Vector3 wideCamera = new Vector3(650f, 420f, 690f);
+        Vector3 closeLook = new Vector3(0f, 27f, 15f);
+        Vector3 wideLook = new Vector3(25f, 18f, 0f);
+        if (sceneCamera != null)
+        {
+            sceneCamera.transform.position = closeCamera;
+            sceneCamera.transform.LookAt(closeLook);
+        }
+
+        message = "EXTERIOR VIEW • ESCAPE SHUTTLE DETACHING";
+        float revealTime = 0f;
+        const float revealDuration = 1.35f;
+        while (revealTime < revealDuration)
+        {
+            revealTime += Time.deltaTime;
+            float reveal = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(revealTime / revealDuration));
+            if (sceneCamera != null)
             {
-                Vector3 target = escapeShuttle.position;
-                sceneCamera.transform.position = target + new Vector3(16f, 11f, -28f);
-                sceneCamera.transform.LookAt(target + Vector3.forward * 8f);
+                sceneCamera.transform.position = Vector3.Lerp(closeCamera, wideCamera, reveal);
+                sceneCamera.transform.LookAt(Vector3.Lerp(closeLook, wideLook, reveal));
             }
             yield return null;
         }
 
-        // Six distinct detonation beats make the whole mother-ship/base collapse readable.
+        message = "ESCAPE SHUTTLE RELEASED • MOTHERSHIP IN VIEW";
+
+        // Six exterior blast locations move from the far/stern section toward the
+        // central reactor. The final charge is deliberately much larger than the rest.
         Vector3[] blasts =
         {
-            new Vector3(-55f, 22f, -70f), new Vector3(42f, 28f, -42f),
-            new Vector3(-28f, 39f, 4f), new Vector3(35f, 42f, 38f),
-            new Vector3(0f, 34f, 83f), new Vector3(0f, 18f, 0f)
+            new Vector3(-18f, 23f, -132f),
+            new Vector3(-58f, 31f, -66f),
+            new Vector3(51f, 39f, -18f),
+            new Vector3(-42f, 43f, 28f),
+            new Vector3(28f, 29f, 88f),
+            new Vector3(0f, 35f, -4f)
         };
+
+        float elapsed = 0f;
+        const float shuttleFlightDuration = 6.4f;
+        float nextChargeTime = 0.75f;
+        GameObject finalBlast = null;
+
+        // Shuttle movement and the explosions run together. A fixed wide camera
+        // keeps the mothership visible while the craft visibly separates and escapes.
         for (int i = 0; i < blasts.Length; i++)
         {
-            message = "MOTHERSHIP CORE FAILURE • " + (i + 1) + "/6";
-            CreateBlast("S4_MothershipDetonation_" + (i + 1), blasts[i], 18f + i * 2.5f);
-            if (sceneCamera != null) sceneCamera.transform.position += new Vector3((i % 2 == 0 ? 1f : -1f) * 0.35f, 0.15f, 0f);
-            yield return new WaitForSeconds(0.48f);
-        }
-        message = "MOTHERSHIP AND ORBITAL BASE DESTROYED";
-        // Fade exterior and ship structures, but leave the escape craft visible.
-        if (worldRoot != null)
-        {
-            var all = worldRoot.GetComponentsInChildren<Renderer>(true);
-            foreach (var r in all)
+            while (elapsed < nextChargeTime)
             {
-                if (r == null || r.transform.IsChildOf(escapeShuttle)) continue;
-                if (r.name.Contains("EscapeShuttle")) continue;
-                r.enabled = false;
+                elapsed += Time.deltaTime;
+                float flight = Mathf.SmoothStep(0f, 1f,
+                    Mathf.Clamp01(elapsed / shuttleFlightDuration));
+
+                if (escapeShuttle != null)
+                {
+                    escapeShuttle.position = Vector3.Lerp(shuttleStart, shuttleEnd, flight);
+                    escapeShuttle.rotation = Quaternion.Slerp(shuttleStartRotation, shuttleEndRotation, flight);
+                }
+
+                if (sceneCamera != null)
+                {
+                    Vector3 lookTarget = Vector3.Lerp(
+                        new Vector3(25f, 18f, 0f),
+                        new Vector3(100f, 30f, 32f), flight);
+                    sceneCamera.transform.LookAt(lookTarget);
+                }
+                yield return null;
             }
+
+            message = i == blasts.Length - 1
+                ? "FINAL CHARGE • MOTHERSHIP CORE DETONATION"
+                : "MOTHERSHIP DETONATION • " + (i + 1) + "/6";
+
+            float radius = i == blasts.Length - 1 ? 78f : 20f + i * 1.8f;
+            GameObject explosion = CreateBlast(
+                "S4_MothershipDetonation_" + (i + 1), blasts[i], radius,
+                i == blasts.Length - 1);
+            if (i == blasts.Length - 1)
+                finalBlast = explosion;
+
+            if (i < plantedBombs.Count && plantedBombs[i] != null)
+                Destroy(plantedBombs[i]);
+
+            nextChargeTime += 0.97f;
         }
-        yield return new WaitForSeconds(1.8f);
-        message = "STAGE 4 COMPLETE";
+
+        while (elapsed < shuttleFlightDuration)
+        {
+            elapsed += Time.deltaTime;
+            float flight = Mathf.SmoothStep(0f, 1f,
+                Mathf.Clamp01(elapsed / shuttleFlightDuration));
+            if (escapeShuttle != null)
+            {
+                escapeShuttle.position = Vector3.Lerp(shuttleStart, shuttleEnd, flight);
+                escapeShuttle.rotation = Quaternion.Slerp(shuttleStartRotation, shuttleEndRotation, flight);
+            }
+            if (sceneCamera != null)
+                sceneCamera.transform.LookAt(Vector3.Lerp(
+                    new Vector3(25f, 18f, 0f),
+                    new Vector3(100f, 30f, 32f), flight));
+            yield return null;
+        }
+
+        message = "MOTHERSHIP CORE DESTROYED";
+        // The last detonation remains visible for the final beat while the hull,
+        // docking districts and lights disappear behind the escaping craft.
+        HideMothershipAfterFinalExplosion(finalBlast);
+        yield return new WaitForSeconds(1.2f);
+
+        PrototypeFlow flow = FindFirstObjectByType<PrototypeFlow>();
+        if (flow != null)
+            flow.CompleteStageFourEscapeToMainMenu();
+        else
+            message = "STAGE 4 COMPLETE";
     }
 
-    private void CreateBlast(string name, Vector3 position, float radius)
+    private void HideInteriorForExteriorShot()
+    {
+        if (worldRoot == null) return;
+
+        Renderer[] renderers = worldRoot.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer r in renderers)
+        {
+            if (r == null || (escapeShuttle != null &&
+                (r.transform == escapeShuttle || r.transform.IsChildOf(escapeShuttle))))
+                continue;
+
+            Transform node = r.transform;
+            bool hide = false;
+            while (node != null && node != worldRoot)
+            {
+                string n = node.name;
+                if (n.StartsWith("S4_Interior") ||
+                    n.StartsWith("S4_Hangar") ||
+                    n.StartsWith("S4_EscapeCommand") ||
+                    n.StartsWith("S4_EscapeCorridor") ||
+                    n.StartsWith("S4_EscapeDoor") ||
+                    n.StartsWith("S4_RedEscapeDoor") ||
+                    n.StartsWith("S4_Charge") ||
+                    n.StartsWith("S4_StoredSquareCharge") ||
+                    n.StartsWith("S4_RedChargeStation") ||
+                    n.StartsWith("S4_SquareTimedCharge") ||
+                    n.StartsWith("S4_AlienTrooper_"))
+                {
+                    hide = true;
+                    break;
+                }
+                node = node.parent;
+            }
+
+            if (hide) r.enabled = false;
+        }
+    }
+
+    private void HideMothershipAfterFinalExplosion(GameObject finalBlast)
+    {
+        if (worldRoot == null) return;
+
+        Renderer[] renderers = worldRoot.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer r in renderers)
+        {
+            if (r == null) continue;
+            if (escapeShuttle != null &&
+                (r.transform == escapeShuttle || r.transform.IsChildOf(escapeShuttle)))
+                continue;
+            if (finalBlast != null &&
+                (r.transform == finalBlast.transform || r.transform.IsChildOf(finalBlast.transform)))
+                continue;
+            r.enabled = false;
+        }
+    }
+
+    private GameObject CreateBlast(string name, Vector3 position, float radius, bool persistAfterExpansion = false)
     {
         var blast = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         blast.name = name;
@@ -420,20 +617,23 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         var col = blast.GetComponent<Collider>();
         if (col != null) Destroy(col);
         blast.GetComponent<Renderer>().material = blastMat;
-        StartCoroutine(ExpandBlast(blast, radius));
+        StartCoroutine(ExpandBlast(blast, radius, persistAfterExpansion));
+        return blast;
     }
 
-    private IEnumerator ExpandBlast(GameObject blast, float radius)
+    private IEnumerator ExpandBlast(GameObject blast, float radius, bool persistAfterExpansion)
     {
         float t = 0f;
-        while (t < 0.55f && blast != null)
+        const float expandDuration = 0.75f;
+        while (t < expandDuration && blast != null)
         {
             t += Time.deltaTime;
-            float f = Mathf.Clamp01(t / 0.55f);
+            float f = Mathf.Clamp01(t / expandDuration);
             blast.transform.localScale = Vector3.one * Mathf.Lerp(0.2f, radius, f);
             yield return null;
         }
-        if (blast != null) Destroy(blast, 0.6f);
+        if (persistAfterExpansion) yield break;
+        if (blast != null) Destroy(blast, 0.75f);
     }
 
     private void OnGUI()
@@ -442,21 +642,44 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         if (messageStyle == null)
         {
             messageStyle = new GUIStyle(GUI.skin.label);
-            messageStyle.fontSize = Mathf.Max(20, Screen.height / 30);
-            messageStyle.alignment = TextAnchor.UpperCenter;
+            messageStyle.fontSize = Mathf.Max(18, Screen.height / 34);
+            messageStyle.alignment = TextAnchor.MiddleCenter;
             messageStyle.fontStyle = FontStyle.Bold;
             messageStyle.normal.textColor = Color.white;
             messageStyle.wordWrap = true;
         }
-        GUI.Label(new Rect(8, 18, Screen.width - 16, 70), message, messageStyle);
+
+        if (finaleStarted)
+        {
+            // Cinematic captions intentionally sit at the bottom instead of covering
+            // the normal health/shield area or the upper-right radar.
+            messageStyle.fontSize = Mathf.Clamp(Screen.height / 34, 18, 30);
+            Rect caption = new Rect(Screen.width * 0.08f, Screen.height * 0.79f,
+                Screen.width * 0.84f, Mathf.Max(48f, Screen.height * 0.11f));
+            Color previous = GUI.color;
+            GUI.color = new Color(0.03f, 0.055f, 0.08f, 0.78f);
+            GUI.Box(caption, GUIContent.none);
+            GUI.color = previous;
+            GUI.Label(caption, message, messageStyle);
+            return;
+        }
+
+        bool landscape = Screen.width >= Screen.height;
+        float titleX = landscape ? Mathf.Min(350f, Screen.width * 0.22f) : 12f;
+        float rightReserve = landscape ? Mathf.Min(320f, Screen.width * 0.22f) : 12f;
+        float statusWidth = Mathf.Max(100f, Screen.width - titleX - rightReserve);
+        float titleY = landscape ? 8f : 150f;
+        float statusFont = Mathf.Clamp(Screen.height / 36f, 18f, 23f);
+        messageStyle.fontSize = Mathf.RoundToInt(statusFont);
+        GUI.Label(new Rect(titleX, titleY, statusWidth, 34f), message, messageStyle);
 
         GUIStyle chargeStyle = new GUIStyle(messageStyle);
-        chargeStyle.fontSize = Mathf.Max(18, Screen.height / 34);
-        chargeStyle.normal.textColor = new Color(1f, 0.32f, 0.12f);
-        GUI.Label(new Rect(0, 88, Screen.width, 40),
+        chargeStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(Screen.height / 39f), 17, 21);
+        chargeStyle.normal.textColor = new Color(1f, 0.42f, 0.20f);
+        float counterY = landscape ? 43f : 190f;
+        GUI.Label(new Rect(titleX, counterY, statusWidth, 30f),
             "BOMBS: " + plantedBombs.Count + "/6 PLANTED   •   " + chargesInInventory + "/6 CARRIED", chargeStyle);
 
-        if (finaleStarted) return;
         int site = FindNearbyBombSite();
         bool nearCrate = !chargesPickedUp && supplyCrate != null && supplyCrate.activeSelf &&
             player != null && Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f;
@@ -490,12 +713,22 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
     private void MakeChildBox(Transform parent, string name, Vector3 pos, Vector3 scale, Material material)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        MakeChildPrimitive(parent, PrimitiveType.Cube, name, pos, scale, material);
+    }
+
+    private void MakeChildPrimitive(Transform parent, PrimitiveType primitiveType, string name,
+        Vector3 pos, Vector3 scale, Material material, Quaternion localRotation = default(Quaternion))
+    {
+        var go = GameObject.CreatePrimitive(primitiveType);
         go.name = name;
         go.transform.SetParent(parent, false);
         go.transform.localPosition = pos;
         go.transform.localScale = scale;
-        go.GetComponent<Renderer>().material = material;
+        if (localRotation != default(Quaternion)) go.transform.localRotation = localRotation;
+        var renderer = go.GetComponent<Renderer>();
+        if (renderer != null) renderer.sharedMaterial = material;
+        var collider = go.GetComponent<Collider>();
+        if (collider != null) Destroy(collider);
     }
 
     private Material MakeMaterial(string name, Color color, Color? emission = null)
