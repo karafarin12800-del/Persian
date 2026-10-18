@@ -34,6 +34,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private Transform supplyLidHinge;
     private GameObject redDoorPanel;
     private Material redBeaconMat;
+    private Material exteriorDockMat;
+    private Transform exteriorDockConnection;
+    private Transform exteriorDockClampPort;
+    private Transform exteriorDockClampStarboard;
     private Camera sceneCamera;
     private Material redDoorMat, doorPanelMat, bombMat, blastMat, supplyMat, greenBeaconMat;
     private GUIStyle messageStyle;
@@ -172,6 +176,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         CreateDoorLabel();
         escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 88f));
         escapeShuttle.gameObject.SetActive(false);
+        BuildExteriorDockConnection();
 
         // The player must find the charge box in the side of the command room.
         supplyCrate = MakeBox("S4_ChargeSupplyBox", new Vector3(5f, 1.1f, -67f), new Vector3(3.2f, 2.2f, 2.6f), supplyMat);
@@ -226,6 +231,97 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             bombSiteIndicators.Add(indicator);
             // No floating text over planting stations; the nearby action button is enough.
         }
+    }
+
+    /// <summary>
+    /// Exterior socket that visually connects the shuttle nose to the mothership prow.
+    /// Built at the corresponding outside coordinates so the cut from the walkable
+    /// inner corridor to the exterior shot reads as the same physical craft/airlock.
+    /// All pieces sit well above the walk plane and therefore cannot trap the player.
+    /// </summary>
+    private void BuildExteriorDockConnection()
+    {
+        exteriorDockMat = MakeMaterial("S4_ExteriorDockGunmetal", new Color(0.18f, 0.27f, 0.34f));
+        exteriorDockConnection = new GameObject("S4_ExteriorDockConnection").transform;
+        exteriorDockConnection.SetParent(worldRoot, false);
+        exteriorDockConnection.localPosition = Vector3.zero;
+
+        Material rimMat = MakeMaterial("S4_ExteriorDockRim", new Color(0.35f, 0.70f, 0.78f),
+            new Color(0.06f, 0.35f, 0.42f));
+        // Two circular rings joined by eight longitudinal struts form an open,
+        // tube-like docking sleeve between the mothership's nose and the shuttle.
+        BuildExteriorDockRing("S4_ExteriorDockRimInner", new Vector3(0f, 14f, 148.8f), 3.05f, 0.22f, 24, rimMat);
+        BuildExteriorDockRing("S4_ExteriorDockRimOuter", new Vector3(0f, 14f, 153.6f), 3.05f, 0.22f, 24, rimMat);
+        for (int i = 0; i < 8; i++)
+        {
+            float angle = i * Mathf.PI * 2f / 8f;
+            Vector3 radial = new Vector3(Mathf.Cos(angle) * 3.05f, Mathf.Sin(angle) * 3.05f, 0f);
+            GameObject rail = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            rail.name = "S4_ExteriorDockSleeveRail_" + i;
+            rail.transform.SetParent(exteriorDockConnection, false);
+            rail.transform.localPosition = new Vector3(radial.x, 14f + radial.y, 151.2f);
+            rail.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            rail.transform.localScale = new Vector3(0.28f, 2.4f, 0.28f);
+            Renderer rr = rail.GetComponent<Renderer>();
+            if (rr != null) rr.sharedMaterial = exteriorDockMat;
+            Collider rc = rail.GetComponent<Collider>();
+            if (rc != null) Destroy(rc);
+        }
+
+        exteriorDockClampPort = CreateExteriorDockClamp(-1);
+        exteriorDockClampStarboard = CreateExteriorDockClamp(1);
+    }
+
+    private void BuildExteriorDockRing(string name, Vector3 center, float radius,
+        float tubeRadius, int segments, Material material)
+    {
+        for (int i = 0; i < segments; i++)
+        {
+            float a0 = i * Mathf.PI * 2f / segments;
+            float a1 = (i + 1) * Mathf.PI * 2f / segments;
+            Vector3 p0 = center + new Vector3(Mathf.Cos(a0) * radius, Mathf.Sin(a0) * radius, 0f);
+            Vector3 p1 = center + new Vector3(Mathf.Cos(a1) * radius, Mathf.Sin(a1) * radius, 0f);
+            Vector3 tangent = p1 - p0;
+            GameObject segment = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            segment.name = name + "_" + i;
+            segment.transform.SetParent(exteriorDockConnection, false);
+            segment.transform.localPosition = (p0 + p1) * 0.5f;
+            segment.transform.localRotation = Quaternion.FromToRotation(Vector3.up, tangent.normalized);
+            segment.transform.localScale = new Vector3(tubeRadius * 2f, tangent.magnitude * 0.5f, tubeRadius * 2f);
+            Renderer renderer = segment.GetComponent<Renderer>();
+            if (renderer != null) renderer.sharedMaterial = material;
+            Collider collider = segment.GetComponent<Collider>();
+            if (collider != null) Destroy(collider);
+        }
+    }
+
+    private Transform CreateExteriorDockClamp(int side)
+    {
+        Transform clamp = new GameObject(side < 0
+            ? "S4_ExteriorDockClampPort" : "S4_ExteriorDockClampStarboard").transform;
+        clamp.SetParent(worldRoot, false);
+        clamp.localPosition = new Vector3(side * 3.55f, 14f, 156f);
+
+        GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        body.name = "ClampArm";
+        body.transform.SetParent(clamp, false);
+        body.transform.localPosition = Vector3.zero;
+        body.transform.localScale = new Vector3(0.7f, 1.7f, 2.8f);
+        Renderer bodyRenderer = body.GetComponent<Renderer>();
+        if (bodyRenderer != null) bodyRenderer.sharedMaterial = exteriorDockMat;
+        Collider bodyCollider = body.GetComponent<Collider>();
+        if (bodyCollider != null) Destroy(bodyCollider);
+
+        GameObject jaw = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        jaw.name = "ClampJaw";
+        jaw.transform.SetParent(clamp, false);
+        jaw.transform.localPosition = new Vector3(-side * 0.52f, -0.32f, -0.35f);
+        jaw.transform.localScale = new Vector3(0.34f, 0.6f, 1.4f);
+        Renderer jawRenderer = jaw.GetComponent<Renderer>();
+        if (jawRenderer != null) jawRenderer.sharedMaterial = redDoorMat;
+        Collider jawCollider = jaw.GetComponent<Collider>();
+        if (jawCollider != null) Destroy(jawCollider);
+        return clamp;
     }
 
     private void CreateWorldLabel(string name, Vector3 position, string value, Color color)
