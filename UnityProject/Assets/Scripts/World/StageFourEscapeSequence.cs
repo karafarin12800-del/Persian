@@ -629,7 +629,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             escapeShuttle.gameObject.SetActive(true);
             escapeShuttle.position = shuttleDockedPosition;
             escapeShuttle.rotation = shuttleDockedRotation;
-            escapeShuttle.localScale = Vector3.one * 0.82f;
+            // Ten times the previous finale scale (0.82 -> 8.2). Keep the craft intact.
+            escapeShuttle.localScale = Vector3.one * 8.2f;
         }
         if (exteriorDockConnection != null)
         {
@@ -643,10 +644,11 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
         // The exterior shot opens on a real-looking connected configuration,
         // rather than beginning with the shuttle already floating away from the base.
-        Vector3 closeCamera = new Vector3(18f, 122f, 365f);
-        Vector3 wideCamera = new Vector3(360f, 235f, 600f);
-        Vector3 closeLook = new Vector3(0f, 24f, 30f);
-        Vector3 wideLook = new Vector3(105f, 42f, 125f);
+        // Bring the exterior camera substantially closer to the now larger shuttle.
+        Vector3 closeCamera = new Vector3(92f, 88f, 300f);
+        Vector3 wideCamera = new Vector3(155f, 112f, 385f);
+        Vector3 closeLook = new Vector3(0f, 22f, 145f);
+        Vector3 wideLook = new Vector3(35f, 28f, 175f);
         if (sceneCamera != null)
         {
             sceneCamera.transform.position = closeCamera;
@@ -718,10 +720,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             yield return null;
         }
 
-        // Keep the entire space base in a distant wide shot while the ship-shaped
-        // escape module disconnects from the docking tunnel and travels into open space.
-        // The detached craft then breaks into six clearly separate sections, one after
-        // another, with a distinct explosion at each break stage.
+        // The shuttle remains intact and the camera stays close enough to read its shape.
         Vector3 shuttleEnd = new Vector3(225f, 82f, 260f);
         if (sceneCamera != null)
         {
@@ -755,11 +754,11 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             escapeShuttle.rotation = shuttleEndRotation;
         }
         message = "ESCAPE MODULE SEPARATED • STRUCTURAL FAILURE";
-        // Hold a stable, distant exterior shot for at least 13 seconds so players
-        // can clearly see the mothership, the detached shuttle, and the gap between them.
-        // Do not cut back to the interior while waiting for the breakup.
+        // Hold on the close exterior shot, then detonate the SIX charges planted
+        // in the mothership. Blast positions are mapped onto the hull above their
+        // actual planting stations. The escape shuttle is never passed to CreateBlast.
         float exteriorHold = 0f;
-        const float exteriorHoldDuration = 13.0f;
+        const float exteriorHoldDuration = 4.0f;
         while (exteriorHold < exteriorHoldDuration)
         {
             exteriorHold += Time.deltaTime;
@@ -771,13 +770,30 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             yield return null;
         }
 
-        // The player escapes in this shuttle. It must remain intact; only the
-        // mothership/station remains behind. After the exterior hold, fly the craft
-        // out of the camera frame and finish the stage without any explosion.
-        message = "ESCAPE SHUTTLE CLEAR • MOTHERSHIP IN VIEW";
+        message = "DETONATING SIX CHARGES • ESCAPE SHUTTLE SAFE";
+        for (int chargeIndex = 0; chargeIndex < bombPositions.Count; chargeIndex++)
+        {
+            Vector3 blastPosition = bombPositions[chargeIndex] + Vector3.up * 18f;
+            CreateBlast("S4_MothershipChargeDetonation_" + (chargeIndex + 1),
+                blastPosition, chargeIndex == bombPositions.Count - 1 ? 28f : 18f,
+                chargeIndex == bombPositions.Count - 1);
+            if (chargeIndex < plantedBombs.Count && plantedBombs[chargeIndex] != null)
+                Destroy(plantedBombs[chargeIndex]);
+            if (sceneCamera != null)
+            {
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(new Vector3(0f, 22f, 65f));
+            }
+            yield return new WaitForSeconds(0.32f);
+        }
+
+        // Once the planted charges have visibly exploded on the base, the shuttle
+        // accelerates away intact. Track it closely rather than leaving it tiny in frame.
+        message = "CHARGES DETONATED • SHUTTLE ESCAPING";
         Vector3 deepSpaceExit = new Vector3(820f, 245f, 940f);
         float departureTime = 0f;
         const float departureDuration = 5.0f;
+        Vector3 escapeCameraOffset = new Vector3(-95f, 58f, 112f);
         while (departureTime < departureDuration)
         {
             departureTime += Time.deltaTime;
@@ -789,10 +805,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 escapeShuttle.rotation = Quaternion.Slerp(shuttleEndRotation,
                     Quaternion.LookRotation(new Vector3(0.72f, 0.22f, 0.65f), Vector3.up), depart);
             }
-            if (sceneCamera != null)
+            if (sceneCamera != null && escapeShuttle != null)
             {
-                sceneCamera.transform.position = wideCamera;
-                sceneCamera.transform.LookAt(wideLook);
+                sceneCamera.transform.position = escapeShuttle.position + escapeCameraOffset;
+                sceneCamera.transform.LookAt(escapeShuttle.position);
             }
             yield return null;
         }
