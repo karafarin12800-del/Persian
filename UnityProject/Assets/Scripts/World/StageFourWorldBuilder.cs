@@ -453,31 +453,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         // Keep only the central structural spine and floating docking structures.
         Box("S4_CentralSpine", new Vector3(0f, -12f, 0f), new Vector3(170f, 8f, 310f), metal);
 
-        // Four short radial connectors suggest that this is one sector of a larger
-        // station, while keeping the rest of the megabase outside the playable view.
-        for (int arm = 0; arm < 4; arm++)
-        {
-            float angle = arm * 90f * Mathf.Deg2Rad;
-            Vector3 dir = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
-            Vector3 pos = dir * 145f + Vector3.up * 4f;
-            Box("S4_DockingArm_" + arm, pos, new Vector3(42f, 10f, 130f), metal,
-                Quaternion.LookRotation(dir));
-            Vector3 padPos = dir * 205f + Vector3.up * 8f;
-            Box("S4_DockPad_" + arm, padPos, new Vector3(68f, 5f, 58f), brightMetal,
-                Quaternion.LookRotation(dir));
-            Vector3 collarPos = dir * 98f + Vector3.up * 10f;
-            Box("S4_DockingCollar_" + arm, collarPos, new Vector3(30f, 4f, 20f), cyan,
-                Quaternion.LookRotation(dir));
-            for (int light = -2; light <= 2; light++)
-            {
-                Box("S4_DockRunwayLight_" + arm + "_" + light,
-                    pos + dir * (light * 17f) + Vector3.up * 10f + Vector3.right * light * 5f,
-                    new Vector3(2.8f, 0.7f, 2.8f), green);
-            }
-            yield return null;
-        }
-
-        // Tall perimeter pylons removed: they overwhelmed the central station silhouette.
+        // Removed all four oversized grey side plates/arms, their pads, collars and runway lights.
+        // The central mothership and the dedicated escape docking sleeve remain.
     }
 
     private IEnumerator BuildDockedShipsRoutine()
