@@ -1300,6 +1300,7 @@ namespace PersiaWar.Unity2D5D
                 stageTwoVictorySequence = null;
             }
 
+            if (mobileInput != null) mobileInput.DeactivateMatch();
             GateGameplay(false);
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
