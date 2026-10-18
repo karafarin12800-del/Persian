@@ -449,9 +449,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         // Stage 4 gameplay is only one small sector of a much larger orbital station.
         // Keep the central sector readable in the finale; do not surround it with a
         // city-sized grid that makes the playable map look like the whole station.
-        Box("S4_OrbitalFoundation", new Vector3(0f, -22f, 0f), new Vector3(430f, 36f, 430f), dark);
+        // No giant flat foundation or ground-like transit slab beneath the station.
+        // Keep only the central structural spine and floating docking structures.
         Box("S4_CentralSpine", new Vector3(0f, -12f, 0f), new Vector3(170f, 8f, 310f), metal);
-        Box("S4_MainTransitRing", new Vector3(0f, -9f, 0f), new Vector3(340f, 4f, 340f), dark);
 
         // Four short radial connectors suggest that this is one sector of a larger
         // station, while keeping the rest of the megabase outside the playable view.
@@ -477,16 +477,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             yield return null;
         }
 
-        // A small perimeter of pylons gives the central sector scale cues without
-        // filling the frame with dozens of unrelated towers and platforms.
-        for (int i = 0; i < 8; i++)
-        {
-            float a = i * Mathf.PI * 2f / 8f;
-            Vector3 p = new Vector3(Mathf.Cos(a) * 225f, 42f, Mathf.Sin(a) * 225f);
-            Box("S4_RingPylon_" + i, p, new Vector3(13f, 72f + (i % 3) * 12f, 13f), brightMetal);
-            Box("S4_RingPylonBeacon_" + i, p + Vector3.up * 43f, new Vector3(4f, 3f, 4f), cyan);
-            if (i % 2 == 1) yield return null;
-        }
+        // Tall perimeter pylons removed: they overwhelmed the central station silhouette.
     }
 
     private IEnumerator BuildDockedShipsRoutine()
@@ -877,7 +868,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private void BuildGreenUplink()
     {
-        BuildTransferPlanet();
+        // Stage 4 is shown in open space; do not render a planet/ground below the base.
         var beam = CreateVisualPrimitive(PrimitiveType.Cylinder, "S4_GreenUplinkFromSpace", green);
         beam.transform.position = new Vector3(0f, 319.8f, 48f);
         beam.transform.localScale = new Vector3(13f, 0.12f, 13f);
