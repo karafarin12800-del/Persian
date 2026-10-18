@@ -113,9 +113,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         if (requestOpenDoor)
         {
             requestOpenDoor = false;
-            if (doorDistance <= 8f && plantedBombs.Count >= 6)
+            if (doorDistance <= 3.8f && plantedBombs.Count >= 6)
                 OpenRedDoor();
-            else if (doorDistance <= 8f)
+            else if (doorDistance <= 3.8f)
                 message = "EXIT LOCKED • PLANT ALL 6 CHARGES FIRST";
         }
 
@@ -390,16 +390,33 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private void OpenRedDoor()
     {
         doorOpened = true;
-        message = "ALL 6 CHARGES ARMED • EXIT OPEN • BOARD SHUTTLE";
+        message = "EXIT UNLOCKED • FOLLOW THE DOCKING TUNNEL";
         if (redDoorPanel != null)
         {
-            var renderer = redDoorPanel.GetComponent<Renderer>();
-            if (renderer != null) renderer.enabled = false;
             var collider = redDoorPanel.GetComponent<Collider>();
             if (collider != null) collider.enabled = false;
+            StartCoroutine(SlideRedDoorOpenRoutine());
         }
         if (escapeShuttle != null) escapeShuttle.gameObject.SetActive(true);
         StartupCheckpoint.Set("StageFourRedEscapeDoorOpened");
+    }
+
+    private IEnumerator SlideRedDoorOpenRoutine()
+    {
+        if (redDoorPanel == null) yield break;
+        Vector3 closed = redDoorPanel.transform.localPosition;
+        Vector3 open = closed + Vector3.left * 6.4f;
+        float elapsed = 0f;
+        const float duration = 0.42f;
+        while (elapsed < duration && redDoorPanel != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+            redDoorPanel.transform.localPosition = Vector3.Lerp(closed, open, t);
+            yield return null;
+        }
+        if (redDoorPanel != null)
+            redDoorPanel.transform.localPosition = open;
     }
 
     private void CreateDoorLabel()
@@ -847,7 +864,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         bool nearEmptySite = site >= 0 && site < bombSiteIndicators.Count &&
             bombSiteIndicators[site] != null && !bombSiteIndicators[site].activeSelf;
         bool nearDoor = !doorOpened && redDoorPanel != null && player != null &&
-            Vector3.Distance(player.position, redDoorPanel.transform.position) <= 8f;
+            Vector3.Distance(player.position, redDoorPanel.transform.position) <= 3.8f;
         float buttonW = Mathf.Min(Screen.width - 40, 420);
         Rect buttonRect = new Rect((Screen.width - buttonW) * 0.5f, Screen.height - 142, buttonW, 58);
         if (nearCrate && !supplyBoxOpened && GUI.Button(buttonRect, "OPEN SUPPLY BOX"))
