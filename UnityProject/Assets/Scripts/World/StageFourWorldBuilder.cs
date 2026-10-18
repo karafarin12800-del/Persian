@@ -446,52 +446,46 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private IEnumerator BuildExteriorMegabaseRoutine()
     {
-        // Orbital city platform stays below the playable deck so it never occludes combat inside.
-        Box("S4_OrbitalFoundation", new Vector3(0f, -22f, 0f), new Vector3(980f, 36f, 980f), dark);
-        Box("S4_CentralSpine", new Vector3(0f, -12f, 0f), new Vector3(260f, 8f, 520f), metal);
-        Box("S4_MainTransitRing", new Vector3(0f, -9f, 0f), new Vector3(780f, 4f, 780f), dark);
+        // Stage 4 gameplay is only one small sector of a much larger orbital station.
+        // Keep the central sector readable in the finale; do not surround it with a
+        // city-sized grid that makes the playable map look like the whole station.
+        Box("S4_OrbitalFoundation", new Vector3(0f, -22f, 0f), new Vector3(430f, 36f, 430f), dark);
+        Box("S4_CentralSpine", new Vector3(0f, -12f, 0f), new Vector3(170f, 8f, 310f), metal);
+        Box("S4_MainTransitRing", new Vector3(0f, -9f, 0f), new Vector3(340f, 4f, 340f), dark);
 
-        for (int x = -4; x <= 4; x++)
-        for (int z = -4; z <= 4; z++)
+        // Four short radial connectors suggest that this is one sector of a larger
+        // station, while keeping the rest of the megabase outside the playable view.
+        for (int arm = 0; arm < 4; arm++)
         {
-            if (Mathf.Abs(x) < 2 && Mathf.Abs(z) < 2) continue;
-            float px = x * 92f, pz = z * 92f;
-            float h = 26f + ((x * 7 + z * 11 + 37) & 3) * 15f;
-            Box("S4_CityDistrict_" + x + "_" + z, new Vector3(px, h * 0.5f - 2f, pz),
-                new Vector3(48f + Mathf.Abs(z % 3) * 9f, h, 52f + Mathf.Abs(x % 3) * 8f),
-                (x + z) % 2 == 0 ? metal : brightMetal);
-            for (int w = -1; w <= 1; w++)
-                Box("S4_DistrictLight_" + x + "_" + z + "_" + w,
-                    new Vector3(px + w * 12f, h + 0.15f, pz - 25f),
-                    new Vector3(3.2f, 0.7f, 0.5f), cyan);
-            if (z == 4) yield return null;
-        }
-
-        // Eight reinforced docking arms radiate from the central mothership.
-        for (int arm = 0; arm < 8; arm++)
-        {
-            float angle = arm * 45f * Mathf.Deg2Rad;
+            float angle = arm * 90f * Mathf.Deg2Rad;
             Vector3 dir = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
-            Vector3 pos = dir * 300f + Vector3.up * 5f;
-            Box("S4_DockingArm_" + arm, pos, new Vector3(66f, 12f, 300f), metal, Quaternion.LookRotation(dir));
-            Vector3 padPos = dir * 395f + Vector3.up * 10f;
-            Box("S4_DockPad_" + arm, padPos, new Vector3(102f, 5f, 78f), brightMetal, Quaternion.LookRotation(dir));
-            Vector3 collarPos = dir * 205f + Vector3.up * 11f;
-            Box("S4_DockingCollar_" + arm, collarPos, new Vector3(46f, 4f, 24f), cyan, Quaternion.LookRotation(dir));
-            for (int light = -3; light <= 3; light++)
+            Vector3 pos = dir * 145f + Vector3.up * 4f;
+            Box("S4_DockingArm_" + arm, pos, new Vector3(42f, 10f, 130f), metal,
+                Quaternion.LookRotation(dir));
+            Vector3 padPos = dir * 205f + Vector3.up * 8f;
+            Box("S4_DockPad_" + arm, padPos, new Vector3(68f, 5f, 58f), brightMetal,
+                Quaternion.LookRotation(dir));
+            Vector3 collarPos = dir * 98f + Vector3.up * 10f;
+            Box("S4_DockingCollar_" + arm, collarPos, new Vector3(30f, 4f, 20f), cyan,
+                Quaternion.LookRotation(dir));
+            for (int light = -2; light <= 2; light++)
+            {
                 Box("S4_DockRunwayLight_" + arm + "_" + light,
-                    pos + dir * ((light + 4) * 18f - 54f) + Vector3.up * 12f + Vector3.right * light * 7f,
+                    pos + dir * (light * 17f) + Vector3.up * 10f + Vector3.right * light * 5f,
                     new Vector3(2.8f, 0.7f, 2.8f), green);
+            }
             yield return null;
         }
 
-        for (int i = 0; i < 24; i++)
+        // A small perimeter of pylons gives the central sector scale cues without
+        // filling the frame with dozens of unrelated towers and platforms.
+        for (int i = 0; i < 8; i++)
         {
-            float a = i * Mathf.PI * 2f / 24f;
-            Vector3 p = new Vector3(Mathf.Cos(a) * 430f, 48f, Mathf.Sin(a) * 430f);
-            Box("S4_RingPylon_" + i, p, new Vector3(18f, 92f + (i % 3) * 22f, 18f), brightMetal);
-            Box("S4_RingPylonBeacon_" + i, p + Vector3.up * 55f, new Vector3(5f, 3f, 5f), cyan);
-            if (i % 3 == 2) yield return null;
+            float a = i * Mathf.PI * 2f / 8f;
+            Vector3 p = new Vector3(Mathf.Cos(a) * 225f, 42f, Mathf.Sin(a) * 225f);
+            Box("S4_RingPylon_" + i, p, new Vector3(13f, 72f + (i % 3) * 12f, 13f), brightMetal);
+            Box("S4_RingPylonBeacon_" + i, p + Vector3.up * 43f, new Vector3(4f, 3f, 4f), cyan);
+            if (i % 2 == 1) yield return null;
         }
     }
 
