@@ -357,6 +357,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private IEnumerator PlayEscapeFinale()
     {
         finaleStarted = true;
+        // Hide the independent mobile input overlay too; the exterior detonation
+        // scene should not be obscured by movement/fire buttons or the music slider.
+        MobileInputHub touchInput = FindFirstObjectByType<MobileInputHub>();
+        if (touchInput != null) touchInput.SetPaused(true);
         message = "ESCAPE ROUTE • BOARDING SHUTTLE";
 
         PlayerController controller = player != null ? player.GetComponent<PlayerController>() : null;
