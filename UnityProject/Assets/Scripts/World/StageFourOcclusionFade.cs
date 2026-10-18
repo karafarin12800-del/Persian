@@ -18,8 +18,8 @@ public sealed class StageFourOcclusionFade : MonoBehaviour
     private readonly HashSet<Renderer> fadeable = new HashSet<Renderer>();
     private readonly List<Renderer> cachedRenderers = new List<Renderer>();
     private readonly List<Renderer> toRestore = new List<Renderer>();
+    private Shader fadeShader;
     private const float FadedAlpha = 0.2f;
-    private const float FadeSpeed = 7f;
 
     public void Configure(Transform playerTransform, Camera cameraToUse, Transform stageRoot)
     {
@@ -27,6 +27,17 @@ public sealed class StageFourOcclusionFade : MonoBehaviour
         player = playerTransform;
         targetCamera = cameraToUse;
         worldRoot = stageRoot;
+        fadeShader = Resources.Load<Shader>("PersiaWarAndroidFade");
+        if (fadeShader == null || !fadeShader.isSupported)
+            fadeShader = Shader.Find("PersiaWar/AndroidFade");
+        if (fadeShader == null || !fadeShader.isSupported)
+            fadeShader = Shader.Find("Sprites/Default");
+        if (fadeShader == null || !fadeShader.isSupported)
+        {
+            fadeShader = null;
+            Debug.LogError("PERSIA_STAGE4_OCCLUSION: no supported transparent shader found.");
+            return;
+        }
         CacheFadeableRenderers();
     }
 
@@ -102,37 +113,29 @@ public sealed class StageFourOcclusionFade : MonoBehaviour
                     colors[m] = source != null
                         ? (source.HasProperty("_BaseColor") ? source.GetColor("_BaseColor") : source.color)
                         : Color.white;
-                    if (source != null)
+
+                    if (source == null) continue;
+                    Material fade = new Material(fadeShader)
                     {
-                        clones[m] = new Material(source);
-                        MakeTransparent(clones[m]);
-                    }
+                        name = source.name + "_StageFourCameraFade",
+                        renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent
+                    };
+
+                    Texture texture = null;
+                    if (source.HasProperty("_MainTex")) texture = source.GetTexture("_MainTex");
+                    else if (source.HasProperty("_BaseMap")) texture = source.GetTexture("_BaseMap");
+                    if (texture != null) fade.SetTexture("_MainTex", texture);
+
+                    Color tint = colors[m];
+                    tint.a = 1f;
+                    fade.SetColor("_Color", tint);
+                    fade.SetFloat("_FadeAlpha", 1f);
+                    clones[m] = fade;
                 }
                 originalColors[r] = colors;
                 fadeMaterials[r] = clones;
             }
         }
-    }
-
-    private static void MakeTransparent(Material material)
-    {
-        if (material == null) return;
-        // Built-in Standard shader transparency.
-        if (material.HasProperty("_Mode"))
-        {
-            material.SetFloat("_Mode", 3f);
-            material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            material.SetInt("_ZWrite", 0);
-            material.DisableKeyword("_ALPHATEST_ON");
-            material.EnableKeyword("_ALPHABLEND_ON");
-            material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        }
-        // URP Lit transparency.
-        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
-        if (material.HasProperty("_Blend")) material.SetFloat("_Blend", 0f);
-        material.SetOverrideTag("RenderType", "Transparent");
-        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
     }
 
     private void SetFaded(Renderer renderer, bool faded)
@@ -147,10 +150,7 @@ public sealed class StageFourOcclusionFade : MonoBehaviour
                 {
                     Material m = mats[i];
                     if (m == null) continue;
-                    Color c = originalColors[renderer][i];
-                    c.a = FadedAlpha;
-                    if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
-                    if (m.HasProperty("_Color")) m.SetColor("_Color", c);
+                    m.SetFloat("_FadeAlpha", FadedAlpha);
                 }
             }
         }
