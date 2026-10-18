@@ -244,6 +244,13 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         {
             SpawnInteriorAliens();
 
+            // Fade only the Stage 4 wall/architecture colliders that block the
+            // camera-to-player view. This is isolated to this world and never
+            // changes the camera behavior of Stages 1-3.
+            StageFourOcclusionFade occlusionFade = GetComponent<StageFourOcclusionFade>();
+            if (occlusionFade == null) occlusionFade = gameObject.AddComponent<StageFourOcclusionFade>();
+            occlusionFade.Configure(controller.transform, gameplayCamera, root);
+
             // Install Stage 4-only escape logic after the player and world are ready.
             // Do not run a global scene-load bootstrap on Stages 1-3; attach once here.
             if (GetComponent<StageFourEscapeSequence>() == null)
