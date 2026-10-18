@@ -422,7 +422,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // following unbroken exterior view clearly shows the whole mothership/base.
         HideInteriorForExteriorShot();
 
-        Vector3 shuttleStart = new Vector3(0f, 36f, 184f);
+        Vector3 shuttleStart = new Vector3(0f, 36f, 132f);
         Vector3 shuttleEnd = new Vector3(520f, 190f, 292f);
         Quaternion shuttleStartRotation = Quaternion.LookRotation(
             new Vector3(0.78f, 0.13f, 0.60f), Vector3.up);
@@ -436,9 +436,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             escapeShuttle.localScale = Vector3.one * 0.82f;
         }
 
-        // Start just outside the bow, then pull back to a high diagonal reveal.
+        // Start with the shuttle visibly docked to the mothership nose, then pull back to a high diagonal reveal.
         // The camera is no longer attached to the player or shuttle during detonations.
-        Vector3 closeCamera = new Vector3(18f, 122f, 438f);
+        Vector3 closeCamera = new Vector3(18f, 122f, 365f);
         Vector3 wideCamera = new Vector3(650f, 420f, 690f);
         Vector3 closeLook = new Vector3(0f, 27f, 15f);
         Vector3 wideLook = new Vector3(25f, 18f, 0f);
