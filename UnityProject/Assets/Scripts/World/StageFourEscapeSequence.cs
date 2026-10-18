@@ -23,11 +23,16 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private bool doorOpened;
     private bool boarded;
     private bool chargesPickedUp;
-    private int chargesInInventory;
+    private bool supplyBoxOpened;
+    private bool requestOpenSupplyBox;
     private bool requestPickup;
     private bool requestPlant;
+    private bool requestOpenDoor;
+    private int chargesInInventory;
     private GameObject supplyCrate;
+    private Transform supplyLidHinge;
     private GameObject redDoorPanel;
+    private Material redBeaconMat;
     private Camera sceneCamera;
     private Material redDoorMat, doorPanelMat, bombMat, blastMat, supplyMat, greenBeaconMat;
     private GUIStyle messageStyle;
@@ -50,20 +55,30 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     {
         if (player == null || worldRoot == null || finaleStarted) return;
 
-        if (!chargesPickedUp && supplyCrate != null &&
-            Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f)
+        bool nearSupplyBox = supplyCrate != null && supplyCrate.activeSelf &&
+            Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f;
+        if (requestOpenSupplyBox)
         {
-            if (requestPickup)
+            requestOpenSupplyBox = false;
+            if (!chargesPickedUp && nearSupplyBox && !supplyBoxOpened)
             {
-                requestPickup = false;
+                supplyBoxOpened = true;
+                if (supplyLidHinge != null) StartCoroutine(OpenSupplyLidRoutine());
+                message = "SUPPLY BOX OPEN • TAKE THE 6 CHARGES";
+                StartupCheckpoint.Set("StageFourSupplyBoxOpened");
+            }
+        }
+        if (requestPickup)
+        {
+            requestPickup = false;
+            if (nearSupplyBox && supplyBoxOpened && !chargesPickedUp)
+            {
                 chargesPickedUp = true;
                 chargesInInventory = 6;
-                supplyCrate.SetActive(false);
-                message = "6 EXPLOSIVE CHARGES COLLECTED • VISIT ALL 6 RED CRATES";
+                message = "6 SQUARE CHARGES COLLECTED • VISIT ALL 6 RED STATIONS";
                 StartupCheckpoint.Set("StageFourSixChargesCollected");
             }
         }
-        else requestPickup = false;
 
         int nearbySite = FindNearbyBombSite();
         if (requestPlant)
@@ -81,20 +96,21 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 PlantTimedBomb(nearbySite);
         }
 
-        // The exit stays locked until every fixed charge station is armed.
+        // The exit is physically inside the corridor and requires a deliberate tap.
         float doorDistance = redDoorPanel != null
             ? Vector3.Distance(player.position, redDoorPanel.transform.position)
             : float.MaxValue;
-        if (!doorOpened && doorDistance <= 8f)
+        if (requestOpenDoor)
         {
-            if (plantedBombs.Count >= 6)
+            requestOpenDoor = false;
+            if (doorDistance <= 8f && plantedBombs.Count >= 6)
                 OpenRedDoor();
-            else
-                message = "LOCKED • PLANT CHARGES: " + plantedBombs.Count + "/6";
+            else if (doorDistance <= 8f)
+                message = "EXIT LOCKED • PLANT ALL 6 CHARGES FIRST";
         }
 
-        // Crossing beyond the red frame automatically starts the shuttle cutscene.
-        if (doorOpened && !boarded && player.position.z >= 132f &&
+        // After manually opening the door, crossing its threshold starts the shuttle cutscene.
+        if (doorOpened && !boarded && player.position.z >= 124f &&
             Mathf.Abs(player.position.x) <= 10f)
         {
             if (plantedBombs.Count < 6)
@@ -141,21 +157,32 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         MakeBox("S4_EscapeCorridorRight", new Vector3(12f, 6f, 112f), new Vector3(1.4f, 12f, 32f), wallMat);
         MakeBox("S4_EscapeCorridorCeiling", new Vector3(0f, 13f, 112f), new Vector3(24f, 1.2f, 32f), MakeMaterial("S4_EscapeCeiling", new Color(0.035f, 0.055f, 0.085f)));
 
-        // Red is restricted to the frame/beacons; the actual door panel is dark metal
-        // and sits slightly forward of the frame so crossing the threshold is obvious.
-        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 6f, 128.2f), new Vector3(9.8f, 10.8f, 0.8f), doorPanelMat);
-        MakeBox("S4_EscapeDoorFrameL", new Vector3(-5.7f, 6f, 127f), new Vector3(0.45f, 12f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorFrameR", new Vector3(5.7f, 6f, 127f), new Vector3(0.45f, 12f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 12f, 127f), new Vector3(11.8f, 0.45f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorBeaconL", new Vector3(-6.4f, 6f, 127f), new Vector3(0.22f, 12.5f, 0.22f), redDoorMat);
-        MakeBox("S4_EscapeDoorBeaconR", new Vector3(6.4f, 6f, 127f), new Vector3(0.22f, 12.5f, 0.22f), redDoorMat);
+        // The door sits within the playable corridor, not beyond the map boundary.
+        // Only its frame is red; the dark panel slides out after the player taps OPEN.
+        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 6f, 120.2f), new Vector3(9.8f, 10.8f, 0.8f), doorPanelMat);
+        MakeBox("S4_EscapeDoorFrameL", new Vector3(-5.7f, 6f, 119f), new Vector3(0.45f, 12f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameR", new Vector3(5.7f, 6f, 119f), new Vector3(0.45f, 12f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 12f, 119f), new Vector3(11.8f, 0.45f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorBeaconL", new Vector3(-6.4f, 6f, 119f), new Vector3(0.22f, 12.5f, 0.22f), redDoorMat);
+        MakeBox("S4_EscapeDoorBeaconR", new Vector3(6.4f, 6f, 119f), new Vector3(0.22f, 12.5f, 0.22f), redDoorMat);
         CreateDoorLabel();
-        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.8f, 146f));
+        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.8f, 140f));
         escapeShuttle.gameObject.SetActive(false);
 
         // The player must find the charge box in the side of the command room.
         supplyCrate = MakeBox("S4_ChargeSupplyBox", new Vector3(20f, 1.1f, 88f), new Vector3(3.2f, 2.2f, 2.6f), supplyMat);
-        MakeBox("S4_ChargeSupplyBoxLid", new Vector3(20f, 2.25f, 88f), new Vector3(3.35f, 0.18f, 2.72f), redDoorMat);
+        // A real hinged lid: the player must open it before the pickup action appears.
+        var hinge = new GameObject("S4_ChargeSupplyBoxHinge");
+        hinge.transform.SetParent(worldRoot, false);
+        hinge.transform.localPosition = new Vector3(18.325f, 2.25f, 88f);
+        supplyLidHinge = hinge.transform;
+        var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        lid.name = "S4_ChargeSupplyBoxLid";
+        lid.transform.SetParent(supplyLidHinge, false);
+        lid.transform.localPosition = new Vector3(1.675f, 0f, 0f);
+        lid.transform.localScale = new Vector3(3.35f, 0.18f, 2.72f);
+        lid.GetComponent<Renderer>().material = redDoorMat;
+        redBeaconMat = MakeMaterial("S4_ChargeRedBeacon", new Color(1f, 0.025f, 0.01f), new Color(2f, 0.015f, 0.005f));
         CreateWorldLabel("S4_ChargeSupplyLabel", new Vector3(20f, 4f, 88f), "EXPLOSIVE CHARGES • 6", new Color(1f, 0.72f, 0.2f));
 
         // Six fixed stations run from the aft engine room to the forward command/exit side.
@@ -210,6 +237,21 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         return craft;
     }
 
+    private IEnumerator OpenSupplyLidRoutine()
+    {
+        if (supplyLidHinge == null) yield break;
+        Quaternion closed = Quaternion.identity;
+        Quaternion open = Quaternion.Euler(0f, 0f, -112f);
+        float t = 0f;
+        while (t < 0.45f)
+        {
+            t += Time.deltaTime;
+            supplyLidHinge.localRotation = Quaternion.Slerp(closed, open, Mathf.Clamp01(t / 0.45f));
+            yield return null;
+        }
+        supplyLidHinge.localRotation = open;
+    }
+
     private void OpenRedDoor()
     {
         doorOpened = true;
@@ -227,7 +269,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
     private void CreateDoorLabel()
     {
-        CreateWorldLabel("S4_RedEscapeDoorLabel", new Vector3(0f, 14.1f, 126.2f),
+        CreateWorldLabel("S4_RedEscapeDoorLabel", new Vector3(0f, 14.1f, 118.2f),
             "ESCAPE • 6 CHARGES REQUIRED", new Color(1f, 0.12f, 0.06f));
     }
 
@@ -238,22 +280,39 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             bombSiteIndicators[siteIndex] == null || bombSiteIndicators[siteIndex].activeSelf)
             return;
 
-        Vector3 p = bombSites[siteIndex].position + Vector3.up * 0.8f;
-        var bomb = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        bomb.name = "S4_TimedCharge_" + (siteIndex + 1);
+        Vector3 p = bombSites[siteIndex].position + Vector3.up * 0.62f;
+        var bomb = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        bomb.name = "S4_SquareTimedCharge_" + (siteIndex + 1);
         bomb.transform.SetParent(worldRoot, false);
         bomb.transform.position = p;
-        bomb.transform.localScale = new Vector3(0.58f, 0.22f, 0.58f);
+        bomb.transform.localScale = new Vector3(0.82f, 0.72f, 0.82f);
         var collider = bomb.GetComponent<Collider>();
         if (collider != null) Destroy(collider);
         var renderer = bomb.GetComponent<Renderer>();
         if (renderer != null) renderer.sharedMaterial = bombMat;
+        var led = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        led.name = "S4_ChargeStatusLED_" + (siteIndex + 1);
+        led.transform.SetParent(bomb.transform, false);
+        led.transform.localPosition = new Vector3(0f, 0.56f, 0f);
+        led.transform.localScale = Vector3.one * 0.22f;
+        var ledCollider = led.GetComponent<Collider>();
+        if (ledCollider != null) Destroy(ledCollider);
+        var ledRenderer = led.GetComponent<Renderer>();
+        if (ledRenderer != null) ledRenderer.sharedMaterial = greenBeaconMat;
 
+        // Once the square charge is planted, its green status LED turns red.
+        var plantedLed = bomb.transform.Find("S4_ChargeStatusLED_" + (siteIndex + 1));
+        if (plantedLed != null)
+        {
+            var ledRenderer = plantedLed.GetComponent<Renderer>();
+            if (ledRenderer != null) ledRenderer.sharedMaterial = redBeaconMat;
+        }
         bombPositions.Add(bombSites[siteIndex].position);
         plantedBombs.Add(bomb);
         chargesInInventory--;
+        bombSiteIndicators[siteIndex].GetComponent<Renderer>().sharedMaterial = redBeaconMat;
         bombSiteIndicators[siteIndex].SetActive(true);
-        message = "CHARGE PLANTED • " + plantedBombs.Count + "/6 • GREEN BEACON ACTIVE";
+        message = "SQUARE CHARGE PLANTED • RED LED ACTIVE • " + plantedBombs.Count + "/6";
         StartupCheckpoint.Set("StageFourChargePlantedAtStation_" + (siteIndex + 1) + "_of_6");
     }
 
@@ -383,13 +442,19 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             player != null && Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f;
         bool nearEmptySite = site >= 0 && site < bombSiteIndicators.Count &&
             bombSiteIndicators[site] != null && !bombSiteIndicators[site].activeSelf;
+        bool nearDoor = !doorOpened && redDoorPanel != null && player != null &&
+            Vector3.Distance(player.position, redDoorPanel.transform.position) <= 8f;
         float buttonW = Mathf.Min(Screen.width - 40, 420);
         Rect buttonRect = new Rect((Screen.width - buttonW) * 0.5f, Screen.height - 142, buttonW, 58);
-        if (nearCrate && GUI.Button(buttonRect, "TAKE 6 CHARGES"))
+        if (nearCrate && !supplyBoxOpened && GUI.Button(buttonRect, "OPEN SUPPLY BOX"))
+            requestOpenSupplyBox = true;
+        else if (nearCrate && supplyBoxOpened && GUI.Button(buttonRect, "TAKE 6 CHARGES"))
             requestPickup = true;
         else if (nearEmptySite && chargesPickedUp && chargesInInventory > 0 &&
-                 GUI.Button(buttonRect, "PLANT CHARGE HERE"))
+                 GUI.Button(buttonRect, "PLANT SQUARE CHARGE"))
             requestPlant = true;
+        else if (nearDoor && GUI.Button(buttonRect, plantedBombs.Count >= 6 ? "OPEN RED EXIT DOOR" : "EXIT LOCKED • PLANT 6 CHARGES"))
+            requestOpenDoor = true;
     }
 
     private GameObject MakeBox(string name, Vector3 pos, Vector3 scale, Material material)
