@@ -771,64 +771,36 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             yield return null;
         }
 
-        Transform[] fragments = DetachShuttleIntoSixSections();
-        GameObject finalBlast = null;
-        Vector3[] fragmentDirections =
+        // The player escapes in this shuttle. It must remain intact; only the
+        // mothership/station remains behind. After the exterior hold, fly the craft
+        // out of the camera frame and finish the stage without any explosion.
+        message = "ESCAPE SHUTTLE CLEAR • MOTHERSHIP IN VIEW";
+        Vector3 deepSpaceExit = new Vector3(820f, 245f, 940f);
+        float departureTime = 0f;
+        const float departureDuration = 5.0f;
+        while (departureTime < departureDuration)
         {
-            new Vector3(-1.0f, 0.35f, -0.25f),
-            new Vector3(0.75f, 0.55f, 0.45f),
-            new Vector3(-0.25f, 1.0f, 0.6f),
-            new Vector3(0.35f, -0.65f, 1.0f),
-            new Vector3(1.0f, 0.15f, -0.55f),
-            new Vector3(-0.55f, -0.35f, -1.0f)
-        };
-
-        for (int stage = 0; stage < 6; stage++)
-        {
-            message = "ESCAPE CRAFT BREAKUP • SECTION " + (stage + 1) + "/6";
-            Transform piece = fragments[stage];
-            Vector3 origin = piece != null ? piece.position : shuttleEnd;
-            GameObject blast = CreateBlast("S4_EscapeCraftBreakup_" + (stage + 1),
-                origin, stage == 5 ? 32f : 11f + stage, stage == 5);
-            if (stage == 5) finalBlast = blast;
-
-            float pieceTime = 0f;
-            const float pieceDuration = 0.72f;
-            Vector3 destination = origin + fragmentDirections[stage].normalized * (22f + stage * 4f);
-            Quaternion startRotation = piece != null ? piece.rotation : Quaternion.identity;
-            Quaternion endRotation = startRotation * Quaternion.Euler(45f + stage * 19f, 70f + stage * 13f, 95f);
-            while (pieceTime < pieceDuration)
+            departureTime += Time.deltaTime;
+            float depart = Mathf.SmoothStep(0f, 1f,
+                Mathf.Clamp01(departureTime / departureDuration));
+            if (escapeShuttle != null)
             {
-                pieceTime += Time.deltaTime;
-                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(pieceTime / pieceDuration));
-                if (piece != null)
-                {
-                    piece.position = Vector3.Lerp(origin, destination, t);
-                    piece.rotation = Quaternion.Slerp(startRotation, endRotation, t);
-                }
-                if (sceneCamera != null)
-                {
-                    // Keep the same exterior composition throughout all six breakup stages.
-                    sceneCamera.transform.position = wideCamera;
-                    sceneCamera.transform.LookAt(wideLook);
-                }
-                yield return null;
+                escapeShuttle.position = Vector3.Lerp(shuttleEnd, deepSpaceExit, depart);
+                escapeShuttle.rotation = Quaternion.Slerp(shuttleEndRotation,
+                    Quaternion.LookRotation(new Vector3(0.72f, 0.22f, 0.65f), Vector3.up), depart);
             }
-
-            if (piece != null)
+            if (sceneCamera != null)
             {
-                Renderer[] sectionRenderers = piece.GetComponentsInChildren<Renderer>(true);
-                foreach (Renderer renderer in sectionRenderers)
-                    if (renderer != null) renderer.enabled = false;
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(wideLook);
             }
-            if (stage < 5 && plantedBombs.Count > stage && plantedBombs[stage] != null)
-                Destroy(plantedBombs[stage]);
-            yield return new WaitForSeconds(0.22f);
+            yield return null;
         }
 
-        if (escapeShuttle != null) escapeShuttle.gameObject.SetActive(false);
-        message = "ESCAPE CRAFT DESTROYED • ALL 6 SECTIONS LOST";
-        yield return new WaitForSeconds(1.3f);
+        if (escapeShuttle != null)
+            escapeShuttle.gameObject.SetActive(false);
+        message = "SHUTTLE ESCAPED • STAGE 4 COMPLETE";
+        yield return new WaitForSeconds(1.5f);
 
         PrototypeFlow flow = FindFirstObjectByType<PrototypeFlow>();
         if (flow != null)
