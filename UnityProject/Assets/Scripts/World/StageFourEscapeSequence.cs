@@ -325,8 +325,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         var plantedLed = bomb.transform.Find("S4_ChargeStatusLED_" + (siteIndex + 1));
         if (plantedLed != null)
         {
-            var ledRenderer = plantedLed.GetComponent<Renderer>();
-            if (ledRenderer != null) ledRenderer.sharedMaterial = redBeaconMat;
+            var plantedLedRenderer = plantedLed.GetComponent<Renderer>();
+            if (plantedLedRenderer != null) plantedLedRenderer.sharedMaterial = redBeaconMat;
         }
         bombPositions.Add(bombSites[siteIndex].position);
         plantedBombs.Add(bomb);
