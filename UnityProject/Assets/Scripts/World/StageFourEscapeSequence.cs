@@ -644,9 +644,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // The exterior shot opens on a real-looking connected configuration,
         // rather than beginning with the shuttle already floating away from the base.
         Vector3 closeCamera = new Vector3(18f, 122f, 365f);
-        Vector3 wideCamera = new Vector3(300f, 205f, 510f);
+        Vector3 wideCamera = new Vector3(360f, 235f, 600f);
         Vector3 closeLook = new Vector3(0f, 24f, 30f);
-        Vector3 wideLook = new Vector3(82f, 32f, 85f);
+        Vector3 wideLook = new Vector3(105f, 42f, 125f);
         if (sceneCamera != null)
         {
             sceneCamera.transform.position = closeCamera;
@@ -710,9 +710,11 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 escapeShuttle.rotation = Quaternion.Slerp(shuttleDockedRotation, shuttleStartRotation, detach);
             }
             if (sceneCamera != null)
-                sceneCamera.transform.LookAt(Vector3.Lerp(
-                    new Vector3(25f, 18f, 0f),
-                    new Vector3(40f, 22f, 6f), detach));
+            {
+                // Never point the camera back into the interior during detachment.
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(wideLook);
+            }
             yield return null;
         }
 
@@ -739,7 +741,11 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 escapeShuttle.rotation = Quaternion.Slerp(shuttleStartRotation, shuttleEndRotation, flight);
             }
             if (sceneCamera != null)
-                sceneCamera.transform.LookAt(Vector3.Lerp(new Vector3(18f, 18f, 12f), wideLook, flight));
+            {
+                // Lock the exterior establishing shot for the entire shuttle flight.
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(wideLook);
+            }
             yield return null;
         }
 
@@ -749,7 +755,21 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             escapeShuttle.rotation = shuttleEndRotation;
         }
         message = "ESCAPE MODULE SEPARATED • STRUCTURAL FAILURE";
-        yield return new WaitForSeconds(0.35f);
+        // Hold a stable, distant exterior shot for at least 13 seconds so players
+        // can clearly see the mothership, the detached shuttle, and the gap between them.
+        // Do not cut back to the interior while waiting for the breakup.
+        float exteriorHold = 0f;
+        const float exteriorHoldDuration = 13.0f;
+        while (exteriorHold < exteriorHoldDuration)
+        {
+            exteriorHold += Time.deltaTime;
+            if (sceneCamera != null)
+            {
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(wideLook);
+            }
+            yield return null;
+        }
 
         Transform[] fragments = DetachShuttleIntoSixSections();
         GameObject finalBlast = null;
@@ -787,7 +807,11 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                     piece.rotation = Quaternion.Slerp(startRotation, endRotation, t);
                 }
                 if (sceneCamera != null)
-                    sceneCamera.transform.LookAt(Vector3.Lerp(wideLook, new Vector3(95f, 42f, 115f), t));
+                {
+                    // Keep the same exterior composition throughout all six breakup stages.
+                    sceneCamera.transform.position = wideCamera;
+                    sceneCamera.transform.LookAt(wideLook);
+                }
                 yield return null;
             }
 
