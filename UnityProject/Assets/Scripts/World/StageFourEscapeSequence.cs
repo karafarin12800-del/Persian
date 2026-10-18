@@ -120,7 +120,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         }
 
         // After manually opening the door, crossing its threshold starts the shuttle cutscene.
-        if (doorOpened && !boarded && player.position.z >= 74f &&
+        if (doorOpened && !boarded && player.position.z >= 86f &&
             Mathf.Abs(player.position.x) <= 10f)
         {
             if (plantedBombs.Count < 6)
@@ -162,19 +162,19 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         doorPanelMat = MakeMaterial("S4_ExitDoorPanel", new Color(0.06f, 0.09f, 0.13f));
         MakeBox("S4_EscapeCommandWallLeft", new Vector3(-20f, 6.5f, 62f), new Vector3(12f, 13f, 1.5f), wallMat);
         MakeBox("S4_EscapeCommandWallRight", new Vector3(20f, 6.5f, 62f), new Vector3(12f, 13f, 1.5f), wallMat);
-        MakeBox("S4_EscapeCorridorFloor", new Vector3(0f, -0.35f, 80f), new Vector3(24f, 0.7f, 36f), MakeMaterial("S4_EscapeFloor", new Color(0.07f, 0.1f, 0.15f)));
-        MakeBox("S4_EscapeCorridorLeft", new Vector3(-12f, 6f, 80f), new Vector3(1.4f, 12f, 36f), wallMat);
-        MakeBox("S4_EscapeCorridorRight", new Vector3(12f, 6f, 80f), new Vector3(1.4f, 12f, 36f), wallMat);
-        MakeBox("S4_EscapeCorridorCeiling", new Vector3(0f, 13f, 80f), new Vector3(24f, 1.2f, 36f), MakeMaterial("S4_EscapeCeiling", new Color(0.035f, 0.055f, 0.085f)));
+        MakeBox("S4_EscapeCorridorFloor", new Vector3(0f, -0.35f, 91f), new Vector3(24f, 0.7f, 26f), MakeMaterial("S4_EscapeFloor", new Color(0.07f, 0.1f, 0.15f)));
+        MakeBox("S4_EscapeCorridorLeft", new Vector3(-12f, 6f, 91f), new Vector3(1.4f, 12f, 26f), wallMat);
+        MakeBox("S4_EscapeCorridorRight", new Vector3(12f, 6f, 91f), new Vector3(1.4f, 12f, 26f), wallMat);
+        MakeBox("S4_EscapeCorridorCeiling", new Vector3(0f, 13f, 91f), new Vector3(24f, 1.2f, 26f), MakeMaterial("S4_EscapeCeiling", new Color(0.035f, 0.055f, 0.085f)));
 
         // The door sits within the playable corridor, not beyond the map boundary.
         // Only its frame is red; the dark panel slides out after the player taps OPEN.
-        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 1.9f, 66f), new Vector3(5.8f, 3.8f, 0.8f), doorPanelMat);
-        MakeBox("S4_EscapeDoorFrameL", new Vector3(-3.1f, 1.95f, 65f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorFrameR", new Vector3(3.1f, 1.95f, 65f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 4.0f, 65f), new Vector3(6.6f, 0.35f, 0.7f), redDoorMat);
+        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 1.9f, 78f), new Vector3(5.8f, 3.8f, 0.8f), doorPanelMat);
+        MakeBox("S4_EscapeDoorFrameL", new Vector3(-3.1f, 1.95f, 77f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameR", new Vector3(3.1f, 1.95f, 77f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 4.0f, 77f), new Vector3(6.6f, 0.35f, 0.7f), redDoorMat);
         CreateDoorLabel();
-        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 88f));
+        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 96f));
         escapeShuttle.gameObject.SetActive(false);
         BuildExteriorDockConnection();
 
@@ -494,7 +494,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         if (player != null && escapeShuttle != null)
         {
             Vector3 walkStart = player.position;
-            Vector3 boardingPoint = escapeShuttle.position + new Vector3(0f, 0.05f, -1.65f);
+            Vector3 boardingPoint = escapeShuttle.position + new Vector3(0f, 0.05f, -4.2f);
             Quaternion walkRotation = player.rotation;
             Vector3 facing = escapeShuttle.position - player.position;
             facing.y = 0f;
@@ -503,7 +503,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 : walkRotation;
 
             float walkTime = 0f;
-            const float walkDuration = 1.25f;
+            const float walkDuration = 1.35f;
             while (walkTime < walkDuration)
             {
                 walkTime += Time.deltaTime;
