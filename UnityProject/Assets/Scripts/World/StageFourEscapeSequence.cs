@@ -875,6 +875,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         {
             // Cinematic captions intentionally sit at the bottom instead of covering
             // the normal health/shield area or the upper-right radar.
+            messageStyle.alignment = TextAnchor.MiddleCenter;
             messageStyle.fontSize = Mathf.Clamp(Screen.height / 34, 18, 30);
             Rect caption = new Rect(Screen.width * 0.08f, Screen.height * 0.79f,
                 Screen.width * 0.84f, Mathf.Max(48f, Screen.height * 0.11f));
@@ -891,8 +892,12 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         float titleX = landscape ? Mathf.Min(360f * hudScale, Screen.width * 0.28f) : 12f;
         float rightReserve = landscape ? Mathf.Min(320f * hudScale, Screen.width * 0.22f) : 12f;
         float statusWidth = Mathf.Max(100f, Screen.width - titleX - rightReserve);
-        float titleY = landscape ? 8f : 150f;
+        // On landscape devices the pause control owns the top-center strip.
+        // Put the status line below it and left-align it so it cannot collide
+        // with pause or the upper-right radar.
+        float titleY = landscape ? 76f : 150f;
         float statusFont = Mathf.Clamp(Screen.height / 36f, 18f, 23f);
+        messageStyle.alignment = TextAnchor.MiddleLeft;
         messageStyle.fontSize = Mathf.RoundToInt(statusFont);
         GUI.Label(new Rect(titleX, titleY, statusWidth, 34f), message, messageStyle);
 
