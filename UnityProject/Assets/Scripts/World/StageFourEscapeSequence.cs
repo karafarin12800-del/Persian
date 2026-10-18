@@ -120,7 +120,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         }
 
         // After manually opening the door, crossing its threshold starts the shuttle cutscene.
-        if (doorOpened && !boarded && player.position.z >= 86f &&
+        if (doorOpened && !boarded && player.position.z >= 80f &&
             Mathf.Abs(player.position.x) <= 10f)
         {
             if (plantedBombs.Count < 6)
@@ -214,12 +214,12 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
         // The door sits within the playable corridor, not beyond the map boundary.
         // Only its frame is red; the dark panel slides out after the player taps OPEN.
-        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 1.9f, 78f), new Vector3(5.8f, 3.8f, 0.8f), doorPanelMat);
-        MakeBox("S4_EscapeDoorFrameL", new Vector3(-3.1f, 1.95f, 77f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorFrameR", new Vector3(3.1f, 1.95f, 77f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 4.0f, 77f), new Vector3(6.6f, 0.35f, 0.7f), redDoorMat);
+        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 1.9f, 72f), new Vector3(5.8f, 3.8f, 0.8f), doorPanelMat);
+        MakeBox("S4_EscapeDoorFrameL", new Vector3(-3.1f, 1.95f, 71f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameR", new Vector3(3.1f, 1.95f, 71f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 4.0f, 71f), new Vector3(6.6f, 0.35f, 0.7f), redDoorMat);
         CreateDoorLabel();
-        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 96f));
+        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 94f));
         escapeShuttle.gameObject.SetActive(false);
         BuildExteriorDockConnection();
 
@@ -442,8 +442,31 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             if (collider != null) collider.enabled = false;
             StartCoroutine(SlideRedDoorOpenRoutine());
         }
+        // The command console was placed directly in the shuttle's boarding lane.
+        // Remove its renderers and colliders when the escape hatch opens so it cannot
+        // block the player or visually intersect the shuttle inside the tunnel.
+        HideCommandConsoleForEscape();
         if (escapeShuttle != null) escapeShuttle.gameObject.SetActive(true);
         StartupCheckpoint.Set("StageFourRedEscapeDoorOpened");
+    }
+
+    private void HideCommandConsoleForEscape()
+    {
+        if (worldRoot == null) return;
+        string[] names =
+        {
+            "S4_InteriorCommandConsole",
+            "S4_InteriorCommandConsoleGlow"
+        };
+        for (int i = 0; i < names.Length; i++)
+        {
+            Transform item = worldRoot.Find(names[i]);
+            if (item == null) continue;
+            Renderer renderer = item.GetComponent<Renderer>();
+            if (renderer != null) renderer.enabled = false;
+            Collider collider = item.GetComponent<Collider>();
+            if (collider != null) collider.enabled = false;
+        }
     }
 
     private IEnumerator SlideRedDoorOpenRoutine()
