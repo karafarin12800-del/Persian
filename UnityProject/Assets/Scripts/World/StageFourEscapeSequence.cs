@@ -165,10 +165,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
         // The door sits within the playable corridor, not beyond the map boundary.
         // Only its frame is red; the dark panel slides out after the player taps OPEN.
-        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 2.35f, 110f), new Vector3(7.8f, 4.7f, 0.8f), doorPanelMat);
-        MakeBox("S4_EscapeDoorFrameL", new Vector3(-4.5f, 2.55f, 109f), new Vector3(0.38f, 5.4f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorFrameR", new Vector3(4.5f, 2.55f, 109f), new Vector3(0.38f, 5.4f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 5.1f, 109f), new Vector3(9.4f, 0.38f, 0.7f), redDoorMat);
+        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 1.9f, 110f), new Vector3(5.8f, 3.8f, 0.8f), doorPanelMat);
+        MakeBox("S4_EscapeDoorFrameL", new Vector3(-3.1f, 1.95f, 109f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameR", new Vector3(3.1f, 1.95f, 109f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 4.0f, 109f), new Vector3(6.6f, 0.35f, 0.7f), redDoorMat);
         CreateDoorLabel();
         escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 124f));
         escapeShuttle.gameObject.SetActive(false);
