@@ -16,6 +16,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private Transform worldRoot;
     private Transform escapeShuttle;
     private readonly List<GameObject> plantedBombs = new List<GameObject>();
+    private readonly List<GameObject> storedCharges = new List<GameObject>();
     private readonly List<Vector3> bombPositions = new List<Vector3>();
     private readonly List<Transform> bombSites = new List<Transform>();
     private readonly List<GameObject> bombSiteIndicators = new List<GameObject>();
@@ -75,6 +76,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             {
                 chargesPickedUp = true;
                 chargesInInventory = 6;
+                for (int i = 0; i < storedCharges.Count; i++)
+                    if (storedCharges[i] != null) Destroy(storedCharges[i]);
+                storedCharges.Clear();
                 message = "6 SQUARE CHARGES COLLECTED • VISIT ALL 6 RED STATIONS";
                 StartupCheckpoint.Set("StageFourSixChargesCollected");
             }
@@ -183,6 +187,23 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         lid.transform.localScale = new Vector3(3.35f, 0.18f, 2.72f);
         lid.GetComponent<Renderer>().material = redDoorMat;
         redBeaconMat = MakeMaterial("S4_ChargeRedBeacon", new Color(1f, 0.025f, 0.01f), new Color(2f, 0.015f, 0.005f));
+        // Six visible square charges sit inside the box with green status LEDs until collected.
+        for (int i = 0; i < 6; i++)
+        {
+            float x = 19.15f + (i % 3) * 0.82f;
+            float z = 87.45f + (i / 3) * 0.92f;
+            var stored = MakeBox("S4_StoredSquareCharge_" + (i + 1), new Vector3(x, 1.48f, z), new Vector3(0.58f, 0.48f, 0.58f), bombMat);
+            storedCharges.Add(stored);
+            var storedLed = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            storedLed.name = "S4_StoredChargeGreenLED_" + (i + 1);
+            storedLed.transform.SetParent(stored.transform, false);
+            storedLed.transform.localPosition = new Vector3(0f, 0.58f, 0f);
+            storedLed.transform.localScale = Vector3.one * 0.18f;
+            var storedCol = storedLed.GetComponent<Collider>();
+            if (storedCol != null) Destroy(storedCol);
+            var storedRenderer = storedLed.GetComponent<Renderer>();
+            if (storedRenderer != null) storedRenderer.sharedMaterial = greenBeaconMat;
+        }
         CreateWorldLabel("S4_ChargeSupplyLabel", new Vector3(20f, 4f, 88f), "EXPLOSIVE CHARGES • 6", new Color(1f, 0.72f, 0.2f));
 
         // Six fixed stations run from the aft engine room to the forward command/exit side.
