@@ -62,10 +62,6 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     {
         if (player == null || worldRoot == null || finaleStarted) return;
 
-        // Mobile gameplay disables touch-to-mouse synthesis. Route stage interactions
-        // from native finger IDs too, so opening the box/airlock never depends on IMGUI.
-        HandleDirectMobileInteractionTouches();
-
         bool nearSupplyBox = supplyCrate != null && supplyCrate.activeSelf &&
             Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f;
         if (requestOpenSupplyBox)
@@ -143,38 +139,43 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         return new Rect((Screen.width - buttonW) * 0.5f, Screen.height - 142f, buttonW, 58f);
     }
 
-    private void HandleDirectMobileInteractionTouches()
+    /// <summary>
+    /// Called by MobileInputHub, the sole native-touch owner, before it assigns a
+    /// contact to movement or combat. Returns true only when that contact activated
+    /// the currently visible Stage 4 interaction button.
+    /// </summary>
+    public static bool TryHandleInteractionTouch(Vector2 screenPosition)
     {
-        if (!Application.isMobilePlatform || Input.touchCount <= 0)
-            return;
+        StageFourEscapeSequence sequence = active;
+        if (!Application.isMobilePlatform || sequence == null ||
+            sequence.player == null || sequence.worldRoot == null || sequence.finaleStarted)
+            return false;
 
-        bool nearCrate = !chargesPickedUp && supplyCrate != null && supplyCrate.activeSelf &&
-            Vector3.Distance(player.position, supplyCrate.transform.position) <= 4.5f;
-        bool nearDoor = !doorOpened && redDoorPanel != null &&
-            Vector3.Distance(player.position, redDoorPanel.transform.position) <= 3.8f;
-        int site = FindNearbyBombSite();
-        bool nearEmptySite = site >= 0 && site < bombSiteIndicators.Count &&
-            bombSiteIndicators[site] != null && !bombSiteIndicators[site].activeSelf;
-        Rect buttonRect = GetInteractionButtonRect();
+        Vector2 guiPoint = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+        if (!sequence.GetInteractionButtonRect().Contains(guiPoint))
+            return false;
 
-        for (int i = 0; i < Input.touchCount; i++)
-        {
-            Touch touch = Input.GetTouch(i);
-            if (touch.phase != TouchPhase.Began)
-                continue;
-            Vector2 guiPoint = new Vector2(touch.position.x, Screen.height - touch.position.y);
-            if (!buttonRect.Contains(guiPoint))
-                continue;
+        bool nearCrate = !sequence.chargesPickedUp && sequence.supplyCrate != null &&
+            sequence.supplyCrate.activeSelf &&
+            Vector3.Distance(sequence.player.position, sequence.supplyCrate.transform.position) <= 4.5f;
+        bool nearDoor = !sequence.doorOpened && sequence.redDoorPanel != null &&
+            Vector3.Distance(sequence.player.position, sequence.redDoorPanel.transform.position) <= 3.8f;
+        int site = sequence.FindNearbyBombSite();
+        bool nearEmptySite = site >= 0 && site < sequence.bombSiteIndicators.Count &&
+            sequence.bombSiteIndicators[site] != null && !sequence.bombSiteIndicators[site].activeSelf;
 
-            if (nearCrate && !supplyBoxOpened)
-                requestOpenSupplyBox = true;
-            else if (nearCrate && supplyBoxOpened)
-                requestPickup = true;
-            else if (nearEmptySite && chargesPickedUp && chargesInInventory > 0)
-                requestPlant = true;
-            else if (nearDoor)
-                requestOpenDoor = true;
-        }
+        if (nearCrate && !sequence.supplyBoxOpened)
+            sequence.requestOpenSupplyBox = true;
+        else if (nearCrate && sequence.supplyBoxOpened)
+            sequence.requestPickup = true;
+        else if (nearEmptySite && sequence.chargesPickedUp && sequence.chargesInInventory > 0)
+            sequence.requestPlant = true;
+        else if (nearDoor)
+            sequence.requestOpenDoor = true;
+        else
+            return false;
+
+        return true;
     }
 
     private int FindNearbyBombSite()
