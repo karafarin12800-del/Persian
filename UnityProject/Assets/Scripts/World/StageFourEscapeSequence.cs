@@ -226,7 +226,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         MakeBox("S4_EscapeDoorFrameR", new Vector3(3.1f, 1.95f, 71f), new Vector3(0.35f, 4.1f, 0.7f), redDoorMat);
         MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 4.0f, 71f), new Vector3(6.6f, 0.35f, 0.7f), redDoorMat);
         CreateDoorLabel();
-        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.4f, 94f));
+        // The escape craft is docked OUTSIDE the hull, at the far end of the exterior tunnel.
+        // Never place a full shuttle in the interior corridor: the player walks through the airlock first.
+        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 14f, 156f));
         escapeShuttle.gameObject.SetActive(false);
         BuildExteriorDockConnection();
 
@@ -569,7 +571,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         if (player != null && escapeShuttle != null)
         {
             Vector3 walkStart = player.position;
-            Vector3 boardingPoint = escapeShuttle.position + new Vector3(0f, 0.05f, 0.35f);
+            // Walk all the way through the interior corridor and exterior connecting tunnel.
+            // The shuttle itself remains outside, attached to the docking sleeve at z=156.
+            Vector3 boardingPoint = new Vector3(0f, 1.45f, 146f);
             Quaternion walkRotation = player.rotation;
             Vector3 facing = escapeShuttle.position - player.position;
             facing.y = 0f;
