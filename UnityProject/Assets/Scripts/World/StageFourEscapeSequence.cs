@@ -114,7 +114,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         }
 
         // After manually opening the door, crossing its threshold starts the shuttle cutscene.
-        if (doorOpened && !boarded && player.position.z >= 124f &&
+        if (doorOpened && !boarded && player.position.z >= 114f &&
             Mathf.Abs(player.position.x) <= 10f)
         {
             if (plantedBombs.Count < 6)
@@ -163,22 +163,22 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
         // The door sits within the playable corridor, not beyond the map boundary.
         // Only its frame is red; the dark panel slides out after the player taps OPEN.
-        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 6f, 120.2f), new Vector3(9.8f, 10.8f, 0.8f), doorPanelMat);
-        MakeBox("S4_EscapeDoorFrameL", new Vector3(-5.7f, 6f, 119f), new Vector3(0.45f, 12f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorFrameR", new Vector3(5.7f, 6f, 119f), new Vector3(0.45f, 12f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 12f, 119f), new Vector3(11.8f, 0.45f, 0.7f), redDoorMat);
-        MakeBox("S4_EscapeDoorBeaconL", new Vector3(-6.4f, 6f, 119f), new Vector3(0.22f, 12.5f, 0.22f), redDoorMat);
-        MakeBox("S4_EscapeDoorBeaconR", new Vector3(6.4f, 6f, 119f), new Vector3(0.22f, 12.5f, 0.22f), redDoorMat);
+        redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 3.6f, 110f), new Vector3(9.8f, 7.2f, 0.8f), doorPanelMat);
+        MakeBox("S4_EscapeDoorFrameL", new Vector3(-5.7f, 3.8f, 109f), new Vector3(0.45f, 8f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorFrameR", new Vector3(5.7f, 3.8f, 109f), new Vector3(0.45f, 8f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorHeader", new Vector3(0f, 7.8f, 109f), new Vector3(11.8f, 0.45f, 0.7f), redDoorMat);
+        MakeBox("S4_EscapeDoorBeaconL", new Vector3(-6.4f, 3.8f, 109f), new Vector3(0.22f, 8.5f, 0.22f), redDoorMat);
+        MakeBox("S4_EscapeDoorBeaconR", new Vector3(6.4f, 3.8f, 109f), new Vector3(0.22f, 8.5f, 0.22f), redDoorMat);
         CreateDoorLabel();
-        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.8f, 140f));
+        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 1.8f, 118f));
         escapeShuttle.gameObject.SetActive(false);
 
         // The player must find the charge box in the side of the command room.
-        supplyCrate = MakeBox("S4_ChargeSupplyBox", new Vector3(20f, 1.1f, 88f), new Vector3(3.2f, 2.2f, 2.6f), supplyMat);
+        supplyCrate = MakeBox("S4_ChargeSupplyBox", new Vector3(5f, 1.1f, -67f), new Vector3(3.2f, 2.2f, 2.6f), supplyMat);
         // A real hinged lid: the player must open it before the pickup action appears.
         var hinge = new GameObject("S4_ChargeSupplyBoxHinge");
         hinge.transform.SetParent(worldRoot, false);
-        hinge.transform.localPosition = new Vector3(18.325f, 2.25f, 88f);
+        hinge.transform.localPosition = new Vector3(3.325f, 2.25f, -67f);
         supplyLidHinge = hinge.transform;
         var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
         lid.name = "S4_ChargeSupplyBoxLid";
@@ -190,8 +190,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // Six visible square charges sit inside the box with green status LEDs until collected.
         for (int i = 0; i < 6; i++)
         {
-            float x = 19.15f + (i % 3) * 0.82f;
-            float z = 87.45f + (i / 3) * 0.92f;
+            float x = 4.15f + (i % 3) * 0.82f;
+            float z = -67.55f + (i / 3) * 0.92f;
             var stored = MakeBox("S4_StoredSquareCharge_" + (i + 1), new Vector3(x, 1.48f, z), new Vector3(0.58f, 0.48f, 0.58f), bombMat);
             storedCharges.Add(stored);
             var storedLed = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -204,7 +204,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             var storedRenderer = storedLed.GetComponent<Renderer>();
             if (storedRenderer != null) storedRenderer.sharedMaterial = greenBeaconMat;
         }
-        CreateWorldLabel("S4_ChargeSupplyLabel", new Vector3(20f, 4f, 88f), "EXPLOSIVE CHARGES • 6", new Color(1f, 0.72f, 0.2f));
+        // Keep the supply box unlabelled; the interaction prompt appears only nearby.
 
         // Six fixed stations run from the aft engine room to the forward command/exit side.
         float[] stationZ = { -88f, -61f, -24f, 22f, 60f, 92f };
@@ -224,7 +224,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             if (renderer != null) renderer.sharedMaterial = greenBeaconMat;
             indicator.SetActive(false);
             bombSiteIndicators.Add(indicator);
-            CreateWorldLabel("S4_ChargeStationLabel_" + (i + 1), new Vector3(0f, 2.3f, stationZ[i]), "CHARGE " + (i + 1), new Color(1f, 0.35f, 0.2f));
+            // No floating text over planting stations; the nearby action button is enough.
         }
     }
 
@@ -290,8 +290,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
     private void CreateDoorLabel()
     {
-        CreateWorldLabel("S4_RedEscapeDoorLabel", new Vector3(0f, 14.1f, 118.2f),
-            "ESCAPE • 6 CHARGES REQUIRED", new Color(1f, 0.12f, 0.06f));
+        // No floating label above the boarding door.
     }
 
     private void PlantTimedBomb(int siteIndex)
