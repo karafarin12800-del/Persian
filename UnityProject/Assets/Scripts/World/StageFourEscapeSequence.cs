@@ -614,7 +614,6 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // the shuttle nose faces inward, into the open docking sleeve, before release.
         Vector3 shuttleDockedPosition = new Vector3(0f, 14f, 156f);
         Vector3 shuttleTravelStart = new Vector3(0f, 15.5f, 174f);
-        Vector3 shuttleEnd = new Vector3(520f, 190f, 292f);
         Quaternion shuttleDockedRotation = Quaternion.Euler(0f, 180f, 0f);
         Quaternion shuttleStartRotation = Quaternion.LookRotation(
             new Vector3(0.22f, 0.04f, 0.97f), Vector3.up);
