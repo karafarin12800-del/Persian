@@ -212,6 +212,13 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         MakeBox("S4_EscapeCorridorRight", new Vector3(12f, 6f, 91f), new Vector3(1.4f, 12f, 26f), wallMat);
         MakeBox("S4_EscapeCorridorCeiling", new Vector3(0f, 13f, 91f), new Vector3(24f, 1.2f, 26f), MakeMaterial("S4_EscapeCeiling", new Color(0.035f, 0.055f, 0.085f)));
 
+        // Extend the same tunnel through the outer hull to the exterior shuttle dock.
+        // This closes the old visual gap between the interior corridor and the craft.
+        MakeBox("S4_ExteriorEscapeTunnelFloor", new Vector3(0f, -0.35f, 126f), new Vector3(24f, 0.7f, 44f), MakeMaterial("S4_ExteriorTunnelFloor", new Color(0.055f, 0.085f, 0.12f)));
+        MakeBox("S4_ExteriorEscapeTunnelLeft", new Vector3(-12f, 6f, 126f), new Vector3(1.4f, 12f, 44f), wallMat);
+        MakeBox("S4_ExteriorEscapeTunnelRight", new Vector3(12f, 6f, 126f), new Vector3(1.4f, 12f, 44f), wallMat);
+        MakeBox("S4_ExteriorEscapeTunnelCeiling", new Vector3(0f, 13f, 126f), new Vector3(24f, 1.2f, 44f), MakeMaterial("S4_ExteriorTunnelCeiling", new Color(0.035f, 0.055f, 0.085f)));
+
         // The door sits within the playable corridor, not beyond the map boundary.
         // Only its frame is red; the dark panel slides out after the player taps OPEN.
         redDoorPanel = MakeBox("S4_RedEscapeDoorPanel", new Vector3(0f, 1.9f, 72f), new Vector3(5.8f, 3.8f, 0.8f), doorPanelMat);
@@ -706,94 +713,146 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             yield return null;
         }
 
-        // Six exterior blast locations move from the far/stern section toward the
-        // central reactor. The final charge is deliberately much larger than the rest.
-        Vector3[] blasts =
+        // Keep the entire space base in a distant wide shot while the ship-shaped
+        // escape module disconnects from the docking tunnel and travels into open space.
+        // The detached craft then breaks into six clearly separate sections, one after
+        // another, with a distinct explosion at each break stage.
+        Vector3 shuttleEnd = new Vector3(225f, 82f, 260f);
+        Vector3 wideCamera = new Vector3(300f, 205f, 510f);
+        Vector3 wideLook = new Vector3(82f, 32f, 85f);
+        if (sceneCamera != null)
         {
-            new Vector3(-18f, 23f, -132f),
-            new Vector3(-58f, 31f, -66f),
-            new Vector3(51f, 39f, -18f),
-            new Vector3(-42f, 43f, 28f),
-            new Vector3(28f, 29f, 88f),
-            new Vector3(0f, 35f, -4f)
-        };
-
-        float elapsed = 0f;
-        const float shuttleFlightDuration = 7.2f;
-        float nextChargeTime = 0.55f;
-        GameObject finalBlast = null;
-
-        // Shuttle movement and the explosions run together. A fixed wide camera
-        // keeps the mothership visible while the craft visibly separates and escapes.
-        for (int i = 0; i < blasts.Length; i++)
-        {
-            while (elapsed < nextChargeTime)
-            {
-                elapsed += Time.deltaTime;
-                float flight = Mathf.SmoothStep(0f, 1f,
-                    Mathf.Clamp01(elapsed / shuttleFlightDuration));
-
-                if (escapeShuttle != null)
-                {
-                    escapeShuttle.position = Vector3.Lerp(shuttleTravelStart, shuttleEnd, flight);
-                    escapeShuttle.rotation = Quaternion.Slerp(shuttleStartRotation, shuttleEndRotation, flight);
-                }
-
-                if (sceneCamera != null)
-                {
-                    Vector3 lookTarget = Vector3.Lerp(
-                        new Vector3(25f, 18f, 0f),
-                        new Vector3(100f, 30f, 32f), flight);
-                    sceneCamera.transform.LookAt(lookTarget);
-                }
-                yield return null;
-            }
-
-            message = i == blasts.Length - 1
-                ? "FINAL CHARGE • MOTHERSHIP CORE DETONATION"
-                : "MOTHERSHIP DETONATION • " + (i + 1) + "/6";
-
-            float radius = i == blasts.Length - 1 ? 78f : 20f + i * 1.8f;
-            GameObject explosion = CreateBlast(
-                "S4_MothershipDetonation_" + (i + 1), blasts[i], radius,
-                i == blasts.Length - 1);
-            if (i == blasts.Length - 1)
-                finalBlast = explosion;
-
-            if (i < plantedBombs.Count && plantedBombs[i] != null)
-                Destroy(plantedBombs[i]);
-
-            nextChargeTime += 0.97f;
+            sceneCamera.transform.position = wideCamera;
+            sceneCamera.transform.LookAt(wideLook);
         }
 
+        float elapsed = 0f;
+        const float shuttleFlightDuration = 5.0f;
         while (elapsed < shuttleFlightDuration)
         {
             elapsed += Time.deltaTime;
-            float flight = Mathf.SmoothStep(0f, 1f,
-                Mathf.Clamp01(elapsed / shuttleFlightDuration));
+            float flight = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / shuttleFlightDuration));
             if (escapeShuttle != null)
             {
                 escapeShuttle.position = Vector3.Lerp(shuttleTravelStart, shuttleEnd, flight);
                 escapeShuttle.rotation = Quaternion.Slerp(shuttleStartRotation, shuttleEndRotation, flight);
             }
             if (sceneCamera != null)
-                sceneCamera.transform.LookAt(Vector3.Lerp(
-                    new Vector3(25f, 18f, 0f),
-                    new Vector3(100f, 30f, 32f), flight));
+                sceneCamera.transform.LookAt(Vector3.Lerp(new Vector3(18f, 18f, 12f), wideLook, flight));
             yield return null;
         }
 
-        message = "MOTHERSHIP CORE DESTROYED";
-        // The last detonation remains visible for the final beat while the hull,
-        // docking districts and lights disappear behind the escaping craft.
-        HideMothershipAfterFinalExplosion(finalBlast);
-        yield return new WaitForSeconds(1.2f);
+        if (escapeShuttle != null)
+        {
+            escapeShuttle.position = shuttleEnd;
+            escapeShuttle.rotation = shuttleEndRotation;
+        }
+        message = "ESCAPE MODULE SEPARATED • STRUCTURAL FAILURE";
+        yield return new WaitForSeconds(0.35f);
+
+        Transform[] fragments = DetachShuttleIntoSixSections();
+        GameObject finalBlast = null;
+        Vector3[] fragmentDirections =
+        {
+            new Vector3(-1.0f, 0.35f, -0.25f),
+            new Vector3(0.75f, 0.55f, 0.45f),
+            new Vector3(-0.25f, 1.0f, 0.6f),
+            new Vector3(0.35f, -0.65f, 1.0f),
+            new Vector3(1.0f, 0.15f, -0.55f),
+            new Vector3(-0.55f, -0.35f, -1.0f)
+        };
+
+        for (int stage = 0; stage < 6; stage++)
+        {
+            message = "ESCAPE CRAFT BREAKUP • SECTION " + (stage + 1) + "/6";
+            Transform piece = fragments[stage];
+            Vector3 origin = piece != null ? piece.position : shuttleEnd;
+            GameObject blast = CreateBlast("S4_EscapeCraftBreakup_" + (stage + 1),
+                origin, stage == 5 ? 32f : 11f + stage, stage == 5);
+            if (stage == 5) finalBlast = blast;
+
+            float pieceTime = 0f;
+            const float pieceDuration = 0.72f;
+            Vector3 destination = origin + fragmentDirections[stage].normalized * (22f + stage * 4f);
+            Quaternion startRotation = piece != null ? piece.rotation : Quaternion.identity;
+            Quaternion endRotation = startRotation * Quaternion.Euler(45f + stage * 19f, 70f + stage * 13f, 95f);
+            while (pieceTime < pieceDuration)
+            {
+                pieceTime += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(pieceTime / pieceDuration));
+                if (piece != null)
+                {
+                    piece.position = Vector3.Lerp(origin, destination, t);
+                    piece.rotation = Quaternion.Slerp(startRotation, endRotation, t);
+                }
+                if (sceneCamera != null)
+                    sceneCamera.transform.LookAt(Vector3.Lerp(wideLook, new Vector3(95f, 42f, 115f), t));
+                yield return null;
+            }
+
+            if (piece != null)
+            {
+                Renderer[] sectionRenderers = piece.GetComponentsInChildren<Renderer>(true);
+                foreach (Renderer renderer in sectionRenderers)
+                    if (renderer != null) renderer.enabled = false;
+            }
+            if (stage < 5 && plantedBombs.Count > stage && plantedBombs[stage] != null)
+                Destroy(plantedBombs[stage]);
+            yield return new WaitForSeconds(0.22f);
+        }
+
+        if (escapeShuttle != null) escapeShuttle.gameObject.SetActive(false);
+        message = "ESCAPE CRAFT DESTROYED • ALL 6 SECTIONS LOST";
+        yield return new WaitForSeconds(1.3f);
 
         PrototypeFlow flow = FindFirstObjectByType<PrototypeFlow>();
         if (flow != null)
             flow.CompleteStageFourEscapeToMainMenu();
         else
             message = "STAGE 4 COMPLETE";
+    }
+
+    private Transform[] DetachShuttleIntoSixSections()
+    {
+        Transform[] sections = new Transform[6];
+        if (escapeShuttle == null) return sections;
+
+        Transform hull = escapeShuttle.Find("ShuttleHull");
+        Transform nose = escapeShuttle.Find("ShuttleNose");
+        Transform cockpit = escapeShuttle.Find("ShuttleCockpit");
+        Transform leftWing = escapeShuttle.Find("SweptWing-1");
+        Transform rightWing = escapeShuttle.Find("SweptWing1");
+
+        Transform engineGroup = new GameObject("S4_EscapeCraftSection6_Engines").transform;
+        engineGroup.SetParent(escapeShuttle, false);
+        Transform leftEngine = escapeShuttle.Find("EngineTube-1");
+        Transform rightEngine = escapeShuttle.Find("EngineTube1");
+        Transform leftGlow = escapeShuttle.Find("EngineGlow-1");
+        Transform rightGlow = escapeShuttle.Find("EngineGlow1");
+        if (leftEngine != null) leftEngine.SetParent(engineGroup, false);
+        if (rightEngine != null) rightEngine.SetParent(engineGroup, false);
+        if (leftGlow != null) leftGlow.SetParent(engineGroup, false);
+        if (rightGlow != null) rightGlow.SetParent(engineGroup, false);
+
+        sections[0] = hull;
+        sections[1] = nose;
+        sections[2] = cockpit;
+        sections[3] = leftWing;
+        sections[4] = rightWing;
+        sections[5] = engineGroup;
+
+        for (int i = 0; i < sections.Length; i++)
+        {
+            Transform section = sections[i];
+            if (section == null) continue;
+            section.SetParent(worldRoot, true);
+            section.name = "S4_EscapeCraftSection" + (i + 1);
+        }
+
+        // The original parent is now only an empty docking shell; hide it so the six
+        // real craft sections, not a duplicate intact shuttle, are what break apart.
+        escapeShuttle.gameObject.SetActive(false);
+        return sections;
     }
 
     private void HideInteriorForExteriorShot()
