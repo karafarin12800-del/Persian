@@ -13,6 +13,7 @@ on:
       - unity-2.5d
       - fix/android-multitouch-pointer-zones
       - feature/stage4-mothership-megabase-20261016
+      - feature/stage4-escape-detonation-20261017
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
@@ -24,7 +25,8 @@ permissions:
   actions: read
 
 concurrency:
-  group: persiawar-unity-android-${{ github.workflow }}-${{ github.ref }}
+  # Isolate each source revision so a stalled Unity build cannot block its crash-fix successor.
+  group: persiawar-unity-android-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -146,6 +148,29 @@ jobs:
           prototype_flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
           assert 'if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)' in prototype_flow, 'Stage 4 must start with a firearm if the saved loadout is melee-only.'
           assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
+          escape_finale = Path('UnityProject/Assets/Scripts/World/StageFourEscapeSequence.cs').read_text(encoding='utf-8')
+          assert 'S4_RedEscapeDoorPanel' in escape_finale and 'S4_EscapeDoorFrameL' in escape_finale and 'OpenRedDoor();' in escape_finale, 'Stage 4 must have a dark exit panel surrounded by a red frame that opens.'
+          assert 'float[] stationZ = { -88f, -61f, -24f, 22f, 46f, 56f }' in escape_finale and 'PlantTimedBomb(int siteIndex)' in escape_finale and 'chargesInInventory = 6' in escape_finale and 'plantedBombs.Count >= 6' in escape_finale, 'Stage 4 must collect six charges and plant them at six fixed stations from aft to forward.'
+          assert 'S4_ChargeSupplyBox' in escape_finale and 'new Vector3(5f, 1.1f, -67f)' in escape_finale and 'OPEN SUPPLY BOX' in escape_finale and 'TAKE 6 CHARGES' in escape_finale, 'Stage 4 supply box must be in the rear corridor and open before charges can be collected.'
+          assert 'S4_SquareTimedCharge_' in escape_finale and 'S4_ChargeStatusLED_' in escape_finale and 'S4_ChargeRedBeacon' in escape_finale and 'PLANT SQUARE CHARGE' in escape_finale, 'Stage 4 charges must be square and their green status LED must turn red after planting.'
+          assert 'OPEN RED EXIT DOOR' in escape_finale and 'requestOpenDoor' in escape_finale and 'new Vector3(0f, 1.9f, 72f)' in escape_finale and 'player.position.z >= 80f' in escape_finale and 'new Vector3(0f, -0.35f, 91f)' in escape_finale and 'BuildEscapeShuttle(new Vector3(0f, 14f, 156f))' in escape_finale and 'Vector3 boardingPoint = new Vector3(0f, 1.45f, 146f)' in escape_finale and 'HideCommandConsoleForEscape();' in escape_finale, 'Stage 4 exit door must be reachable inside the corridor and the command console must not block the shuttle boarding lane.'
+          assert 'doorDistance <= 3.8f' in escape_finale and 'SlideRedDoorOpenRoutine' in escape_finale and 'worldLimit = 108.1f' in Path('UnityProject/Assets/Scripts/Player/PlayerController.cs').read_text(encoding='utf-8'), 'Stage 4 must require the player to reach the interior door and animate it open well inside the player boundary.'
+          input_hub_for_stage4 = Path('UnityProject/Assets/Scripts/Input/MobileInputHub.cs').read_text(encoding='utf-8')
+          assert 'public static bool TryHandleInteractionTouch(Vector2 screenPosition)' in escape_finale and 'GetInteractionButtonRect()' in escape_finale and 'global::StageFourEscapeSequence.TryHandleInteractionTouch(touchStartScreen)' in input_hub_for_stage4 and 'stageInteractionPointerId == touch.fingerId' in input_hub_for_stage4, 'Stage 4 interactions must route through the single native Android touch owner.'
+          assert 'S4_ChargeSupplyLabel' not in escape_finale and 'CreateWorldLabel("S4_ChargeStationLabel_' not in escape_finale and 'S4_RedEscapeDoorLabel' not in escape_finale, 'Stage 4 must not show floating text labels over the supply box, planting stations, or exit door.'
+          assert '"BOMBS: "' in escape_finale and 'S4_MothershipChargeDetonation_' in escape_finale and 'CreateBlast("S4_MothershipChargeDetonation_"' in escape_finale, 'Stage 4 must show the bomb counter and detonate planted charges on the mothership, not the escape shuttle.'
+          assert 'PlayEscapeFinale' in escape_finale and 'for (int chargeIndex = 0; chargeIndex < bombPositions.Count; chargeIndex++)' in escape_finale and 'SHUTTLE ESCAPED • STAGE 4 COMPLETE' in escape_finale and 'S4_EscapeCraftBreakup_' not in escape_finale, 'Stage 4 finale must detonate the planted base charges and let the escape shuttle leave intact.'
+          assert 'BuildExteriorDockConnection();' in escape_finale and 'S4_ExteriorDockSleeveRail_' in escape_finale and 'S4_ExteriorDockClampPort' in escape_finale and 'S4_ExteriorDockClampStarboard' in escape_finale, 'Stage 4 shuttle must start physically docked to the mothership through a retractable sleeve and two clamps.'
+          assert 'Vector3 shuttleDockedPosition = new Vector3(0f, 14f, 156f)' in escape_finale and 'Vector3 shuttleTravelStart = new Vector3(0f, 15.5f, 174f)' in escape_finale and 'Vector3 shuttleEnd = new Vector3(225f, 82f, 260f)' in escape_finale and 'S4_ExteriorEscapeTunnelFloor' in escape_finale, 'Stage 4 shuttle must connect to the tunnel, detach visibly, and stay framed with the whole space base.'
+          assert 'walkDuration = 1.35f' in escape_finale and 'HideInteriorForExteriorShot();' in escape_finale and 'EXTERIOR VIEW • SHUTTLE DOCKED TO MOTHERSHIP' in escape_finale and 'DOCKING CLAMPS RELEASING' in escape_finale and 'connectorRetracted = new Vector3(0f, 0f, -8f)' in escape_finale, 'Stage 4 must automatically board the shuttle and reveal the exterior before sequential blasts.'
+          assert 'CompleteStageFourEscapeToMainMenu' in prototype_flow and 'StageFourEscapeSequence.IsFinaleActive' in prototype_flow, 'Stage 4 must suppress overlapping combat HUD during the finale and return to main menu after the last detonation.'
+          assert 'new Rect(14f * scale, 154f * scale, 340f * scale, 32f * scale)' in prototype_flow, 'Stage 4 objective HUD must remain below player health, shield and loadout indicators.'
+          patrol = Path('UnityProject/Assets/Scripts/World/StageFourAlienPatrol.cs').read_text(encoding='utf-8')
+          assert 'patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));' in stage4, 'Stage 4 aliens must receive explicit corridor patrol routes.'
+          assert 'StageFourAlienCorridorPatrolsConfigured_' in stage4, 'Stage 4 must report its patrol initialization checkpoint.'
+          assert 'HasClearSightToPlayer' in patrol and 'PatrolCorridor' in patrol, 'Stage 4 sentries must patrol and use line-of-sight detection.'
+          assert 'DisengageToPatrol' in patrol and 'EnemyChase' in patrol, 'Stage 4 sentries must return to patrol after losing contact.'
+          assert 'new Vector3(5f, 0f, 118f)' in stage4 and 'p.z = Mathf.Clamp(p.z, -100f, 127f)' in patrol, 'Stage 4 must double the guards and keep patrol/chase movement inside ship bounds.'
           side_room = stage4[stage4.index('private void BuildSideCompartment(int side)'):stage4.index('private IEnumerator BuildExpandedWing(int side)')]
           assert 'yield return' not in side_room, 'Side compartment helper must be a synchronous method.' 
           target_health = Path('UnityProject/Assets/Scripts/Combat/TargetHealth.cs').read_text(encoding='utf-8')
@@ -376,6 +401,7 @@ jobs:
           echo 'Repository hygiene validation passed.'
 
   build-android:
+    if: github.event_name != 'pull_request'
     name: Build Android APK
     needs: validate
     runs-on: ubuntu-latest

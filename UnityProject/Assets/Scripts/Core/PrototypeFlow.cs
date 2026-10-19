@@ -336,6 +336,10 @@ namespace PersiaWar.Unity2D5D
                     DrawStageFourIntroOverlay();
                     return;
                 }
+                // Stage 4 finale uses its own cinematic captions; keep the tactical HUD
+                // and pause overlay out of the exterior separation/destruction shot.
+                if (stageNumber == 4 && StageFourEscapeSequence.IsFinaleActive)
+                    return;
                 if (stageNumber == 3)
                     DrawStageThreeHUD();
                 else
@@ -1074,7 +1078,9 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.70f, 1.2f);
-            Rect panel = new Rect(14f * scale, 48f * scale, 246f * scale, 48f * scale);
+            // Leave the HP/shield panel and its ammo row completely unobstructed.
+            // The objective belongs immediately beneath those elements, not over them.
+            Rect panel = new Rect(14f * scale, 154f * scale, 340f * scale, 32f * scale);
             Fill(panel, new Color(0.015f, 0.035f, 0.055f, 0.82f));
             Fill(new Rect(panel.x, panel.y, 3.5f * scale, panel.height),
                 new Color(0.10f, 1f, 0.42f, 0.95f));
@@ -1084,8 +1090,8 @@ namespace PersiaWar.Unity2D5D
             string objective = remaining > 0
                 ? "HOSTILES  " + remaining + " / " + total
                 : "MOTHERSHIP SECURED";
-            GUI.Label(new Rect(panel.x + 10f * scale, panel.y + 5f * scale,
-                panel.width - 16f * scale, panel.height - 8f * scale),
+            GUI.Label(new Rect(panel.x + 10f * scale, panel.y + 2f * scale,
+                panel.width - 16f * scale, panel.height - 4f * scale),
                 objective, menuSmallStyle);
         }
 
@@ -1275,6 +1281,67 @@ namespace PersiaWar.Unity2D5D
             startupStatus = "Stage 4: green uplink to the orbital mothership...";
             StartupCheckpoint.Set("StageThreeComplete_AutoStartStageFour");
             StartCoroutine(BeginMainGameAfterMenuFrame());
+        }
+
+        /// <summary>
+        /// Called only after the final Stage 4 exterior detonation. The cinematic then
+        /// returns to the existing front-end menu rather than leaving the player trapped
+        /// in a finished match. Stage test mode keeps the campaign progress untouched.
+        /// </summary>
+        public void CompleteStageFourEscapeToMainMenu()
+        {
+            Time.timeScale = 1f;
+            StageTwoArenaManager.Instance?.ResetForStageChange();
+
+            if (stageTwoVictorySequence != null)
+            {
+                stageTwoVictorySequence.FinishAndCleanup();
+                Destroy(stageTwoVictorySequence);
+                stageTwoVictorySequence = null;
+            }
+
+            if (mobileInput != null) mobileInput.DeactivateMatch();
+            GateGameplay(false);
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
+
+            StageFourEscapeSequence escape = gameRoot != null
+                ? gameRoot.GetComponent<StageFourEscapeSequence>() : null;
+            if (escape != null) Destroy(escape);
+
+            StageFourWorldBuilder.ClearExistingWorld();
+            if (stageFourWorldBuilder != null)
+            {
+                Destroy(stageFourWorldBuilder);
+                stageFourWorldBuilder = null;
+            }
+
+            if (playerRoot != null) playerRoot.SetActive(false);
+            if (gameRoot != null) gameRoot.SetActive(false);
+
+            startingMatch = false;
+            matchPaused = false;
+            resultOverlayStartTime = -1f;
+            stageTwoLobbyRunning = false;
+            spawnChosen = false;
+
+            if (stageTestRun)
+            {
+                RestoreCampaignProgressAfterTest();
+                mode = ScreenMode.MainMenu;
+                ShowLobbyNotice("STAGE 4 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
+                StartupCheckpoint.Set("StageFourTestComplete_ReturnToMainMenu");
+                return;
+            }
+
+            stageNumber = 5;
+            PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
+            PlayerPrefs.SetInt("PW.Stage4Completed", 1);
+            PlayerPrefs.Save();
+            mode = ScreenMode.MainMenu;
+            ShowLobbyNotice("STAGE 4 COMPLETE  •  MOTHERSHIP DESTROYED");
+            StartupCheckpoint.Set("StageFourCampaignComplete_ReturnToMainMenu");
         }
 
         private void DrawProfileScreen()
