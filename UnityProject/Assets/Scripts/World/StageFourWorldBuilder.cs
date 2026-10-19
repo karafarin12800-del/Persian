@@ -462,6 +462,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
         // Removed all four oversized grey side plates/arms, their pads, collars and runway lights.
         // The central mothership and the dedicated escape docking sleeve remain.
+        yield return null;
     }
 
     private IEnumerator BuildDockedShipsRoutine()
