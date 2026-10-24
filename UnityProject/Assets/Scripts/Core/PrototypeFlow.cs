@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
             Store,
             Settings,
             HeroSelect,
+            WeaponSelect,
             DropMap,
             Match
         }
@@ -54,6 +55,8 @@ namespace PersiaWar.Unity2D5D
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
+        private WeaponController.WeaponKind selectedCampaignWeaponKind = WeaponController.WeaponKind.AssaultRifle;
+        private WeaponController.WeaponKind[] campaignWeaponOptions = System.Array.Empty<WeaponController.WeaponKind>();
         private int stageTwoOriginalHero;
         private bool stageTwoShopOpen;
         private float girlRescueNoticeUntil;
@@ -70,6 +73,7 @@ namespace PersiaWar.Unity2D5D
         private bool matchInputArmed;
         private bool matchPaused;
         private float resultOverlayStartTime = -1f;
+        private float resultAutoReturnAt = -1f;
         private StageTwoVictorySequence stageTwoVictorySequence;
         private StageThreeWorldBuilder stageThreeWorldBuilder;
         private StageFourWorldBuilder stageFourWorldBuilder;
@@ -237,6 +241,30 @@ namespace PersiaWar.Unity2D5D
                 GameSession session = GameSession.Instance;
                 if (session != null && session.IsFinished)
                 {
+                    if (!session.PlayerWon)
+                    {
+                        // The in-game input hub disables touch-to-mouse synthesis while
+                        // it owns gameplay input, so the result button also has a native
+                        // touch path instead of depending on IMGUI mouse emulation.
+                        HandleDefeatResultTouches();
+                        if (mode != ScreenMode.Match)
+                            return;
+
+                        // Defeat is a terminal result for the current attempt. Use
+                        // unscaled time so the return still works while gameplay is paused.
+                        if (resultAutoReturnAt < 0f)
+                            resultAutoReturnAt = Time.unscaledTime + 4.5f;
+                        if (Time.unscaledTime >= resultAutoReturnAt)
+                        {
+                            ReturnToMainMenuFromResult();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        resultAutoReturnAt = -1f;
+                    }
+
                     if (stageNumber == 2 && session.PlayerWon)
                     {
                         if (stageTwoVictorySequence == null)
@@ -247,11 +275,12 @@ namespace PersiaWar.Unity2D5D
                     else if (stageNumber == 3 && session.PlayerWon &&
                         stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
                     {
-                        ReturnToMainMenuFromResult();
+                        ReturnToMainMenuFromResult(true);
                     }
                     return;
                 }
 
+                resultAutoReturnAt = -1f;
                 CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
                 return;
@@ -267,8 +296,49 @@ namespace PersiaWar.Unity2D5D
                 HandleHeroSelectTouches();
                 return;
             }
+            if (mode == ScreenMode.WeaponSelect)
+            {
+                HandleWeaponSelectTouches();
+                return;
+            }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
+        }
+
+        private void HandleDefeatResultTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            float panelWidth = Mathf.Min(Screen.width - 64f, 720f);
+            float panelHeight = Mathf.Min(Screen.height - 80f, 340f);
+            Rect panel = new Rect(
+                (Screen.width - panelWidth) * 0.5f,
+                (Screen.height - panelHeight) * 0.5f,
+                panelWidth,
+                panelHeight);
+            Rect returnButton = new Rect(
+                panel.x + 32f,
+                panel.y + panel.height - 82f,
+                panel.width - 64f,
+                54f);
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 gui = new Vector2(
+                    touch.position.x,
+                    Screen.height - touch.position.y);
+                if (!returnButton.Contains(gui))
+                    continue;
+
+                ReturnToMainMenuFromResult();
+                StartupCheckpoint.Set("DefeatResultReturnToMainMenuByNativeTouch");
+                return;
+            }
         }
 
         private void HandleAndroidPauseTouches()
@@ -410,6 +480,9 @@ namespace PersiaWar.Unity2D5D
                         DrawCharacterShop();
                     else
                         DrawHeroSelect();
+                    break;
+                case ScreenMode.WeaponSelect:
+                    DrawWeaponSelect();
                     break;
                 default:
                     DrawDropMap();
@@ -1230,21 +1303,23 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
-                // Seamless campaign hand-off: start Stage 3 immediately, carrying
-                // the exact ship preserved above into the Stage 3 landing cinematic.
+                // Preserve the cinematic's ship, but stop here for a deliberate
+                // between-stage hero selection instead of launching the next fight
+                // underneath the result transition.
                 stageNumber = 3;
                 PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
                 PlayerPrefs.Save();
                 spawnWorld = new Vector2(0f, -97f);
-                spawnChosen = true;
-                mode = ScreenMode.DropMap;
-                startupStatus = "Stage 3: transport ship approaching the alien planet...";
-                StartupCheckpoint.Set("StageTwoCutsceneComplete_AutoStartStage3Transport_" + result);
-                StartCoroutine(BeginMainGameAfterMenuFrame());
+                spawnChosen = false;
+                stageTwoShopOpen = false;
+                mode = ScreenMode.HeroSelect;
+                startupStatus = "Stage 3: select your hero.";
+                resultAutoReturnAt = -1f;
+                StartupCheckpoint.Set("StageTwoCutsceneComplete_OpenStage3HeroSelection_" + result);
             }
         }
 
-        private void ReturnToMainMenuFromResult()
+        private void ReturnToMainMenuFromResult(bool advanceToStageFour = false)
         {
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
@@ -1254,33 +1329,61 @@ namespace PersiaWar.Unity2D5D
                 Destroy(stageTwoVictorySequence);
                 stageTwoVictorySequence = null;
             }
+
+            if (mobileInput != null)
+                mobileInput.DeactivateMatch();
             GateGameplay(false);
             if (activeCamera != null) activeCamera.enabled = false;
-            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             if (followCamera != null) followCamera.enabled = false;
+            if (androidRuntimeCamera != null)
+            {
+                androidRuntimeCamera.enabled = false;
+                Destroy(androidRuntimeCamera.gameObject);
+                androidRuntimeCamera = null;
+            }
+            activeCamera = null;
+            followCamera = null;
+            cameraOcclusionFader = null;
+
             if (playerRoot != null) playerRoot.SetActive(false);
             if (gameRoot != null) gameRoot.SetActive(false);
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
+            resultAutoReturnAt = -1f;
+            spawnChosen = false;
+
             if (stageTestRun)
             {
                 RestoreCampaignProgressAfterTest();
-                spawnChosen = false;
                 mode = ScreenMode.MainMenu;
-                ShowLobbyNotice("STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
-                StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
+                ShowLobbyNotice(advanceToStageFour
+                    ? "STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED"
+                    : "MATCH ENDED  •  CAMPAIGN PROGRESS PRESERVED");
+                StartupCheckpoint.Set(advanceToStageFour
+                    ? "StageThreeTestComplete_ReturnToMenu"
+                    : "StageTestEnded_ReturnToMenu");
                 return;
             }
-            stageNumber = 4;
-            PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
-            PlayerPrefs.Save();
-            spawnWorld = Vector2.zero;
-            spawnChosen = true;
-            mode = ScreenMode.DropMap;
-            startupStatus = "Stage 4: green uplink to the orbital mothership...";
-            StartupCheckpoint.Set("StageThreeComplete_AutoStartStageFour");
-            StartCoroutine(BeginMainGameAfterMenuFrame());
+
+            if (advanceToStageFour)
+            {
+                stageNumber = 4;
+                PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
+                PlayerPrefs.Save();
+                spawnWorld = Vector2.zero;
+                spawnChosen = false;
+                stageTwoShopOpen = false;
+                stageTwoLobbyRunning = false;
+                stageTwoLobbyReady = false;
+                mode = ScreenMode.HeroSelect;
+                startupStatus = "Stage 4: select your hero.";
+                StartupCheckpoint.Set("StageThreeComplete_OpenStage4HeroSelection");
+                return;
+            }
+
+            mode = ScreenMode.MainMenu;
+            StartupCheckpoint.Set("ResultReturnToMainMenu_Stage" + stageNumber);
         }
 
         /// <summary>
@@ -1323,6 +1426,7 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
+            resultAutoReturnAt = -1f;
             stageTwoLobbyRunning = false;
             spawnChosen = false;
 
@@ -1557,8 +1661,9 @@ namespace PersiaWar.Unity2D5D
                     if (continueRect.Contains(gui))
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
-                        EnterDropMap();
+                        EnterWeaponSelect();
                         StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        StartupCheckpoint.Set("HeroSelectionContinuedToWeaponSelectByTouch");
                         return;
                     }
                     if (shopRect.Contains(gui))
@@ -1575,8 +1680,9 @@ namespace PersiaWar.Unity2D5D
                     if (continueRect.Contains(gui))
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
-                        EnterDropMap();
+                        EnterWeaponSelect();
                         StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        StartupCheckpoint.Set("HeroSelectionContinuedToWeaponSelectByTouch");
                         return;
                     }
                 }
@@ -1585,12 +1691,13 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawHeroSelect()
         {
-            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
+            string stageTitle = stageNumber >= 2
+                ? "STAGE " + stageNumber + "  •  CHOOSE YOUR HERO"
+                : "CHOOSE YOUR HERO";
+            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageTitle, menuHeaderStyle);
             string heroHint = stageNumber >= 2
-                ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
-                    ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
-                    : "RESCUE ANAHITA IN STAGE 1 TO UNLOCK HER  •  OTHERS LOCKED")
-                : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
+                ? "CHOOSE AN UNLOCKED FIGHTER FOR THE NEXT STAGE"
+                : "SELECT A FIGHTER TO BEGIN THE CAMPAIGN";
             GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), heroHint, menuSmallStyle);
 
             float gap = 14f;
@@ -1609,11 +1716,11 @@ namespace PersiaWar.Unity2D5D
                     selectedHero = i;
             }
 
-            string continueLabel = stageNumber >= 2
-                ? (selectedHero == stageTwoOriginalHero
-                    ? "KEEP CURRENT HERO  •  CONTINUE"
-                    : "USE SELECTED HERO  •  CONTINUE")
-                : "SELECT SPAWN POINT";
+            string continueLabel = stageNumber >= 3
+                ? "CHOOSE LOADOUT  •  STAGE " + stageNumber
+                : stageNumber == 2
+                    ? "CHOOSE LOADOUT  •  CONTINUE"
+                    : "CHOOSE LOADOUT";
 
             if (stageNumber >= 2)
             {
@@ -1625,7 +1732,7 @@ namespace PersiaWar.Unity2D5D
                 Rect continueRect = new Rect(left, Screen.height - 112f, continueWidth, 62f);
                 Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
                 if (DrawFantasyButton(continueRect, continueLabel, true))
-                    EnterDropMap();
+                    EnterWeaponSelect();
                 if (DrawFantasyButton(shopRect, "HERO SHOP  ✦", false))
                     stageTwoShopOpen = true;
             }
@@ -1633,7 +1740,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
                 if (DrawFantasyButton(continueRect, continueLabel, true))
-                    EnterDropMap();
+                    EnterWeaponSelect();
             }
         }
 
@@ -1915,6 +2022,9 @@ namespace PersiaWar.Unity2D5D
         {
             ExtractionBeacon.ClearForStageTransition();
             Time.timeScale = 1f;
+            if (GameSession.Instance != null)
+                GameSession.Instance.ResetMatch();
+            resultAutoReturnAt = -1f;
             stageNumber = 2;
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
@@ -1935,8 +2045,208 @@ namespace PersiaWar.Unity2D5D
             Debug.Log("PERSIA_STAGE2: extraction transition complete; opening hero selection");
         }
 
+        private void EnterWeaponSelect()
+        {
+            campaignWeaponOptions = BuildCampaignWeaponOptions();
+            int savedKind = PlayerPrefs.GetInt(
+                "PW.SelectedWeaponKind",
+                (int)WeaponController.WeaponKind.AssaultRifle);
+            selectedCampaignWeaponKind = (WeaponController.WeaponKind)savedKind;
+            if (System.Array.IndexOf(campaignWeaponOptions, selectedCampaignWeaponKind) < 0)
+                selectedCampaignWeaponKind = WeaponController.WeaponKind.AssaultRifle;
+
+            stageTwoShopOpen = false;
+            mode = ScreenMode.WeaponSelect;
+            StartupCheckpoint.Set("WeaponSelectionOpened_Stage" + stageNumber);
+        }
+
+        private WeaponController.WeaponKind[] BuildCampaignWeaponOptions()
+        {
+            WeaponController.WeaponKind[] options = new WeaponController.WeaponKind[5];
+            int count = 0;
+            options[count++] = WeaponController.WeaponKind.LightPistol;
+            options[count++] = WeaponController.WeaponKind.AssaultRifle;
+            options[count++] = WeaponController.WeaponKind.HeavyMachineGun;
+
+            // Unlockable weapons are selectable only when the offline profile owns them.
+            // The axe remains a melee pickup/secondary, not a primary loadout.
+            if (stageNumber >= 2 &&
+                PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0)
+                options[count++] = WeaponController.WeaponKind.VoidRifle;
+
+            // Stage 4 deliberately begins with a ranged encounter. Do not offer its
+            // melee-only sword as the initial weapon; it remains available elsewhere.
+            if (stageNumber >= 2 && stageNumber < 4 &&
+                PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0)
+                options[count++] = WeaponController.WeaponKind.AlienSword;
+
+            System.Array.Resize(ref options, count);
+            return options;
+        }
+
+        private string GetCampaignWeaponName(WeaponController.WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponController.WeaponKind.LightPistol: return "LIGHT PISTOL";
+                case WeaponController.WeaponKind.AssaultRifle: return "ASSAULT RIFLE";
+                case WeaponController.WeaponKind.HeavyMachineGun: return "HEAVY MACHINE GUN";
+                case WeaponController.WeaponKind.VoidRifle: return "VOID RIFLE";
+                case WeaponController.WeaponKind.AlienSword: return "ALIEN SWORD";
+                default: return "ASSAULT RIFLE";
+            }
+        }
+
+        private string GetCampaignWeaponDescription(WeaponController.WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponController.WeaponKind.LightPistol: return "LIGHTWEIGHT  •  QUICK HANDLING";
+                case WeaponController.WeaponKind.AssaultRifle: return "BALANCED  •  STANDARD LOADOUT";
+                case WeaponController.WeaponKind.HeavyMachineGun: return "HEAVY  •  SLOWER MOVEMENT";
+                case WeaponController.WeaponKind.VoidRifle: return "UNLOCKED REWARD  •  LONG RANGE";
+                case WeaponController.WeaponKind.AlienSword: return "UNLOCKED REWARD  •  MELEE";
+                default: return string.Empty;
+            }
+        }
+
+        private Rect GetCampaignWeaponCardRect(int index)
+        {
+            int columns = Mathf.Min(3, Mathf.Max(1, campaignWeaponOptions.Length));
+            int rows = Mathf.CeilToInt(campaignWeaponOptions.Length / (float)columns);
+            float totalWidth = Mathf.Min(Screen.width - 56f, 1000f);
+            float gap = 14f;
+            float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
+            float top = rows > 1 ? Mathf.Clamp(Screen.height * 0.29f, 155f, 220f) : Mathf.Clamp(Screen.height * 0.34f, 170f, 250f);
+            float bottomReserve = 130f;
+            float availableHeight = Mathf.Max(90f, Screen.height - top - bottomReserve);
+            float cardHeight = Mathf.Clamp((availableHeight - gap * (rows - 1)) / rows, 56f, 158f);
+            int row = index / columns;
+            int column = index % columns;
+            int itemsInRow = Mathf.Min(columns, campaignWeaponOptions.Length - row * columns);
+            float rowWidth = itemsInRow * cardWidth + (itemsInRow - 1) * gap;
+            float rowLeft = (Screen.width - rowWidth) * 0.5f;
+            return new Rect(rowLeft + column * (cardWidth + gap), top + row * (cardHeight + gap), cardWidth, cardHeight);
+        }
+
+        private Rect GetCampaignWeaponBackRect()
+        {
+            return new Rect(20f, Screen.height - 78f, Mathf.Min(180f, Screen.width * 0.20f), 54f);
+        }
+
+        private Rect GetCampaignWeaponConfirmRect()
+        {
+            float width = Mathf.Min(420f, Screen.width * 0.48f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height - 78f, width, 54f);
+        }
+
+        private void HandleWeaponSelectTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                for (int option = 0; option < campaignWeaponOptions.Length; option++)
+                {
+                    if (!GetCampaignWeaponCardRect(option).Contains(gui))
+                        continue;
+                    selectedCampaignWeaponKind = campaignWeaponOptions[option];
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    StartupCheckpoint.Set("CampaignWeaponSelectedByTouch_" + GetCampaignWeaponName(selectedCampaignWeaponKind));
+                    return;
+                }
+
+                if (GetCampaignWeaponBackRect().Contains(gui))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    mode = ScreenMode.HeroSelect;
+                    StartupCheckpoint.Set("WeaponSelectionBackToHero");
+                    return;
+                }
+
+                if (GetCampaignWeaponConfirmRect().Contains(gui))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    ConfirmCampaignWeaponSelection();
+                    return;
+                }
+            }
+        }
+
+        private void DrawWeaponSelect()
+        {
+            GUI.Label(new Rect(0f, 108f, Screen.width, 54f),
+                "STAGE " + stageNumber + "  •  CHOOSE YOUR WEAPON",
+                menuHeaderStyle);
+            GUI.Label(new Rect(24f, 158f, Screen.width - 48f, 30f),
+                "SELECT YOUR STARTING LOADOUT",
+                menuSmallStyle);
+
+            for (int i = 0; i < campaignWeaponOptions.Length; i++)
+            {
+                WeaponController.WeaponKind kind = campaignWeaponOptions[i];
+                Rect card = GetCampaignWeaponCardRect(i);
+                bool selected = selectedCampaignWeaponKind == kind;
+                Fill(card, selected
+                    ? new Color(0.035f, 0.15f, 0.20f, 0.96f)
+                    : new Color(0.025f, 0.055f, 0.085f, 0.88f));
+                Fill(new Rect(card.x, card.y, card.width, 5f),
+                    selected ? new Color(0.96f, 0.72f, 0.22f, 1f)
+                             : new Color(0.25f, 0.55f, 0.69f, 0.88f));
+                GUI.Label(new Rect(card.x + 8f, card.y + 14f, card.width - 16f, 34f),
+                    GetCampaignWeaponName(kind), menuButtonStyle);
+                GUI.Label(new Rect(card.x + 8f, card.y + 52f, card.width - 16f, Mathf.Max(24f, card.height - 58f)),
+                    GetCampaignWeaponDescription(kind), menuSmallStyle);
+                if (GUI.Button(card, GUIContent.none, GUIStyle.none) &&
+                    Time.frameCount != suppressMenuButtonClicksFrame)
+                {
+                    selectedCampaignWeaponKind = kind;
+                    StartupCheckpoint.Set("CampaignWeaponSelected_" + GetCampaignWeaponName(kind));
+                }
+            }
+
+            if (DrawFantasyButton(GetCampaignWeaponBackRect(), "BACK TO HERO", false))
+                mode = ScreenMode.HeroSelect;
+
+            string confirmLabel = stageNumber >= 3
+                ? "START STAGE " + stageNumber
+                : "CONFIRM LOADOUT";
+            if (DrawFantasyButton(GetCampaignWeaponConfirmRect(), confirmLabel, true))
+                ConfirmCampaignWeaponSelection();
+        }
+
+        private void ConfirmCampaignWeaponSelection()
+        {
+            if (System.Array.IndexOf(campaignWeaponOptions, selectedCampaignWeaponKind) < 0)
+                selectedCampaignWeaponKind = WeaponController.WeaponKind.AssaultRifle;
+
+            PlayerPrefs.SetInt("PW.SelectedWeaponKind", (int)selectedCampaignWeaponKind);
+            PlayerPrefs.Save();
+            StartupCheckpoint.Set("CampaignLoadoutConfirmed_Stage" + stageNumber + "_" + GetCampaignWeaponName(selectedCampaignWeaponKind));
+            EnterDropMap();
+        }
+
         private void EnterDropMap()
         {
+            if (stageNumber >= 3)
+            {
+                // Stages 3 and 4 have authored entry points, not the Stage 2 village
+                // landing map. Commit the selected hero and start the chosen stage.
+                spawnWorld = stageNumber == 3 ? new Vector2(0f, -97f) : Vector2.zero;
+                spawnChosen = true;
+                stageTwoShopOpen = false;
+                mode = ScreenMode.DropMap;
+                StartupCheckpoint.Set("HeroSelectionConfirmed_StartStage" + stageNumber);
+                StartMatch();
+                return;
+            }
+
             mode = ScreenMode.DropMap;
             if (stageNumber >= 2)
             {
@@ -2289,6 +2599,10 @@ namespace PersiaWar.Unity2D5D
         {
             startingMatch = true;
             matchInputArmed = false;
+            resultOverlayStartTime = -1f;
+            resultAutoReturnAt = -1f;
+            if (GameSession.Instance != null)
+                GameSession.Instance.ResetMatch();
             startupStatus = "Stage 1: starting battlefield preparation...";
 
             StartupCheckpoint.Set("MatchActivationStarted");
@@ -2479,20 +2793,32 @@ namespace PersiaWar.Unity2D5D
             // Stage one keeps its original three firearms. Stage two additionally
             // enables the axe, Void Rifle and Alien Sword when the local profile owns them.
             player.Weapon?.SetAxeEnabledForMatch(stageNumber >= 2);
-            if (stageNumber >= 2 && player.Weapon != null)
+            if (player.Weapon != null)
             {
                 WeaponController.WeaponKind selectedKind = (WeaponController.WeaponKind)
                     PlayerPrefs.GetInt("PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
                 bool ownsVoidRifle = PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0;
                 bool ownsAlienSword = PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0;
-                if (selectedKind == WeaponController.WeaponKind.VoidRifle && !ownsVoidRifle)
-                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
-                if (selectedKind == WeaponController.WeaponKind.AlienSword && !ownsAlienSword)
+
+                // Stages 1 uses only the three baseline firearms; locked rewards and
+                // melee-only selections must never silently override the starter gun.
+                if (stageNumber < 2 &&
+                    selectedKind != WeaponController.WeaponKind.LightPistol &&
+                    selectedKind != WeaponController.WeaponKind.AssaultRifle &&
+                    selectedKind != WeaponController.WeaponKind.HeavyMachineGun)
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
 
-                // Stage 4 opens with ranged combat inside the mothership. If a prior
-                // store choice left the melee-only alien sword selected, guarantee a
-                // firearm for the first encounter; the player can still swap later.
+                if (selectedKind == WeaponController.WeaponKind.VoidRifle &&
+                    (!ownsVoidRifle || stageNumber < 2))
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                if (selectedKind == WeaponController.WeaponKind.AlienSword &&
+                    (!ownsAlienSword || stageNumber < 2))
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                if (selectedKind == WeaponController.WeaponKind.Axe)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+
+                // Stage 4 opens with ranged combat inside the mothership. Guarantee a
+                // firearm for the first encounter even if an older saved choice was melee.
                 if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
 
@@ -3077,7 +3403,7 @@ namespace PersiaWar.Unity2D5D
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
                     ? (stageNumber >= 2 ? GetStageTwoResultMessage() : "Extraction reached. Mission complete.")
-                    : "Your fighter was defeated.",
+                    : "MISSION FAILED  •  RETURNING TO MAIN MENU",
                 bodyStyle);
 
             GUI.Label(
@@ -3085,9 +3411,28 @@ namespace PersiaWar.Unity2D5D
                 "SCORE  " + session.Score + "    ENEMIES  " + session.EnemiesDefeated,
                 smallStyle);
 
+            float buttonY = panel.y + panel.height - 82f;
+            if (!session.PlayerWon)
+            {
+                float secondsRemaining = resultAutoReturnAt >= 0f
+                    ? Mathf.Max(0f, resultAutoReturnAt - Time.unscaledTime)
+                    : 4.5f;
+                GUI.Label(
+                    new Rect(panel.x + 20f, panel.y + 184f, panel.width - 40f, 28f),
+                    "RETURNING TO MAIN MENU IN " + Mathf.CeilToInt(secondsRemaining),
+                    smallStyle);
+                if (GUI.Button(
+                    new Rect(panel.x + 32f, buttonY, panel.width - 64f, 54f),
+                    "RETURN TO MAIN MENU",
+                    buttonStyle))
+                {
+                    ReturnToMainMenuFromResult();
+                }
+                return;
+            }
+
             float buttonGap = 14f;
             float buttonWidth = (panel.width - 64f - buttonGap) * 0.5f;
-            float buttonY = panel.y + panel.height - 82f;
             if (GUI.Button(
                 new Rect(panel.x + 32f, buttonY, buttonWidth, 54f),
                 "PLAY AGAIN",
