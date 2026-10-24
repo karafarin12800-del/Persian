@@ -70,6 +70,7 @@ namespace PersiaWar.Unity2D5D
         private bool matchInputArmed;
         private bool matchPaused;
         private float resultOverlayStartTime = -1f;
+        private float resultAutoReturnAt = -1f;
         private StageTwoVictorySequence stageTwoVictorySequence;
         private StageThreeWorldBuilder stageThreeWorldBuilder;
         private StageFourWorldBuilder stageFourWorldBuilder;
@@ -237,6 +238,23 @@ namespace PersiaWar.Unity2D5D
                 GameSession session = GameSession.Instance;
                 if (session != null && session.IsFinished)
                 {
+                    if (!session.PlayerWon)
+                    {
+                        // Defeat is a terminal result for the current attempt. Use
+                        // unscaled time so the return still works while gameplay is paused.
+                        if (resultAutoReturnAt < 0f)
+                            resultAutoReturnAt = Time.unscaledTime + 4.5f;
+                        if (Time.unscaledTime >= resultAutoReturnAt)
+                        {
+                            ReturnToMainMenuFromResult();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        resultAutoReturnAt = -1f;
+                    }
+
                     if (stageNumber == 2 && session.PlayerWon)
                     {
                         if (stageTwoVictorySequence == null)
@@ -247,11 +265,12 @@ namespace PersiaWar.Unity2D5D
                     else if (stageNumber == 3 && session.PlayerWon &&
                         stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
                     {
-                        ReturnToMainMenuFromResult();
+                        ReturnToMainMenuFromResult(true);
                     }
                     return;
                 }
 
+                resultAutoReturnAt = -1f;
                 CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
                 return;
@@ -1230,21 +1249,23 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
-                // Seamless campaign hand-off: start Stage 3 immediately, carrying
-                // the exact ship preserved above into the Stage 3 landing cinematic.
+                // Preserve the cinematic's ship, but stop here for a deliberate
+                // between-stage hero selection instead of launching the next fight
+                // underneath the result transition.
                 stageNumber = 3;
                 PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
                 PlayerPrefs.Save();
                 spawnWorld = new Vector2(0f, -97f);
-                spawnChosen = true;
-                mode = ScreenMode.DropMap;
-                startupStatus = "Stage 3: transport ship approaching the alien planet...";
-                StartupCheckpoint.Set("StageTwoCutsceneComplete_AutoStartStage3Transport_" + result);
-                StartCoroutine(BeginMainGameAfterMenuFrame());
+                spawnChosen = false;
+                stageTwoShopOpen = false;
+                mode = ScreenMode.HeroSelect;
+                startupStatus = "Stage 3: select your hero.";
+                resultAutoReturnAt = -1f;
+                StartupCheckpoint.Set("StageTwoCutsceneComplete_OpenStage3HeroSelection_" + result);
             }
         }
 
-        private void ReturnToMainMenuFromResult()
+        private void ReturnToMainMenuFromResult(bool advanceToStageFour = false)
         {
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
@@ -1254,33 +1275,61 @@ namespace PersiaWar.Unity2D5D
                 Destroy(stageTwoVictorySequence);
                 stageTwoVictorySequence = null;
             }
+
+            if (mobileInput != null)
+                mobileInput.DeactivateMatch();
             GateGameplay(false);
             if (activeCamera != null) activeCamera.enabled = false;
-            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             if (followCamera != null) followCamera.enabled = false;
+            if (androidRuntimeCamera != null)
+            {
+                androidRuntimeCamera.enabled = false;
+                Destroy(androidRuntimeCamera.gameObject);
+                androidRuntimeCamera = null;
+            }
+            activeCamera = null;
+            followCamera = null;
+            cameraOcclusionFader = null;
+
             if (playerRoot != null) playerRoot.SetActive(false);
             if (gameRoot != null) gameRoot.SetActive(false);
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
+            resultAutoReturnAt = -1f;
+            spawnChosen = false;
+
             if (stageTestRun)
             {
                 RestoreCampaignProgressAfterTest();
-                spawnChosen = false;
                 mode = ScreenMode.MainMenu;
-                ShowLobbyNotice("STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
-                StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
+                ShowLobbyNotice(advanceToStageFour
+                    ? "STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED"
+                    : "MATCH ENDED  •  CAMPAIGN PROGRESS PRESERVED");
+                StartupCheckpoint.Set(advanceToStageFour
+                    ? "StageThreeTestComplete_ReturnToMenu"
+                    : "StageTestEnded_ReturnToMenu");
                 return;
             }
-            stageNumber = 4;
-            PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
-            PlayerPrefs.Save();
-            spawnWorld = Vector2.zero;
-            spawnChosen = true;
-            mode = ScreenMode.DropMap;
-            startupStatus = "Stage 4: green uplink to the orbital mothership...";
-            StartupCheckpoint.Set("StageThreeComplete_AutoStartStageFour");
-            StartCoroutine(BeginMainGameAfterMenuFrame());
+
+            if (advanceToStageFour)
+            {
+                stageNumber = 4;
+                PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
+                PlayerPrefs.Save();
+                spawnWorld = Vector2.zero;
+                spawnChosen = false;
+                stageTwoShopOpen = false;
+                stageTwoLobbyRunning = false;
+                stageTwoLobbyReady = false;
+                mode = ScreenMode.HeroSelect;
+                startupStatus = "Stage 4: select your hero.";
+                StartupCheckpoint.Set("StageThreeComplete_OpenStage4HeroSelection");
+                return;
+            }
+
+            mode = ScreenMode.MainMenu;
+            StartupCheckpoint.Set("ResultReturnToMainMenu_Stage" + stageNumber);
         }
 
         /// <summary>
@@ -1323,6 +1372,7 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
+            resultAutoReturnAt = -1f;
             stageTwoLobbyRunning = false;
             spawnChosen = false;
 
@@ -1585,12 +1635,13 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawHeroSelect()
         {
-            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
+            string stageTitle = stageNumber >= 2
+                ? "STAGE " + stageNumber + "  •  CHOOSE YOUR HERO"
+                : "CHOOSE YOUR HERO";
+            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageTitle, menuHeaderStyle);
             string heroHint = stageNumber >= 2
-                ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
-                    ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
-                    : "RESCUE ANAHITA IN STAGE 1 TO UNLOCK HER  •  OTHERS LOCKED")
-                : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
+                ? "CHOOSE AN UNLOCKED FIGHTER FOR THE NEXT STAGE"
+                : "SELECT A FIGHTER TO BEGIN THE CAMPAIGN";
             GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), heroHint, menuSmallStyle);
 
             float gap = 14f;
@@ -1609,11 +1660,13 @@ namespace PersiaWar.Unity2D5D
                     selectedHero = i;
             }
 
-            string continueLabel = stageNumber >= 2
-                ? (selectedHero == stageTwoOriginalHero
-                    ? "KEEP CURRENT HERO  •  CONTINUE"
-                    : "USE SELECTED HERO  •  CONTINUE")
-                : "SELECT SPAWN POINT";
+            string continueLabel = stageNumber >= 3
+                ? "START STAGE " + stageNumber
+                : stageNumber == 2
+                    ? (selectedHero == stageTwoOriginalHero
+                        ? "KEEP CURRENT HERO  •  CONTINUE"
+                        : "USE SELECTED HERO  •  CONTINUE")
+                    : "SELECT SPAWN POINT";
 
             if (stageNumber >= 2)
             {
@@ -1915,6 +1968,9 @@ namespace PersiaWar.Unity2D5D
         {
             ExtractionBeacon.ClearForStageTransition();
             Time.timeScale = 1f;
+            if (GameSession.Instance != null)
+                GameSession.Instance.ResetMatch();
+            resultAutoReturnAt = -1f;
             stageNumber = 2;
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
@@ -1937,6 +1993,19 @@ namespace PersiaWar.Unity2D5D
 
         private void EnterDropMap()
         {
+            if (stageNumber >= 3)
+            {
+                // Stages 3 and 4 have authored entry points, not the Stage 2 village
+                // landing map. Commit the selected hero and start the chosen stage.
+                spawnWorld = stageNumber == 3 ? new Vector2(0f, -97f) : Vector2.zero;
+                spawnChosen = true;
+                stageTwoShopOpen = false;
+                mode = ScreenMode.DropMap;
+                StartupCheckpoint.Set("HeroSelectionConfirmed_StartStage" + stageNumber);
+                StartMatch();
+                return;
+            }
+
             mode = ScreenMode.DropMap;
             if (stageNumber >= 2)
             {
@@ -2289,6 +2358,10 @@ namespace PersiaWar.Unity2D5D
         {
             startingMatch = true;
             matchInputArmed = false;
+            resultOverlayStartTime = -1f;
+            resultAutoReturnAt = -1f;
+            if (GameSession.Instance != null)
+                GameSession.Instance.ResetMatch();
             startupStatus = "Stage 1: starting battlefield preparation...";
 
             StartupCheckpoint.Set("MatchActivationStarted");
@@ -3077,7 +3150,7 @@ namespace PersiaWar.Unity2D5D
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
                     ? (stageNumber >= 2 ? GetStageTwoResultMessage() : "Extraction reached. Mission complete.")
-                    : "Your fighter was defeated.",
+                    : "MISSION FAILED  •  RETURNING TO MAIN MENU",
                 bodyStyle);
 
             GUI.Label(
@@ -3085,9 +3158,28 @@ namespace PersiaWar.Unity2D5D
                 "SCORE  " + session.Score + "    ENEMIES  " + session.EnemiesDefeated,
                 smallStyle);
 
+            float buttonY = panel.y + panel.height - 82f;
+            if (!session.PlayerWon)
+            {
+                float secondsRemaining = resultAutoReturnAt >= 0f
+                    ? Mathf.Max(0f, resultAutoReturnAt - Time.unscaledTime)
+                    : 4.5f;
+                GUI.Label(
+                    new Rect(panel.x + 20f, panel.y + 184f, panel.width - 40f, 28f),
+                    "RETURNING TO MAIN MENU IN " + Mathf.CeilToInt(secondsRemaining),
+                    smallStyle);
+                if (GUI.Button(
+                    new Rect(panel.x + 32f, buttonY, panel.width - 64f, 54f),
+                    "RETURN TO MAIN MENU",
+                    buttonStyle))
+                {
+                    ReturnToMainMenuFromResult();
+                }
+                return;
+            }
+
             float buttonGap = 14f;
             float buttonWidth = (panel.width - 64f - buttonGap) * 0.5f;
-            float buttonY = panel.y + panel.height - 82f;
             if (GUI.Button(
                 new Rect(panel.x + 32f, buttonY, buttonWidth, 54f),
                 "PLAY AGAIN",
