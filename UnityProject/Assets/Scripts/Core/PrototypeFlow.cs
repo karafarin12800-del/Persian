@@ -1619,6 +1619,7 @@ namespace PersiaWar.Unity2D5D
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
                         EnterWeaponSelect();
+                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
                         StartupCheckpoint.Set("HeroSelectionContinuedToWeaponSelectByTouch");
                         return;
                     }
@@ -1637,6 +1638,7 @@ namespace PersiaWar.Unity2D5D
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
                         EnterWeaponSelect();
+                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
                         StartupCheckpoint.Set("HeroSelectionContinuedToWeaponSelectByTouch");
                         return;
                     }
