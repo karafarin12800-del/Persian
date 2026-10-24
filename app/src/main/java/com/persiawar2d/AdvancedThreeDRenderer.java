@@ -46,12 +46,20 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private float weaponKick;
 
     private int hp = 100, ammo = 30, reserve = 120, kills = 0, grenades = 3, wave = 1;
+    private final int stageNumber;
+    private final int wavesPerStage = 3;
+    private boolean stageComplete;
     private long nextWaveAt;
     private int width = 1, height = 1;
 
     private final ArrayList<Road> roads = new ArrayList<>();
 
     public AdvancedThreeDRenderer(Context context) {
+        this(context, 1);
+    }
+
+    public AdvancedThreeDRenderer(Context context, int stageNumber) {
+        this.stageNumber = Math.max(1, stageNumber);
         buildCity();
         spawnEnemies();
         spawnPickups();
@@ -183,7 +191,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         long now = System.nanoTime();
         float dt = Math.min(.033f, Math.max(.001f, (now - lastNanos) / 1_000_000_000f));
         lastNanos = now;
-        if (gameOver) return;
+        if (gameOver || stageComplete) return;
         fireCooldown = Math.max(0, fireCooldown - dt);
         muzzleFlash = Math.max(0, muzzleFlash - dt);
         weaponKick = Math.max(0, weaponKick - dt * 5f);
@@ -195,8 +203,19 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         collectPickups();
         long nowMs = System.currentTimeMillis();
         if (livingEnemyCount() == 0) {
-            if (nextWaveAt == 0) nextWaveAt = nowMs + 1400;
-            else if (nowMs >= nextWaveAt) { wave++; spawnEnemies(); nextWaveAt = 0; }
+            if (nextWaveAt == 0) {
+                nextWaveAt = nowMs + 1400;
+            } else if (nowMs >= nextWaveAt) {
+                if (wave >= wavesPerStage) {
+                    stageComplete = true;
+                    nextWaveAt = 0;
+                } else {
+                    wave++;
+                    spawnEnemies();
+                    spawnPickups();
+                    nextWaveAt = 0;
+                }
+            }
         } else {
             nextWaveAt = 0;
         }
@@ -421,7 +440,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
 
     public void resetBattle() {
         px=0f;pz=0f;hp=100;ammo=30;reserve=120;kills=0;grenades=3;wave=1;
-        gameOver=false;nextWaveAt=0;fireCooldown=0;muzzleFlash=0;weaponKick=0;
+        gameOver=false;stageComplete=false;nextWaveAt=0;fireCooldown=0;muzzleFlash=0;weaponKick=0;
         projectiles.clear();spawnEnemies();spawnPickups();
     }
 
@@ -449,6 +468,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     public boolean onTouch(MotionEvent e) {
+        if (gameOver || stageComplete) return true;
         float x=e.getX(), y=e.getY();
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
@@ -582,7 +602,10 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     public int getHp(){return hp;} public int getAmmo(){return ammo;} public int getReserve(){return reserve;} public int getKills(){return kills;} public int getGrenades(){return grenades;} public int getWave(){return wave;}
+    public int getStageNumber(){return stageNumber;}
+    public int getWavesPerStage(){return wavesPerStage;}
     public boolean isGameOver(){return gameOver;}
+    public boolean isStageComplete(){return stageComplete;}
     public void drawMinimap(Canvas c,float left,float top,float size) {
         Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
         float h=size*.82f;
