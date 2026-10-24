@@ -243,6 +243,13 @@ namespace PersiaWar.Unity2D5D
                 {
                     if (!session.PlayerWon)
                     {
+                        // The in-game input hub disables touch-to-mouse synthesis while
+                        // it owns gameplay input, so the result button also has a native
+                        // touch path instead of depending on IMGUI mouse emulation.
+                        HandleDefeatResultTouches();
+                        if (mode != ScreenMode.Match)
+                            return;
+
                         // Defeat is a terminal result for the current attempt. Use
                         // unscaled time so the return still works while gameplay is paused.
                         if (resultAutoReturnAt < 0f)
@@ -296,6 +303,42 @@ namespace PersiaWar.Unity2D5D
             }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
+        }
+
+        private void HandleDefeatResultTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            float panelWidth = Mathf.Min(Screen.width - 64f, 720f);
+            float panelHeight = Mathf.Min(Screen.height - 80f, 340f);
+            Rect panel = new Rect(
+                (Screen.width - panelWidth) * 0.5f,
+                (Screen.height - panelHeight) * 0.5f,
+                panelWidth,
+                panelHeight);
+            Rect returnButton = new Rect(
+                panel.x + 32f,
+                panel.y + panel.height - 82f,
+                panel.width - 64f,
+                54f);
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 gui = new Vector2(
+                    touch.position.x,
+                    Screen.height - touch.position.y);
+                if (!returnButton.Contains(gui))
+                    continue;
+
+                ReturnToMainMenuFromResult();
+                StartupCheckpoint.Set("DefeatResultReturnToMainMenuByNativeTouch");
+                return;
+            }
         }
 
         private void HandleAndroidPauseTouches()
