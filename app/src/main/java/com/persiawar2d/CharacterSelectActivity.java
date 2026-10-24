@@ -20,6 +20,7 @@ public final class CharacterSelectActivity extends Activity {
     public static final String EXTRA_STAGE = "campaign_stage";
     public static final String EXTRA_NEXT_STAGE_FLOW = "next_stage_flow";
     public static final String EXTRA_SELECTED_SKIN = "selected_skin";
+    private static final int REQUEST_LOADOUT = 6121;
 
     private static final int GOLD = Color.rgb(239, 197, 92);
     private static final int INK = Color.rgb(7, 24, 33);
@@ -191,9 +192,32 @@ public final class CharacterSelectActivity extends Activity {
 
     private void continueToStage() {
         getSharedPreferences("player", 0).edit().putString("skin", selectedSkin).apply();
+        if (targetStage >= 2) {
+            Intent loadout = new Intent(this, LoadoutSelectActivity.class);
+            loadout.putExtra(LoadoutSelectActivity.EXTRA_STAGE, targetStage);
+            loadout.putExtra(LoadoutSelectActivity.EXTRA_NEXT_STAGE_FLOW, nextStageFlow);
+            startActivityForResult(loadout, REQUEST_LOADOUT);
+            return;
+        }
+        enterStage(null);
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_LOADOUT || resultCode != RESULT_OK || data == null) return;
+        String weaponId = data.getStringExtra(LoadoutSelectActivity.EXTRA_SELECTED_WEAPON);
+        if (weaponId != null) {
+            getSharedPreferences("player", 0).edit()
+                    .putString(LoadoutSelectActivity.EXTRA_SELECTED_WEAPON, weaponId).apply();
+        }
+        enterStage(weaponId);
+    }
+
+    private void enterStage(String weaponId) {
         Intent result = new Intent();
         result.putExtra(EXTRA_STAGE, targetStage);
         result.putExtra(EXTRA_SELECTED_SKIN, selectedSkin);
+        if (weaponId != null) result.putExtra(LoadoutSelectActivity.EXTRA_SELECTED_WEAPON, weaponId);
         if (nextStageFlow) {
             setResult(RESULT_OK, result);
             finish();
