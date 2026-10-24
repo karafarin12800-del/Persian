@@ -3,6 +3,8 @@ name: Legacy Android App Build
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main, fix/android-multitouch-pointer-zones]
   workflow_dispatch:
 
 concurrency:

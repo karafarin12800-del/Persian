@@ -15,6 +15,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".CharacterSelectActivity" android:screenOrientation="landscape" android:exported="false" />
+        <activity android:name=".LoadoutSelectActivity" android:screenOrientation="landscape" android:exported="false" />
+        <activity android:name=".LoadoutSelectActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".ThreeDGameActivity" android:screenOrientation="landscape" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".ControlActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".GameShellActivity" android:screenOrientation="landscape" android:exported="false" />
