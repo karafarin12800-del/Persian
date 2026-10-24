@@ -2075,7 +2075,7 @@ namespace PersiaWar.Unity2D5D
             float top = rows > 1 ? Mathf.Clamp(Screen.height * 0.29f, 155f, 220f) : Mathf.Clamp(Screen.height * 0.34f, 170f, 250f);
             float bottomReserve = 130f;
             float availableHeight = Mathf.Max(90f, Screen.height - top - bottomReserve);
-            float cardHeight = Mathf.Clamp((availableHeight - gap * (rows - 1)) / rows, 88f, 158f);
+            float cardHeight = Mathf.Clamp((availableHeight - gap * (rows - 1)) / rows, 56f, 158f);
             int row = index / columns;
             int column = index % columns;
             int itemsInRow = Mathf.Min(columns, campaignWeaponOptions.Length - row * columns);
@@ -2086,7 +2086,7 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetCampaignWeaponBackRect()
         {
-            return new Rect(20f, Screen.height - 78f, Mathf.Min(230f, Screen.width * 0.28f), 54f);
+            return new Rect(20f, Screen.height - 78f, Mathf.Min(180f, Screen.width * 0.20f), 54f);
         }
 
         private Rect GetCampaignWeaponConfirmRect()
