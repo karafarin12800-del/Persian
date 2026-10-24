@@ -199,6 +199,8 @@ public final class CharacterSelectActivity extends Activity {
             startActivityForResult(loadout, REQUEST_LOADOUT);
             return;
         }
+        getSharedPreferences("player", 0).edit()
+                .putString(LoadoutSelectActivity.EXTRA_SELECTED_WEAPON, "royal_bow").apply();
         enterStage(null);
     }
 
