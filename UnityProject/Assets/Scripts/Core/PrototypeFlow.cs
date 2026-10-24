@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
             Store,
             Settings,
             HeroSelect,
+            WeaponSelect,
             DropMap,
             Match
         }
@@ -54,6 +55,8 @@ namespace PersiaWar.Unity2D5D
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
+        private WeaponController.WeaponKind selectedCampaignWeaponKind = WeaponController.WeaponKind.AssaultRifle;
+        private WeaponController.WeaponKind[] campaignWeaponOptions = System.Array.Empty<WeaponController.WeaponKind>();
         private int stageTwoOriginalHero;
         private bool stageTwoShopOpen;
         private float girlRescueNoticeUntil;
@@ -286,6 +289,11 @@ namespace PersiaWar.Unity2D5D
                 HandleHeroSelectTouches();
                 return;
             }
+            if (mode == ScreenMode.WeaponSelect)
+            {
+                HandleWeaponSelectTouches();
+                return;
+            }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
         }
@@ -429,6 +437,9 @@ namespace PersiaWar.Unity2D5D
                         DrawCharacterShop();
                     else
                         DrawHeroSelect();
+                    break;
+                case ScreenMode.WeaponSelect:
+                    DrawWeaponSelect();
                     break;
                 default:
                     DrawDropMap();
@@ -1607,8 +1618,8 @@ namespace PersiaWar.Unity2D5D
                     if (continueRect.Contains(gui))
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
-                        EnterDropMap();
-                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        EnterWeaponSelect();
+                        StartupCheckpoint.Set("HeroSelectionContinuedToWeaponSelectByTouch");
                         return;
                     }
                     if (shopRect.Contains(gui))
@@ -1625,8 +1636,8 @@ namespace PersiaWar.Unity2D5D
                     if (continueRect.Contains(gui))
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
-                        EnterDropMap();
-                        StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
+                        EnterWeaponSelect();
+                        StartupCheckpoint.Set("HeroSelectionContinuedToWeaponSelectByTouch");
                         return;
                     }
                 }
@@ -1661,12 +1672,10 @@ namespace PersiaWar.Unity2D5D
             }
 
             string continueLabel = stageNumber >= 3
-                ? "START STAGE " + stageNumber
+                ? "CHOOSE LOADOUT  •  STAGE " + stageNumber
                 : stageNumber == 2
-                    ? (selectedHero == stageTwoOriginalHero
-                        ? "KEEP CURRENT HERO  •  CONTINUE"
-                        : "USE SELECTED HERO  •  CONTINUE")
-                    : "SELECT SPAWN POINT";
+                    ? "CHOOSE LOADOUT  •  CONTINUE"
+                    : "CHOOSE LOADOUT";
 
             if (stageNumber >= 2)
             {
@@ -1678,7 +1687,7 @@ namespace PersiaWar.Unity2D5D
                 Rect continueRect = new Rect(left, Screen.height - 112f, continueWidth, 62f);
                 Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
                 if (DrawFantasyButton(continueRect, continueLabel, true))
-                    EnterDropMap();
+                    EnterWeaponSelect();
                 if (DrawFantasyButton(shopRect, "HERO SHOP  ✦", false))
                     stageTwoShopOpen = true;
             }
@@ -1686,7 +1695,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Rect continueRect = new Rect(Screen.width * 0.5f - 180f, Screen.height - 112f, 360f, 62f);
                 if (DrawFantasyButton(continueRect, continueLabel, true))
-                    EnterDropMap();
+                    EnterWeaponSelect();
             }
         }
 
@@ -1989,6 +1998,193 @@ namespace PersiaWar.Unity2D5D
             GateGameplay(false);
             StartupCheckpoint.Set("StageTwoHeroSelectionOpened");
             Debug.Log("PERSIA_STAGE2: extraction transition complete; opening hero selection");
+        }
+
+        private void EnterWeaponSelect()
+        {
+            campaignWeaponOptions = BuildCampaignWeaponOptions();
+            int savedKind = PlayerPrefs.GetInt(
+                "PW.SelectedWeaponKind",
+                (int)WeaponController.WeaponKind.AssaultRifle);
+            selectedCampaignWeaponKind = (WeaponController.WeaponKind)savedKind;
+            if (System.Array.IndexOf(campaignWeaponOptions, selectedCampaignWeaponKind) < 0)
+                selectedCampaignWeaponKind = WeaponController.WeaponKind.AssaultRifle;
+
+            stageTwoShopOpen = false;
+            mode = ScreenMode.WeaponSelect;
+            StartupCheckpoint.Set("WeaponSelectionOpened_Stage" + stageNumber);
+        }
+
+        private WeaponController.WeaponKind[] BuildCampaignWeaponOptions()
+        {
+            WeaponController.WeaponKind[] options = new WeaponController.WeaponKind[5];
+            int count = 0;
+            options[count++] = WeaponController.WeaponKind.LightPistol;
+            options[count++] = WeaponController.WeaponKind.AssaultRifle;
+            options[count++] = WeaponController.WeaponKind.HeavyMachineGun;
+
+            // Unlockable weapons are selectable only when the offline profile owns them.
+            // The axe remains a melee pickup/secondary, not a primary loadout.
+            if (stageNumber >= 2 &&
+                PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0)
+                options[count++] = WeaponController.WeaponKind.VoidRifle;
+
+            // Stage 4 deliberately begins with a ranged encounter. Do not offer its
+            // melee-only sword as the initial weapon; it remains available elsewhere.
+            if (stageNumber >= 2 && stageNumber < 4 &&
+                PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0)
+                options[count++] = WeaponController.WeaponKind.AlienSword;
+
+            System.Array.Resize(ref options, count);
+            return options;
+        }
+
+        private string GetCampaignWeaponName(WeaponController.WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponController.WeaponKind.LightPistol: return "LIGHT PISTOL";
+                case WeaponController.WeaponKind.AssaultRifle: return "ASSAULT RIFLE";
+                case WeaponController.WeaponKind.HeavyMachineGun: return "HEAVY MACHINE GUN";
+                case WeaponController.WeaponKind.VoidRifle: return "VOID RIFLE";
+                case WeaponController.WeaponKind.AlienSword: return "ALIEN SWORD";
+                default: return "ASSAULT RIFLE";
+            }
+        }
+
+        private string GetCampaignWeaponDescription(WeaponController.WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponController.WeaponKind.LightPistol: return "LIGHTWEIGHT  •  QUICK HANDLING";
+                case WeaponController.WeaponKind.AssaultRifle: return "BALANCED  •  STANDARD LOADOUT";
+                case WeaponController.WeaponKind.HeavyMachineGun: return "HEAVY  •  SLOWER MOVEMENT";
+                case WeaponController.WeaponKind.VoidRifle: return "UNLOCKED REWARD  •  LONG RANGE";
+                case WeaponController.WeaponKind.AlienSword: return "UNLOCKED REWARD  •  MELEE";
+                default: return string.Empty;
+            }
+        }
+
+        private Rect GetCampaignWeaponCardRect(int index)
+        {
+            int columns = Mathf.Min(3, Mathf.Max(1, campaignWeaponOptions.Length));
+            int rows = Mathf.CeilToInt(campaignWeaponOptions.Length / (float)columns);
+            float totalWidth = Mathf.Min(Screen.width - 56f, 1000f);
+            float gap = 14f;
+            float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
+            float top = rows > 1 ? Mathf.Clamp(Screen.height * 0.29f, 155f, 220f) : Mathf.Clamp(Screen.height * 0.34f, 170f, 250f);
+            float bottomReserve = 130f;
+            float availableHeight = Mathf.Max(90f, Screen.height - top - bottomReserve);
+            float cardHeight = Mathf.Clamp((availableHeight - gap * (rows - 1)) / rows, 88f, 158f);
+            int row = index / columns;
+            int column = index % columns;
+            int itemsInRow = Mathf.Min(columns, campaignWeaponOptions.Length - row * columns);
+            float rowWidth = itemsInRow * cardWidth + (itemsInRow - 1) * gap;
+            float rowLeft = (Screen.width - rowWidth) * 0.5f;
+            return new Rect(rowLeft + column * (cardWidth + gap), top + row * (cardHeight + gap), cardWidth, cardHeight);
+        }
+
+        private Rect GetCampaignWeaponBackRect()
+        {
+            return new Rect(20f, Screen.height - 78f, Mathf.Min(230f, Screen.width * 0.28f), 54f);
+        }
+
+        private Rect GetCampaignWeaponConfirmRect()
+        {
+            float width = Mathf.Min(420f, Screen.width * 0.48f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height - 78f, width, 54f);
+        }
+
+        private void HandleWeaponSelectTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                for (int option = 0; option < campaignWeaponOptions.Length; option++)
+                {
+                    if (!GetCampaignWeaponCardRect(option).Contains(gui))
+                        continue;
+                    selectedCampaignWeaponKind = campaignWeaponOptions[option];
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    StartupCheckpoint.Set("CampaignWeaponSelectedByTouch_" + GetCampaignWeaponName(selectedCampaignWeaponKind));
+                    return;
+                }
+
+                if (GetCampaignWeaponBackRect().Contains(gui))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    mode = ScreenMode.HeroSelect;
+                    StartupCheckpoint.Set("WeaponSelectionBackToHero");
+                    return;
+                }
+
+                if (GetCampaignWeaponConfirmRect().Contains(gui))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    ConfirmCampaignWeaponSelection();
+                    return;
+                }
+            }
+        }
+
+        private void DrawWeaponSelect()
+        {
+            GUI.Label(new Rect(0f, 108f, Screen.width, 54f),
+                "STAGE " + stageNumber + "  •  CHOOSE YOUR WEAPON",
+                menuHeaderStyle);
+            GUI.Label(new Rect(24f, 158f, Screen.width - 48f, 30f),
+                "SELECT YOUR STARTING LOADOUT",
+                menuSmallStyle);
+
+            for (int i = 0; i < campaignWeaponOptions.Length; i++)
+            {
+                WeaponController.WeaponKind kind = campaignWeaponOptions[i];
+                Rect card = GetCampaignWeaponCardRect(i);
+                bool selected = selectedCampaignWeaponKind == kind;
+                Fill(card, selected
+                    ? new Color(0.035f, 0.15f, 0.20f, 0.96f)
+                    : new Color(0.025f, 0.055f, 0.085f, 0.88f));
+                Fill(new Rect(card.x, card.y, card.width, 5f),
+                    selected ? new Color(0.96f, 0.72f, 0.22f, 1f)
+                             : new Color(0.25f, 0.55f, 0.69f, 0.88f));
+                GUI.Label(new Rect(card.x + 8f, card.y + 14f, card.width - 16f, 34f),
+                    GetCampaignWeaponName(kind), menuButtonStyle);
+                GUI.Label(new Rect(card.x + 8f, card.y + 52f, card.width - 16f, Mathf.Max(24f, card.height - 58f)),
+                    GetCampaignWeaponDescription(kind), menuSmallStyle);
+                if (GUI.Button(card, GUIContent.none, GUIStyle.none) &&
+                    Time.frameCount != suppressMenuButtonClicksFrame)
+                {
+                    selectedCampaignWeaponKind = kind;
+                    StartupCheckpoint.Set("CampaignWeaponSelected_" + GetCampaignWeaponName(kind));
+                }
+            }
+
+            if (DrawFantasyButton(GetCampaignWeaponBackRect(), "BACK TO HERO", false))
+                mode = ScreenMode.HeroSelect;
+
+            string confirmLabel = stageNumber >= 3
+                ? "START STAGE " + stageNumber
+                : "CONFIRM LOADOUT";
+            if (DrawFantasyButton(GetCampaignWeaponConfirmRect(), confirmLabel, true))
+                ConfirmCampaignWeaponSelection();
+        }
+
+        private void ConfirmCampaignWeaponSelection()
+        {
+            if (System.Array.IndexOf(campaignWeaponOptions, selectedCampaignWeaponKind) < 0)
+                selectedCampaignWeaponKind = WeaponController.WeaponKind.AssaultRifle;
+
+            PlayerPrefs.SetInt("PW.SelectedWeaponKind", (int)selectedCampaignWeaponKind);
+            PlayerPrefs.Save();
+            StartupCheckpoint.Set("CampaignLoadoutConfirmed_Stage" + stageNumber + "_" + GetCampaignWeaponName(selectedCampaignWeaponKind));
+            EnterDropMap();
         }
 
         private void EnterDropMap()
@@ -2552,20 +2748,32 @@ namespace PersiaWar.Unity2D5D
             // Stage one keeps its original three firearms. Stage two additionally
             // enables the axe, Void Rifle and Alien Sword when the local profile owns them.
             player.Weapon?.SetAxeEnabledForMatch(stageNumber >= 2);
-            if (stageNumber >= 2 && player.Weapon != null)
+            if (player.Weapon != null)
             {
                 WeaponController.WeaponKind selectedKind = (WeaponController.WeaponKind)
                     PlayerPrefs.GetInt("PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
                 bool ownsVoidRifle = PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0;
                 bool ownsAlienSword = PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0;
-                if (selectedKind == WeaponController.WeaponKind.VoidRifle && !ownsVoidRifle)
-                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
-                if (selectedKind == WeaponController.WeaponKind.AlienSword && !ownsAlienSword)
+
+                // Stages 1 uses only the three baseline firearms; locked rewards and
+                // melee-only selections must never silently override the starter gun.
+                if (stageNumber < 2 &&
+                    selectedKind != WeaponController.WeaponKind.LightPistol &&
+                    selectedKind != WeaponController.WeaponKind.AssaultRifle &&
+                    selectedKind != WeaponController.WeaponKind.HeavyMachineGun)
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
 
-                // Stage 4 opens with ranged combat inside the mothership. If a prior
-                // store choice left the melee-only alien sword selected, guarantee a
-                // firearm for the first encounter; the player can still swap later.
+                if (selectedKind == WeaponController.WeaponKind.VoidRifle &&
+                    (!ownsVoidRifle || stageNumber < 2))
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                if (selectedKind == WeaponController.WeaponKind.AlienSword &&
+                    (!ownsAlienSword || stageNumber < 2))
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+                if (selectedKind == WeaponController.WeaponKind.Axe)
+                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
+
+                // Stage 4 opens with ranged combat inside the mothership. Guarantee a
+                // firearm for the first encounter even if an older saved choice was melee.
                 if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
 
