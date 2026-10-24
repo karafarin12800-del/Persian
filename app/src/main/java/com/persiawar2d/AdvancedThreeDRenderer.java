@@ -47,6 +47,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
 
     private int hp = 100, ammo = 30, reserve = 120, kills = 0, grenades = 3, wave = 1;
     private final int stageNumber;
+    private final String weaponId;
     private final int wavesPerStage = 3;
     private boolean stageComplete;
     private long nextWaveAt;
@@ -55,14 +56,81 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private final ArrayList<Road> roads = new ArrayList<>();
 
     public AdvancedThreeDRenderer(Context context) {
-        this(context, 1);
+        this(context, 1, "royal_bow");
     }
 
     public AdvancedThreeDRenderer(Context context, int stageNumber) {
+        this(context, stageNumber, "royal_bow");
+    }
+
+    public AdvancedThreeDRenderer(Context context, int stageNumber, String weaponId) {
         this.stageNumber = Math.max(1, stageNumber);
+        this.weaponId = isKnownWeapon(weaponId) ? weaponId : "royal_bow";
+        ammo = magazineSize();
+        reserve = reserveSize();
         buildCity();
         spawnEnemies();
         spawnPickups();
+    }
+
+    private boolean isKnownWeapon(String id) {
+        return "royal_bow".equals(id) || "scout_bow".equals(id)
+                || "war_spear".equals(id) || "sun_bow".equals(id)
+                || "arcane_orb".equals(id) || "royal_crossbow".equals(id);
+    }
+
+    private int magazineSize() {
+        if ("scout_bow".equals(weaponId)) return 42;
+        if ("war_spear".equals(weaponId)) return 12;
+        if ("sun_bow".equals(weaponId)) return 24;
+        if ("arcane_orb".equals(weaponId)) return 36;
+        if ("royal_crossbow".equals(weaponId)) return 18;
+        return 30;
+    }
+
+    private int reserveSize() {
+        if ("scout_bow".equals(weaponId)) return 168;
+        if ("war_spear".equals(weaponId)) return 72;
+        if ("sun_bow".equals(weaponId)) return 96;
+        if ("arcane_orb".equals(weaponId)) return 144;
+        if ("royal_crossbow".equals(weaponId)) return 90;
+        return 120;
+    }
+
+    private float shotCooldown() {
+        if ("scout_bow".equals(weaponId)) return .105f;
+        if ("war_spear".equals(weaponId)) return .55f;
+        if ("sun_bow".equals(weaponId)) return .32f;
+        if ("arcane_orb".equals(weaponId)) return .15f;
+        if ("royal_crossbow".equals(weaponId)) return .48f;
+        return .20f;
+    }
+
+    private float shotSpeed() {
+        if ("scout_bow".equals(weaponId)) return 16.0f;
+        if ("war_spear".equals(weaponId)) return 12.0f;
+        if ("sun_bow".equals(weaponId)) return 18.5f;
+        if ("arcane_orb".equals(weaponId)) return 12.0f;
+        if ("royal_crossbow".equals(weaponId)) return 20.0f;
+        return 14.5f;
+    }
+
+    private float shotDamage() {
+        if ("scout_bow".equals(weaponId)) return 28f;
+        if ("war_spear".equals(weaponId)) return 70f;
+        if ("sun_bow".equals(weaponId)) return 65f;
+        if ("arcane_orb".equals(weaponId)) return 32f;
+        if ("royal_crossbow".equals(weaponId)) return 95f;
+        return 45f;
+    }
+
+    public String getWeaponDisplayName() {
+        if ("scout_bow".equals(weaponId)) return "SCOUT BOW";
+        if ("war_spear".equals(weaponId)) return "WAR SPEAR";
+        if ("sun_bow".equals(weaponId)) return "SUN BOW";
+        if ("arcane_orb".equals(weaponId)) return "ARCANE ORB";
+        if ("royal_crossbow".equals(weaponId)) return "ROYAL CROSSBOW";
+        return "ROYAL BOW";
     }
 
     private void buildCity() {
@@ -435,8 +503,9 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     public void reload() {
-        if(gameOver || ammo>=30 || reserve<=0)return;
-        int add=Math.min(30-ammo,reserve);
+        int clip = magazineSize();
+        if(gameOver || stageComplete || ammo>=clip || reserve<=0)return;
+        int add=Math.min(clip-ammo,reserve);
         ammo+=add;reserve-=add;
     }
 
@@ -448,7 +517,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     public void resetBattle() {
-        px=0f;pz=0f;hp=100;ammo=30;reserve=120;kills=0;grenades=3;wave=1;
+        px=0f;pz=0f;hp=100;ammo=magazineSize();reserve=reserveSize();kills=0;grenades=3;wave=1;
         gameOver=false;stageComplete=false;nextWaveAt=0;fireCooldown=0;muzzleFlash=0;weaponKick=0;
         projectiles.clear();spawnEnemies();spawnPickups();
     }
@@ -504,9 +573,9 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     }
 
     private void fire() {
-        if (gameOver || ammo<=0 || fireCooldown>0 || hp<=0) return;
+        if (gameOver || stageComplete || ammo<=0 || fireCooldown>0 || hp<=0) return;
         ammo--;
-        fireCooldown=.20f;
+        fireCooldown=shotCooldown();
         muzzleFlash=.10f;
         weaponKick=.16f;
         float fx=(float)Math.sin(yaw), fz=(float)Math.cos(yaw);
@@ -524,7 +593,9 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
             float dx=best.x-px,dz=best.z-pz,d=Math.max(.001f,(float)Math.hypot(dx,dz));
             tx=dx/d;tz=dz/d;
         }
-        projectiles.add(new Projectile(sx,1.22f,sz,tx*14.5f,tz*14.5f,2.0f,45,true));
+        boolean explosive = "arcane_orb".equals(weaponId);
+        projectiles.add(new Projectile(sx,1.22f,sz,tx*shotSpeed(),tz*shotSpeed(),2.0f,
+                shotDamage(),true,explosive,explosive?2.8f:0f));
     }
 
     private void updateProjectiles(float dt) {
@@ -573,8 +644,19 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private void drawProjectile(Projectile b) {
         float glow=(float)(.65+.35*Math.sin(animationTime*18f));
         if(b.fromPlayer) {
-            if(b.explosive) box(b.x,.98f,b.z,.34f,.34f,.34f,.28f,.58f,.30f);
-            else box(b.x,.92f,b.z,.22f,.18f,.48f,1.0f*glow,.68f,.20f);
+            if(b.explosive) {
+                box(b.x,.98f,b.z,.38f,.38f,.38f,.18f,.48f,1.0f);
+            } else if ("war_spear".equals(weaponId)) {
+                box(b.x,.92f,b.z,.16f,.16f,.82f,.78f,.73f,.56f);
+            } else if ("sun_bow".equals(weaponId)) {
+                box(b.x,.92f,b.z,.20f,.18f,.62f,1.0f,.38f,.10f);
+            } else if ("royal_crossbow".equals(weaponId)) {
+                box(b.x,.92f,b.z,.18f,.16f,.68f,1.0f*glow,.86f,.42f);
+            } else if ("scout_bow".equals(weaponId)) {
+                box(b.x,.92f,b.z,.18f,.16f,.52f,.47f,.90f,.52f);
+            } else {
+                box(b.x,.92f,b.z,.22f,.18f,.48f,1.0f*glow,.68f,.20f);
+            }
         } else {
             box(b.x,.92f,b.z,.24f,.18f,.52f,.85f,.16f,.10f);
         }
