@@ -152,8 +152,17 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
 
     private void spawnEnemies() {
         enemies.clear();
-        float[][] spots = {{-25,-25},{0,-25},{25,-25},{-25,0},{25,0},{-25,25},{0,25},{25,25}};
-        for (float[] s : spots) enemies.add(new Enemy(s[0], s[1]));
+        float[][] spots = {
+                {-25,-25},{0,-25},{25,-25},{-25,0},{25,0},{-25,25},{0,25},{25,25},
+                {-31,-9},{31,-9},{-31,9},{31,9},
+                {-9,-31},{9,-31},{-9,31},{9,31}
+        };
+        int count = 8 + Math.min(4, stageNumber - 1);
+        int enemyHp = 100 + (stageNumber - 1) * 8 + (wave - 1) * 5;
+        for (int i = 0; i < count; i++) {
+            float[] spot = spots[i];
+            enemies.add(new Enemy(spot[0], spot[1], enemyHp));
+        }
     }
 
     private void spawnPickups() {
@@ -319,7 +328,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
         boxRotated(e.x + .40f, 1.16f + bob, e.z, .20f, .85f, .20f, -stride * .65f, 0f, 12f, .46f, .14f, .10f);
         float recoil = attack * .10f;
         boxRotated(e.x, 1.20f, e.z - .48f - recoil, .24f, .24f, .85f, 0f, 0f, 0f, .12f, .12f, .10f);
-        float pct = Math.max(0f, e.hp / 100f);
+        float pct = Math.max(0f, Math.min(1f, e.hp / (float)e.maxHp));
         box(e.x, 2.55f, e.z, .95f, .08f, .10f, .15f, .08f, .06f);
         if (pct > 0) box(e.x - .48f*(1-pct), 2.56f, e.z, .92f*pct, .10f, .12f,
                 .72f, .12f, .08f);
@@ -626,7 +635,7 @@ public final class AdvancedThreeDRenderer implements GLSurfaceView.Renderer {
     private static final class Road{final float x1,z1,x2,z2,width;Road(float x1,float z1,float x2,float z2,float width){this.x1=x1;this.z1=z1;this.x2=x2;this.z2=z2;this.width=width;}}
     private static final class Building{final float x,z,w,d,h;final int style;Building(float x,float z,float w,float d,float h,int style){this.x=x;this.z=z;this.w=w;this.d=d;this.h=h;this.style=style;}}
     private static final class Tree{final float x,z,r;Tree(float x,float z,float r){this.x=x;this.z=z;this.r=r;}}
-    private static final class Enemy{float x,z;int hp=100;long lastShot;Enemy(float x,float z){this.x=x;this.z=z;}}
+    private static final class Enemy{float x,z;int hp,maxHp;long lastShot;Enemy(float x,float z,int maxHp){this.x=x;this.z=z;this.hp=maxHp;this.maxHp=maxHp;}}
     private static final class Projectile{float x,y,z,vx,vz,life,damage,splashRadius;boolean fromPlayer,explosive;Projectile(float x,float y,float z,float vx,float vz,float life,float damage,boolean fromPlayer){this(x,y,z,vx,vz,life,damage,fromPlayer,false,0f);}Projectile(float x,float y,float z,float vx,float vz,float life,float damage,boolean fromPlayer,boolean explosive,float splashRadius){this.x=x;this.y=y;this.z=z;this.vx=vx;this.vz=vz;this.life=life;this.damage=damage;this.fromPlayer=fromPlayer;this.explosive=explosive;this.splashRadius=splashRadius;}}
     private static final class Pickup{static final int AMMO=1,GRENADE=2,MEDKIT=3;final float x,z;final int type;Pickup(float x,float z,int type){this.x=x;this.z=z;this.type=type;}}
 }
