@@ -208,7 +208,8 @@ public final class LoadoutSelectActivity extends Activity {
         int index = Math.max(0, indexOf(selectedId));
         footerSelection.setText(names[index] + "  •  DMG " + damage[index]
                 + "  •  SPEED " + speed[index] + "  •  REACH " + reach[index]);
-        enterButton.setText("ENTER STAGE " + String.format("%02d", stage));
+        enterButton.setText((nextStageFlow ? "CONTINUE TO STAGE " : "ENTER STAGE ")
+                + String.format("%02d", stage));
     }
 
     private void enterStage() {
@@ -216,14 +217,7 @@ public final class LoadoutSelectActivity extends Activity {
         Intent result = new Intent();
         result.putExtra(EXTRA_STAGE, stage);
         result.putExtra(EXTRA_SELECTED_WEAPON, selectedId);
-        if (nextStageFlow) {
-            setResult(RESULT_OK, result);
-            finish();
-            return;
-        }
-        Intent game = new Intent(this, ThreeDGameActivity.class);
-        game.putExtra(CharacterSelectActivity.EXTRA_STAGE, stage);
-        startActivity(game);
+        setResult(RESULT_OK, result);
         finish();
     }
 
