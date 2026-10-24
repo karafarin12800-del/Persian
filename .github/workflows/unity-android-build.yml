@@ -14,6 +14,7 @@ on:
       - fix/android-multitouch-pointer-zones
       - feature/stage4-mothership-megabase-20261016
       - feature/stage4-escape-detonation-20261017
+      - feature/campaign-menu-flow-20261024
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
