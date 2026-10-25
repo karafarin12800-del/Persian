@@ -1619,8 +1619,21 @@ namespace PersiaWar.Unity2D5D
                 else
                 {
                     WeaponCatalog.Entry e=WeaponCatalog.GetAt(i);
-                    Fill(new Rect(card.x+card.width*.18f,card.y+card.height*.24f,card.width*.64f,card.height*.18f),new Color(.48f,.59f,.67f,1));
-                    Fill(new Rect(card.x+card.width*.42f,card.y+card.height*.1f,card.width*.16f,card.height*.46f),e.Kind==WeaponController.WeaponKind.VoidRifle?Color.cyan:(e.Kind==WeaponController.WeaponKind.AlienSword?Color.green:new Color(.8f,.62f,.25f)));
+                    Rect previewRect = new Rect(card.x + card.width * .18f, card.y + 8f * sc, card.width * .64f, card.height * .55f);
+                    if (!WeaponPreviewStudio.Draw(previewRect, e.Kind, chosen))
+                    {
+                        Fill(new Rect(card.x+card.width*.18f,card.y+card.height*.24f,card.width*.64f,card.height*.18f),new Color(.48f,.59f,.67f,1));
+                        Fill(new Rect(card.x+card.width*.42f,card.y+card.height*.1f,card.width*.16f,card.height*.46f),e.Kind==WeaponController.WeaponKind.VoidRifle?Color.cyan:(e.Kind==WeaponController.WeaponKind.AlienSword?Color.green:new Color(.8f,.62f,.25f)));
+                    }
+                    float rangeStat = WeaponController.GetEffectiveRangeForKind(e.Kind);
+                    float damageStat = WeaponController.GetDamageForKind(e.Kind);
+                    float fireStat = 1f / WeaponController.GetFireCooldownForKind(e.Kind);
+                    float weightStat = WeaponController.GetWeightForKind(e.Kind);
+                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .65f, card.width - 8f, 15f * sc),
+                        "DMG " + damageStat + "  RNG " + rangeStat.ToString("0") + "M  RATE " + fireStat.ToString("0.0") + "/S", menuSmallStyle);
+                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .76f, card.width * .76f, 4f * sc), new Color(.18f,.24f,.30f,1f));
+                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .76f, card.width * .76f * Mathf.Clamp01(weightStat / 1.6f), 4f * sc), new Color(.94f,.68f,.23f,1f));
+                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .78f, card.width - 8f, 14f * sc), "WEIGHT " + weightStat.ToString("0.0"), menuSmallStyle);
                     bool ok=LoadoutStore.CanUseWeapon(e.Kind);
                     GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),e.Name,menuSmallStyle);
                     string state=ok?(chosen?"SELECTED":"TAP TO SELECT"):(!LoadoutStore.IsStageUnlocked(e.RequiredCompletedStage)?"CLEAR STAGE "+e.RequiredCompletedStage:e.Price+" COINS • TAP TO BUY");
@@ -1658,6 +1671,7 @@ namespace PersiaWar.Unity2D5D
             if(!LoadoutStore.CanUseHero(selectedHero,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued)||!LoadoutStore.CanUseWeapon(chosen)){loadoutNotice="SELECT AN AVAILABLE HERO AND WEAPON";return;}
             LoadoutStore.SelectedHero=selectedHero;LoadoutStore.SelectedWeapon=chosen;
             HeroPortraitStudio.Close();
+            WeaponPreviewStudio.Close();
             if(stageNumber<=2){EnterDropMap();return;}
             spawnWorld=stageNumber==3?new Vector2(0f,-97f):Vector2.zero;spawnChosen=true;mode=ScreenMode.DropMap;StartMatch();
         }

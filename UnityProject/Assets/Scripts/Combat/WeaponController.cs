@@ -61,6 +61,42 @@ namespace PersiaWar.Unity2D5D
         private const float AssaultRifleRange = 13.5f;
         private const float HeavyMachineGunRange = 21f;
 
+        public static int GetDamageForKind(WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponKind.LightPistol: return 14;
+                case WeaponKind.HeavyMachineGun: return 34;
+                case WeaponKind.Axe: return 0;
+                case WeaponKind.VoidRifle: return 42;
+                case WeaponKind.AlienSword: return 0;
+                default: return 22;
+            }
+        }
+
+        public static float GetFireCooldownForKind(WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponKind.LightPistol: return 0.24f;
+                case WeaponKind.HeavyMachineGun: return 0.31f;
+                case WeaponKind.Axe: return 0.55f;
+                case WeaponKind.VoidRifle: return 0.42f;
+                case WeaponKind.AlienSword: return 0.5f;
+                default: return 0.19f;
+            }
+        }
+
+        public static float GetWeightForKind(WeaponKind kind)
+        {
+            float mobility = kind == WeaponKind.LightPistol ? 1.20f
+                : kind == WeaponKind.HeavyMachineGun ? 0.78f
+                : kind == WeaponKind.Axe ? 0.92f
+                : kind == WeaponKind.AlienSword ? 1.05f
+                : kind == WeaponKind.VoidRifle ? 0.94f : 1f;
+            return 1f / mobility;
+        }
+
         public static float GetEffectiveRangeForKind(WeaponKind kind)
         {
             switch (kind)
@@ -139,8 +175,16 @@ namespace PersiaWar.Unity2D5D
             loadoutConfigured = true;
             axeEnabledForMatch = System.Array.IndexOf(configuredLoadout, WeaponKind.Axe) >= 0 || LoadoutTestSwitch.UnlockEverything;
             if (System.Array.IndexOf(configuredLoadout, selectedKind) < 0) selectedKind = WeaponKind.AssaultRifle;
-            if (selectedKind == WeaponKind.Axe) { axeEquippedAsMelee = true; weaponKind = WeaponKind.AssaultRifle; }
-            else axeEquippedAsMelee = false;
+            if (selectedKind == WeaponKind.Axe)
+            {
+                axeEquippedAsMelee = true;
+                weaponKind = WeaponKind.Axe;
+                ApplyWeaponProfile(true);
+                RefreshWeaponVisual();
+                UpdateRangeIndicator();
+                return;
+            }
+            axeEquippedAsMelee = false;
             SelectWeapon(selectedKind);
         }
 
@@ -239,24 +283,24 @@ namespace PersiaWar.Unity2D5D
                 case WeaponKind.LightPistol:
                     projectileSpeed = 34f;
                     weaponRange = LightPistolRange;
-                    projectileDamage = 14;
-                    fireCooldown = 0.24f;
+                    projectileDamage = GetDamageForKind(weaponKind);
+                    fireCooldown = GetFireCooldownForKind(weaponKind);
                     magazineSize = 15;
                     break;
 
                 case WeaponKind.HeavyMachineGun:
                     projectileSpeed = 40f;
                     weaponRange = HeavyMachineGunRange;
-                    projectileDamage = 34;
-                    fireCooldown = 0.31f;
+                    projectileDamage = GetDamageForKind(weaponKind);
+                    fireCooldown = GetFireCooldownForKind(weaponKind);
                     magazineSize = 36;
                     break;
 
                 case WeaponKind.Axe:
                     projectileSpeed = 1f;
                     weaponRange = 3.1f;
-                    projectileDamage = 0;
-                    fireCooldown = 0.55f;
+                    projectileDamage = GetDamageForKind(weaponKind);
+                    fireCooldown = GetFireCooldownForKind(weaponKind);
                     magazineSize = 1;
                     meleeDamage = 72;
                     meleeRange = 3.2f;
@@ -267,16 +311,16 @@ namespace PersiaWar.Unity2D5D
                 case WeaponKind.VoidRifle:
                     projectileSpeed = 55f;
                     weaponRange = 28f;
-                    projectileDamage = 42;
-                    fireCooldown = 0.42f;
+                    projectileDamage = GetDamageForKind(weaponKind);
+                    fireCooldown = GetFireCooldownForKind(weaponKind);
                     magazineSize = 18;
                     break;
 
                 case WeaponKind.AlienSword:
                     projectileSpeed = 1f;
                     weaponRange = 3.5f;
-                    projectileDamage = 0;
-                    fireCooldown = 0.5f;
+                    projectileDamage = GetDamageForKind(weaponKind);
+                    fireCooldown = GetFireCooldownForKind(weaponKind);
                     magazineSize = 1;
                     meleeDamage = 90;
                     meleeRange = 3.5f;
@@ -287,8 +331,8 @@ namespace PersiaWar.Unity2D5D
                 default:
                     projectileSpeed = 38f;
                     weaponRange = AssaultRifleRange;
-                    projectileDamage = 22;
-                    fireCooldown = 0.19f;
+                    projectileDamage = GetDamageForKind(weaponKind);
+                    fireCooldown = GetFireCooldownForKind(weaponKind);
                     magazineSize = 24;
                     break;
             }
