@@ -22,6 +22,9 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     private static int worldLookStage = -1;
     private static Color worldLookPreviousAmbient;
     private static bool worldLookAmbientCaptured;
+    private static readonly Dictionary<Light, Color> WorldOriginalLightColors = new Dictionary<Light, Color>();
+    private static readonly Dictionary<Light, Quaternion> WorldOriginalLightRotations = new Dictionary<Light, Quaternion>();
+    private static readonly Dictionary<Light, float> WorldOriginalLightIntensities = new Dictionary<Light, float>();
 
     private Transform lookRoot;
     private readonly Transform[] billboards = new Transform[220];
@@ -141,7 +144,16 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     public static void ApplyWorldLook(Transform root, int stage)
     {
         if (root == null || stage < 1 || stage > 4) return;
-        if (!IsEnhanced || stage == 4) { RestoreWorldLook(); return; }
+        if (!IsEnhanced || stage == 4)
+        {
+            if (stage == 4)
+            {
+                Transform atmosphereRoot = root.Find("PW_WorldAtmosphereParticles");
+                if (atmosphereRoot != null) Destroy(atmosphereRoot.gameObject);
+            }
+            RestoreWorldLook();
+            return;
+        }
         if (worldLookRoot == root && worldLookStage == stage) return;
         RestoreWorldLook();
         if (!worldLookAmbientCaptured) { worldLookPreviousAmbient = RenderSettings.ambientLight; worldLookAmbientCaptured = true; }
@@ -183,6 +195,22 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         }
         RenderSettings.ambientLight = stage == 1 ? new Color(.53f,.56f,.61f) :
             stage == 2 ? new Color(.58f,.50f,.39f) : new Color(.28f,.42f,.58f);
+        Light[] stageLights = root.GetComponentsInChildren<Light>(true);
+        for (int i = 0; i < stageLights.Length; i++)
+        {
+            Light light = stageLights[i];
+            if (light == null || light.type != LightType.Directional) continue;
+            if (!WorldOriginalLightColors.ContainsKey(light))
+            {
+                WorldOriginalLightColors[light] = light.color;
+                WorldOriginalLightRotations[light] = light.transform.rotation;
+                WorldOriginalLightIntensities[light] = light.intensity;
+            }
+            light.color = stage == 1 ? new Color(1f,.91f,.78f) : stage == 2 ? new Color(1f,.78f,.55f) : new Color(.42f,.88f,1f);
+            light.intensity = stage == 2 ? .9f : 1.1f;
+            light.transform.rotation = stage == 1 ? Quaternion.Euler(48f, -32f, 0f)
+                : stage == 2 ? Quaternion.Euler(34f, 24f, 0f) : Quaternion.Euler(22f, -18f, 0f);
+        }
         ParticleSystem atmosphere = root.Find("PW_WorldAtmosphereParticles") != null
             ? root.Find("PW_WorldAtmosphereParticles").GetComponent<ParticleSystem>() : null;
         if (atmosphere == null)
@@ -212,6 +240,15 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         foreach (KeyValuePair<Renderer, Material[]> entry in WorldOriginals)
             if (entry.Key != null) entry.Key.sharedMaterials = entry.Value;
         WorldOriginals.Clear();
+        foreach (KeyValuePair<Light, Color> entry in WorldOriginalLightColors)
+            if (entry.Key != null) entry.Key.color = entry.Value;
+        foreach (KeyValuePair<Light, Quaternion> entry in WorldOriginalLightRotations)
+            if (entry.Key != null) entry.Key.transform.rotation = entry.Value;
+        foreach (KeyValuePair<Light, float> entry in WorldOriginalLightIntensities)
+            if (entry.Key != null) entry.Key.intensity = entry.Value;
+        WorldOriginalLightColors.Clear();
+        WorldOriginalLightRotations.Clear();
+        WorldOriginalLightIntensities.Clear();
         if (worldLookAmbientCaptured)
         {
             RenderSettings.ambientLight = worldLookPreviousAmbient;

@@ -48,6 +48,8 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobileLeftLeg;
         private Renderer mobileRightLeg;
         private Transform[] heroAccessoryRoots;
+        private static readonly System.Collections.Generic.Dictionary<int, Material> LitCharacterMaterialCache =
+            new System.Collections.Generic.Dictionary<int, Material>();
 
         public Transform Muzzle => muzzle;
         public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;
@@ -513,8 +515,27 @@ namespace PersiaWar.Unity2D5D
         private static void SetRendererColor(Renderer renderer, Color color)
         {
             if (renderer == null) return;
-            renderer.sharedMaterial = RuntimeMaterialFactory.Create(
-                "MobileCharacterColor", color);
+            Material material = RuntimeMaterialFactory.Create("MobileCharacterColor", color);
+            if (material == null) return;
+            if (GraphicsQualityProfile.CurrentTier != GraphicsQualityProfile.QualityTier.Low)
+            {
+                Shader lit = Shader.Find("PersiaWar/MobileLit");
+                if (lit != null && material.shader != lit)
+                {
+                    int key = material.GetInstanceID();
+                    if (!LitCharacterMaterialCache.TryGetValue(key, out Material litMaterial) || litMaterial == null)
+                    {
+                        litMaterial = new Material(material);
+                        litMaterial.shader = lit;
+                        litMaterial.enableInstancing = true;
+                        if (material.HasProperty("_MainTex") && litMaterial.HasProperty("_MainTex")) litMaterial.mainTexture = material.mainTexture;
+                        if (material.HasProperty("_Color") && litMaterial.HasProperty("_Color")) litMaterial.SetColor("_Color", color);
+                        LitCharacterMaterialCache[key] = litMaterial;
+                    }
+                    material = litMaterial;
+                }
+            }
+            renderer.sharedMaterial = material;
         }
 
         private void EnsurePresentation()
