@@ -423,6 +423,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 new Vector3(side * 0.9f, -0.03f, -4.0f), Vector3.one * 0.48f, greenBeaconMat);
         }
 
+        if (GraphicsQualityProfile.IsEnhanced)
+            GraphicsQualityProfile.AddBlobShadow(craft, new Vector3(0f, -0.22f, -0.1f), new Vector2(4f, 7f));
         return craft;
     }
 

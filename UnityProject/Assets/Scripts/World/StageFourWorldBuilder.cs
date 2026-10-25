@@ -927,6 +927,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         light.intensity = 1.1f;
         light.shadows = LightShadows.None;
         RenderSettings.ambientLight = new Color(0.22f, 0.27f, 0.35f);
+        if (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High)
+            light.shadows = LightShadows.Soft;
+        GraphicsQualityProfile.ApplyStageFourLook(root, controller != null ? controller.transform : null);
     }
 
     private GameObject BuildShip(string name, Vector3 position, Quaternion rotation, float scale)
@@ -1202,6 +1205,11 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         // Use the project's Resources-backed shader first. Shader.Find fallbacks can
         // be stripped from Android players when no serialized material references them.
         Shader shader = RuntimeMaterialFactory.GetShader();
+        if (GraphicsQualityProfile.IsEnhanced)
+        {
+            Shader stageFourLit = Resources.Load<Shader>("PersiaWarMobileLit");
+            if (stageFourLit != null) shader = stageFourLit;
+        }
         if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
         if (shader == null) shader = Shader.Find("Standard");
         if (shader == null)
