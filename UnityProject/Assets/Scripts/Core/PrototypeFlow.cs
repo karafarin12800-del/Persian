@@ -1606,9 +1606,9 @@ namespace PersiaWar.Unity2D5D
             Rect panel=new Rect(12f*sc,112f*sc,Screen.width-24f*sc,Screen.height-194f*sc);
             MenuTheme.DrawPanel(panel,pixel);
             GUI.Label(new Rect(panel.x+12f,panel.y+6f*sc,panel.width-24f,38f*sc),"STAGE "+stageNumber+"  •  "+(loadoutWeaponTab?"CHOOSE WEAPON":"CHOOSE HERO"),menuHeaderStyle);
-            GUI.Label(new Rect(panel.x+12f,panel.y+42f*sc,panel.width-24f,24f*sc),"COINS  "+LoadoutStore.Coins,menuBodyStyle);
+            GUI.Label(new Rect(panel.x+12f,panel.y+39f*sc,panel.width-24f,24f*sc),"COINS  "+LoadoutStore.Coins+"     TOKENS  ✦ "+LoadoutStore.Tokens,menuBodyStyle);
             if(LoadoutTestSwitch.UnlockEverything){Rect b=new Rect(panel.xMax-116f*sc,panel.y+8f*sc,100f*sc,24f*sc);Fill(b,new Color(.58f,.12f,.08f,1));GUI.Label(b,"TEST MODE",menuSmallStyle);}
-            if(lastStageReward>0)GUI.Label(new Rect(panel.x+12f,panel.y+66f*sc,panel.width-24f,20f*sc),"STAGE CLEAR REWARD  +"+lastStageReward+" COINS",menuSmallStyle);
+            if(lastStageReward>0)GUI.Label(new Rect(panel.x+12f,panel.y+63f*sc,panel.width-24f,20f*sc),"STAGE CLEAR  +"+lastStageReward+" COINS  •  +"+LoadoutStore.LastStageTokenReward+" TOKENS",menuSmallStyle);
             for(int i=0;i<6;i++)
             {
                 Rect card=LoadoutCard(i);
@@ -1617,10 +1617,10 @@ namespace PersiaWar.Unity2D5D
                 Fill(new Rect(card.x+3f,card.y+3f,card.width-6f,card.height-6f),new Color(.025f,.055f,.085f,.97f));
                 if(!loadoutWeaponTab)
                 {
-                    HeroPortraitStudio.Draw(new Rect(card.x+card.width*.25f,card.y+7f,card.width*.5f,card.height*.58f),i,chosen);
+                    HeroPortraitStudio.Draw(new Rect(card.x+card.width*.12f,card.y+3f*sc,card.width*.76f,card.height*.69f),i,chosen);
                     bool ok=LoadoutStore.CanUseHero(i,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued);
                     GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),HeroCatalog.Name(i),menuSmallStyle);
-                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),ok?(chosen?"SELECTED":"TAP TO SELECT"):HeroCatalog.Price(i)+" COINS • TAP TO BUY",menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),ok?(chosen?"SELECTED":"TAP TO SELECT"):(HeroCatalog.TokenPrice(i)>0?HeroCatalog.TokenPrice(i)+" TOKENS • BUY":HeroCatalog.Price(i)+" COINS • BUY"),menuSmallStyle);
                 }
                 else
                 {
@@ -1642,7 +1642,7 @@ namespace PersiaWar.Unity2D5D
                     GUI.Label(new Rect(card.x + 4f, card.y + card.height * .69f, card.width - 8f, 14f * sc), "W " + weightStat.ToString("0.0"), menuSmallStyle);
                     bool ok=LoadoutStore.CanUseWeapon(e.Kind);
                     GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),e.Name,menuSmallStyle);
-                    string state=ok?(chosen?"SELECTED":"TAP TO SELECT"):(!LoadoutStore.IsStageUnlocked(e.RequiredCompletedStage)?"CLEAR STAGE "+e.RequiredCompletedStage:e.Price+" COINS • TAP TO BUY");
+                    string state=ok?(chosen?"SELECTED":"TAP TO SELECT"):(!LoadoutStore.IsStageUnlocked(e.RequiredCompletedStage)?"CLEAR STAGE "+e.RequiredCompletedStage:(e.TokenPrice>0?e.TokenPrice+" TOKENS • TAP TO BUY":e.Price+" COINS • TAP TO BUY"));
                     GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),state,menuSmallStyle);
                 }
                 if(GUI.Button(card,GUIContent.none,GUIStyle.none))ChooseLoadoutItem(i);
