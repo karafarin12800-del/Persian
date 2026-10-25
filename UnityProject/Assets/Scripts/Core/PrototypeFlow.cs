@@ -1586,7 +1586,7 @@ namespace PersiaWar.Unity2D5D
         private Rect LoadoutCard(int i)
         {
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-            float gap=9f*sc, total=Mathf.Min(Screen.width-28f*sc,1000f), w=(total-gap*2f)/3f, h=164f*sc;
+            float gap=9f*sc, total=Mathf.Min(Screen.width-28f*sc,1000f), w=(total-gap*2f)/3f, h=Mathf.Min(160f,Screen.height*.23f);
             return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap),Screen.height*.25f+(i/3)*(h+gap),w,h);
         }
         private Rect LoadoutNext()
@@ -1630,10 +1630,10 @@ namespace PersiaWar.Unity2D5D
                     float fireStat = 1f / WeaponController.GetFireCooldownForKind(e.Kind);
                     float weightStat = WeaponController.GetWeightForKind(e.Kind);
                     GUI.Label(new Rect(card.x + 4f, card.y + card.height * .65f, card.width - 8f, 15f * sc),
-                        "DMG " + damageStat + "  RNG " + rangeStat.ToString("0") + "M  RATE " + fireStat.ToString("0.0") + "/S", menuSmallStyle);
+                        "D" + damageStat + " R" + rangeStat.ToString("0") + " F" + fireStat.ToString("0.0"), menuSmallStyle);
                     Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .76f, card.width * .76f, 4f * sc), new Color(.18f,.24f,.30f,1f));
                     Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .76f, card.width * .76f * Mathf.Clamp01(weightStat / 1.6f), 4f * sc), new Color(.94f,.68f,.23f,1f));
-                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .78f, card.width - 8f, 14f * sc), "WEIGHT " + weightStat.ToString("0.0"), menuSmallStyle);
+                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .78f, card.width - 8f, 14f * sc), "W " + weightStat.ToString("0.0"), menuSmallStyle);
                     bool ok=LoadoutStore.CanUseWeapon(e.Kind);
                     GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),e.Name,menuSmallStyle);
                     string state=ok?(chosen?"SELECTED":"TAP TO SELECT"):(!LoadoutStore.IsStageUnlocked(e.RequiredCompletedStage)?"CLEAR STAGE "+e.RequiredCompletedStage:e.Price+" COINS • TAP TO BUY");
