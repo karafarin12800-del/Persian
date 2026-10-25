@@ -784,16 +784,48 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 sceneCamera.transform.position = wideCamera;
                 sceneCamera.transform.LookAt(new Vector3(0f, 22f, 65f));
             }
-            yield return new WaitForSeconds(0.32f);
+            yield return new WaitForSeconds(0.4f);
         }
 
-        // Once the planted charges have visibly exploded on the base, the shuttle
-        // accelerates away intact. Track it closely rather than leaving it tiny in frame.
+        // The charges chain across visible hull sections before the core gives way.
+        // These small effects reuse the shared embers/smoke systems and stay inside
+        // the mothership radius; the boarded escape shuttle is never a blast target.
+        for (int secondaryIndex = 0; secondaryIndex < 14; secondaryIndex++)
+        {
+            CreateBlast("S4_MothershipSecondaryDetonation_" + (secondaryIndex + 1),
+                new Vector3(0f, 34f, 10f), 4.5f, false);
+            if (sceneCamera != null)
+            {
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(new Vector3(0f, 28f, 0f));
+            }
+            yield return new WaitForSeconds(0.09f);
+        }
+
+        GameObject coreBlast = CreateBlast("S4_MothershipCoreDetonation",
+            new Vector3(0f, 40f, 10f), 60f, true);
+        message = "MOTHERSHIP CORE BREACH • SHUTTLE CLEAR";
+        float coreHold = 0f;
+        const float coreHoldDuration = 3.0f;
+        while (coreHold < coreHoldDuration)
+        {
+            coreHold += Time.deltaTime;
+            if (sceneCamera != null)
+            {
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(new Vector3(0f, 28f, 0f));
+            }
+            yield return null;
+        }
+        HideMothershipAfterFinalExplosion(coreBlast);
+
+        // After the core hold, depart with the explosion in frame for a final beat,
+        // then ease the camera onto the shuttle without an accumulated shake offset.
         message = "CHARGES DETONATED • SHUTTLE ESCAPING";
         Vector3 deepSpaceExit = new Vector3(820f, 245f, 940f);
         float departureTime = 0f;
-        const float departureDuration = 5.0f;
-        Vector3 escapeCameraOffset = new Vector3(-95f, 58f, 112f);
+        const float departureDuration = 3.4f;
+        Vector3 escapeCameraOffset = new Vector3(-170f, 100f, 190f);
         while (departureTime < departureDuration)
         {
             departureTime += Time.deltaTime;
@@ -807,14 +839,18 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             }
             if (sceneCamera != null && escapeShuttle != null)
             {
-                sceneCamera.transform.position = escapeShuttle.position + escapeCameraOffset;
-                sceneCamera.transform.LookAt(escapeShuttle.position);
+                float cameraBlend = Mathf.SmoothStep(0f, 1f, depart);
+                sceneCamera.transform.position = Vector3.Lerp(wideCamera, escapeShuttle.position + escapeCameraOffset, cameraBlend);
+                sceneCamera.transform.LookAt(Vector3.Lerp(new Vector3(0f, 28f, 0f), escapeShuttle.position, cameraBlend));
             }
             yield return null;
         }
 
         if (escapeShuttle != null)
             escapeShuttle.gameObject.SetActive(false);
+        StageFourMothershipExplosionFX.FinishEffects();
+        StageFourMothershipExplosionFX.PlayFinalFlash(sceneCamera);
+        yield return new WaitForSeconds(0.35f);
         message = "SHUTTLE ESCAPED • STAGE 4 COMPLETE";
         yield return new WaitForSeconds(1.5f);
 
@@ -914,9 +950,12 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         Renderer[] renderers = worldRoot.GetComponentsInChildren<Renderer>(true);
         foreach (Renderer r in renderers)
         {
-            if (r == null) continue;
+            if (r == null || !r.gameObject.name.StartsWith("S4_Mothership", System.StringComparison.Ordinal))
+                continue;
             if (escapeShuttle != null &&
                 (r.transform == escapeShuttle || r.transform.IsChildOf(escapeShuttle)))
+                continue;
+            if (r.GetComponent<StageFourHullChunkFlight>() != null)
                 continue;
             if (finalBlast != null &&
                 (r.transform == finalBlast.transform || r.transform.IsChildOf(finalBlast.transform)))
@@ -927,31 +966,25 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
     private GameObject CreateBlast(string name, Vector3 position, float radius, bool persistAfterExpansion = false)
     {
-        var blast = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        blast.name = name;
+        Vector3 hullPosition = StageFourMothershipExplosionFX.ResolveHullPlacement(worldRoot, position, name, sceneCamera);
+        var blast = new GameObject(name);
         blast.transform.SetParent(worldRoot, false);
-        blast.transform.position = position;
-        blast.transform.localScale = Vector3.one * 0.2f;
-        var col = blast.GetComponent<Collider>();
-        if (col != null) Destroy(col);
-        blast.GetComponent<Renderer>().material = blastMat;
+        blast.transform.position = hullPosition;
+        var fx = blast.AddComponent<StageFourMothershipExplosionFX>();
+        fx.Play(worldRoot, sceneCamera, escapeShuttle, radius);
         StartCoroutine(ExpandBlast(blast, radius, persistAfterExpansion));
         return blast;
     }
 
     private IEnumerator ExpandBlast(GameObject blast, float radius, bool persistAfterExpansion)
     {
-        float t = 0f;
-        const float expandDuration = 0.75f;
-        while (t < expandDuration && blast != null)
-        {
-            t += Time.deltaTime;
-            float f = Mathf.Clamp01(t / expandDuration);
-            blast.transform.localScale = Vector3.one * Mathf.Lerp(0.2f, radius, f);
+        // The expanded effect root is temporary even for the final charge: its
+        // persistent flag only gives the last flash a slightly longer lifetime.
+        float duration = persistAfterExpansion ? 3.15f : 2.55f;
+        float started = Time.time;
+        while (Time.time - started < duration && blast != null)
             yield return null;
-        }
-        if (persistAfterExpansion) yield break;
-        if (blast != null) Destroy(blast, 0.75f);
+        if (blast != null) Destroy(blast);
     }
 
     private void OnGUI()
