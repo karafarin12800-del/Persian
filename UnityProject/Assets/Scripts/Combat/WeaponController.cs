@@ -1,4 +1,5 @@
 using UnityEngine;
+using PersiaWar.Unity2D5D.UI.Loadout;
 
 namespace PersiaWar.Unity2D5D
 {
@@ -36,6 +37,8 @@ namespace PersiaWar.Unity2D5D
         private bool axeEnabledForMatch;
         private bool axeEquippedAsMelee;
         private bool meleeProfileApplied;
+        private WeaponKind[] configuredLoadout;
+        private bool loadoutConfigured;
         private PlayerController player;
         private Transform gunRoot;
         private Transform axeRoot;
@@ -128,30 +131,41 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        public void ConfigureLoadout(WeaponKind[] ownedKinds, WeaponKind selectedKind)
+        {
+            if (ownedKinds == null || ownedKinds.Length == 0) ownedKinds = new[] { WeaponKind.AssaultRifle };
+            configuredLoadout = new WeaponKind[ownedKinds.Length];
+            System.Array.Copy(ownedKinds, configuredLoadout, ownedKinds.Length);
+            loadoutConfigured = true;
+            axeEnabledForMatch = System.Array.IndexOf(configuredLoadout, WeaponKind.Axe) >= 0 || LoadoutTestSwitch.UnlockEverything;
+            if (System.Array.IndexOf(configuredLoadout, selectedKind) < 0) selectedKind = WeaponKind.AssaultRifle;
+            if (selectedKind == WeaponKind.Axe) { axeEquippedAsMelee = true; weaponKind = WeaponKind.AssaultRifle; }
+            else axeEquippedAsMelee = false;
+            SelectWeapon(selectedKind);
+        }
+
         public void CycleWeapon()
         {
-            if (!axeEnabledForMatch)
+            if (loadoutConfigured && configuredLoadout != null && configuredLoadout.Length > 0)
             {
-                weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
+                int current = System.Array.IndexOf(configuredLoadout, weaponKind);
+                weaponKind = configuredLoadout[(current + 1 + configuredLoadout.Length) % configuredLoadout.Length];
             }
+            else if (!axeEnabledForMatch) weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
             else
             {
-                WeaponKind[] stageTwoWeapons =
-                {
-                    WeaponKind.LightPistol, WeaponKind.AssaultRifle, WeaponKind.HeavyMachineGun,
-                    WeaponKind.VoidRifle, WeaponKind.AlienSword
-                };
+                WeaponKind[] stageTwoWeapons = { WeaponKind.LightPistol, WeaponKind.AssaultRifle, WeaponKind.HeavyMachineGun, WeaponKind.VoidRifle, WeaponKind.AlienSword };
                 int current = System.Array.IndexOf(stageTwoWeapons, weaponKind);
                 weaponKind = stageTwoWeapons[(current + 1 + stageTwoWeapons.Length) % stageTwoWeapons.Length];
             }
-            ApplyWeaponProfile(true);
-            RefreshWeaponVisual();
-            UpdateRangeIndicator();
+            ApplyWeaponProfile(true); RefreshWeaponVisual(); UpdateRangeIndicator();
             StartupCheckpoint.Set("WeaponSwitched_" + CurrentWeaponName);
         }
 
         public void SelectWeapon(WeaponKind selectedWeapon)
         {
+            if (loadoutConfigured && configuredLoadout != null && System.Array.IndexOf(configuredLoadout, selectedWeapon) < 0 && selectedWeapon != WeaponKind.Axe)
+                selectedWeapon = WeaponKind.AssaultRifle;
             if (selectedWeapon == WeaponKind.Axe)
             {
                 if (axeEnabledForMatch)

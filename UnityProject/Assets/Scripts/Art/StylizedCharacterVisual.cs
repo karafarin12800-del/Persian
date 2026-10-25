@@ -79,6 +79,16 @@ namespace PersiaWar.Unity2D5D
                 EnsureMobile3DCharacter();
         }
 
+        public void ConfigurePortraitModel(int heroIndex)
+        {
+            playerCharacter = true;
+            archetype = 1;
+            EnsurePresentation();
+            LoadCharacterSprite();
+            EnsureMobile3DCharacter();
+            ApplyMobilePlayerColors(Mathf.Clamp(heroIndex, 0, 5));
+        }
+
         public void ConfigurePlayerHero(int heroIndex)
         {
             playerCharacter = true;

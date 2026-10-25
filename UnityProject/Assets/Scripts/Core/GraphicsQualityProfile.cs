@@ -89,6 +89,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         instance = this;
         ChooseTierOnce();
         DontDestroyOnLoad(gameObject);
+        Application.targetFrameRate = 60;
+        QualitySettings.vSyncCount = 0;
         StartCoroutine(ApplyAntiAliasingAfterPresentationLayer());
         StartCoroutine(DiscoverCharacterShadows());
     }

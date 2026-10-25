@@ -14,6 +14,7 @@ namespace PersiaWar.Unity2D5D
         // Reusable movement query buffer avoids allocating a Collider[] every frame.
         private static readonly Collider[] MovementCollisionBuffer = new Collider[128];
         private Vector3 input;
+        private Vector3 velocity;
         private Vector3 aimDirection;
         private bool hasAimDirection;
         private WeaponController weapon;
@@ -36,6 +37,7 @@ namespace PersiaWar.Unity2D5D
         public int Shield => shield;
         public float WorldLimit => worldLimit;
         public Vector2 MoveInput => new Vector2(input.x, input.z);
+        public float Speed01 => Mathf.Clamp01(velocity.magnitude / Mathf.Max(0.01f, moveSpeed));
         public bool IsDefeated { get; private set; }
         public bool IsMovementEnabled => movementEnabled && Time.time >= movementLockUntil && !IsDefeated;
         public bool IsGameplayReady => health != null && weapon != null && aim != null && inventory != null && grenadeController != null;
@@ -66,6 +68,7 @@ namespace PersiaWar.Unity2D5D
         {
             IsDefeated = false;
             input = Vector3.zero;
+            velocity = Vector3.zero;
             aimDirection = Vector3.zero;
             hasAimDirection = false;
             movementEnabled = true;
@@ -95,6 +98,7 @@ namespace PersiaWar.Unity2D5D
             if (!enabled)
             {
                 SetMoveInput(Vector2.zero);
+                velocity = Vector3.zero;
                 ClearAimDirection();
             }
         }
@@ -110,6 +114,7 @@ namespace PersiaWar.Unity2D5D
             if (!movementEnabled || IsDefeated)
             {
                 input = Vector3.zero;
+                velocity = Vector3.zero;
                 return;
             }
 
@@ -212,7 +217,9 @@ namespace PersiaWar.Unity2D5D
             }
 
             float weaponMoveMultiplier = weapon != null ? weapon.MoveSpeedMultiplier : 1f;
-            Vector3 desired = input * moveSpeed * weaponMoveMultiplier * Time.deltaTime;
+            Vector3 targetVelocity = input * moveSpeed * weaponMoveMultiplier;
+            velocity = Vector3.MoveTowards(velocity, targetVelocity, (input.sqrMagnitude > 0.0001f ? 55f : 75f) * Time.deltaTime);
+            Vector3 desired = velocity * Time.deltaTime;
             Vector3 next = transform.position + desired;
             next.x = Mathf.Clamp(next.x, -worldLimit, worldLimit);
             next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
@@ -220,26 +227,17 @@ namespace PersiaWar.Unity2D5D
 
             if (desired.sqrMagnitude > 0.00001f)
             {
-                if (!WouldCollide(next))
-                {
-                    transform.position = next;
-                }
+                if (!WouldCollide(next)) transform.position = next;
                 else
                 {
-                    // Slide along walls and parked vehicles instead of stopping at
-                    // every diagonal collision. Both candidate positions still pass
-                    // through the same solid-obstacle query.
                     Vector3 slideX = new Vector3(next.x, next.y, transform.position.z);
                     Vector3 slideZ = new Vector3(transform.position.x, next.y, next.z);
-                    if (!WouldCollide(slideX))
-                        transform.position = slideX;
-                    else if (!WouldCollide(slideZ))
-                        transform.position = slideZ;
+                    if (!WouldCollide(slideX)) { transform.position = slideX; velocity.z = 0f; }
+                    else if (!WouldCollide(slideZ)) { transform.position = slideZ; velocity.x = 0f; }
+                    else velocity = Vector3.zero;
                 }
             }
-
-            if (visual != null)
-                visual.SetMoving(input.sqrMagnitude > 0.0001f);
+            if (visual != null) visual.SetMoving(velocity.sqrMagnitude > 0.0001f);
 
             Vector3 facingDirection = hasAimDirection ? aimDirection : input;
             if (facingDirection.sqrMagnitude > 0.0001f)
