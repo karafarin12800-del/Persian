@@ -885,8 +885,8 @@ namespace PersiaWar.Unity2D5D
             for(int i=0;i<labels.Length;i++)
             {
                 Rect button=GetLobbyButtonRect(i);
-                bool available=i>=4&&LoadoutStore.IsCampaignStageAvailable(i-3);
-                if(DrawFantasyButton(button,labels[i],i==0||available))ActivateLobbyButton(i);
+                bool available=i<4||LoadoutStore.IsCampaignStageAvailable(i-3);
+                if(DrawFantasyButton(button,labels[i],available))ActivateLobbyButton(i);
             }
             if(!string.IsNullOrEmpty(lobbyNotice)&&Time.unscaledTime<lobbyNoticeUntil)
             {
