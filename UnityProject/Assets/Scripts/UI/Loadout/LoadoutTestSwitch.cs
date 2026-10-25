@@ -1,1 +1,1 @@
-namespace PersiaWar.Unity2D5D.UI.Loadout { public static class LoadoutTestSwitch { public const bool UnlockEverything = true; } }
+namespace PersiaWar.Unity2D5D.UI.Loadout { public static class LoadoutTestSwitch { public const bool UnlockEverything = false; } }
