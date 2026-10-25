@@ -16,6 +16,7 @@ on:
       - feature/stage4-escape-detonation-20261017
       - Persian-war1
       - Persian-war2
+      - Persian-war3
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
