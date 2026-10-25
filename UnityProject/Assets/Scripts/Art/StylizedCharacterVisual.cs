@@ -23,6 +23,8 @@ namespace PersiaWar.Unity2D5D
         private bool moving;
         private bool playerCharacter;
         private bool portraitMode;
+        private float smoothedMoveAmount;
+        private PlayerController cachedPlayerController;
         private int archetype = 1;
         private float phase;
         private float fireUntil;
@@ -177,12 +179,18 @@ namespace PersiaWar.Unity2D5D
                     artRoot.rotation = Quaternion.LookRotation(toCamera.normalized, Vector3.up);
             }
 
+            if (playerCharacter && !portraitMode && cachedPlayerController == null)
+                cachedPlayerController = GetComponentInParent<PlayerController>();
+            float targetMove = cachedPlayerController != null ? cachedPlayerController.Speed01 : (moving ? 1f : 0f);
+            smoothedMoveAmount = Mathf.MoveTowards(smoothedMoveAmount, targetMove, Time.deltaTime * 6.5f);
             float t = Time.time + phase;
-            float bob = moving ? Mathf.Abs(Mathf.Sin(t * 11f)) * 0.045f : Mathf.Sin(t * 2.2f) * 0.015f;
+            float bob = smoothedMoveAmount > 0.025f
+                ? Mathf.Abs(Mathf.Sin(t * 11f)) * 0.045f * smoothedMoveAmount
+                : Mathf.Sin(t * 2.2f) * 0.015f;
             sprite.transform.localPosition = new Vector3(0f, bob, 0f);
 
-            float squash = moving
-                ? 1f + Mathf.Sin(t * 11f) * 0.018f
+            float squash = smoothedMoveAmount > 0.025f
+                ? 1f + Mathf.Sin(t * 11f) * 0.018f * smoothedMoveAmount
                 : 1f + Mathf.Sin(t * 2.2f) * 0.008f;
 
             sprite.transform.localScale = new Vector3(
@@ -193,11 +201,13 @@ namespace PersiaWar.Unity2D5D
             if (mobileModelRoot != null)
             {
                 mobileModelRoot.localPosition = new Vector3(0f, bob, 0f);
-                float walk = moving ? Mathf.Sin(t * 11f) * 24f : Mathf.Sin(t * 2.2f) * 2.5f;
-                if (mobileLeftArm != null) mobileLeftArm.transform.localRotation = Quaternion.Euler(walk, 0f, moving ? -7f : 0f);
-                if (mobileRightArm != null) mobileRightArm.transform.localRotation = Quaternion.Euler(-walk, 0f, moving ? 7f : 0f);
+                float walk = Mathf.Sin(t * 11f) * 24f * smoothedMoveAmount;
+                if (mobileLeftArm != null) mobileLeftArm.transform.localRotation = Quaternion.Euler(walk, 0f, -7f * smoothedMoveAmount);
+                if (mobileRightArm != null) mobileRightArm.transform.localRotation = Quaternion.Euler(-walk, 0f, 7f * smoothedMoveAmount);
                 if (mobileLeftLeg != null) mobileLeftLeg.transform.localRotation = Quaternion.Euler(-walk * .65f, 0f, 0f);
                 if (mobileRightLeg != null) mobileRightLeg.transform.localRotation = Quaternion.Euler(walk * .65f, 0f, 0f);
+                if (!portraitMode && cachedPlayerController != null)
+                    mobileModelRoot.localRotation = Quaternion.Euler(0f, 0f, -cachedPlayerController.MoveInput.x * 5f * smoothedMoveAmount);
                 if (Time.time < fireUntil && mobileRightArm != null)
                     mobileRightArm.transform.localRotation = Quaternion.Euler(-10f, 0f, 5f);
             }
