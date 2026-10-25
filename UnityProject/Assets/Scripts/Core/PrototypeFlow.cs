@@ -1654,7 +1654,17 @@ namespace PersiaWar.Unity2D5D
                 if(DrawFantasyButton(back,"BACK TO HERO",false))SwitchLoadoutTab(false);
                 if(DrawFantasyButton(LoadoutNext(),"START STAGE "+stageNumber,true))StartStageFromLoadout();
             }
-            else if(DrawFantasyButton(LoadoutNext(),"CONTINUE TO WEAPONS",true))SwitchLoadoutTab(true);
+            else
+            {
+                Rect backMenu = new Rect(12f*sc, Screen.height-72f*sc, 145f*sc, 48f*sc);
+                if (DrawFantasyButton(backMenu, "BACK TO MENU", false))
+                {
+                    HeroPortraitStudio.Close();
+                    WeaponPreviewStudio.Close();
+                    mode = ScreenMode.MainMenu;
+                }
+                if (DrawFantasyButton(LoadoutNext(), "CONTINUE TO WEAPONS", true)) SwitchLoadoutTab(true);
+            }
         }
         private void SwitchLoadoutTab(bool weaponTab)
         {
@@ -1697,7 +1707,13 @@ namespace PersiaWar.Unity2D5D
                 Touch touch=Input.GetTouch(t);if(touch.phase!=TouchPhase.Began)continue;
                 Vector2 p=new Vector2(touch.position.x,Screen.height-touch.position.y);
                 float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-                if(loadoutWeaponTab&&new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;SwitchLoadoutTab(false);return;}
+                if(new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p))
+                {
+                    suppressMenuButtonClicksFrame=Time.frameCount;
+                    if(loadoutWeaponTab) SwitchLoadoutTab(false);
+                    else { HeroPortraitStudio.Close(); WeaponPreviewStudio.Close(); mode=ScreenMode.MainMenu; }
+                    return;
+                }
                 if(LoadoutNext().Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;if(loadoutWeaponTab)StartStageFromLoadout();else SwitchLoadoutTab(true);return;}
                 for(int i=0;i<6;i++)if(LoadoutCard(i).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;ChooseLoadoutItem(i);return;}
             }
