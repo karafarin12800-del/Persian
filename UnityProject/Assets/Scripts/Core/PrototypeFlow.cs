@@ -1596,7 +1596,6 @@ namespace PersiaWar.Unity2D5D
         }
         private void DrawLoadoutScreen()
         {
-            MenuTheme.DrawBackdrop(pixel);
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
             Rect panel=new Rect(12f*sc,112f*sc,Screen.width-24f*sc,Screen.height-194f*sc);
             MenuTheme.DrawPanel(panel,pixel);

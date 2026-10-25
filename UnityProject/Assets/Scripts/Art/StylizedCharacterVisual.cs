@@ -22,6 +22,7 @@ namespace PersiaWar.Unity2D5D
 
         private bool moving;
         private bool playerCharacter;
+        private bool portraitMode;
         private int archetype = 1;
         private float phase;
         private float fireUntil;
@@ -84,6 +85,7 @@ namespace PersiaWar.Unity2D5D
 
         public void ConfigurePortraitModel(int heroIndex)
         {
+            portraitMode = true;
             playerCharacter = true;
             archetype = 1;
             EnsurePresentation();
@@ -164,7 +166,7 @@ namespace PersiaWar.Unity2D5D
             if (sprite == null)
                 return;
 
-            Camera cam = Camera.main;
+            Camera cam = portraitMode ? null : Camera.main;
             if (cam != null && artRoot != null)
             {
                 Vector3 toCamera = cam.transform.position - artRoot.position;
