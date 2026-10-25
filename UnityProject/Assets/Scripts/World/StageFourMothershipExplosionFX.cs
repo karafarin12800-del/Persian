@@ -194,6 +194,7 @@ public sealed class StageFourMothershipExplosionFX : MonoBehaviour
         BuildDebris();
         EmitExplosionParticles();
         PeelNearestHull();
+        RuntimeGameAudio.PlayExplosion(radius);
         StageFourCameraShake.Trigger(targetCamera, Mathf.Clamp(radius * 0.018f, 0.08f, 1.25f));
     }
 

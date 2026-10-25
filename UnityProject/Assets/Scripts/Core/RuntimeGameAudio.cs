@@ -15,6 +15,7 @@ public sealed class RuntimeGameAudio : MonoBehaviour
     private AudioClip rifleShot;
     private AudioClip heavyShot;
     private AudioClip enemyShot;
+    private AudioClip explosionClip;
 
     public static RuntimeGameAudio EnsureInstance()
     {
@@ -47,6 +48,14 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         RuntimeGameAudio audio = EnsureInstance();
         if (audio.effectsSource != null && audio.enemyShot != null)
             audio.effectsSource.PlayOneShot(audio.enemyShot, 0.55f);
+    }
+
+    public static void PlayExplosion(float size)
+    {
+        RuntimeGameAudio audio = EnsureInstance();
+        if (audio.effectsSource == null || audio.explosionClip == null) return;
+        float volume = Mathf.Clamp(0.25f + Mathf.Clamp(size, 0f, 60f) / 60f * 0.62f, 0.25f, 0.9f);
+        audio.effectsSource.PlayOneShot(audio.explosionClip, volume);
     }
 
     private void Awake()
@@ -95,6 +104,7 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         rifleShot = BuildShotClip("PersiaWar_RifleShot", 145f, 1250f, 0.13f);
         heavyShot = BuildShotClip("PersiaWar_HeavyShot", 72f, 540f, 0.22f);
         enemyShot = BuildShotClip("PersiaWar_EnemyShot", 95f, 760f, 0.16f);
+        explosionClip = BuildExplosionClip();
         musicSource.clip = BuildMusicLoop();
         musicSource.Play();
     }
@@ -130,6 +140,34 @@ public sealed class RuntimeGameAudio : MonoBehaviour
         }
 
         AudioClip clip = AudioClip.Create("PersiaWar_BackgroundLoop", count, 1, SampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
+    private static AudioClip BuildExplosionClip()
+    {
+        const float duration = 1.15f;
+        int count = Mathf.RoundToInt(SampleRate * duration);
+        float[] data = new float[count];
+        uint noise = 0x72A14C3Du;
+        float phase = 0f;
+        for (int i = 0; i < count; i++)
+        {
+            float t = i / (float)SampleRate;
+            float progress = t / duration;
+            noise ^= noise << 13;
+            noise ^= noise >> 17;
+            noise ^= noise << 5;
+            float white = ((noise & 0xFFFFu) / 32767.5f) - 1f;
+            float envelope = Mathf.Exp(-progress * 4.3f);
+            float lowFrequency = Mathf.Lerp(54f, 31f, progress);
+            phase += 2f * Mathf.PI * lowFrequency / SampleRate;
+            float lowRumble = Mathf.Sin(phase) * 0.68f + Mathf.Sin(phase * 0.53f) * 0.24f;
+            float attack = Mathf.Exp(-progress * 24f);
+            float crack = white * (0.32f * attack + 0.12f);
+            data[i] = Mathf.Clamp((lowRumble + crack) * envelope, -0.96f, 0.96f);
+        }
+        AudioClip clip = AudioClip.Create("PersiaWar_ProceduralExplosion", count, 1, SampleRate, false);
         clip.SetData(data, 0);
         return clip;
     }
