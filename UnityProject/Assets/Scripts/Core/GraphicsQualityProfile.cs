@@ -20,6 +20,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     private static readonly Dictionary<int, Material> WorldLitCache = new Dictionary<int, Material>();
     private static Transform worldLookRoot;
     private static int worldLookStage = -1;
+    private static Color worldLookPreviousAmbient;
+    private static bool worldLookAmbientCaptured;
 
     private Transform lookRoot;
     private readonly Transform[] billboards = new Transform[220];
@@ -138,9 +140,11 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
 
     public static void ApplyWorldLook(Transform root, int stage)
     {
-        if (!IsEnhanced || root == null || stage < 1 || stage > 3) return;
+        if (root == null || stage < 1 || stage > 4) return;
+        if (!IsEnhanced || stage == 4) { RestoreWorldLook(); return; }
         if (worldLookRoot == root && worldLookStage == stage) return;
         RestoreWorldLook();
+        if (!worldLookAmbientCaptured) { worldLookPreviousAmbient = RenderSettings.ambientLight; worldLookAmbientCaptured = true; }
         Shader lit = Shader.Find("PersiaWar/MobileLit");
         if (lit == null) return;
         worldLookRoot = root;
@@ -208,6 +212,11 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         foreach (KeyValuePair<Renderer, Material[]> entry in WorldOriginals)
             if (entry.Key != null) entry.Key.sharedMaterials = entry.Value;
         WorldOriginals.Clear();
+        if (worldLookAmbientCaptured)
+        {
+            RenderSettings.ambientLight = worldLookPreviousAmbient;
+            worldLookAmbientCaptured = false;
+        }
         worldLookRoot = null;
         worldLookStage = -1;
     }

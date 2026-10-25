@@ -1459,8 +1459,10 @@ namespace PersiaWar.Unity2D5D
                     : i == 3 ? new Color(0.08f, 0.72f, 0.98f) : new Color(0.20f, 0.95f, 0.58f);
                 Fill(emblem, emblemColor);
                 GUI.Label(new Rect(card.x + 6f, card.y + 76f, card.width - 12f, 34f), StoreCosmeticNames[i], menuSmallStyle);
+                int catalogPrice = i == 3 ? WeaponCatalog.Get(WeaponController.WeaponKind.VoidRifle).Price
+                    : i == 4 ? WeaponCatalog.Get(WeaponController.WeaponKind.AlienSword).Price : StoreCosmeticPrices[i];
                 GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f),
-                    owned ? (equipped ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
+                    owned ? (equipped ? "EQUIPPED" : "OWNED") : (catalogPrice + " COINS"),
                     menuBodyStyle);
                 Rect action = GetStoreActionRect(i);
                 if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : (i >= 3 ? "EQUIP WEAPON" : "EQUIP")) : "UNLOCK"))
@@ -1668,9 +1670,9 @@ namespace PersiaWar.Unity2D5D
                 Touch touch=Input.GetTouch(t);if(touch.phase!=TouchPhase.Began)continue;
                 Vector2 p=new Vector2(touch.position.x,Screen.height-touch.position.y);
                 float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-                if(loadoutWeaponTab&&new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p)){loadoutWeaponTab=false;return;}
-                if(LoadoutNext().Contains(p)){if(loadoutWeaponTab)StartStageFromLoadout();else loadoutWeaponTab=true;return;}
-                for(int i=0;i<6;i++)if(LoadoutCard(i).Contains(p)){ChooseLoadoutItem(i);return;}
+                if(loadoutWeaponTab&&new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;loadoutWeaponTab=false;return;}
+                if(LoadoutNext().Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;if(loadoutWeaponTab)StartStageFromLoadout();else loadoutWeaponTab=true;return;}
+                for(int i=0;i<6;i++)if(LoadoutCard(i).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;ChooseLoadoutItem(i);return;}
             }
         }
 
