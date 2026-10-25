@@ -892,7 +892,7 @@ namespace PersiaWar.Unity2D5D
             {
                 Rect button=GetLobbyButtonRect(i);
                 bool available=i<4||LoadoutStore.IsCampaignStageAvailable(i-3);
-                if(DrawFantasyButton(button,labels[i],available))ActivateLobbyButton(i);
+                if(DrawFantasyButton(button,labels[i],false,available))ActivateLobbyButton(i);
             }
             if(!string.IsNullOrEmpty(lobbyNotice)&&Time.unscaledTime<lobbyNoticeUntil)
             {
@@ -1572,11 +1572,26 @@ namespace PersiaWar.Unity2D5D
                 {
                     WeaponCatalog.Entry entry = weaponEntry;
                     bool purchaseEnabled = owned || LoadoutStore.IsStageUnlocked(entry.RequiredCompletedStage);
-                    if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : "EQUIP WEAPON") : "UNLOCK", purchaseEnabled))
-                        PurchaseOrEquipCosmetic(i);
+                    if (purchaseEnabled)
+                    {
+                        if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : "EQUIP WEAPON") : "UNLOCK", equipped, true))
+                            PurchaseOrEquipCosmetic(i);
+                    }
+                    else
+                    {
+                        DrawFantasyButton(action, "CLEAR STAGE " + weaponEntry.RequiredCompletedStage, false, false);
+                    }
+
                     bool sellEnabled = owned && !LoadoutTestSwitch.UnlockEverything;
-                    if (DrawFantasyButton(GetStoreSellRect(i), owned ? "SELL" : "NOT OWNED", sellEnabled))
-                        SellStoreWeapon(i);
+                    if (sellEnabled)
+                    {
+                        if (DrawFantasyButton(GetStoreSellRect(i), "SELL", false, true))
+                            SellStoreWeapon(i);
+                    }
+                    else
+                    {
+                        DrawFantasyButton(GetStoreSellRect(i), owned ? "TEST MODE" : "NOT OWNED", false, false);
+                    }
                 }
                 else if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : "EQUIP") : "UNLOCK"))
                 {
@@ -3529,11 +3544,11 @@ namespace PersiaWar.Unity2D5D
             menuButtonStyle.normal.textColor = new Color(1f, 0.92f, 0.72f, 1f);
         }
 
-        private bool DrawFantasyButton(Rect rect, string label, bool selected = false)
+        private bool DrawFantasyButton(Rect rect, string label, bool selected = false, bool enabled = true)
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
-            bool hovered = Event.current != null && rect.Contains(Event.current.mousePosition);
-            bool pressed = hovered && Event.current.type == EventType.MouseDown;
+            bool hovered = enabled && Event.current != null && rect.Contains(Event.current.mousePosition);
+            bool pressed = enabled && hovered && Event.current.type == EventType.MouseDown;
             int scaleKey = label.GetHashCode() ^ Mathf.RoundToInt(rect.x * 3f) ^ Mathf.RoundToInt(rect.y * 7f);
             if (!menuButtonScales.TryGetValue(scaleKey, out float currentScale)) currentScale = 1f;
             float targetScale = pressed ? 0.965f : hovered ? 1.025f : 1f;
@@ -3541,9 +3556,11 @@ namespace PersiaWar.Unity2D5D
             menuButtonScales[scaleKey] = currentScale;
             rect = new Rect(rect.center.x - rect.width * currentScale * 0.5f,
                 rect.center.y - rect.height * currentScale * 0.5f, rect.width * currentScale, rect.height * currentScale);
-            Color edge = selected || hovered
-                ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
-                : new Color(0.35f, 0.66f, 0.78f, 0.68f);
+            Color edge = !enabled
+                ? new Color(0.28f, 0.31f, 0.35f, 0.62f)
+                : (selected || hovered
+                    ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
+                    : new Color(0.35f, 0.66f, 0.78f, 0.68f));
 
             // Layered translucent glass with a lower shadow and top bevel gives
             // menu controls a raised, readable appearance without changing layout.
@@ -3553,23 +3570,23 @@ namespace PersiaWar.Unity2D5D
             float inset = Mathf.Max(2f, 2.5f * scale);
             Rect inner = new Rect(rect.x + inset, rect.y + inset,
                 Mathf.Max(0f, rect.width - inset * 2f), Mathf.Max(0f, rect.height - inset * 2f));
-            Fill(inner, new Color(0.025f, 0.075f, 0.12f, 0.78f));
+            Fill(inner, enabled ? new Color(0.025f, 0.075f, 0.12f, 0.78f) : new Color(0.035f, 0.04f, 0.045f, 0.72f));
             Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
                 Mathf.Max(0f, inner.width - 4f * scale), Mathf.Max(1f, rect.height * 0.20f)),
-                new Color(0.52f, 0.86f, 0.98f, selected || hovered ? 0.25f : 0.13f));
+                new Color(0.52f, 0.86f, 0.98f, enabled ? (selected || hovered ? 0.25f : 0.13f) : 0.025f));
             Fill(new Rect(inner.x + 2f * scale, inner.yMax - 3f * scale,
                 Mathf.Max(0f, inner.width - 4f * scale), 2f * scale),
                 new Color(0f, 0f, 0f, 0.30f));
             Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
                 2f * scale, Mathf.Max(0f, inner.height - 4f * scale)),
-                new Color(0.65f, 0.94f, 1f, 0.34f));
+                new Color(0.65f, 0.94f, 1f, enabled ? 0.34f : 0.07f));
 
-            bool clicked = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+            bool clicked = enabled && GUI.Button(rect, GUIContent.none, GUIStyle.none);
             GUI.Label(rect, label, menuButtonStyle);
             // Native Android menu touch handling can change screens in Update before
             // the synthesized IMGUI mouse event is processed. Suppress that same-frame
             // click so the new screen cannot accidentally activate a second button.
-            if (Time.frameCount == suppressMenuButtonClicksFrame)
+            if (!enabled || Time.frameCount == suppressMenuButtonClicksFrame)
                 return false;
             return clicked;
         }
