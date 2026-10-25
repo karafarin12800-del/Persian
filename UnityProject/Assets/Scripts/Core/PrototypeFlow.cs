@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using PersiaWar.Unity2D5D.UI.Loadout;
 
 namespace PersiaWar.Unity2D5D
 {
@@ -16,6 +17,7 @@ namespace PersiaWar.Unity2D5D
             Store,
             Settings,
             HeroSelect,
+            Loadout,
             DropMap,
             Match
         }
@@ -54,6 +56,9 @@ namespace PersiaWar.Unity2D5D
         private Vector2 spawnWorld = new Vector2(0f, -4f);
         private bool spawnChosen;
         private int selectedHero;
+        private bool loadoutWeaponTab;
+        private int lastStageReward;
+        private string loadoutNotice = string.Empty;
         private int stageTwoOriginalHero;
         private bool stageTwoShopOpen;
         private float girlRescueNoticeUntil;
@@ -182,6 +187,9 @@ namespace PersiaWar.Unity2D5D
             // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
             InitializeLocalProfile();
+            LoadoutStore.EnsureDefaults();
+            selectedHero = LoadoutStore.SelectedHero;
+            selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
 #if UNITY_ANDROID
             // Android production path: keep the real front-end interactive.
             // Do NOT auto-start the match. The previous isolation build skipped the
@@ -262,6 +270,7 @@ namespace PersiaWar.Unity2D5D
                 HandleLobbyTouches();
                 return;
             }
+            if (mode == ScreenMode.Loadout) { HandleLoadoutTouches(); return; }
             if (mode == ScreenMode.HeroSelect)
             {
                 HandleHeroSelectTouches();
@@ -410,6 +419,9 @@ namespace PersiaWar.Unity2D5D
                         DrawCharacterShop();
                     else
                         DrawHeroSelect();
+                    break;
+                case ScreenMode.Loadout:
+                    DrawLoadoutScreen();
                     break;
                 default:
                     DrawDropMap();
@@ -726,20 +738,9 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawBackdrop()
         {
-            // Bright blue lobby palette inspired by the supplied battle-royale waiting screen.
-            Color old = GUI.color;
-            GUI.color = new Color(0.14f, 0.49f, 0.70f, 1f);
-            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), pixel);
-            GUI.color = old;
-            for (int band = 0; band < 8; band++)
-            {
-                float t = band / 7f;
-                Fill(new Rect(0f, band * Screen.height / 8f, Screen.width, Screen.height / 8f + 1f),
-                    Color.Lerp(new Color(0.10f, 0.38f, 0.61f, 0.30f),
-                               new Color(0.37f, 0.72f, 0.83f, 0.22f), t));
-            }
+            MenuTheme.DrawBackdrop(pixel);
             Rect topBar = new Rect(0f, 0f, Screen.width, Mathf.Min(110f, Screen.height * 0.16f));
-            Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.48f));
+            Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.62f));
             GUI.Label(new Rect(28f, 12f, Screen.width * 0.62f, 56f), "♛  PERSIA WAR", menuTitleStyle);
             GUI.Label(new Rect(30f, 64f, Screen.width * 0.60f, 32f), "CLASSIC BATTLE ROYALE", menuSmallStyle);
         }
@@ -935,7 +936,10 @@ namespace PersiaWar.Unity2D5D
             // If Stage 2 was tested last, don't accidentally reuse its generated
             // village when the real campaign resumes at Stage 1.
             forceStageOneWorldRebuildForTest = stageNumber == 1;
-            mode = ScreenMode.HeroSelect;
+            selectedHero = LoadoutStore.SelectedHero;
+            selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
+            loadoutWeaponTab = false;
+            mode = ScreenMode.Loadout;
             spawnChosen = false;
             StartupCheckpoint.Set("CampaignContinue_Stage" + stageNumber);
         }
@@ -998,7 +1002,8 @@ namespace PersiaWar.Unity2D5D
                 if (activeCamera != null) activeCamera.enabled = false;
                 if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
                 GateGameplay(false);
-                mode = ScreenMode.HeroSelect;
+                mode = ScreenMode.Loadout;
+                loadoutWeaponTab = false;
                 StartupCheckpoint.Set("DirectStageTestEntry_1");
                 return;
             }
@@ -1033,8 +1038,8 @@ namespace PersiaWar.Unity2D5D
                 if (activeCamera != null) activeCamera.enabled = false;
                 if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
                 GateGameplay(false);
-                mode = ScreenMode.DropMap;
-                StartCoroutine(BeginMainGameAfterMenuFrame());
+                mode = ScreenMode.Loadout;
+                loadoutWeaponTab = false;
                 StartupCheckpoint.Set("DirectStageTestEntry_" + targetStage);
             }
         }
@@ -1230,17 +1235,18 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
-                // Seamless campaign hand-off: start Stage 3 immediately, carrying
-                // the exact ship preserved above into the Stage 3 landing cinematic.
+                lastStageReward = LoadoutStore.MarkStageCompleted(2, false);
                 stageNumber = 3;
                 PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
                 PlayerPrefs.Save();
+                selectedHero = LoadoutStore.SelectedHero;
+                selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
+                loadoutWeaponTab = false;
                 spawnWorld = new Vector2(0f, -97f);
                 spawnChosen = true;
-                mode = ScreenMode.DropMap;
+                mode = ScreenMode.Loadout;
                 startupStatus = "Stage 3: transport ship approaching the alien planet...";
                 StartupCheckpoint.Set("StageTwoCutsceneComplete_AutoStartStage3Transport_" + result);
-                StartCoroutine(BeginMainGameAfterMenuFrame());
             }
         }
 
@@ -1272,15 +1278,18 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
                 return;
             }
+            lastStageReward = LoadoutStore.MarkStageCompleted(3, false);
             stageNumber = 4;
             PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
             PlayerPrefs.Save();
+            selectedHero = LoadoutStore.SelectedHero;
+            selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
+            loadoutWeaponTab = false;
             spawnWorld = Vector2.zero;
             spawnChosen = true;
-            mode = ScreenMode.DropMap;
+            mode = ScreenMode.Loadout;
             startupStatus = "Stage 4: green uplink to the orbital mothership...";
             StartupCheckpoint.Set("StageThreeComplete_AutoStartStageFour");
-            StartCoroutine(BeginMainGameAfterMenuFrame());
         }
 
         /// <summary>
@@ -1335,6 +1344,7 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
+            lastStageReward = LoadoutStore.MarkStageCompleted(4, false);
             stageNumber = 5;
             PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
             PlayerPrefs.SetInt("PW.Stage4Completed", 1);
@@ -1390,10 +1400,8 @@ namespace PersiaWar.Unity2D5D
 
         private bool IsStoreItemOwned(int index)
         {
-            if (index < 3)
-                return PlayerPrefs.GetInt("PW.CosmeticOwned." + index, index == 0 ? 1 : 0) != 0;
-            string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
-            return PlayerPrefs.GetInt(rewardKey, 0) != 0;
+            if (index < 3) return PlayerPrefs.GetInt("PW.CosmeticOwned." + index, index == 0 ? 1 : 0) != 0;
+            return LoadoutStore.IsWeaponOwned(index == 3 ? WeaponController.WeaponKind.VoidRifle : WeaponController.WeaponKind.AlienSword);
         }
 
         private bool IsStoreItemEquipped(int index)
@@ -1407,21 +1415,10 @@ namespace PersiaWar.Unity2D5D
         {
             if (index >= 3)
             {
-                string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
-                bool ownedWeapon = PlayerPrefs.GetInt(rewardKey, 0) != 0;
-                if (!ownedWeapon)
-                {
-                    int price = StoreCosmeticPrices[index];
-                    if (storeCoins < price) return;
-                    storeCoins -= price;
-                    PlayerPrefs.SetInt("PW.StoreCoins", storeCoins);
-                    PlayerPrefs.SetInt(rewardKey, 1);
-                }
-                selectedStoreWeaponKind = index == 3
-                    ? (int)WeaponController.WeaponKind.VoidRifle
-                    : (int)WeaponController.WeaponKind.AlienSword;
-                PlayerPrefs.SetInt("PW.SelectedWeaponKind", selectedStoreWeaponKind);
-                PlayerPrefs.Save();
+                WeaponController.WeaponKind kind = index == 3 ? WeaponController.WeaponKind.VoidRifle : WeaponController.WeaponKind.AlienSword;
+                if (!LoadoutStore.TryBuyWeapon(kind)) return;
+                selectedStoreWeaponKind = (int)kind;
+                LoadoutStore.SelectedWeapon = kind;
                 return;
             }
 
@@ -1583,6 +1580,99 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+
+        private Rect LoadoutCard(int i)
+        {
+            float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
+            float gap=9f*sc, total=Mathf.Min(Screen.width-28f*sc,1000f), w=(total-gap*2f)/3f, h=164f*sc;
+            return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap),Screen.height*.25f+(i/3)*(h+gap),w,h);
+        }
+        private Rect LoadoutNext()
+        {
+            float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
+            return new Rect(Screen.width*.5f-180f*sc,Screen.height-72f*sc,360f*sc,50f*sc);
+        }
+        private void DrawLoadoutScreen()
+        {
+            MenuTheme.DrawBackdrop(pixel);
+            float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
+            Rect panel=new Rect(12f*sc,112f*sc,Screen.width-24f*sc,Screen.height-194f*sc);
+            MenuTheme.DrawPanel(panel,pixel);
+            GUI.Label(new Rect(panel.x+12f,panel.y+6f*sc,panel.width-24f,38f*sc),"STAGE "+stageNumber+"  •  "+(loadoutWeaponTab?"CHOOSE WEAPON":"CHOOSE HERO"),menuHeaderStyle);
+            GUI.Label(new Rect(panel.x+12f,panel.y+42f*sc,panel.width-24f,24f*sc),"COINS  "+LoadoutStore.Coins,menuBodyStyle);
+            if(LoadoutTestSwitch.UnlockEverything){Rect b=new Rect(panel.xMax-116f*sc,panel.y+8f*sc,100f*sc,24f*sc);Fill(b,new Color(.58f,.12f,.08f,1));GUI.Label(b,"TEST MODE",menuSmallStyle);}
+            if(lastStageReward>0)GUI.Label(new Rect(panel.x+12f,panel.y+66f*sc,panel.width-24f,20f*sc),"STAGE CLEAR REWARD  +"+lastStageReward+" COINS",menuSmallStyle);
+            for(int i=0;i<6;i++)
+            {
+                Rect card=LoadoutCard(i);
+                bool chosen=loadoutWeaponTab?(selectedStoreWeaponKind==(int)WeaponCatalog.GetAt(i).Kind):(selectedHero==i);
+                Fill(card,new Color(.76f,.53f,.16f,chosen?1f:.78f));
+                Fill(new Rect(card.x+3f,card.y+3f,card.width-6f,card.height-6f),new Color(.025f,.055f,.085f,.97f));
+                if(!loadoutWeaponTab)
+                {
+                    DrawChibiFigure(new Rect(card.x+card.width*.25f,card.y+7f,card.width*.5f,card.height*.58f),i);
+                    bool ok=LoadoutStore.CanUseHero(i,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),HeroCatalog.Name(i),menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),ok?(chosen?"SELECTED":"TAP TO SELECT"):HeroCatalog.Price(i)+" COINS • TAP TO BUY",menuSmallStyle);
+                }
+                else
+                {
+                    WeaponCatalog.Entry e=WeaponCatalog.GetAt(i);
+                    Fill(new Rect(card.x+card.width*.18f,card.y+card.height*.24f,card.width*.64f,card.height*.18f),new Color(.48f,.59f,.67f,1));
+                    Fill(new Rect(card.x+card.width*.42f,card.y+card.height*.1f,card.width*.16f,card.height*.46f),e.Kind==WeaponController.WeaponKind.VoidRifle?Color.cyan:(e.Kind==WeaponController.WeaponKind.AlienSword?Color.green:new Color(.8f,.62f,.25f)));
+                    bool ok=LoadoutStore.CanUseWeapon(e.Kind);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),e.Name,menuSmallStyle);
+                    string state=ok?(chosen?"SELECTED":"TAP TO SELECT"):(!LoadoutStore.IsStageUnlocked(e.RequiredCompletedStage)?"CLEAR STAGE "+e.RequiredCompletedStage:e.Price+" COINS • TAP TO BUY");
+                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),state,menuSmallStyle);
+                }
+                if(GUI.Button(card,GUIContent.none,GUIStyle.none))ChooseLoadoutItem(i);
+            }
+            GUI.Label(new Rect(panel.x+8f,panel.yMax-42f*sc,panel.width-16f,20f*sc),loadoutNotice,menuSmallStyle);
+            if(loadoutWeaponTab)
+            {
+                Rect back=new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc);
+                if(DrawFantasyButton(back,"BACK TO HERO",false))loadoutWeaponTab=false;
+                if(DrawFantasyButton(LoadoutNext(),"START STAGE "+stageNumber,true))StartStageFromLoadout();
+            }
+            else if(DrawFantasyButton(LoadoutNext(),"CONTINUE TO WEAPONS",true))loadoutWeaponTab=true;
+        }
+        private void ChooseLoadoutItem(int i)
+        {
+            if(!loadoutWeaponTab)
+            {
+                bool rescued=gameBootstrap!=null&&gameBootstrap.VillageGirlRescued;
+                if(LoadoutStore.CanUseHero(i,rescued)||LoadoutStore.TryBuyHero(i,rescued)){selectedHero=i;LoadoutStore.SelectedHero=i;loadoutNotice=string.Empty;}
+                else loadoutNotice="NOT ENOUGH COINS OR HERO LOCKED";
+            }
+            else
+            {
+                WeaponCatalog.Entry e=WeaponCatalog.GetAt(i);
+                if(LoadoutStore.CanUseWeapon(e.Kind)||LoadoutStore.TryBuyWeapon(e.Kind)){selectedStoreWeaponKind=(int)e.Kind;LoadoutStore.SelectedWeapon=e.Kind;loadoutNotice=string.Empty;}
+                else loadoutNotice="WEAPON LOCKED OR NOT ENOUGH COINS";
+            }
+        }
+        private void StartStageFromLoadout()
+        {
+            WeaponController.WeaponKind chosen=(WeaponController.WeaponKind)selectedStoreWeaponKind;
+            if(!LoadoutStore.CanUseHero(selectedHero,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued)||!LoadoutStore.CanUseWeapon(chosen)){loadoutNotice="SELECT AN AVAILABLE HERO AND WEAPON";return;}
+            LoadoutStore.SelectedHero=selectedHero;LoadoutStore.SelectedWeapon=chosen;
+            if(stageNumber<=2){EnterDropMap();return;}
+            spawnWorld=stageNumber==3?new Vector2(0f,-97f):Vector2.zero;spawnChosen=true;mode=ScreenMode.DropMap;StartMatch();
+        }
+        private void HandleLoadoutTouches()
+        {
+            if(!Application.isMobilePlatform||Input.touchCount<=0)return;
+            for(int t=0;t<Input.touchCount;t++)
+            {
+                Touch touch=Input.GetTouch(t);if(touch.phase!=TouchPhase.Began)continue;
+                Vector2 p=new Vector2(touch.position.x,Screen.height-touch.position.y);
+                float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
+                if(loadoutWeaponTab&&new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p)){loadoutWeaponTab=false;return;}
+                if(LoadoutNext().Contains(p)){if(loadoutWeaponTab)StartStageFromLoadout();else loadoutWeaponTab=true;return;}
+                for(int i=0;i<6;i++)if(LoadoutCard(i).Contains(p)){ChooseLoadoutItem(i);return;}
+            }
+        }
+
         private void DrawHeroSelect()
         {
             GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
@@ -1661,12 +1751,7 @@ namespace PersiaWar.Unity2D5D
 
         private bool IsHeroUnlocked(int index)
         {
-            if (index == 0)
-                return true;
-
-            // Anahita is deliberately the second card from the left.
-            return index == 1 && stageNumber >= 2 &&
-                gameBootstrap != null && gameBootstrap.VillageGirlRescued;
+            return LoadoutStore.CanUseHero(index, gameBootstrap != null && gameBootstrap.VillageGirlRescued);
         }
 
         private void CheckStageOneGirlRescue()
@@ -1915,13 +2000,17 @@ namespace PersiaWar.Unity2D5D
         {
             ExtractionBeacon.ClearForStageTransition();
             Time.timeScale = 1f;
+            lastStageReward = LoadoutStore.MarkStageCompleted(1, stageTestRun);
             stageNumber = 2;
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
+            selectedHero = LoadoutStore.SelectedHero;
+            selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
             stageTwoLobbyRunning = false;
             stageTwoLobbyReady = false;
             stageTwoLobbyPlayers = 1;
-            mode = ScreenMode.HeroSelect;
+            mode = ScreenMode.Loadout;
+            loadoutWeaponTab = false;
             spawnChosen = false;
             startingMatch = false;
             matchPaused = false;
