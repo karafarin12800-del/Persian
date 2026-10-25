@@ -199,7 +199,8 @@ namespace PersiaWar.Unity2D5D
             // Do NOT auto-start the match. The previous isolation build skipped the
             // hero/drop-map screens and immediately activated the heaviest gameplay
             // systems, which made the app appear to "rush through" the choices.
-            selectedHero = 0;
+            // Preserve the saved hero selection; forcing Ardeshir here made Anahita appear to disappear on every Android app launch.
+            selectedHero = LoadoutStore.SelectedHero;
             spawnWorld = new Vector2(0f, -4f);
             spawnChosen = false;
             mode = ScreenMode.MainMenu;
