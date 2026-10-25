@@ -54,6 +54,12 @@ namespace PersiaWar.Unity2D5D
         private float originalCameraFieldOfView;
         private float originalCameraOrthographicSize;
         private bool cameraWasOrthographic;
+        private CameraClearFlags originalCameraClearFlags;
+        private Color originalCameraBackgroundColor;
+        private float originalCameraFarClipPlane;
+        private ParticleSystem orbitalStars;
+        private Material orbitalStarMaterial;
+        private Vector3 ascentCameraOffset;
         private Vector3 cameraStartPosition;
         private Quaternion cameraStartRotation;
         private Vector3 cameraTargetPosition;
@@ -78,9 +84,9 @@ namespace PersiaWar.Unity2D5D
         private const float FlashDuration = 0.20f;
         private const float DecloakDuration = 2.0f;
         private const float BoardingDuration = 6.2f;
-        private const float AscentDuration = 2.0f;
-        private const float AscentHeight = 70f;
-        private const float DecloakDistance = 30f;
+        private const float AscentDuration = 4.2f;
+        private const float AscentHeight = 180f;
+        private const float MinimumDecloakDistance = 14f;
 
         public bool IsRunning { get; private set; }
         public bool IsComplete { get; private set; }
@@ -150,6 +156,9 @@ namespace PersiaWar.Unity2D5D
                 originalCameraFieldOfView = cinematicCamera.fieldOfView;
                 originalCameraOrthographicSize = cinematicCamera.orthographicSize;
                 cameraWasOrthographic = cinematicCamera.orthographic;
+                originalCameraClearFlags = cinematicCamera.clearFlags;
+                originalCameraBackgroundColor = cinematicCamera.backgroundColor;
+                originalCameraFarClipPlane = cinematicCamera.farClipPlane;
                 cameraStartPosition = originalCameraPosition;
                 cameraStartRotation = originalCameraRotation;
                 cameraStateCaptured = true;
@@ -182,8 +191,8 @@ namespace PersiaWar.Unity2D5D
             toShip.y = 0f;
             shipForward = toShip.sqrMagnitude > 0.001f ? toShip.normalized : viewForward;
 
-            // Keep the hero near screen centre while pulling back enough to show
-            // the ship 30 metres away in the same cinematic shot.
+            // Keep the hero near screen centre while making room to reveal the
+            // transport at the nearest safe, reachable landing site ahead.
             if (cinematicCamera != null)
             {
                 cameraTargetPosition = localPlayer.position - viewForward * 19f + Vector3.up * 11.5f;
@@ -219,7 +228,7 @@ namespace PersiaWar.Unity2D5D
             IsComplete = false;
             cleaned = false;
 
-            Debug.Log("PERSIA_STAGE2_END: camera framing; hidden ship placed 30m ahead on clear ground.");
+            Debug.Log("PERSIA_STAGE2_END: camera framing; ship hidden at nearest clear forward landing site.");
         }
 
         private void Update()
@@ -296,6 +305,7 @@ namespace PersiaWar.Unity2D5D
                         // Safety fallback prevents an obstructed approach from
                         // leaving the final sequence stuck indefinitely.
                         BoardAnyRemainingActors();
+                        BeginOrbitalAscent();
                         ChangePhase(SequencePhase.Ascent);
                     }
                     break;
@@ -307,18 +317,114 @@ namespace PersiaWar.Unity2D5D
                     if (shipRoot != null)
                         shipRoot.position = landingPosition + Vector3.up * (AscentHeight * eased);
 
-                    // The camera remains locked on the ground, so the ship visibly
-                    // exits the frame instead of being followed upward.
+                    // Follow the same transport upward, then transition the sky to
+                    // a star field so the player sees the departure into space.
+                    if (cinematicCamera != null && shipRoot != null)
+                    {
+                        cinematicCamera.transform.position = shipRoot.position + ascentCameraOffset;
+                        Vector3 lookTarget = shipRoot.position + Vector3.up * 1.4f;
+                        Vector3 lookDirection = lookTarget - cinematicCamera.transform.position;
+                        if (lookDirection.sqrMagnitude > 0.001f)
+                            cinematicCamera.transform.rotation = Quaternion.LookRotation(lookDirection, Vector3.up);
+
+                        if (t >= 0.38f)
+                        {
+                            cinematicCamera.clearFlags = CameraClearFlags.SolidColor;
+                            float spaceBlend = Mathf.SmoothStep(0f, 1f,
+                                Mathf.InverseLerp(0.38f, 0.92f, t));
+                            Color atmosphere = new Color(0.16f, 0.27f, 0.43f, 1f);
+                            Color space = new Color(0.003f, 0.008f, 0.022f, 1f);
+                            cinematicCamera.backgroundColor = Color.Lerp(atmosphere, space, spaceBlend);
+
+                            if (orbitalStars == null)
+                                CreateOrbitalStarfield();
+                        }
+                    }
+
                     if (t >= 1f)
                     {
                         IsRunning = false;
                         IsComplete = true;
                         Phase = SequencePhase.Complete;
-                        Debug.Log("PERSIA_STAGE2_END: local hero boarded; ship ascended out of frame in 2 seconds.");
+                        Debug.Log("PERSIA_STAGE2_END: local hero boarded; transport completed the visible orbital ascent for Stage 3.");
                     }
                     break;
                 }
             }
+        }
+
+        private void BeginOrbitalAscent()
+        {
+            if (shipRoot == null) return;
+
+            if (cinematicCamera != null)
+            {
+                ascentCameraOffset = cinematicCamera.transform.position - shipRoot.position;
+                cinematicCamera.farClipPlane = Mathf.Max(originalCameraFarClipPlane, 600f);
+            }
+            else
+            {
+                ascentCameraOffset = new Vector3(0f, 12f, -32f);
+            }
+        }
+
+        private void CreateOrbitalStarfield()
+        {
+            if (cinematicCamera == null || orbitalStars != null) return;
+
+            GameObject starObject = new GameObject("StageTwoOrbitalStarfield");
+            starObject.transform.SetParent(cinematicCamera.transform, false);
+            starObject.transform.localPosition = Vector3.zero;
+            starObject.transform.localRotation = Quaternion.identity;
+
+            orbitalStars = starObject.AddComponent<ParticleSystem>();
+            ParticleSystem.MainModule main = orbitalStars.main;
+            main.duration = AscentDuration;
+            main.loop = false;
+            main.playOnAwake = false;
+            main.useUnscaledTime = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(5f, 7f);
+            main.startSpeed = 0f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.42f);
+            main.startColor = new Color(0.78f, 0.89f, 1f, 0.96f);
+            main.maxParticles = 180;
+
+            ParticleSystem.EmissionModule emission = orbitalStars.emission;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, (short)150)
+            });
+
+            ParticleSystem.ShapeModule shape = orbitalStars.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.position = new Vector3(0f, 0f, 85f);
+            shape.scale = new Vector3(105f, 70f, 5f);
+
+            ParticleSystemRenderer starRenderer = orbitalStars.GetComponent<ParticleSystemRenderer>();
+            if (starRenderer != null)
+            {
+                starRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+                starRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                starRenderer.receiveShadows = false;
+                Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit") ??
+                    Shader.Find("Particles/Standard Unlit") ?? Shader.Find("Sprites/Default");
+                if (shader != null)
+                {
+                    orbitalStarMaterial = new Material(shader);
+                    orbitalStarMaterial.name = "StageTwoOrbitalStarfieldMaterial";
+                    orbitalStarMaterial.color = Color.white;
+                    if (orbitalStarMaterial.HasProperty("_BaseColor"))
+                        orbitalStarMaterial.SetColor("_BaseColor", Color.white);
+                    if (orbitalStarMaterial.HasProperty("_Color"))
+                        orbitalStarMaterial.SetColor("_Color", Color.white);
+                    starRenderer.sharedMaterial = orbitalStarMaterial;
+                }
+            }
+
+            orbitalStars.Play(true);
+            StartupCheckpoint.Set("StageTwoTransportEnteringSpace");
         }
 
         private void ChangePhase(SequencePhase next)
@@ -474,56 +580,54 @@ namespace PersiaWar.Unity2D5D
             forward = GetFlatDirection(forward);
             if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
 
-            // Search straight ahead first, then fan around it in five-degree steps.
-            // Do not clamp a position: the final location must actually be 30m away.
-            List<float> angleOffsets = new List<float> { 0f };
-            for (float angle = 5f; angle < 180f; angle += 5f)
+            // Search the nearest ship-length landing distance first. Only fan out
+            // to either side when the directly-forward site is blocked.
+            float[] distances =
             {
-                angleOffsets.Add(angle);
-                angleOffsets.Add(-angle);
-            }
-            angleOffsets.Add(180f);
-
-            for (int a = 0; a < angleOffsets.Count; a++)
+                MinimumDecloakDistance, 16f, 18f, 21f, 24f, 28f, 33f
+            };
+            float[] angleOffsets =
             {
-                float offset = angleOffsets[a];
-                Vector3 direction = Quaternion.AngleAxis(offset, Vector3.up) * forward;
-                Vector3 candidate = reference + direction * DecloakDistance;
+                0f, 10f, -10f, 20f, -20f, 30f, -30f, 40f, -40f, 50f, -50f
+            };
 
-                if (candidate.x < -83f || candidate.x > 83f ||
-                    candidate.z < -83f || candidate.z > 83f)
-                    continue;
+            for (int d = 0; d < distances.Length; d++)
+            {
+                float distance = distances[d];
+                for (int a = 0; a < angleOffsets.Length; a++)
+                {
+                    float offset = angleOffsets[a];
+                    Vector3 direction = Quaternion.AngleAxis(offset, Vector3.up) * forward;
+                    Vector3 candidate = reference + direction * distance;
+                    if (candidate.x < -83f || candidate.x > 83f ||
+                        candidate.z < -83f || candidate.z > 83f)
+                        continue;
 
-                candidate.y = 0f;
-                float actualDistance = Vector2.Distance(
-                    new Vector2(candidate.x, candidate.z),
-                    new Vector2(reference.x, reference.z));
-                if (Mathf.Abs(actualDistance - DecloakDistance) > 0.20f)
-                    continue;
+                    candidate.y = 0f;
+                    Quaternion shipRotation = Quaternion.LookRotation(direction, Vector3.up);
+                    Vector3 rearRampApproach = candidate - direction * 6.35f;
+                    if (!IsLandingAreaClear(candidate, shipRotation, localPlayer))
+                        continue;
+                    if (!HasClearApproach(reference, rearRampApproach, localPlayer))
+                        continue;
 
-                Quaternion shipRotation = Quaternion.LookRotation(direction, Vector3.up);
-                if (!IsLandingAreaClear(candidate, shipRotation, localPlayer))
-                    continue;
-                if (!HasClearApproach(reference, candidate, localPlayer))
-                    continue;
+                    RaycastHit hit;
+                    Vector3 rayOrigin = new Vector3(candidate.x,
+                        Mathf.Max(80f, reference.y + 80f), candidate.z);
+                    if (Physics.Raycast(rayOrigin, Vector3.down, out hit, 180f,
+                        ~0, QueryTriggerInteraction.Ignore))
+                        candidate.y = hit.point.y;
 
-                RaycastHit hit;
-                Vector3 rayOrigin = new Vector3(candidate.x, Mathf.Max(80f, reference.y + 80f), candidate.z);
-                if (Physics.Raycast(rayOrigin, Vector3.down, out hit, 180f,
-                    ~0, QueryTriggerInteraction.Ignore))
-                    candidate.y = hit.point.y;
-
-                Debug.Log("PERSIA_STAGE2_END: clear decloak site selected at " +
-                    Vector2.Distance(new Vector2(reference.x, reference.z),
-                        new Vector2(candidate.x, candidate.z)).ToString("F1") + "m; angle=" +
-                    offset.ToString("F0") + " degrees.");
-                return candidate;
+                    Debug.Log("PERSIA_STAGE2_END: nearest clear forward ship site selected at " +
+                        distance.ToString("F1") + "m; angle=" + offset.ToString("F0") + " degrees.");
+                    return candidate;
+                }
             }
 
-            // A ship must never appear inside a building or on top of another actor.
-            // If the map offers no valid 30m landing/approach point, skip the scene
-            // instead of teleporting the ship or hero into occupied space.
-            Debug.LogError("PERSIA_STAGE2_END: no clear ground and unobstructed path found at 30m.");
+            // Never place the ship inside a building or across a blocked approach.
+            // A NaN result makes the caller skip the cutscene rather than teleport
+            // the player into geometry.
+            Debug.LogError("PERSIA_STAGE2_END: no clear forward landing site or unobstructed boarding path found.");
             return new Vector3(float.NaN, float.NaN, float.NaN);
         }
 
@@ -935,7 +1039,7 @@ namespace PersiaWar.Unity2D5D
                 case SequencePhase.Flash: return "STEALTH FIELD COLLAPSE";
                 case SequencePhase.Decloak: return "ALIEN SHIP REVEALING";
                 case SequencePhase.Boarding: return "BOARD THE SHIP";
-                case SequencePhase.Ascent: return "DEPARTURE IN PROGRESS";
+                case SequencePhase.Ascent: return "ASCENDING INTO SPACE — STAGE 3 APPROACH";
                 default: return string.Empty;
             }
         }
@@ -991,6 +1095,9 @@ namespace PersiaWar.Unity2D5D
                 cinematicCamera.transform.position = originalCameraPosition;
                 cinematicCamera.transform.rotation = originalCameraRotation;
                 cinematicCamera.orthographic = cameraWasOrthographic;
+                cinematicCamera.clearFlags = originalCameraClearFlags;
+                cinematicCamera.backgroundColor = originalCameraBackgroundColor;
+                cinematicCamera.farClipPlane = originalCameraFarClipPlane;
                 if (cameraWasOrthographic)
                     cinematicCamera.orthographicSize = originalCameraOrthographicSize;
                 else
@@ -999,6 +1106,10 @@ namespace PersiaWar.Unity2D5D
 
             if (greenSparks != null) Destroy(greenSparks.gameObject);
             if (whiteSparks != null) Destroy(whiteSparks.gameObject);
+            if (orbitalStars != null) Destroy(orbitalStars.gameObject);
+            orbitalStars = null;
+            if (orbitalStarMaterial != null) Destroy(orbitalStarMaterial);
+            orbitalStarMaterial = null;
             // The decloak rings belong to the ship hierarchy; remove them before
             // handing the same ship instance to Stage 3.
             if (greenRing != null) Destroy(greenRing.gameObject);
