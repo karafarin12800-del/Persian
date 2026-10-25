@@ -233,6 +233,10 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         worldMain.startColor = stage == 1 ? new Color(.90f,.83f,.65f,.28f) :
             stage == 2 ? new Color(.65f,.84f,.49f,.25f) : new Color(.24f,.88f,1f,.30f);
         atmosphere.Play(true);
+        PickupItem[] worldPickups = root.GetComponentsInChildren<PickupItem>(true);
+        for (int i = 0; i < worldPickups.Length; i++)
+            if (worldPickups[i] != null)
+                AddBlobShadow(worldPickups[i].transform, new Vector3(0f, -0.42f, 0f), new Vector2(.72f, .48f));
     }
 
     private static void RestoreWorldLook()
