@@ -44,6 +44,9 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobileFemaleHairLeft;
         private Renderer mobileFemaleHairRight;
         private Renderer mobileFemaleHairCap;
+        private Renderer mobileLeftLeg;
+        private Renderer mobileRightLeg;
+        private Transform[] heroAccessoryRoots;
 
         public Transform Muzzle => muzzle;
         public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;
@@ -184,7 +187,16 @@ namespace PersiaWar.Unity2D5D
                 1f);
 
             if (mobileModelRoot != null)
+            {
                 mobileModelRoot.localPosition = new Vector3(0f, bob, 0f);
+                float walk = moving ? Mathf.Sin(t * 11f) * 24f : Mathf.Sin(t * 2.2f) * 2.5f;
+                if (mobileLeftArm != null) mobileLeftArm.transform.localRotation = Quaternion.Euler(walk, 0f, moving ? -7f : 0f);
+                if (mobileRightArm != null) mobileRightArm.transform.localRotation = Quaternion.Euler(-walk, 0f, moving ? 7f : 0f);
+                if (mobileLeftLeg != null) mobileLeftLeg.transform.localRotation = Quaternion.Euler(-walk * .65f, 0f, 0f);
+                if (mobileRightLeg != null) mobileRightLeg.transform.localRotation = Quaternion.Euler(walk * .65f, 0f, 0f);
+                if (Time.time < fireUntil && mobileRightArm != null)
+                    mobileRightArm.transform.localRotation = Quaternion.Euler(-10f, 0f, 5f);
+            }
 
             if (muzzle != null && Time.time < fireUntil)
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.62f);
@@ -238,6 +250,10 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, 0.78f, 0f), new Vector3(0.78f, 0.42f, 0.56f));
                 mobilePants = CreateMobilePrimitive(PrimitiveType.Cube, "Pants", mobileModelRoot,
                     new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.28f, 0.48f));
+                mobileLeftLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftLeg", mobileModelRoot,
+                    new Vector3(-0.18f, 0.31f, 0f), new Vector3(0.20f, 0.40f, 0.20f));
+                mobileRightLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "RightLeg", mobileModelRoot,
+                    new Vector3(0.18f, 0.31f, 0f), new Vector3(0.20f, 0.40f, 0.20f));
                 mobileShoes = CreateMobilePrimitive(PrimitiveType.Cube, "Shoes", mobileModelRoot,
                     new Vector3(0f, 0.05f, 0f), new Vector3(0.78f, 0.14f, 0.56f));
                 mobileHair = CreateMobilePrimitive(PrimitiveType.Cylinder, "Hair", mobileModelRoot,
@@ -362,6 +378,8 @@ namespace PersiaWar.Unity2D5D
             SetRendererColor(mobileBody, shirtColor * 0.85f);
             SetRendererColor(mobileShirt, shirtColor);
             SetRendererColor(mobilePants, isAnahita ? new Color(0.70f, 0.17f, 0.43f) : new Color(0.08f, 0.12f, 0.20f));
+            SetRendererColor(mobileLeftLeg, isAnahita ? new Color(0.70f, 0.17f, 0.43f) : new Color(0.08f, 0.12f, 0.20f));
+            SetRendererColor(mobileRightLeg, isAnahita ? new Color(0.70f, 0.17f, 0.43f) : new Color(0.08f, 0.12f, 0.20f));
             SetRendererColor(mobileShoes, new Color(0.10f, 0.11f, 0.13f));
             SetRendererColor(mobileHair, hairColor);
             SetRendererColor(mobileArmor, Color.Lerp(shirtColor, Color.white, 0.16f));
@@ -419,6 +437,60 @@ namespace PersiaWar.Unity2D5D
             {
                 mobileFemaleHairCap.enabled = isAnahita;
                 SetRendererColor(mobileFemaleHairCap, hairColor);
+            }
+            EnsureHeroAccessories();
+            for (int i = 0; i < heroAccessoryRoots.Length; i++)
+                heroAccessoryRoots[i].gameObject.SetActive(i == heroIndex);
+        }
+
+        private void EnsureHeroAccessories()
+        {
+            if (heroAccessoryRoots != null || mobileModelRoot == null) return;
+            heroAccessoryRoots = new Transform[6];
+            for (int i = 0; i < heroAccessoryRoots.Length; i++)
+            {
+                Transform group = new GameObject("HeroAccessory_" + i).transform;
+                group.SetParent(mobileModelRoot, false);
+                heroAccessoryRoots[i] = group;
+                Color gold = new Color(0.96f, 0.70f, 0.18f);
+                Color shirt = i == 0 ? new Color(0.46f,0.12f,0.08f) : i == 1 ? new Color(0.85f,0.25f,0.52f) :
+                    i == 2 ? new Color(0.10f,0.55f,0.63f) : i == 3 ? new Color(0.12f,0.25f,0.17f) :
+                    i == 4 ? new Color(0.46f,0.16f,0.52f) : new Color(0.56f,0.39f,0.13f);
+                if (i == 0)
+                {
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"RoyalCrownBand",group,new Vector3(0,1.70f,0.02f),new Vector3(.52f,.09f,.48f)),gold);
+                    for(int spike=0;spike<3;spike++) SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"RoyalCrownSpike_"+spike,group,new Vector3((spike-1)*.16f,1.81f,.02f),new Vector3(.07f,.16f,.08f)),gold);
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"RoyalCape",group,new Vector3(0,.76f,-.31f),new Vector3(.65f,.70f,.12f)),shirt);
+                }
+                else if (i == 1)
+                {
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"AnahitaSash",group,new Vector3(.03f,.90f,.30f),new Vector3(.12f,.56f,.05f)),gold);
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Sphere,"AnahitaShoulderLight",group,new Vector3(-.39f,.98f,.03f),new Vector3(.20f,.18f,.20f)),new Color(.85f,.82f,.73f));
+                }
+                else if (i == 2)
+                {
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"GuardShoulderLeft",group,new Vector3(-.48f,1.03f,0),new Vector3(.30f,.23f,.34f)),shirt);
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"GuardShoulderRight",group,new Vector3(.48f,1.03f,0),new Vector3(.30f,.23f,.34f)),shirt);
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"GuardChestPlate",group,new Vector3(0,.88f,.23f),new Vector3(.46f,.30f,.09f)),new Color(.15f,.72f,.72f));
+                }
+                else if (i == 3)
+                {
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Sphere,"ScoutHood",group,new Vector3(0,1.51f,-.05f),new Vector3(.70f,.55f,.65f)),shirt);
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"ScoutQuiver",group,new Vector3(.25f,.94f,-.37f),new Vector3(.18f,.58f,.16f)),new Color(.36f,.25f,.12f));
+                }
+                else if (i == 4)
+                {
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"SilkScarf",group,new Vector3(0,1.14f,.20f),new Vector3(.70f,.12f,.12f)),new Color(.82f,.20f,.28f));
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"SilkWristBladeLeft",group,new Vector3(-.52f,.65f,.15f),new Vector3(.08f,.27f,.08f)),gold);
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"SilkWristBladeRight",group,new Vector3(.52f,.65f,.15f),new Vector3(.08f,.27f,.08f)),gold);
+                }
+                else
+                {
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Sphere,"DesertTurban",group,new Vector3(0,1.69f,0),new Vector3(.68f,.28f,.62f)),new Color(.78f,.68f,.46f));
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"DesertCloak",group,new Vector3(0,.78f,-.30f),new Vector3(.70f,.76f,.12f)),shirt);
+                    SetRendererColor(CreateMobilePrimitive(PrimitiveType.Cube,"DesertBelt",group,new Vector3(0,.51f,.20f),new Vector3(.64f,.09f,.09f)),gold);
+                }
+                group.gameObject.SetActive(false);
             }
         }
 

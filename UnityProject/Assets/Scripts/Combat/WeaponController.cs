@@ -197,6 +197,13 @@ namespace PersiaWar.Unity2D5D
 
         public void EquipWeaponFromPickup(WeaponKind selectedWeapon, int reserveAmmo)
         {
+            if (loadoutConfigured && configuredLoadout != null && System.Array.IndexOf(configuredLoadout, selectedWeapon) < 0)
+            {
+                WeaponKind[] expanded = new WeaponKind[configuredLoadout.Length + 1];
+                System.Array.Copy(configuredLoadout, expanded, configuredLoadout.Length);
+                expanded[expanded.Length - 1] = selectedWeapon;
+                configuredLoadout = expanded;
+            }
             if (selectedWeapon == WeaponKind.Axe)
             {
                 if (axeEnabledForMatch)

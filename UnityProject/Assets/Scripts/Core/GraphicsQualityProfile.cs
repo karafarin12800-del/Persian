@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using PersiaWar.Unity2D5D;
 
@@ -15,6 +16,10 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     private static GraphicsQualityProfile instance;
     private static bool tierChosen;
     private static QualityTier selectedTier = QualityTier.Medium;
+    private static readonly Dictionary<Renderer, Material[]> WorldOriginals = new Dictionary<Renderer, Material[]>();
+    private static readonly Dictionary<int, Material> WorldLitCache = new Dictionary<int, Material>();
+    private static Transform worldLookRoot;
+    private static int worldLookStage = -1;
 
     private Transform lookRoot;
     private readonly Transform[] billboards = new Transform[220];
@@ -128,6 +133,83 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
                 AddBlobShadow(enemies[i] != null ? enemies[i].transform : null,
                     new Vector3(0f, -0.03f, 0f), new Vector2(1.45f, 0.95f));
         }
+    }
+
+
+    public static void ApplyWorldLook(Transform root, int stage)
+    {
+        if (!IsEnhanced || root == null || stage < 1 || stage > 3) return;
+        if (worldLookRoot == root && worldLookStage == stage) return;
+        RestoreWorldLook();
+        Shader lit = Shader.Find("PersiaWar/MobileLit");
+        if (lit == null) return;
+        worldLookRoot = root;
+        worldLookStage = stage;
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || renderer.sharedMaterials == null) continue;
+            Material[] originals = renderer.sharedMaterials;
+            Material[] converted = new Material[originals.Length];
+            bool changed = false;
+            for (int m = 0; m < originals.Length; m++)
+            {
+                Material original = originals[m];
+                if (original == null) { converted[m] = null; continue; }
+                if (original.shader == lit) { converted[m] = original; continue; }
+                int key = original.GetInstanceID();
+                if (!WorldLitCache.TryGetValue(key, out Material cached) || cached == null)
+                {
+                    cached = new Material(original);
+                    cached.shader = lit;
+                    cached.enableInstancing = true;
+                    if (original.HasProperty("_MainTex") && cached.HasProperty("_MainTex")) cached.mainTexture = original.mainTexture;
+                    if (original.HasProperty("_Color") && cached.HasProperty("_Color")) cached.SetColor("_Color", original.GetColor("_Color"));
+                    WorldLitCache[key] = cached;
+                }
+                converted[m] = cached;
+                changed = true;
+            }
+            if (changed)
+            {
+                WorldOriginals[renderer] = originals;
+                renderer.sharedMaterials = converted;
+            }
+        }
+        RenderSettings.ambientLight = stage == 1 ? new Color(.53f,.56f,.61f) :
+            stage == 2 ? new Color(.58f,.50f,.39f) : new Color(.28f,.42f,.58f);
+        ParticleSystem atmosphere = root.Find("PW_WorldAtmosphereParticles") != null
+            ? root.Find("PW_WorldAtmosphereParticles").GetComponent<ParticleSystem>() : null;
+        if (atmosphere == null)
+        {
+            GameObject go = new GameObject("PW_WorldAtmosphereParticles");
+            go.transform.SetParent(root, false);
+            atmosphere = go.AddComponent<ParticleSystem>();
+            ParticleSystem.MainModule main = atmosphere.main;
+            main.loop = true; main.playOnAwake = false; main.maxParticles = 150;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(4f, 9f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(.05f, .35f);
+            main.startSize = new ParticleSystem.MinMaxCurve(.025f, .10f);
+            ParticleSystem.ShapeModule shape = atmosphere.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(190f, 18f, 190f);
+            ParticleSystem.EmissionModule emission = atmosphere.emission;
+            emission.rateOverTime = 14f;
+        }
+        ParticleSystem.MainModule worldMain = atmosphere.main;
+        worldMain.startColor = stage == 1 ? new Color(.90f,.83f,.65f,.28f) :
+            stage == 2 ? new Color(.65f,.84f,.49f,.25f) : new Color(.24f,.88f,1f,.30f);
+        atmosphere.Play(true);
+    }
+
+    private static void RestoreWorldLook()
+    {
+        foreach (KeyValuePair<Renderer, Material[]> entry in WorldOriginals)
+            if (entry.Key != null) entry.Key.sharedMaterials = entry.Value;
+        WorldOriginals.Clear();
+        worldLookRoot = null;
+        worldLookStage = -1;
     }
 
     public static void ApplyStageFourLook(Transform worldRoot, Transform player)

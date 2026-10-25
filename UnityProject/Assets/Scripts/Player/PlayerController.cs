@@ -107,6 +107,7 @@ namespace PersiaWar.Unity2D5D
         {
             movementLockUntil = Mathf.Max(movementLockUntil, Time.time + Mathf.Max(0f, seconds));
             input = Vector3.zero;
+            velocity = Vector3.zero;
         }
 
         public void SetMoveInput(Vector2 value)

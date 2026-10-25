@@ -2663,6 +2663,8 @@ namespace PersiaWar.Unity2D5D
             if (followCamera != null) followCamera.enabled = false;
 
             startupStatus = "Stage 12: core stable — Android isolation test.";
+            if (gameRoot != null)
+                GraphicsQualityProfile.ApplyWorldLook(gameRoot.transform, stageNumber);
             StartupCheckpoint.Set("MatchCoreReady");
             mode = ScreenMode.Match;
             startingMatch = false;
