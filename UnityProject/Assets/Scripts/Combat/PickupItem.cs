@@ -153,7 +153,9 @@ namespace PersiaWar.Unity2D5D
     case PickupType.Medkit:player.Heal(amount);break;
     case PickupType.Grenade:PlayerInventory inv=player.GetComponent<PlayerInventory>();if(inv!=null)inv.AddGrenades(amount);break;
     case PickupType.Shield:player.AddShield(amount);break;
-    case PickupType.Weapon:if(player.Weapon!=null)player.Weapon.EquipWeaponFromPickup(weaponKind,amount);break;
+    case PickupType.Weapon:
+     if (player.Weapon != null) player.Weapon.EquipWeaponFromPickup(weaponKind, amount);
+     break;
     case PickupType.QuickDash:player.AddQuickDashCharges(2);break;
    }
    Destroy(gameObject);
