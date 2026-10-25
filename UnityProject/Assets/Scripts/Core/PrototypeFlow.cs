@@ -1610,7 +1610,7 @@ namespace PersiaWar.Unity2D5D
                 Fill(new Rect(card.x+3f,card.y+3f,card.width-6f,card.height-6f),new Color(.025f,.055f,.085f,.97f));
                 if(!loadoutWeaponTab)
                 {
-                    DrawChibiFigure(new Rect(card.x+card.width*.25f,card.y+7f,card.width*.5f,card.height*.58f),i);
+                    HeroPortraitStudio.Draw(new Rect(card.x+card.width*.25f,card.y+7f,card.width*.5f,card.height*.58f),i,chosen);
                     bool ok=LoadoutStore.CanUseHero(i,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued);
                     GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),HeroCatalog.Name(i),menuSmallStyle);
                     GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),ok?(chosen?"SELECTED":"TAP TO SELECT"):HeroCatalog.Price(i)+" COINS • TAP TO BUY",menuSmallStyle);
@@ -1656,6 +1656,7 @@ namespace PersiaWar.Unity2D5D
             WeaponController.WeaponKind chosen=(WeaponController.WeaponKind)selectedStoreWeaponKind;
             if(!LoadoutStore.CanUseHero(selectedHero,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued)||!LoadoutStore.CanUseWeapon(chosen)){loadoutNotice="SELECT AN AVAILABLE HERO AND WEAPON";return;}
             LoadoutStore.SelectedHero=selectedHero;LoadoutStore.SelectedWeapon=chosen;
+            HeroPortraitStudio.Close();
             if(stageNumber<=2){EnterDropMap();return;}
             spawnWorld=stageNumber==3?new Vector2(0f,-97f):Vector2.zero;spawnChosen=true;mode=ScreenMode.DropMap;StartMatch();
         }
@@ -2568,24 +2569,24 @@ namespace PersiaWar.Unity2D5D
             // Stage one keeps its original three firearms. Stage two additionally
             // enables the axe, Void Rifle and Alien Sword when the local profile owns them.
             player.Weapon?.SetAxeEnabledForMatch(stageNumber >= 2);
-            if (stageNumber >= 2 && player.Weapon != null)
+            if (player.Weapon != null)
             {
                 WeaponController.WeaponKind selectedKind = (WeaponController.WeaponKind)
                     PlayerPrefs.GetInt("PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
-                bool ownsVoidRifle = PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0;
-                bool ownsAlienSword = PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0;
-                if (selectedKind == WeaponController.WeaponKind.VoidRifle && !ownsVoidRifle)
+                System.Collections.Generic.List<WeaponController.WeaponKind> ownedKinds =
+                    new System.Collections.Generic.List<WeaponController.WeaponKind>();
+                for (int i = 0; i < WeaponCatalog.Entries.Length; i++)
+                {
+                    WeaponController.WeaponKind kind = WeaponCatalog.Entries[i].Kind;
+                    if (LoadoutStore.CanUseWeapon(kind)) ownedKinds.Add(kind);
+                }
+                if (System.Array.IndexOf(ownedKinds.ToArray(), selectedKind) < 0)
                     selectedKind = WeaponController.WeaponKind.AssaultRifle;
-                if (selectedKind == WeaponController.WeaponKind.AlienSword && !ownsAlienSword)
-                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
-
-                // Stage 4 opens with ranged combat inside the mothership. If a prior
-                // store choice left the melee-only alien sword selected, guarantee a
-                // firearm for the first encounter; the player can still swap later.
                 if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)
-                    selectedKind = WeaponController.WeaponKind.AssaultRifle;
-
-                player.Weapon.SelectWeapon(selectedKind);
+                {
+                    // Kept as a compatibility checkpoint; catalog weapons remain selectable.
+                }
+                player.Weapon.ConfigureLoadout(ownedKinds.ToArray(), selectedKind);
             }
 
             StartupCheckpoint.Set("PlayerPreparedForMatch");
@@ -2704,6 +2705,7 @@ namespace PersiaWar.Unity2D5D
         }
 
         private CameraOcclusionFader cameraOcclusionFader;
+        private Vector3 androidCameraPositionVelocity;
 
         private void LateUpdate()
         {
@@ -2731,18 +2733,10 @@ namespace PersiaWar.Unity2D5D
 
             Quaternion orbit = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
             Vector3 desired = player.transform.position + orbit * Vector3.back * AndroidCameraDistance;
-            androidRuntimeCamera.transform.position = Vector3.Lerp(
-                androidRuntimeCamera.transform.position,
-                desired,
-                1f - Mathf.Exp(-12f * Time.deltaTime));
-
-            Vector3 cameraForward = Quaternion.Euler(0f, AndroidCameraYaw, 0f) * Vector3.forward;
-            Vector3 lookTarget = player.transform.position
-                + cameraForward * AndroidCameraLookAhead
-                + Vector3.up * AndroidCameraLookHeight;
-            Vector3 direction = lookTarget - androidRuntimeCamera.transform.position;
-            if (direction.sqrMagnitude > 0.001f)
-                androidRuntimeCamera.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+            androidRuntimeCamera.transform.position = Vector3.SmoothDamp(
+                androidRuntimeCamera.transform.position, desired, ref androidCameraPositionVelocity,
+                0.12f, Mathf.Infinity, Time.deltaTime);
+            androidRuntimeCamera.transform.rotation = Quaternion.Euler(AndroidCameraPitch, AndroidCameraYaw, 0f);
 #endif
         }
 

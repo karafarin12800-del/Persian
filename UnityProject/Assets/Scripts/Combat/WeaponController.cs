@@ -419,6 +419,7 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < gunRenderers.Length && i < baseGunMaterials.Length; i++)
                     if (gunRenderers[i] != null) gunRenderers[i].sharedMaterial = baseGunMaterials[i];
             }
+            WeaponModelLibrary.Refresh(gunRoot, weaponKind);
         }
 
         private void SetWeaponPart(string partName, bool visible, Vector3 localPosition, Vector3 localScale)
