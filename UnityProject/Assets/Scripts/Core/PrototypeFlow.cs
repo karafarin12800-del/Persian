@@ -841,6 +841,12 @@ namespace PersiaWar.Unity2D5D
                 {
                     for (int item = 0; item < StoreCosmeticNames.Length; item++)
                     {
+                        if (item >= 3 && GetStoreSellRect(item).Contains(point))
+                        {
+                            suppressMenuButtonClicksFrame = Time.frameCount;
+                            SellStoreWeapon(item);
+                            return;
+                        }
                         if (!GetStoreActionRect(item).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
                         PurchaseOrEquipCosmetic(item);
@@ -1427,7 +1433,19 @@ namespace PersiaWar.Unity2D5D
         private Rect GetStoreActionRect(int index)
         {
             Rect card = GetStoreItemRect(index);
-            return new Rect(card.x + 10f, card.yMax - 44f, card.width - 20f, 34f);
+            float width = card.width - 20f;
+            if (index >= 3)
+                width -= Mathf.Min(86f, card.width * 0.34f);
+            return new Rect(card.x + 10f, card.yMax - 44f, Mathf.Max(42f, width), 34f);
+        }
+
+        private Rect GetStoreSellRect(int index)
+        {
+            Rect action = GetStoreActionRect(index);
+            Rect card = GetStoreItemRect(index);
+            float sellWidth = Mathf.Min(80f, card.width * 0.30f);
+            float gap = Mathf.Min(6f, card.width * 0.025f);
+            return new Rect(action.xMax + gap, action.y, sellWidth, action.height);
         }
 
         private bool IsStoreItemOwned(int index)
@@ -1448,9 +1466,17 @@ namespace PersiaWar.Unity2D5D
             if (index >= 3)
             {
                 WeaponController.WeaponKind kind = index == 3 ? WeaponController.WeaponKind.VoidRifle : WeaponController.WeaponKind.AlienSword;
-                if (!LoadoutStore.TryBuyWeapon(kind)) return;
+                WeaponCatalog.Entry entry = WeaponCatalog.Get(kind);
+                if (!LoadoutStore.TryBuyWeapon(kind))
+                {
+                    loadoutNotice = !LoadoutStore.IsStageUnlocked(entry.RequiredCompletedStage)
+                        ? "CLEAR STAGE " + entry.RequiredCompletedStage + " FIRST"
+                        : (entry.TokenPrice > 0 ? "NOT ENOUGH TOKENS" : "NOT ENOUGH COINS");
+                    return;
+                }
                 selectedStoreWeaponKind = (int)kind;
                 LoadoutStore.SelectedWeapon = kind;
+                loadoutNotice = "EQUIPPED: " + entry.Name;
                 return;
             }
 
@@ -1469,12 +1495,34 @@ namespace PersiaWar.Unity2D5D
             PlayerPrefs.Save();
         }
 
+        private void SellStoreWeapon(int index)
+        {
+            WeaponController.WeaponKind kind = index == 3
+                ? WeaponController.WeaponKind.VoidRifle
+                : WeaponController.WeaponKind.AlienSword;
+            int refund;
+            bool refundInTokens;
+            if (!LoadoutStore.TrySellWeapon(kind, out refund, out refundInTokens))
+            {
+                loadoutNotice = "WEAPON NOT OWNED OR NOT AVAILABLE FOR SALE";
+                return;
+            }
+
+            if (selectedStoreWeaponKind == (int)kind)
+                selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
+            storeCoins = LoadoutStore.Coins;
+            WeaponCatalog.Entry entry = WeaponCatalog.Get(kind);
+            loadoutNotice = "SOLD " + entry.Name + "  •  +" + refund +
+                (refundInTokens ? " TOKENS" : " COINS");
+        }
+
         private void DrawStoreScreen()
         {
-            storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
-            GUI.Label(new Rect(0f, 118f, Screen.width, 54f), "PERSIA STORE", menuHeaderStyle);
-            GUI.Label(new Rect(0f, 166f, Screen.width, 36f), "OFFLINE DEMO STORE  •  NO REAL-MONEY PAYMENTS", menuSmallStyle);
-            GUI.Label(new Rect(Screen.width - 300f, 24f, 270f, 42f), "COINS  " + storeCoins, menuBodyStyle);
+            storeCoins = LoadoutStore.Coins;
+            GUI.Label(new Rect(0f, 118f, Screen.width, 54f), "PERSIA STORE & WEAPON ARMORY", menuHeaderStyle);
+            GUI.Label(new Rect(0f, 166f, Screen.width, 36f), "BUY, EQUIP OR SELL WEAPONS  •  OFFLINE DEMO STORE", menuSmallStyle);
+            GUI.Label(new Rect(Screen.width - 430f, 24f, 405f, 42f),
+                "COINS  " + storeCoins + "     TOKENS  ✦ " + LoadoutStore.Tokens, menuBodyStyle);
 
             for (int i = 0; i < StoreCosmeticNames.Length; i++)
             {
@@ -1491,15 +1539,53 @@ namespace PersiaWar.Unity2D5D
                     : i == 3 ? new Color(0.08f, 0.72f, 0.98f) : new Color(0.20f, 0.95f, 0.58f);
                 Fill(emblem, emblemColor);
                 GUI.Label(new Rect(card.x + 6f, card.y + 76f, card.width - 12f, 34f), StoreCosmeticNames[i], menuSmallStyle);
-                int catalogPrice = i == 3 ? WeaponCatalog.Get(WeaponController.WeaponKind.VoidRifle).Price
-                    : i == 4 ? WeaponCatalog.Get(WeaponController.WeaponKind.AlienSword).Price : StoreCosmeticPrices[i];
-                GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f),
-                    owned ? (equipped ? "EQUIPPED" : "OWNED") : (catalogPrice + " COINS"),
-                    menuBodyStyle);
+
+                string priceLabel;
+                WeaponCatalog.Entry weaponEntry = new WeaponCatalog.Entry();
+                if (i >= 3)
+                {
+                    weaponEntry = WeaponCatalog.Get(i == 3
+                        ? WeaponController.WeaponKind.VoidRifle
+                        : WeaponController.WeaponKind.AlienSword);
+                    int refund = weaponEntry.TokenPrice > 0
+                        ? Mathf.Max(1, weaponEntry.TokenPrice / 2)
+                        : Mathf.Max(1, weaponEntry.Price / 2);
+                    if (owned)
+                        priceLabel = (equipped ? "EQUIPPED" : "OWNED") + "  •  SELL " + refund +
+                            (weaponEntry.TokenPrice > 0 ? " TOKENS" : " COINS");
+                    else if (!LoadoutStore.IsStageUnlocked(weaponEntry.RequiredCompletedStage))
+                        priceLabel = "CLEAR STAGE " + weaponEntry.RequiredCompletedStage;
+                    else
+                        priceLabel = weaponEntry.TokenPrice > 0
+                            ? weaponEntry.TokenPrice + " TOKENS"
+                            : weaponEntry.Price + " COINS";
+                }
+                else
+                {
+                    priceLabel = owned ? (equipped ? "EQUIPPED" : "OWNED")
+                        : StoreCosmeticPrices[i] + " COINS";
+                }
+
+                GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f), priceLabel, menuBodyStyle);
                 Rect action = GetStoreActionRect(i);
-                if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : (i >= 3 ? "EQUIP WEAPON" : "EQUIP")) : "UNLOCK"))
+                if (i >= 3)
+                {
+                    WeaponCatalog.Entry entry = weaponEntry;
+                    bool purchaseEnabled = owned || LoadoutStore.IsStageUnlocked(entry.RequiredCompletedStage);
+                    if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : "EQUIP WEAPON") : "UNLOCK", purchaseEnabled))
+                        PurchaseOrEquipCosmetic(i);
+                    bool sellEnabled = owned && !LoadoutTestSwitch.UnlockEverything;
+                    if (DrawFantasyButton(GetStoreSellRect(i), owned ? "SELL" : "NOT OWNED", sellEnabled))
+                        SellStoreWeapon(i);
+                }
+                else if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : "EQUIP") : "UNLOCK"))
+                {
                     PurchaseOrEquipCosmetic(i);
+                }
             }
+
+            if (!string.IsNullOrEmpty(loadoutNotice))
+                GUI.Label(new Rect(0f, Screen.height - 124f, Screen.width, 28f), loadoutNotice, menuSmallStyle);
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
         }
 
