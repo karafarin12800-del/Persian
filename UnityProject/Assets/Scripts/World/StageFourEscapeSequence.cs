@@ -565,6 +565,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         }
 
         if (sceneCamera == null) sceneCamera = Camera.main;
+        float originalFieldOfView = sceneCamera != null ? sceneCamera.fieldOfView : 60f;
+        if (sceneCamera != null) sceneCamera.fieldOfView = Mathf.Clamp(originalFieldOfView + 10f, 58f, 66f);
         CameraFollow25D cameraFollow = FindFirstObjectByType<CameraFollow25D>();
         if (cameraFollow != null) cameraFollow.enabled = false;
 
@@ -651,6 +653,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         Vector3 wideCamera = new Vector3(155f, 112f, 385f);
         Vector3 closeLook = new Vector3(0f, 22f, 145f);
         Vector3 wideLook = new Vector3(35f, 28f, 175f);
+        Vector3 mothershipExplosionLook = new Vector3(0f, 28f, 35f);
         if (sceneCamera != null)
         {
             sceneCamera.transform.position = closeCamera;
@@ -784,7 +787,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             if (sceneCamera != null)
             {
                 sceneCamera.transform.position = wideCamera;
-                sceneCamera.transform.LookAt(new Vector3(0f, 22f, 65f));
+                sceneCamera.transform.LookAt(mothershipExplosionLook);
             }
             yield return new WaitForSeconds(0.4f);
         }
@@ -799,7 +802,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             if (sceneCamera != null)
             {
                 sceneCamera.transform.position = wideCamera;
-                sceneCamera.transform.LookAt(new Vector3(0f, 28f, 0f));
+                sceneCamera.transform.LookAt(mothershipExplosionLook);
             }
             yield return new WaitForSeconds(0.09f);
         }
@@ -815,14 +818,25 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             if (sceneCamera != null)
             {
                 sceneCamera.transform.position = wideCamera;
-                sceneCamera.transform.LookAt(new Vector3(0f, 28f, 0f));
+                sceneCamera.transform.LookAt(mothershipExplosionLook);
             }
             yield return null;
         }
-        HideMothershipAfterFinalExplosion(coreBlast);
-
-        // After the core hold, depart with the explosion in frame for a final beat,
-        // then ease the camera onto the shuttle without an accumulated shake offset.
+        // Preserve the mother ship while the external blast is visible; hiding its
+        // renderers made the spacecraft vanish before the camera could show the explosion.
+        message = "MOTHERSHIP EXPLODING • SHUTTLE CLEAR";
+        float explosionRevealTime = 0f;
+        const float explosionRevealDuration = 2.0f;
+        while (explosionRevealTime < explosionRevealDuration)
+        {
+            explosionRevealTime += Time.deltaTime;
+            if (sceneCamera != null)
+            {
+                sceneCamera.transform.position = wideCamera;
+                sceneCamera.transform.LookAt(mothershipExplosionLook);
+            }
+            yield return null;
+        }
         message = "CHARGES DETONATED • SHUTTLE ESCAPING";
         Vector3 deepSpaceExit = new Vector3(820f, 245f, 940f);
         float departureTime = 0f;
@@ -843,7 +857,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             {
                 float cameraBlend = Mathf.SmoothStep(0f, 1f, depart);
                 sceneCamera.transform.position = Vector3.Lerp(wideCamera, escapeShuttle.position + escapeCameraOffset, cameraBlend);
-                sceneCamera.transform.LookAt(Vector3.Lerp(new Vector3(0f, 28f, 0f), escapeShuttle.position, cameraBlend));
+                sceneCamera.transform.LookAt(Vector3.Lerp(mothershipExplosionLook, escapeShuttle.position, cameraBlend));
             }
             yield return null;
         }
@@ -853,6 +867,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         StageFourMothershipExplosionFX.FinishEffects();
         StageFourMothershipExplosionFX.PlayFinalFlash(sceneCamera);
         yield return new WaitForSeconds(0.35f);
+        if (sceneCamera != null) sceneCamera.fieldOfView = originalFieldOfView;
         message = "SHUTTLE ESCAPED • STAGE 4 COMPLETE";
         yield return new WaitForSeconds(1.5f);
 

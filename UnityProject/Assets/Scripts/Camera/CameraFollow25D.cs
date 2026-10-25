@@ -6,10 +6,10 @@ namespace PersiaWar.Unity2D5D
     {
         [SerializeField] private Transform target;
         [SerializeField] private float followSpeed = 12f;
-        [SerializeField] private float pitch = 52f;
+        [SerializeField] private float pitch = 46f;
         [SerializeField] private float yaw = 32f;
         [SerializeField] private float fieldOfView = 50f;
-        [SerializeField] private float fixedDistance = 18.5f;
+        [SerializeField] private float fixedDistance = 20f;
         [SerializeField] private float lookHeight = 0.85f;
 
         public float Yaw => yaw;

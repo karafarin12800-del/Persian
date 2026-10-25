@@ -1,4 +1,5 @@
 using UnityEngine;
+using PersiaWar.Unity2D5D.UI.Loadout;
 
 namespace PersiaWar.Unity2D5D
 {
@@ -41,6 +42,8 @@ namespace PersiaWar.Unity2D5D
                 int scoreBonus = Mathf.Max(0, enemy.ScoreValue - 10);
                 if (StageTwoArenaManager.Instance != null)
                     StageTwoArenaManager.Instance.RegisterKill(attacker);
+                PlayerController playerKiller = attacker != null ? attacker.GetComponentInParent<PlayerController>() : null;
+                if (playerKiller != null) LoadoutStore.AddTokens(1);
                 if (GameSession.Instance != null)
                 {
                     GameSession.Instance.RegisterEnemyDefeated();
