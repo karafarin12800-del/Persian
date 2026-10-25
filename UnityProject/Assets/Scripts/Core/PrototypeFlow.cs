@@ -59,6 +59,10 @@ namespace PersiaWar.Unity2D5D
         private bool loadoutWeaponTab;
         private int lastStageReward;
         private string loadoutNotice = string.Empty;
+        private float loadoutSlideOffset;
+        private float loadoutSlideVelocity;
+        private readonly System.Collections.Generic.Dictionary<int, float> menuButtonScales =
+            new System.Collections.Generic.Dictionary<int, float>();
         private int stageTwoOriginalHero;
         private bool stageTwoShopOpen;
         private float girlRescueNoticeUntil;
@@ -237,6 +241,8 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (mode == ScreenMode.Loadout)
+                loadoutSlideOffset = Mathf.SmoothDamp(loadoutSlideOffset, 0f, ref loadoutSlideVelocity, 0.18f, Mathf.Infinity, Time.unscaledDeltaTime);
             // Use direct Touch.fingerId input for front-end controls on Android.
             // GUI.Button still draws the visual surface, but must not be the only
             // path that can advance the menu if touch-to-mouse synthesis is missing.
@@ -1587,7 +1593,7 @@ namespace PersiaWar.Unity2D5D
         {
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
             float gap=9f*sc, total=Mathf.Min(Screen.width-28f*sc,1000f), w=(total-gap*2f)/3f, h=Mathf.Min(160f,Screen.height*.23f);
-            return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap),Screen.height*.25f+(i/3)*(h+gap),w,h);
+            return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap)+loadoutSlideOffset,Screen.height*.25f+(i/3)*(h+gap),w,h);
         }
         private Rect LoadoutNext()
         {
@@ -1645,11 +1651,19 @@ namespace PersiaWar.Unity2D5D
             if(loadoutWeaponTab)
             {
                 Rect back=new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc);
-                if(DrawFantasyButton(back,"BACK TO HERO",false))loadoutWeaponTab=false;
+                if(DrawFantasyButton(back,"BACK TO HERO",false))SwitchLoadoutTab(false);
                 if(DrawFantasyButton(LoadoutNext(),"START STAGE "+stageNumber,true))StartStageFromLoadout();
             }
-            else if(DrawFantasyButton(LoadoutNext(),"CONTINUE TO WEAPONS",true))loadoutWeaponTab=true;
+            else if(DrawFantasyButton(LoadoutNext(),"CONTINUE TO WEAPONS",true))SwitchLoadoutTab(true);
         }
+        private void SwitchLoadoutTab(bool weaponTab)
+        {
+            if (loadoutWeaponTab == weaponTab) return;
+            loadoutWeaponTab = weaponTab;
+            loadoutSlideOffset = weaponTab ? Screen.width * 0.12f : -Screen.width * 0.12f;
+            loadoutSlideVelocity = 0f;
+        }
+
         private void ChooseLoadoutItem(int i)
         {
             if(!loadoutWeaponTab)
@@ -1683,8 +1697,8 @@ namespace PersiaWar.Unity2D5D
                 Touch touch=Input.GetTouch(t);if(touch.phase!=TouchPhase.Began)continue;
                 Vector2 p=new Vector2(touch.position.x,Screen.height-touch.position.y);
                 float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-                if(loadoutWeaponTab&&new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;loadoutWeaponTab=false;return;}
-                if(LoadoutNext().Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;if(loadoutWeaponTab)StartStageFromLoadout();else loadoutWeaponTab=true;return;}
+                if(loadoutWeaponTab&&new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;SwitchLoadoutTab(false);return;}
+                if(LoadoutNext().Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;if(loadoutWeaponTab)StartStageFromLoadout();else SwitchLoadoutTab(true);return;}
                 for(int i=0;i<6;i++)if(LoadoutCard(i).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;ChooseLoadoutItem(i);return;}
             }
         }
@@ -3339,6 +3353,14 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
             bool hovered = Event.current != null && rect.Contains(Event.current.mousePosition);
+            bool pressed = hovered && Event.current.type == EventType.MouseDown;
+            int scaleKey = label.GetHashCode() ^ Mathf.RoundToInt(rect.x * 3f) ^ Mathf.RoundToInt(rect.y * 7f);
+            if (!menuButtonScales.TryGetValue(scaleKey, out float currentScale)) currentScale = 1f;
+            float targetScale = pressed ? 0.965f : hovered ? 1.025f : 1f;
+            currentScale = Mathf.Lerp(currentScale, targetScale, 1f - Mathf.Exp(-20f * Time.unscaledDeltaTime));
+            menuButtonScales[scaleKey] = currentScale;
+            rect = new Rect(rect.center.x - rect.width * currentScale * 0.5f,
+                rect.center.y - rect.height * currentScale * 0.5f, rect.width * currentScale, rect.height * currentScale);
             Color edge = selected || hovered
                 ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
                 : new Color(0.35f, 0.66f, 0.78f, 0.68f);
