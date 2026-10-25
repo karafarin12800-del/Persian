@@ -61,9 +61,9 @@ namespace PersiaWar.Unity2D5D.UI.Loadout
             camera.cullingMask = 1 << Layer;
             camera.nearClipPlane = .05f;
             camera.farClipPlane = 20f;
+            cameraGo.transform.SetParent(root.transform, false);
             cameraGo.transform.localPosition = new Vector3(0f, .35f, -2.8f);
-            cameraGo.transform.LookAt(root.transform.position + new Vector3(0f, .1f, 0f));
-            cameraGo.transform.SetParent(root.transform, true);
+            cameraGo.transform.LookAt(origin + new Vector3(0f, .1f, 0f));
             SetLayer(root.transform);
             Cameras[i] = camera;
             RenderTexture target = new RenderTexture(256, 192, 16, RenderTextureFormat.ARGB32);

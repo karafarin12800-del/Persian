@@ -1350,7 +1350,7 @@ namespace PersiaWar.Unity2D5D
             PlayerPrefs.SetInt("PW.Stage4Completed", 1);
             PlayerPrefs.Save();
             mode = ScreenMode.MainMenu;
-            ShowLobbyNotice("STAGE 4 COMPLETE  •  MOTHERSHIP DESTROYED");
+            ShowLobbyNotice("STAGE 4 COMPLETE  •  +" + lastStageReward + " COINS  •  MOTHERSHIP DESTROYED");
             StartupCheckpoint.Set("StageFourCampaignComplete_ReturnToMainMenu");
         }
 
