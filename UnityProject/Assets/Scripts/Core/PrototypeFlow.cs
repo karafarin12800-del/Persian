@@ -262,7 +262,7 @@ namespace PersiaWar.Unity2D5D
                     else if (stageNumber == 3 && session.PlayerWon &&
                         stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
                     {
-                        ReturnToMainMenuFromResult();
+                        CompleteStageThreeTransition();
                     }
                     return;
                 }
@@ -1276,6 +1276,44 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
+            spawnChosen = false;
+            lastStageReward = 0;
+            PlayerPrefs.SetInt("PW.LastStageReward", 0);
+            PlayerPrefs.SetInt("PW.LastStageTokenReward", 0);
+            if (stageTestRun)
+            {
+                RestoreCampaignProgressAfterTest();
+            }
+            else
+            {
+                stageNumber = 1;
+            }
+            mode = ScreenMode.MainMenu;
+            HeroPortraitStudio.Close();
+            WeaponPreviewStudio.Close();
+            PlayerPrefs.Save();
+            StartupCheckpoint.Set("ResultScreen_ReturnToMainMenu_WithoutStageAdvance");
+        }
+
+        private void CompleteStageThreeTransition()
+        {
+            StageTwoArenaManager.Instance?.ResetForStageChange();
+            Time.timeScale = 1f;
+            if (stageTwoVictorySequence != null)
+            {
+                stageTwoVictorySequence.FinishAndCleanup();
+                Destroy(stageTwoVictorySequence);
+                stageTwoVictorySequence = null;
+            }
+            GateGameplay(false);
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
+            if (playerRoot != null) playerRoot.SetActive(false);
+            if (gameRoot != null) gameRoot.SetActive(false);
+            startingMatch = false;
+            matchPaused = false;
+            resultOverlayStartTime = -1f;
             if (stageTestRun)
             {
                 RestoreCampaignProgressAfterTest();
@@ -2043,11 +2081,21 @@ namespace PersiaWar.Unity2D5D
             spawnChosen = true;
         }
 
-        private void BeginStageTwoSelection()
+        private void BeginStageTwoSelection(bool awardStageOne = false)
         {
             ExtractionBeacon.ClearForStageTransition();
             Time.timeScale = 1f;
-            lastStageReward = LoadoutStore.MarkStageCompleted(1, stageTestRun);
+            if (awardStageOne && !stageTestRun)
+            {
+                lastStageReward = LoadoutStore.MarkStageCompleted(1, false);
+            }
+            else
+            {
+                lastStageReward = 0;
+                PlayerPrefs.SetInt("PW.LastStageReward", 0);
+                PlayerPrefs.SetInt("PW.LastStageTokenReward", 0);
+                PlayerPrefs.Save();
+            }
             stageNumber = 2;
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
@@ -3181,7 +3229,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     // The mission only becomes a win after the player enters the
                     // captive-house extraction beam, which has already rescued Anahita.
-                    BeginStageTwoSelection();
+                    BeginStageTwoSelection(true);
                     return;
                 }
             }
