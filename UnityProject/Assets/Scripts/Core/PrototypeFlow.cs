@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
             Profile,
             Store,
             Settings,
+            StageTestSelect,
             HeroSelect,
             Loadout,
             DropMap,
@@ -272,6 +273,11 @@ namespace PersiaWar.Unity2D5D
                 HandleAndroidPauseTouches();
                 return;
             }
+            if (mode == ScreenMode.StageTestSelect)
+            {
+                HandleStageTestSelectTouches();
+                return;
+            }
             if (mode == ScreenMode.MainMenu || mode == ScreenMode.Profile ||
                 mode == ScreenMode.Store || mode == ScreenMode.Settings)
             {
@@ -420,6 +426,9 @@ namespace PersiaWar.Unity2D5D
                     break;
                 case ScreenMode.Settings:
                     DrawSettingsScreen();
+                    break;
+                case ScreenMode.StageTestSelect:
+                    DrawStageTestSelect();
                     break;
                 case ScreenMode.HeroSelect:
                     if (stageNumber >= 2 && stageTwoShopOpen)
@@ -777,15 +786,16 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetLobbyButtonRect(int index)
         {
+            const int buttonCount = 9;
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
             float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
-            float heightLimit = Mathf.Max(28f, (Screen.height - 120f * scale) / 10f);
+            float heightLimit = Mathf.Max(26f, (Screen.height - 112f * scale) / (buttonCount + 1f));
             float height = Mathf.Min(58f * scale, heightLimit);
-            float gapLimit = Mathf.Max(2f, (Screen.height - 100f * scale - height * 8f) / 7f);
-            float gap = Mathf.Min(14f * scale, gapLimit);
-            float totalHeight = height * 8f + gap * 7f;
-            float topLimit = Mathf.Max(54f * scale, Screen.height - totalHeight - 8f);
-            float top = Mathf.Clamp((Screen.height - totalHeight) * 0.48f, 54f * scale, topLimit);
+            float gapLimit = Mathf.Max(2f, (Screen.height - 92f * scale - height * buttonCount) / (buttonCount - 1f));
+            float gap = Mathf.Min(12f * scale, gapLimit);
+            float totalHeight = height * buttonCount + gap * (buttonCount - 1);
+            float topLimit = Mathf.Max(42f * scale, Screen.height - totalHeight - 6f);
+            float top = Mathf.Clamp((Screen.height - totalHeight) * 0.46f, 42f * scale, topLimit);
             float left = Mathf.Max(Screen.width * 0.52f, Screen.width - width - 28f);
             left = Mathf.Min(left, Screen.width - width - 18f);
             return new Rect(left, top + index * (height + gap), width, height);
@@ -812,9 +822,9 @@ namespace PersiaWar.Unity2D5D
                 Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
                 if (mode == ScreenMode.MainMenu)
                 {
-                    // Keep native touch hit-testing aligned with all eight menu buttons.
-                    // Stage 4 is index 7; excluding it makes the visible Android button inert.
-                    for (int button = 0; button < 8; button++)
+                    // Keep native Android hit-testing aligned with all nine menu buttons,
+                    // including the temporary direct stage-test entry.
+                    for (int button = 0; button < 9; button++)
                     {
                         if (!GetLobbyButtonRect(button).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
@@ -887,16 +897,17 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(card.x+18f,card.y+card.height-68f,card.width-36f,48f),"OFFLINE PROFILE",menuSmallStyle);
             GUI.Label(new Rect(Screen.width*.40f,Screen.height*.055f,Screen.width*.54f,46f),"CAMPAIGN  •  STAGE SELECT",menuBodyStyle);
             string[] labels={"CONTINUE CAMPAIGN","PLAYER PROFILE","STORE / WEAPON ARMORY","SETTINGS",
-                GetCampaignStageButtonLabel(1),GetCampaignStageButtonLabel(2),GetCampaignStageButtonLabel(3),GetCampaignStageButtonLabel(4)};
+                GetCampaignStageButtonLabel(1),GetCampaignStageButtonLabel(2),GetCampaignStageButtonLabel(3),GetCampaignStageButtonLabel(4),
+                "TEST STAGES  •  NO CAMPAIGN PROGRESS"};
             for(int i=0;i<labels.Length;i++)
             {
                 Rect button=GetLobbyButtonRect(i);
-                bool available=i<4||LoadoutStore.IsCampaignStageAvailable(i-3);
+                bool available=i<4||i==8||LoadoutStore.IsCampaignStageAvailable(i-3);
                 if(DrawFantasyButton(button,labels[i],false,available))ActivateLobbyButton(i);
             }
             if(!string.IsNullOrEmpty(lobbyNotice)&&Time.unscaledTime<lobbyNoticeUntil)
             {
-                Rect lastButton=GetLobbyButtonRect(7);
+                Rect lastButton=GetLobbyButtonRect(8);
                 float scale=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.55f,1.2f);
                 float h=34f*scale,y=Mathf.Min(lastButton.yMax+6f*scale,Screen.height-58f*scale-34f*scale);
                 Rect notice=new Rect(Screen.width*.52f,y,Screen.width*.42f,h);
@@ -912,6 +923,12 @@ namespace PersiaWar.Unity2D5D
             else if(index==2)mode=ScreenMode.Store;
             else if(index==3)mode=ScreenMode.Settings;
             else if(index>=4&&index<=7)BeginCampaignStageEntry(index-3);
+            else if(index==8)
+            {
+                mode=ScreenMode.StageTestSelect;
+                StartupCheckpoint.Set("DirectStageTestMenuOpened");
+                return;
+            }
             StartupCheckpoint.Set("LobbyNavigation_"+mode);
         }
 
@@ -987,10 +1004,94 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("TestMode_CampaignProgressRestored_Stage" + stageNumber);
         }
 
+        private Rect GetStageTestButtonRect(int index)
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.15f);
+            float contentWidth = Mathf.Min(Screen.width - 40f, 760f * scale);
+            float gap = 12f * scale;
+            float buttonWidth = (contentWidth - gap) * 0.5f;
+            float buttonHeight = Mathf.Min(72f * scale, (Screen.height - 190f * scale) * 0.34f);
+            float top = Screen.height * 0.35f;
+            int column = index % 2;
+            int row = index / 2;
+            return new Rect((Screen.width - contentWidth) * 0.5f + column * (buttonWidth + gap),
+                top + row * (buttonHeight + gap), buttonWidth, buttonHeight);
+        }
+
+        private void DrawStageTestSelect()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.65f, 1.15f);
+            GUI.Label(new Rect(0f, 42f * scale, Screen.width, 54f * scale),
+                "DIRECT STAGE TEST", menuHeaderStyle);
+            GUI.Label(new Rect(Screen.width * 0.08f, 96f * scale, Screen.width * 0.84f, 42f * scale),
+                "Choose a stage without replaying earlier stages. Test runs do not award rewards or unlock campaign progress.",
+                menuSmallStyle);
+
+            for (int i = 0; i < 4; i++)
+            {
+                string[] labels = { "TEST STAGE 1  •  CITY", "TEST STAGE 2  •  VILLAGE",
+                    "TEST STAGE 3  •  ALIEN PLANET", "TEST STAGE 4  •  MOTHERSHIP" };
+                if (DrawFantasyButton(GetStageTestButtonRect(i), labels[i], false, true))
+                {
+                    BeginStageTestEntry(i + 1);
+                    StartupCheckpoint.Set("DirectStageTestSelected_" + (i + 1));
+                    return;
+                }
+            }
+
+            if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MAIN MENU", false, true))
+                mode = ScreenMode.MainMenu;
+        }
+
+        private void HandleStageTestSelectTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (GetLobbyBackRect().Contains(point))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    mode = ScreenMode.MainMenu;
+                    StartupCheckpoint.Set("DirectStageTestMenuBack");
+                    return;
+                }
+
+                for (int stage = 1; stage <= 4; stage++)
+                {
+                    if (!GetStageTestButtonRect(stage - 1).Contains(point))
+                        continue;
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    BeginStageTestEntry(stage);
+                    StartupCheckpoint.Set("DirectStageTestSelectedByTouch_" + stage);
+                    return;
+                }
+            }
+        }
+
         private void BeginStageTestEntry(int targetStage)
         {
             CaptureCampaignProgressBeforeTest();
             StageThreeWorldBuilder.ClearExistingWorld();
+            StageFourWorldBuilder.ClearExistingWorld();
+            if (stageFourWorldBuilder != null)
+            {
+                Destroy(stageFourWorldBuilder);
+                stageFourWorldBuilder = null;
+            }
+            StageFourEscapeSequence existingEscape = gameRoot != null
+                ? gameRoot.GetComponent<StageFourEscapeSequence>() : null;
+            if (existingEscape != null)
+            {
+                existingEscape.enabled = false;
+                Destroy(existingEscape);
+            }
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
             lobbyNotice = string.Empty;
@@ -1079,8 +1180,18 @@ namespace PersiaWar.Unity2D5D
             GateGameplay(false);
             if (followCamera != null) followCamera.enabled = false;
             stageTwoVictorySequence = gameObject.AddComponent<StageTwoVictorySequence>();
-            Transform localRoot = playerRoot != null ? playerRoot.transform
-                : (player != null ? player.transform : null);
+            // The playerRoot field can reference a scene/container wrapper rather than
+            // the actual actor. Boarding must receive the PlayerController transform.
+            Transform localRoot = player != null ? player.transform
+                : (playerRoot != null && playerRoot.GetComponent<PlayerController>() != null
+                    ? playerRoot.transform
+                    : null);
+            if (localRoot == null)
+            {
+                PlayerController scenePlayer = FindFirstObjectByType<PlayerController>();
+                if (scenePlayer != null)
+                    localRoot = scenePlayer.transform;
+            }
             Camera cinematicCamera = androidRuntimeCamera != null && androidRuntimeCamera.isActiveAndEnabled
                 ? androidRuntimeCamera
                 : (activeCamera != null && activeCamera.isActiveAndEnabled ? activeCamera : Camera.main);
