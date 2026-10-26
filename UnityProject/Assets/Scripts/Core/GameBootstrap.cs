@@ -1148,8 +1148,8 @@ namespace PersiaWar.Unity2D5D
                 CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z) + 0.08f,
                 targetHouse.z);
 
-            // House entrances face the negative-Z side. Keep Anahita inside the
-            // selected house, just behind the front entrance and near the blue beacon.
+            // House entrances face the negative-Z side. Keep Anahita outside the
+            // selected house, directly in front of the entrance and near the blue beacon.
             float halfDepth = selected < androidBuildingHalfExtents.Count
                 ? androidBuildingHalfExtents[selected].y
                 : 3.5f;
@@ -1158,6 +1158,9 @@ namespace PersiaWar.Unity2D5D
                 targetHouse.x,
                 CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z - frontOffset),
                 targetHouse.z - frontOffset);
+            // Put the blue guide directly on the captive, not at the house centre.
+            captiveVillageGirlBeaconPosition = new Vector3(captiveVillageGirlPosition.x,
+                captiveVillageGirlPosition.y + 0.08f, captiveVillageGirlPosition.z);
             captiveVillageGirlRoot.transform.position = captiveVillageGirlPosition;
             captiveVillageGirlRoot.SetActive(true);
             float actualDistance = Vector2.Distance(
@@ -1172,7 +1175,7 @@ namespace PersiaWar.Unity2D5D
             VillageGirlRescued = false;
 
             // Pick a random existing residential house. Do not alter the city layout
-            // or create extra houses; the captive's visual stays inside that house.
+            // or create extra houses; Anahita waits just outside its front door.
             int houseIndex = ChooseRandomResidentialHouseIndex();
             if (houseIndex >= 0 && houseIndex < androidBuildingCenters.Count)
             {
@@ -1182,7 +1185,7 @@ namespace PersiaWar.Unity2D5D
                 float halfDepth = houseIndex < androidBuildingHalfExtents.Count
                     ? androidBuildingHalfExtents[houseIndex].y
                     : 3.5f;
-                float frontOffset = Mathf.Max(halfDepth - 1.2f, 1.0f);
+                float frontOffset = halfDepth + 3.1f;
                 captiveVillageGirlPosition = new Vector3(
                     house.x,
                     CalculateAndroidTerrainHeight(house.x, house.z - frontOffset),
@@ -1195,6 +1198,11 @@ namespace PersiaWar.Unity2D5D
                 captiveVillageGirlPosition = new Vector3(
                     -7f, CalculateAndroidTerrainHeight(-7f, 14f), 14f);
             }
+
+            // Keep the initial guide beside Anahita too, so the light highlights the
+            // rescue location and does not appear inside the house while she is outside.
+            captiveVillageGirlBeaconPosition = new Vector3(captiveVillageGirlPosition.x,
+                captiveVillageGirlPosition.y + 0.08f, captiveVillageGirlPosition.z);
 
             captiveVillageGirlRoot = new GameObject("CaptiveVillageGirl_Anahita");
             captiveVillageGirlRoot.transform.SetParent(worldRoot, true);
@@ -1234,7 +1242,7 @@ namespace PersiaWar.Unity2D5D
                 new Vector3(0.085f, 1.57f, 0.177f), new Vector3(0.035f, 0.045f, 0.025f), hair, Vector3.zero);
 
             // A small iron cage makes the captive state clear but does not block
-            // movement or bullets; rescue is intentionally tied to entering the room.
+            // movement or bullets; rescue is intentionally reachable at the front door.
             for (int i = 0; i < 4; i++)
             {
                 float x = -0.54f + i * 0.36f;
