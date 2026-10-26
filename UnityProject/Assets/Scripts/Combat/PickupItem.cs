@@ -111,8 +111,26 @@ namespace PersiaWar.Unity2D5D
   }
   private void BuildQuickDash()
   {
-   Part(PrimitiveType.Cube,"QuickDashCrystal",new Vector3(0,.22f,0),new Vector3(.32f,.32f,.32f),new Color(.90f,.10f,.88f),new Vector3(45,45,45));
-   Part(PrimitiveType.Cube,"QuickDashCore",new Vector3(0,.24f,0),new Vector3(.12f,.12f,.12f),new Color(.70f,.95f,1f),new Vector3(45,45,45));
+   // A ground-facing lightning/speed token is distinct from weapons, grenades,
+   // shields and medkits; avoid the old generic magenta cube.
+   GameObject bolt=new GameObject("QuickDashLightningBolt");
+   bolt.transform.SetParent(visualRoot,false);
+   bolt.transform.localPosition=new Vector3(0,.045f,0);
+   Mesh mesh=new Mesh{name="PW_QuickDashLightningBoltMesh"};
+   mesh.vertices=new[]{
+    new Vector3(-.12f,0,.42f),new Vector3(.12f,0,.42f),new Vector3(-.025f,0,.13f),
+    new Vector3(.22f,0,.13f),new Vector3(-.17f,0,-.42f),new Vector3(-.09f,0,-.04f),
+    new Vector3(-.28f,0,-.04f)};
+   mesh.triangles=new[]{0,1,2,1,3,2,2,3,4,3,4,5,4,6,5};
+   mesh.RecalculateNormals();mesh.RecalculateBounds();generatedMeshes.Add(mesh);
+   bolt.AddComponent<MeshFilter>().sharedMesh=mesh;
+   bolt.AddComponent<MeshRenderer>().sharedMaterial=GetMaterial(new Color(1f,.78f,.08f));
+   Part(PrimitiveType.Cube,"QuickDashTrailLeft",new Vector3(-.28f,.025f,-.19f),
+    new Vector3(.045f,.035f,.24f),new Color(.08f,.86f,1f));
+   Part(PrimitiveType.Cube,"QuickDashTrailRight",new Vector3(.30f,.025f,-.12f),
+    new Vector3(.045f,.035f,.18f),new Color(.08f,.86f,1f));
+   Part(PrimitiveType.Sphere,"QuickDashPulseCore",new Vector3(0,.075f,0),
+    new Vector3(.12f,.08f,.12f),new Color(.52f,.97f,1f));
   }
   private void ShieldMesh(string name,float w,float d,Color color,float y)
   {
