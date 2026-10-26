@@ -622,7 +622,7 @@ namespace PersiaWar.Unity2D5D
                         : (i < stageOneCountPerType * 3 ? PickupItem.PickupType.Grenade : PickupItem.PickupType.QuickDash));
                     Color color = type == PickupItem.PickupType.Weapon ? new Color(0.95f, 0.72f, 0.18f)
                         : (type == PickupItem.PickupType.Shield ? new Color(0.12f, 0.55f, 1f)
-                        : (type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f) : new Color(0.94f, 0.08f, 0.92f)));
+                        : (type == PickupItem.PickupType.Grenade ? new Color(0.95f, 0.28f, 0.12f) : new Color(0.08f, 0.86f, 1f)));
                     GameObject item = GameObject.CreatePrimitive(type == PickupItem.PickupType.Weapon ? PrimitiveType.Cube : (type == PickupItem.PickupType.QuickDash ? PrimitiveType.Quad : PrimitiveType.Sphere));
                     item.name = "HouseLoot_" + type + "_" + i;
                     item.transform.SetParent(worldRoot, true);
@@ -642,7 +642,7 @@ namespace PersiaWar.Unity2D5D
                     else
                         pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
                 }
-                Debug.Log("PERSIA_LOOT: spawned 8 weapons, 8 shields, 8 grenades and 8 magenta triangular quick-dash pickups inside houses");
+                Debug.Log("PERSIA_LOOT: spawned 8 weapons, 8 shields, 8 grenades and 8 cyan lightning quick-dash pickups inside houses");
                 return;
             }
 
