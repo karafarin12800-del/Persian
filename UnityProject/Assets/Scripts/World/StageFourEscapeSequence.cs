@@ -234,12 +234,12 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // read as a ramp, not another oversized station platform.
         Quaternion boardingRampRotation = Quaternion.Euler(-19.5f, 0f, 0f);
         GameObject boardingRamp = MakeBox("S4_ExteriorEscapeRamp", new Vector3(0f, 4.55f, 162f),
-            new Vector3(22f, 0.8f, 24f), MakeMaterial("S4_ExteriorEscapeRampMat", new Color(0.12f, 0.19f, 0.25f)));
+            new Vector3(42f, 0.8f, 24f), MakeMaterial("S4_ExteriorEscapeRampMat", new Color(0.12f, 0.19f, 0.25f)));
         boardingRamp.transform.rotation = boardingRampRotation;
         for (int side = -1; side <= 1; side += 2)
         {
             GameObject rail = MakeBox("S4_ExteriorEscapeRampRail_" + side,
-                new Vector3(side * 10.3f, 5.25f, 162f), new Vector3(0.7f, 1.7f, 24f), wallMat);
+                new Vector3(side * 20.2f, 5.25f, 162f), new Vector3(0.7f, 1.7f, 24f), wallMat);
             rail.transform.rotation = boardingRampRotation;
         }
 
@@ -330,18 +330,21 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             new Color(0.06f, 0.35f, 0.42f));
         // Two circular rings joined by eight longitudinal struts form an open,
         // tube-like docking sleeve between the mothership's nose and the shuttle.
-        BuildExteriorDockRing("S4_ExteriorDockRimInner", new Vector3(0f, 14f, 148.8f), 3.05f, 0.22f, 24, rimMat);
-        BuildExteriorDockRing("S4_ExteriorDockRimOuter", new Vector3(0f, 14f, 153.6f), 3.05f, 0.22f, 24, rimMat);
+        // Match the docking socket to the ten-times enlarged shuttle nose.
+        // The previous tiny ring could not visually connect to the larger craft.
+        const float dockRadius = 17.5f;
+        BuildExteriorDockRing("S4_ExteriorDockRimInner", new Vector3(0f, 14f, 148.8f), dockRadius, 0.72f, 32, rimMat);
+        BuildExteriorDockRing("S4_ExteriorDockRimOuter", new Vector3(0f, 14f, 153.6f), dockRadius, 0.72f, 32, rimMat);
         for (int i = 0; i < 8; i++)
         {
             float angle = i * Mathf.PI * 2f / 8f;
-            Vector3 radial = new Vector3(Mathf.Cos(angle) * 3.05f, Mathf.Sin(angle) * 3.05f, 0f);
+            Vector3 radial = new Vector3(Mathf.Cos(angle) * dockRadius, Mathf.Sin(angle) * dockRadius, 0f);
             GameObject rail = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             rail.name = "S4_ExteriorDockSleeveRail_" + i;
             rail.transform.SetParent(exteriorDockConnection, false);
             rail.transform.localPosition = new Vector3(radial.x, 14f + radial.y, 151.2f);
             rail.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            rail.transform.localScale = new Vector3(0.28f, 2.4f, 0.28f);
+            rail.transform.localScale = new Vector3(0.9f, 2.4f, 0.9f);
             Renderer rr = rail.GetComponent<Renderer>();
             if (rr != null) rr.sharedMaterial = exteriorDockMat;
             Collider rc = rail.GetComponent<Collider>();
@@ -380,7 +383,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         Transform clamp = new GameObject(side < 0
             ? "S4_ExteriorDockClampPort" : "S4_ExteriorDockClampStarboard").transform;
         clamp.SetParent(worldRoot, false);
-        clamp.localPosition = new Vector3(side * 3.55f, 14f, 156f);
+        clamp.localPosition = new Vector3(side * 18.5f, 14f, 156f);
 
         GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cube);
         body.name = "ClampArm";
@@ -686,9 +689,9 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             exteriorDockConnection.localPosition = Vector3.zero;
         }
         if (exteriorDockClampPort != null)
-            exteriorDockClampPort.localPosition = new Vector3(-3.55f, 14f, 156f);
+            exteriorDockClampPort.localPosition = new Vector3(-18.5f, 14f, 156f);
         if (exteriorDockClampStarboard != null)
-            exteriorDockClampStarboard.localPosition = new Vector3(3.55f, 14f, 156f);
+            exteriorDockClampStarboard.localPosition = new Vector3(18.5f, 14f, 156f);
 
         // The exterior shot opens on a real-looking connected configuration,
         // rather than beginning with the shuttle already floating away from the base.
@@ -723,10 +726,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // Release the clamps and retract the connector sleeve into the mothership.
         // The shuttle remains in place until the hardware has visibly disengaged.
         message = "DOCKING CLAMPS RELEASING";
-        Vector3 clampPortClosed = new Vector3(-3.55f, 14f, 156f);
-        Vector3 clampStarboardClosed = new Vector3(3.55f, 14f, 156f);
-        Vector3 clampPortOpen = new Vector3(-7.1f, 14f, 156f);
-        Vector3 clampStarboardOpen = new Vector3(7.1f, 14f, 156f);
+        Vector3 clampPortClosed = new Vector3(-18.5f, 14f, 156f);
+        Vector3 clampStarboardClosed = new Vector3(18.5f, 14f, 156f);
+        Vector3 clampPortOpen = new Vector3(-25.5f, 14f, 156f);
+        Vector3 clampStarboardOpen = new Vector3(25.5f, 14f, 156f);
         Vector3 connectorClosed = Vector3.zero;
         Vector3 connectorRetracted = new Vector3(0f, 0f, -8f);
         float releaseHardwareTime = 0f;
