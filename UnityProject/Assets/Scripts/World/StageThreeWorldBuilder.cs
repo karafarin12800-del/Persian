@@ -1506,24 +1506,27 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         float beamElapsed = 0f;
         const float beamDuration = 1.45f;
         const float beamBaseY = 29.45f;
-        const float beamMaximumHeight = 84f;
+        const float beamRiseDistance = 84f;
+        const float beamHeight = 8f;
+        // A compact energy streak travels upward from the orb. Do not stretch one
+        // cylinder from the ground to the sky; that reads as a static green pillar.
         while (beamElapsed < beamDuration)
         {
             beamElapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(beamElapsed / beamDuration);
-            float beamHeight = Mathf.Lerp(0.3f, beamMaximumHeight, t * t);
-            Vector3 beamPosition = new Vector3(0f, beamBaseY + beamHeight * 0.5f, 0f);
+            float rise = beamRiseDistance * t * t;
+            Vector3 beamPosition = new Vector3(0f, beamBaseY + rise + beamHeight * 0.5f, 0f);
             if (beamColumn != null)
             {
                 beamColumn.position = beamPosition;
-                beamColumn.localScale = new Vector3(1.55f, beamHeight * 0.5f, 1.55f);
+                beamColumn.localScale = new Vector3(1.05f, beamHeight * 0.5f, 1.05f);
             }
             if (beamCoreColumn != null)
             {
                 beamCoreColumn.position = beamPosition;
-                beamCoreColumn.localScale = new Vector3(0.40f, beamHeight * 0.5f, 0.40f);
+                beamCoreColumn.localScale = new Vector3(0.24f, beamHeight * 0.5f, 0.24f);
             }
-            FollowLaunchBeamDuringCinematic(beamBaseY + beamHeight);
+            FollowLaunchBeamDuringCinematic(beamBaseY + rise + beamHeight);
             yield return null;
         }
 
