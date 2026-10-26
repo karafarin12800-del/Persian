@@ -95,16 +95,13 @@ namespace PersiaWar.Unity2D5D
   }
   private void BuildWeaponCrate()
   {
-   // Use a recognizable dropped rifle silhouette instead of a generic cube.
-   Color receiver=new Color(.18f,.23f,.27f);
-   Color metal=new Color(.58f,.64f,.67f);
-   Color grip=new Color(.12f,.15f,.17f);
-   Part(PrimitiveType.Cube,"DroppedWeaponReceiver",new Vector3(0,.30f,0),new Vector3(.18f,.13f,.78f),receiver);
-   Part(PrimitiveType.Cylinder,"DroppedWeaponMuzzle",new Vector3(0,.30f,.49f),new Vector3(.045f,.16f,.045f),metal,new Vector3(90,0,0));
-   Part(PrimitiveType.Cube,"DroppedWeaponStock",new Vector3(0,.30f,-.49f),new Vector3(.14f,.11f,.30f),grip);
-   Part(PrimitiveType.Cube,"DroppedWeaponMagazine",new Vector3(0,.19f,.04f),new Vector3(.11f,.25f,.17f),metal,new Vector3(8,0,0));
-   Part(PrimitiveType.Cube,"DroppedWeaponGrip",new Vector3(0,.19f,-.10f),new Vector3(.12f,.22f,.14f),grip,new Vector3(-12,0,0));
-   Part(PrimitiveType.Cube,"DroppedWeaponSight",new Vector3(0,.39f,.08f),new Vector3(.08f,.07f,.18f),metal);
+   // Render the same weapon silhouette used by the equipment preview/player model,
+   // and select the exact weapon type carried by the defeated enemy.
+   if (!PersiaWar.Unity2D5D.UI.Loadout.WeaponModelLibrary.BuildPickupModel(visualRoot, weaponKind))
+   {
+    Debug.LogError("PERSIA_PICKUP: weapon model could not be rendered for " + weaponKind);
+    StartupCheckpoint.Set("WeaponPickupVisualBuildFailed_" + weaponKind);
+   }
   }
   private void BuildAmmoCrate()
   {
@@ -137,9 +134,11 @@ namespace PersiaWar.Unity2D5D
   {
    Color32 c=color;int key=(c.r<<24)|(c.g<<16)|(c.b<<8)|c.a;Material m;
    if(Materials.TryGetValue(key,out m)&&m!=null)return m;
-   Shader shader=RuntimeMaterialFactory.GetShader();if(shader==null)shader=Shader.Find("Universal Render Pipeline/Lit");if(shader==null)shader=Shader.Find("Standard");if(shader==null)shader=Shader.Find("Unlit/Color");
-   if(shader==null)return null;
-   m=new Material(shader);m.color=color;if(m.HasProperty("_Glossiness"))m.SetFloat("_Glossiness",.18f);Materials[key]=m;return m;
+   // Use the project's Android-safe shader path and set both supported tint
+   // properties; Shader.Find("Standard") alone can leave stripped Android shaders pink.
+   m=RuntimeMaterialFactory.Create("PW_PickupMaterial_"+key.ToString("X8"),color);
+   if(m!=null)Materials[key]=m;
+   return m;
   }
   private void Update()
   {
