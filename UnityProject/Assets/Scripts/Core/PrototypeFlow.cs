@@ -1830,13 +1830,21 @@ namespace PersiaWar.Unity2D5D
         private Rect LoadoutCard(int i)
         {
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-            float gap=9f*sc, total=Mathf.Min(Screen.width-28f*sc,1000f), w=(total-gap*2f)/3f, h=Mathf.Min(160f,Screen.height*.23f);
-            return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap)+loadoutSlideOffset,Screen.height*.25f+(i/3)*(h+gap),w,h);
+            float gap=12f*sc;
+            float total=Mathf.Min(Screen.width-28f*sc,1260f*sc);
+            float w=(total-gap*2f)/3f;
+            float top=Screen.height*.235f;
+            float rowGap=12f*sc;
+            float bottomReserve=130f*sc;
+            float h=Mathf.Clamp((Screen.height-top-bottomReserve-rowGap)/2f,175f,280f);
+            return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap)+loadoutSlideOffset,
+                top+(i/3)*(h+rowGap),w,h);
         }
         private Rect LoadoutNext()
         {
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-            return new Rect(Screen.width*.5f-180f*sc,Screen.height-72f*sc,360f*sc,50f*sc);
+            float width=Mathf.Min(Screen.width-40f*sc,460f*sc);
+            return new Rect((Screen.width-width)*.5f,Screen.height-84f*sc,width,62f*sc);
         }
         private void DrawLoadoutScreen()
         {
@@ -1857,14 +1865,14 @@ namespace PersiaWar.Unity2D5D
                 {
                     HeroPortraitStudio.Draw(new Rect(card.x+card.width*.12f,card.y+3f*sc,card.width*.76f,card.height*.69f),i,chosen);
                     bool ok=LoadoutStore.CanUseHero(i,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued);
-                    GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),HeroCatalog.Name(i),menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-50f*sc,card.width-6f,26f*sc),HeroCatalog.Name(i),menuSmallStyle);
                     string heroState=ok?(chosen?"SELECTED":"TAP TO SELECT"):(i==1?"RESCUE IN STAGE 1":(HeroCatalog.TokenPrice(i)>0?HeroCatalog.TokenPrice(i)+" TOKENS • BUY":HeroCatalog.Price(i)+" COINS • BUY"));
-                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),heroState,menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-25f*sc,card.width-6f,24f*sc),heroState,menuSmallStyle);
                 }
                 else
                 {
                     WeaponCatalog.Entry e=WeaponCatalog.GetAt(i);
-                    Rect previewRect = new Rect(card.x + card.width * .18f, card.y + 8f * sc, card.width * .64f, card.height * .55f);
+                    Rect previewRect = new Rect(card.x + card.width * .16f, card.y + 8f * sc, card.width * .68f, card.height * .44f);
                     if (!WeaponPreviewStudio.Draw(previewRect, e.Kind, chosen))
                     {
                         Fill(new Rect(card.x+card.width*.18f,card.y+card.height*.24f,card.width*.64f,card.height*.18f),new Color(.48f,.59f,.67f,1));
@@ -1874,15 +1882,14 @@ namespace PersiaWar.Unity2D5D
                     float damageStat = WeaponController.GetDamageForKind(e.Kind);
                     float fireStat = 1f / WeaponController.GetFireCooldownForKind(e.Kind);
                     float weightStat = WeaponController.GetWeightForKind(e.Kind);
-                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .56f, card.width - 8f, 15f * sc),
-                        "D" + damageStat + " R" + rangeStat.ToString("0") + " F" + fireStat.ToString("0.0"), menuSmallStyle);
-                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .66f, card.width * .76f, 4f * sc), new Color(.18f,.24f,.30f,1f));
-                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .76f, card.width * .76f * Mathf.Clamp01(weightStat / 1.6f), 4f * sc), new Color(.94f,.68f,.23f,1f));
-                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .69f, card.width - 8f, 14f * sc), "W " + weightStat.ToString("0.0"), menuSmallStyle);
+                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .45f, card.width - 8f, 25f * sc),
+                        "D" + damageStat + " R" + rangeStat.ToString("0") + " F" + fireStat.ToString("0.0") + " W" + weightStat.ToString("0.0"), menuSmallStyle);
+                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .59f, card.width * .76f, 5f * sc), new Color(.18f,.24f,.30f,1f));
+                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .68f, card.width * .76f * Mathf.Clamp01(weightStat / 1.6f), 5f * sc), new Color(.94f,.68f,.23f,1f));
                     bool ok=LoadoutStore.CanUseWeapon(e.Kind);
-                    GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),e.Name,menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-50f*sc,card.width-6f,26f*sc),e.Name,menuSmallStyle);
                     string state=ok?(chosen?"SELECTED":"TAP TO SELECT"):(!LoadoutStore.IsStageUnlocked(e.RequiredCompletedStage)?"CLEAR STAGE "+e.RequiredCompletedStage:(e.TokenPrice>0?e.TokenPrice+" TOKENS • TAP TO BUY":e.Price+" COINS • TAP TO BUY"));
-                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),state,menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-25f*sc,card.width-6f,24f*sc),state,menuSmallStyle);
                 }
                 if(GUI.Button(card,GUIContent.none,GUIStyle.none))ChooseLoadoutItem(i);
             }
@@ -1897,7 +1904,7 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
-                Rect backMenu = new Rect(12f*sc, Screen.height-72f*sc, 145f*sc, 48f*sc);
+                Rect backMenu = new Rect(12f*sc, Screen.height-84f*sc, 200f*sc, 60f*sc);
                 if (DrawFantasyButton(backMenu, "BACK TO MENU", false))
                 {
                     HeroPortraitStudio.Close();
@@ -1910,8 +1917,8 @@ namespace PersiaWar.Unity2D5D
         private Rect LoadoutWeaponActionRect(int index)
         {
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-            float bw=118f*sc,sw=136f*sc,tw=178f*sc,gap=6f*sc;
-            float total=bw+sw+tw+gap*2f,x=(Screen.width-total)*.5f,y=Screen.height-72f*sc,h=48f*sc;
+            float bw=160f*sc,sw=190f*sc,tw=240f*sc,gap=10f*sc;
+            float total=bw+sw+tw+gap*2f,x=(Screen.width-total)*.5f,y=Screen.height-84f*sc,h=60f*sc;
             if(index==0)return new Rect(x,y,bw,h);
             x+=bw+gap;if(index==1)return new Rect(x,y,sw,h);
             x+=sw+gap;return new Rect(x,y,tw,h);
@@ -1985,7 +1992,7 @@ namespace PersiaWar.Unity2D5D
                 else
                 {
                     float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-                    if(new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(point))
+                    if(new Rect(12f*sc,Screen.height-84f*sc,200f*sc,60f*sc).Contains(point))
                     {
                         suppressMenuButtonClicksFrame=Time.frameCount;
                         HeroPortraitStudio.Close();WeaponPreviewStudio.Close();mode=ScreenMode.MainMenu;return;
