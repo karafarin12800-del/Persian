@@ -189,6 +189,16 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         return -1;
     }
 
+    private int GetNextRequiredBombSiteIndex()
+    {
+        for (int i = 0; i < bombSiteIndicators.Count; i++)
+        {
+            if (bombSiteIndicators[i] != null && !bombSiteIndicators[i].activeSelf)
+                return i;
+        }
+        return -1;
+    }
+
     private void BuildEscapeHallAndDoor()
     {
         if (worldRoot == null) return;
@@ -214,10 +224,24 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
         // Extend the same tunnel through the outer hull to the exterior shuttle dock.
         // This closes the old visual gap between the interior corridor and the craft.
-        MakeBox("S4_ExteriorEscapeTunnelFloor", new Vector3(0f, -0.35f, 126f), new Vector3(24f, 0.7f, 44f), MakeMaterial("S4_ExteriorTunnelFloor", new Color(0.055f, 0.085f, 0.12f)));
-        MakeBox("S4_ExteriorEscapeTunnelLeft", new Vector3(-12f, 6f, 126f), new Vector3(1.4f, 12f, 44f), wallMat);
-        MakeBox("S4_ExteriorEscapeTunnelRight", new Vector3(12f, 6f, 126f), new Vector3(1.4f, 12f, 44f), wallMat);
-        MakeBox("S4_ExteriorEscapeTunnelCeiling", new Vector3(0f, 13f, 126f), new Vector3(24f, 1.2f, 44f), MakeMaterial("S4_ExteriorTunnelCeiling", new Color(0.035f, 0.055f, 0.085f)));
+        MakeBox("S4_ExteriorEscapeTunnelFloor", new Vector3(0f, -0.35f, 139f), new Vector3(24f, 0.7f, 70f), MakeMaterial("S4_ExteriorTunnelFloor", new Color(0.055f, 0.085f, 0.12f)));
+        MakeBox("S4_ExteriorEscapeTunnelLeft", new Vector3(-12f, 6f, 139f), new Vector3(1.4f, 12f, 70f), wallMat);
+        MakeBox("S4_ExteriorEscapeTunnelRight", new Vector3(12f, 6f, 139f), new Vector3(1.4f, 12f, 70f), wallMat);
+        MakeBox("S4_ExteriorEscapeTunnelCeiling", new Vector3(0f, 13f, 139f), new Vector3(24f, 1.2f, 70f), MakeMaterial("S4_ExteriorTunnelCeiling", new Color(0.035f, 0.055f, 0.085f)));
+
+        // A short, sloped boarding ramp connects the walkable ground-level tunnel
+        // to the underside of the enlarged shuttle at z=180. It is narrow enough to
+        // read as a ramp, not another oversized station platform.
+        Quaternion boardingRampRotation = Quaternion.Euler(-19.5f, 0f, 0f);
+        GameObject boardingRamp = MakeBox("S4_ExteriorEscapeRamp", new Vector3(0f, 4.55f, 162f),
+            new Vector3(22f, 0.8f, 24f), MakeMaterial("S4_ExteriorEscapeRampMat", new Color(0.12f, 0.19f, 0.25f)));
+        boardingRamp.transform.rotation = boardingRampRotation;
+        for (int side = -1; side <= 1; side += 2)
+        {
+            GameObject rail = MakeBox("S4_ExteriorEscapeRampRail_" + side,
+                new Vector3(side * 10.3f, 5.25f, 162f), new Vector3(0.7f, 1.7f, 24f), wallMat);
+            rail.transform.rotation = boardingRampRotation;
+        }
 
         // The door sits within the playable corridor, not beyond the map boundary.
         // Only its frame is red; the dark panel slides out after the player taps OPEN.
@@ -228,10 +252,12 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         CreateDoorLabel();
         // The escape craft is docked OUTSIDE the hull, at the far end of the exterior tunnel.
         // Never place a full shuttle in the interior corridor: the player walks through the airlock first.
-        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 14f, 156f));
+        escapeShuttle = BuildEscapeShuttle(new Vector3(0f, 14f, 180f));
         escapeShuttle.gameObject.SetActive(false);
         BuildExteriorDockConnection();
 
+        // The boarding ramp remains part of the exterior tunnel route and is hidden
+        // during the cut to the clean wide exterior shot.
         // The player must find the charge box in the side of the command room.
         supplyCrate = MakeBox("S4_ChargeSupplyBox", new Vector3(5f, 1.1f, -67f), new Vector3(3.2f, 2.2f, 2.6f), supplyMat);
         // A real hinged lid: the player must open it before the pickup action appears.
@@ -510,6 +536,14 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             bombSiteIndicators[siteIndex] == null || bombSiteIndicators[siteIndex].activeSelf)
             return;
 
+        int requiredSite = GetNextRequiredBombSiteIndex();
+        if (siteIndex != requiredSite)
+        {
+            message = "PLANT BOMBS IN ORDER • START AT THE AFT ENGINE ROOM";
+            StartupCheckpoint.Set("StageFourOutOfOrderChargePlantRejected_" + (siteIndex + 1));
+            return;
+        }
+
         Vector3 p = bombSites[siteIndex].position + Vector3.up * 0.62f;
         var bomb = GameObject.CreatePrimitive(PrimitiveType.Cube);
         bomb.name = "S4_SquareTimedCharge_" + (siteIndex + 1);
@@ -575,9 +609,10 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         if (player != null && escapeShuttle != null)
         {
             Vector3 walkStart = player.position;
-            // Walk all the way through the interior corridor and exterior connecting tunnel.
-            // The shuttle itself remains outside, attached to the docking sleeve at z=156.
-            Vector3 boardingPoint = new Vector3(0f, 1.45f, 146f);
+            // First follow the ground-level passage to its end, then climb the
+            // purpose-built ramp to the enlarged shuttle's underside airlock.
+            Vector3 corridorWaypoint = new Vector3(0f, 1.45f, 149f);
+            Vector3 boardingPoint = new Vector3(0f, 9.6f, 174f);
             Quaternion walkRotation = player.rotation;
             Vector3 facing = escapeShuttle.position - player.position;
             facing.y = 0f;
@@ -586,13 +621,22 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 : walkRotation;
 
             float walkTime = 0f;
-            const float walkDuration = 1.35f;
+            const float walkDuration = 1.8f;
             while (walkTime < walkDuration)
             {
                 walkTime += Time.deltaTime;
-                float step = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(walkTime / walkDuration));
-                player.position = Vector3.Lerp(walkStart, boardingPoint, step);
-                player.rotation = Quaternion.Slerp(walkRotation, boardingRotation, step);
+                float step;
+                if (walkTime < 0.95f)
+                {
+                    step = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(walkTime / 0.95f));
+                    player.position = Vector3.Lerp(walkStart, corridorWaypoint, step);
+                }
+                else
+                {
+                    step = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((walkTime - 0.95f) / (walkDuration - 0.95f)));
+                    player.position = Vector3.Lerp(corridorWaypoint, boardingPoint, step);
+                }
+                player.rotation = Quaternion.Slerp(walkRotation, boardingRotation, Mathf.Clamp01(walkTime / walkDuration));
 
                 if (sceneCamera != null)
                 {
@@ -620,8 +664,8 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
 
         // The outside scene uses the same nose socket built on the mothership prow:
         // the shuttle nose faces inward, into the open docking sleeve, before release.
-        Vector3 shuttleDockedPosition = new Vector3(0f, 14f, 156f);
-        Vector3 shuttleTravelStart = new Vector3(0f, 15.5f, 174f);
+        Vector3 shuttleDockedPosition = new Vector3(0f, 14f, 180f);
+        Vector3 shuttleTravelStart = new Vector3(0f, 15.5f, 198f);
         Quaternion shuttleDockedRotation = Quaternion.Euler(0f, 180f, 0f);
         Quaternion shuttleStartRotation = Quaternion.LookRotation(
             new Vector3(0.22f, 0.04f, 0.97f), Vector3.up);
@@ -649,10 +693,11 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         // The exterior shot opens on a real-looking connected configuration,
         // rather than beginning with the shuttle already floating away from the base.
         // Bring the exterior camera substantially closer to the now larger shuttle.
-        Vector3 closeCamera = new Vector3(92f, 88f, 300f);
-        Vector3 wideCamera = new Vector3(155f, 112f, 385f);
+        Vector3 closeCamera = new Vector3(82f, 66f, 220f);
+        Vector3 wideCamera = new Vector3(125f, 88f, 280f);
         Vector3 closeLook = new Vector3(0f, 22f, 145f);
-        Vector3 wideLook = new Vector3(35f, 28f, 175f);
+        // Frame the central mothership and the detached shuttle in one shot.
+        Vector3 wideLook = new Vector3(20f, 23f, 35f);
         Vector3 mothershipExplosionLook = new Vector3(0f, 28f, 35f);
         if (sceneCamera != null)
         {
@@ -837,6 +882,11 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             }
             yield return null;
         }
+
+        // Once all six charges and the core blast have been shown clearly, remove
+        // the remaining intact hull renderers. Detached hull chunks and the escape
+        // shuttle are explicitly protected from this cleanup.
+        HideMothershipAfterFinalExplosion(coreBlast);
         message = "CHARGES DETONATED • SHUTTLE ESCAPING";
         Vector3 deepSpaceExit = new Vector3(820f, 245f, 940f);
         float departureTime = 0f;
@@ -942,6 +992,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                     n.StartsWith("S4_EscapeCommand") ||
                     n.StartsWith("S4_EscapeCorridor") ||
                     n.StartsWith("S4_ExteriorEscapeTunnel") ||
+                    n.StartsWith("S4_ExteriorEscapeRamp") ||
                     n.StartsWith("S4_EscapeDoor") ||
                     n.StartsWith("S4_RedEscapeDoor") ||
                     n.StartsWith("S4_Charge") ||
