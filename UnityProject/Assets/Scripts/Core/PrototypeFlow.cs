@@ -1833,7 +1833,7 @@ namespace PersiaWar.Unity2D5D
             float gap=12f*sc;
             float total=Mathf.Min(Screen.width-28f*sc,1260f*sc);
             float w=(total-gap*2f)/3f;
-            float top=Screen.height*.235f;
+            float top=Mathf.Max(210f*sc,Screen.height*.22f);
             float rowGap=12f*sc;
             float bottomReserve=130f*sc;
             float h=Mathf.Clamp((Screen.height-top-bottomReserve-rowGap)/2f,175f,280f);
@@ -1872,7 +1872,7 @@ namespace PersiaWar.Unity2D5D
                 else
                 {
                     WeaponCatalog.Entry e=WeaponCatalog.GetAt(i);
-                    Rect previewRect = new Rect(card.x + card.width * .16f, card.y + 8f * sc, card.width * .68f, card.height * .44f);
+                    Rect previewRect = new Rect(card.x + card.width * .16f, card.y + 8f * sc, card.width * .68f, card.height * .40f);
                     if (!WeaponPreviewStudio.Draw(previewRect, e.Kind, chosen))
                     {
                         Fill(new Rect(card.x+card.width*.18f,card.y+card.height*.24f,card.width*.64f,card.height*.18f),new Color(.48f,.59f,.67f,1));
@@ -1882,7 +1882,7 @@ namespace PersiaWar.Unity2D5D
                     float damageStat = WeaponController.GetDamageForKind(e.Kind);
                     float fireStat = 1f / WeaponController.GetFireCooldownForKind(e.Kind);
                     float weightStat = WeaponController.GetWeightForKind(e.Kind);
-                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .45f, card.width - 8f, 25f * sc),
+                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .43f, card.width - 8f, 25f * sc),
                         "D" + damageStat + " R" + rangeStat.ToString("0") + " F" + fireStat.ToString("0.0") + " W" + weightStat.ToString("0.0"), menuSmallStyle);
                     Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .59f, card.width * .76f, 5f * sc), new Color(.18f,.24f,.30f,1f));
                     Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .68f, card.width * .76f * Mathf.Clamp01(weightStat / 1.6f), 5f * sc), new Color(.94f,.68f,.23f,1f));
