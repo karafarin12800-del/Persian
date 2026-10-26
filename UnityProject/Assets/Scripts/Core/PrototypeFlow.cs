@@ -1836,7 +1836,7 @@ namespace PersiaWar.Unity2D5D
             float top=Mathf.Max(210f*sc,Screen.height*.22f);
             float rowGap=12f*sc;
             float bottomReserve=130f*sc;
-            float h=Mathf.Clamp((Screen.height-top-bottomReserve-rowGap)/2f,175f,280f);
+            float h=Mathf.Clamp((Screen.height-top-bottomReserve-rowGap)/2f,175f,320f);
             return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap)+loadoutSlideOffset,
                 top+(i/3)*(h+rowGap),w,h);
         }
