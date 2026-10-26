@@ -16,8 +16,7 @@ namespace PersiaWar.Unity2D5D
         private int stageTwoLayoutVariant;
         private GameObject captiveVillageGirlRoot;
         private Vector3 captiveVillageGirlPosition;
-        // Keep the blue beam at the house interior while Anahita waits just outside
-        // its front entrance, so the player can free her before stepping into the beam.
+        // Keep Anahita visibly outside the selected house, directly in front of its entrance.
         private Vector3 captiveVillageGirlBeaconPosition;
 
         public bool VillageGirlRescued { get; private set; }
@@ -1054,15 +1053,14 @@ namespace PersiaWar.Unity2D5D
 
             Vector2 playerXZ = new Vector2(playerPosition.x, playerPosition.z);
             Vector2 girlXZ = new Vector2(captiveVillageGirlPosition.x, captiveVillageGirlPosition.z);
-            // The trigger is deliberately inside the chosen house, not on the street:
-            // this only fires after the player reaches the interior.
-            if (Vector2.Distance(playerXZ, girlXZ) > 3.35f)
+            // Rescue is intentionally reachable at the front door, where Anahita is visibly waiting.
+            if (Vector2.Distance(playerXZ, girlXZ) > 4.5f)
                 return false;
 
             VillageGirlRescued = true;
             captiveVillageGirlRoot.SetActive(false);
-            StartupCheckpoint.Set("VillageGirlRescuedInsideHouse");
-            Debug.Log("PERSIA_RESCUE: Anahita rescued inside the Stage 1 house");
+            StartupCheckpoint.Set("VillageGirlRescuedAtFrontDoor");
+            Debug.Log("PERSIA_RESCUE: Anahita rescued at the Stage 1 house entrance");
             return true;
         }
 
@@ -1155,7 +1153,7 @@ namespace PersiaWar.Unity2D5D
             float halfDepth = selected < androidBuildingHalfExtents.Count
                 ? androidBuildingHalfExtents[selected].y
                 : 3.5f;
-            float frontOffset = Mathf.Max(halfDepth - 1.2f, 1.0f);
+            float frontOffset = halfDepth + 3.1f;
             captiveVillageGirlPosition = new Vector3(
                 targetHouse.x,
                 CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z - frontOffset),
