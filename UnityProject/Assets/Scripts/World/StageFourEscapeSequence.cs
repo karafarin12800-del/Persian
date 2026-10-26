@@ -771,7 +771,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
         }
 
         // The shuttle remains intact and the camera stays close enough to read its shape.
-        Vector3 shuttleEnd = new Vector3(225f, 82f, 260f);
+        Vector3 shuttleEnd = new Vector3(100f, 42f, 220f);
         if (sceneCamera != null)
         {
             sceneCamera.transform.position = wideCamera;
