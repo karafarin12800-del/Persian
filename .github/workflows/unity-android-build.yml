@@ -152,7 +152,7 @@ jobs:
           prototype_flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
           assert 'if (stageNumber == 4 && selectedKind == WeaponController.WeaponKind.AlienSword)' in prototype_flow, 'Stage 4 must start with a firearm if the saved loadout is melee-only.'
           assert 'ScreenMode.StageTestSelect' in prototype_flow and 'TEST STAGES  •  NO CAMPAIGN PROGRESS' in prototype_flow and 'BeginStageTestEntry(i + 1)' in prototype_flow, 'Main menu must expose direct test entry for all four stages.'
-          assert 'Transform localRoot = player != null ? player.transform' in prototype_flow and 'StageTwoVictorySequence.Begin(localRoot, cinematicCamera)' in prototype_flow, 'Stage 2 evacuation must receive the actual player actor transform.'
+          assert 'Transform localRoot = player != null ? player.transform' in prototype_flow and 'stageTwoVictorySequence.Begin(localRoot, cinematicCamera)' in prototype_flow, 'Stage 2 evacuation must receive the actual player actor transform.'
           assert 'SpawnInteriorAliens();' in stage4 and 'S4_AlienTrooper_' in stage4, 'Stage 4 must spawn combat hostiles inside the mothership.'
           escape_finale = Path('UnityProject/Assets/Scripts/World/StageFourEscapeSequence.cs').read_text(encoding='utf-8')
           assert 'S4_RedEscapeDoorPanel' in escape_finale and 'S4_EscapeDoorFrameL' in escape_finale and 'OpenRedDoor();' in escape_finale, 'Stage 4 must have a dark exit panel surrounded by a red frame that opens.'
