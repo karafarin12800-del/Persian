@@ -1150,12 +1150,12 @@ namespace PersiaWar.Unity2D5D
                 CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z) + 0.08f,
                 targetHouse.z);
 
-            // House entrances face the negative-Z side. Put the captive outside the
-            // entrance, in front of the blue beam inside the house, not in the room.
+            // House entrances face the negative-Z side. Keep Anahita inside the
+            // selected house, just behind the front entrance and near the blue beacon.
             float halfDepth = selected < androidBuildingHalfExtents.Count
                 ? androidBuildingHalfExtents[selected].y
                 : 3.5f;
-            float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
+            float frontOffset = Mathf.Max(halfDepth - 1.2f, 1.0f);
             captiveVillageGirlPosition = new Vector3(
                 targetHouse.x,
                 CalculateAndroidTerrainHeight(targetHouse.x, targetHouse.z - frontOffset),
@@ -1184,7 +1184,7 @@ namespace PersiaWar.Unity2D5D
                 float halfDepth = houseIndex < androidBuildingHalfExtents.Count
                     ? androidBuildingHalfExtents[houseIndex].y
                     : 3.5f;
-                float frontOffset = Mathf.Max(halfDepth + 3.1f, 6.0f);
+                float frontOffset = Mathf.Max(halfDepth - 1.2f, 1.0f);
                 captiveVillageGirlPosition = new Vector3(
                     house.x,
                     CalculateAndroidTerrainHeight(house.x, house.z - frontOffset),
@@ -1195,7 +1195,7 @@ namespace PersiaWar.Unity2D5D
                 captiveVillageGirlBeaconPosition = new Vector3(
                     -7f, CalculateAndroidTerrainHeight(-7f, 17f) + 0.08f, 17f);
                 captiveVillageGirlPosition = new Vector3(
-                    -7f, CalculateAndroidTerrainHeight(-7f, 9f), 9f);
+                    -7f, CalculateAndroidTerrainHeight(-7f, 14f), 14f);
             }
 
             captiveVillageGirlRoot = new GameObject("CaptiveVillageGirl_Anahita");
