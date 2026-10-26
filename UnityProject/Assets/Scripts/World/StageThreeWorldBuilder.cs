@@ -1534,7 +1534,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         while (afterglowElapsed < 0.45f)
         {
             afterglowElapsed += Time.unscaledDeltaTime;
-            FollowLaunchBeamDuringCinematic(beamBaseY + beamMaximumHeight);
+            FollowLaunchBeamDuringCinematic(beamBaseY + beamRiseDistance + beamHeight);
             yield return null;
         }
 
