@@ -407,7 +407,7 @@ jobs:
           echo 'Repository hygiene validation passed.'
 
   build-android:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     name: Build Android APK
     needs: validate
     runs-on: ubuntu-latest
