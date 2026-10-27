@@ -37,6 +37,8 @@ namespace PersiaWar.Unity2D5D
         private bool axeEnabledForMatch;
         private bool axeEquippedAsMelee;
         private bool meleeProfileApplied;
+        private float savedFirearmAmmoRatio = 1f;
+        private bool hasSavedFirearmAmmoRatio;
         private WeaponKind[] configuredLoadout;
         private bool loadoutConfigured;
         private PlayerController player;
@@ -267,7 +269,18 @@ namespace PersiaWar.Unity2D5D
         private void ApplyWeaponProfile(bool preserveAmmo)
         {
             int oldMagazineSize = Mathf.Max(1, magazineSize);
-            float oldAmmoRatio = preserveAmmo ? magazine / (float)oldMagazineSize : 1f;
+            bool wasMeleeProfile = meleeProfileApplied;
+            bool selectedIsMelee = weaponKind == WeaponKind.Axe || weaponKind == WeaponKind.AlienSword;
+            float oldAmmoRatio = preserveAmmo
+                ? (wasMeleeProfile && !selectedIsMelee && hasSavedFirearmAmmoRatio
+                    ? savedFirearmAmmoRatio
+                    : magazine / (float)oldMagazineSize)
+                : 1f;
+            if (preserveAmmo && !wasMeleeProfile && selectedIsMelee)
+            {
+                savedFirearmAmmoRatio = Mathf.Clamp01(magazine / (float)oldMagazineSize);
+                hasSavedFirearmAmmoRatio = true;
+            }
             // Only restore the original melee tuning after leaving the stage-two axe.
             // Normal stage-one firearm switches keep their original serialized values.
             if (meleeProfileApplied && weaponKind != WeaponKind.Axe && weaponKind != WeaponKind.AlienSword)
@@ -342,7 +355,16 @@ namespace PersiaWar.Unity2D5D
                 ? Mathf.Clamp(Mathf.RoundToInt(oldAmmoRatio * magazineSize), 0, magazineSize)
                 : magazineSize;
             if (!preserveAmmo)
+            {
                 reserve = Mathf.Max(0, startingReserve);
+                savedFirearmAmmoRatio = 1f;
+                hasSavedFirearmAmmoRatio = false;
+            }
+            else if (!selectedIsMelee)
+            {
+                savedFirearmAmmoRatio = magazineSize > 0 ? magazine / (float)magazineSize : 1f;
+                hasSavedFirearmAmmoRatio = true;
+            }
 
             if (gunRoot != null)
                 RefreshWeaponVisual();
