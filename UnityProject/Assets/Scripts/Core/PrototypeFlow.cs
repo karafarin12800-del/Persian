@@ -803,6 +803,11 @@ namespace PersiaWar.Unity2D5D
             AudioListener.volume = soundEnabled ? 1f : 0f;
             if (!PlayerPrefs.HasKey("PW.CosmeticOwned.0"))
                 PlayerPrefs.SetInt("PW.CosmeticOwned.0", 1);
+            int legacyReachedStage = PlayerPrefs.GetInt("PW.Stage4Completed", 0) != 0 ? 5
+                : PlayerPrefs.GetInt("PW.Stage4Unlocked", 0) != 0 ? 4
+                : PlayerPrefs.GetInt("PW.Stage3Unlocked", 0) != 0 ? 3
+                : LoadoutStore.GetNextCampaignStage();
+            stageNumber = Mathf.Clamp(PlayerPrefs.GetInt("PW.CampaignStage", legacyReachedStage), 1, 5);
             PlayerPrefs.Save();
         }
 
@@ -1356,6 +1361,7 @@ namespace PersiaWar.Unity2D5D
             lastStageReward = LoadoutStore.MarkStageCompleted(3, false);
             stageNumber = 4;
             PlayerPrefs.SetInt("PW.CampaignStage", stageNumber);
+            PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
             PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
             PlayerPrefs.Save();
             selectedHero = LoadoutStore.SelectedHero;
@@ -2269,6 +2275,8 @@ namespace PersiaWar.Unity2D5D
                 PlayerPrefs.Save();
             }
             stageNumber = 2;
+            PlayerPrefs.SetInt("PW.CampaignStage", stageNumber);
+            PlayerPrefs.Save();
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
             selectedHero = LoadoutStore.SelectedHero;
