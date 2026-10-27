@@ -3147,7 +3147,7 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < 8; i++)
                 yield return null;
 
-            StartupCheckpoint.Set("AndroidCameraStable8Frames");
+            StartupCheckpoint.Set("AndroidCameraStable120Frames");
 
             // DIAGNOSTIC PASS 2: camera is proven stable. Now enable ONLY the mobile
             // input/UI layer. HUD, minimap rendering and enemies remain disabled.
@@ -3179,7 +3179,7 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < 8; i++)
                 yield return null;
 
-            StartupCheckpoint.Set("AndroidInputStable8Frames");
+            StartupCheckpoint.Set("AndroidInputStable120Frames");
             startupStatus = "INPUT STABLE — enabling gameplay services one at a time";
 
             // PASS 3: enable only the lightweight HUD, then prove it is stable.
@@ -3197,7 +3197,7 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < 8; i++)
                 yield return null;
 
-            StartupCheckpoint.Set("AndroidHudStable8Frames");
+            StartupCheckpoint.Set("AndroidHudStable120Frames");
 
             StartupCheckpoint.Set("AndroidHudStable120Frames");
 
