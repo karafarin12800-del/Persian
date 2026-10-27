@@ -451,6 +451,8 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 27f * scale, right.width - 24f * scale, 24f * scale),
                 survivorCount.ToString(), headerStyle);
 
+            if (stageNumber <= 2)
+            {
             // Tactical minimap remains see-through so the 3D battle stays visible.
             float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
@@ -599,13 +601,17 @@ namespace PersiaWar.Unity2D5D
                 30f * scale);
             Fill(counters, new Color(0.03f, 0.06f, 0.08f, 0.86f));
             StageTwoArenaManager arenaManager = stageNumber >= 2 ? GetComponent<StageTwoArenaManager>() : null;
-            string counterText = stageNumber >= 2
-                ? "WAVE " + wave + "/5   KILLS " + (arenaManager != null ? arenaManager.LocalKills : 0)
-                : "WAVE  " + wave + "     SCORE  " + score;
+            string counterText = stageNumber >= 3
+                ? "HOSTILES  " + (stageNumber == 3
+                    ? (stageThreeWorldBuilder != null ? stageThreeWorldBuilder.RemainingHostiles : 0)
+                    : (stageFourWorldBuilder != null ? stageFourWorldBuilder.RemainingHostiles : 0))
+                : stageNumber == 2
+                    ? "WAVE " + wave + "/5   KILLS " + (arenaManager != null ? arenaManager.LocalKills : 0)
+                    : "WAVE  " + wave + "     SCORE  " + score;
             GUI.Label(new Rect(counters.x + 8f * scale, counters.y, counters.width - 16f * scale, counters.height),
                 counterText, smallStyle);
 
-            if (stageNumber >= 2 && arenaManager != null)
+            if (stageNumber == 2 && arenaManager != null)
             {
                 // Put the winners/leaderboard panel to the LEFT of the map, not on
                 // top of the tactical map markers. Keep it responsive on narrow phones.
@@ -638,6 +644,8 @@ namespace PersiaWar.Unity2D5D
                     smallStyle);
             }
         }
+
+            }
 
         private void DrawStatusBar(Rect rect, float ratio, Color fillColor)
         {
@@ -1055,7 +1063,7 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
             float width = Mathf.Min(Screen.width - 28f * scale, 430f * scale);
-            Rect panel = new Rect(14f * scale, 14f * scale, width, 146f * scale);
+            Rect panel = new Rect(14f * scale, 14f * scale, width, 166f * scale);
             Fill(panel, new Color(0.015f, 0.028f, 0.05f, 0.90f));
             Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.22f, 0.91f, 1f, 0.98f));
             int remaining = stageThreeWorldBuilder != null ? stageThreeWorldBuilder.RemainingHostiles : 66;
@@ -1082,8 +1090,12 @@ namespace PersiaWar.Unity2D5D
             string objective = remaining > 0
                 ? "ELIMINATE ALL ALIENS"
                 : "ALIENS CLEARED — REACH THE CENTRAL LIFT";
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 101f * scale, panel.width - 22f * scale, 30f * scale),
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 101f * scale, panel.width - 22f * scale, 22f * scale),
                 objective, menuSmallStyle);
+            WeaponController weapon = player != null ? player.Weapon : null;
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 126f * scale, panel.width - 22f * scale, 24f * scale),
+                weapon != null ? weapon.CurrentWeaponName + "  AMMO " + weapon.Magazine + "/" + weapon.Reserve : "NO WEAPON",
+                menuSmallStyle);
         }
 
         private void DrawStageThreeIntroOverlay()
@@ -2516,8 +2528,15 @@ namespace PersiaWar.Unity2D5D
             // Use a completely isolated runtime camera for Android. It has no
             // CameraFollow component and therefore cannot trigger the previous
             // target/lifecycle race when the scene camera is activated.
+            if (androidRuntimeCamera != null)
+            {
+                if (mobileInput != null) mobileInput.SetGameplayCamera(null);
+                Destroy(androidRuntimeCamera.gameObject);
+                androidRuntimeCamera = null;
+            }
             androidRuntimeCamera = CreateAndroidRuntimeCamera(player.transform);
             activeCamera = androidRuntimeCamera;
+            GraphicsQualityProfile.ApplyToCamera(activeCamera);
             followCamera = null;
 
             if (mobileInput != null)
