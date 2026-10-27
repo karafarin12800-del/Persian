@@ -33,6 +33,10 @@ namespace PersiaWar.Unity2D5D
         private float nextMeleeTime;
         private int magazine;
         private int reserve;
+        // Melee profiles use a one-slot placeholder magazine. Preserve firearm
+        // ammunition independently so cycling through melee never refills or drains it.
+        private float firearmAmmoRatio = 1f;
+        private int firearmReserve;
         private bool axeEnabledForMatch;
         private bool axeEquippedAsMelee;
         private bool meleeProfileApplied;
@@ -130,6 +134,7 @@ namespace PersiaWar.Unity2D5D
 
         public void CycleWeapon()
         {
+            SaveFirearmAmmoState();
             if (!axeEnabledForMatch)
             {
                 weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
@@ -152,6 +157,7 @@ namespace PersiaWar.Unity2D5D
 
         public void SelectWeapon(WeaponKind selectedWeapon)
         {
+            SaveFirearmAmmoState();
             if (selectedWeapon == WeaponKind.Axe)
             {
                 if (axeEnabledForMatch)
@@ -199,10 +205,25 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("WeaponPickupEquipped_" + CurrentWeaponName);
         }
 
+        private bool IsFirearmWeapon(WeaponKind kind)
+        {
+            return kind != WeaponKind.Axe && kind != WeaponKind.AlienSword;
+        }
+
+        private void SaveFirearmAmmoState()
+        {
+            if (!IsFirearmWeapon(weaponKind)) return;
+            firearmAmmoRatio = magazineSize > 0
+                ? Mathf.Clamp01(magazine / (float)magazineSize) : 1f;
+            firearmReserve = Mathf.Max(0, reserve);
+        }
+
         private void ApplyWeaponProfile(bool preserveAmmo)
         {
             int oldMagazineSize = Mathf.Max(1, magazineSize);
-            float oldAmmoRatio = preserveAmmo ? magazine / (float)oldMagazineSize : 1f;
+            float oldAmmoRatio = preserveAmmo
+                ? (IsFirearmWeapon(weaponKind) ? firearmAmmoRatio : magazine / (float)oldMagazineSize)
+                : 1f;
             // Only restore the original melee tuning after leaving the stage-two axe.
             // Normal stage-one firearm switches keep their original serialized values.
             if (meleeProfileApplied && weaponKind != WeaponKind.Axe && weaponKind != WeaponKind.AlienSword)
@@ -277,7 +298,16 @@ namespace PersiaWar.Unity2D5D
                 ? Mathf.Clamp(Mathf.RoundToInt(oldAmmoRatio * magazineSize), 0, magazineSize)
                 : magazineSize;
             if (!preserveAmmo)
+            {
                 reserve = Mathf.Max(0, startingReserve);
+                firearmReserve = reserve;
+                firearmAmmoRatio = 1f;
+            }
+            else if (IsFirearmWeapon(weaponKind))
+            {
+                reserve = Mathf.Max(0, firearmReserve);
+                firearmAmmoRatio = oldAmmoRatio;
+            }
 
             if (gunRoot != null)
                 RefreshWeaponVisual();
