@@ -99,6 +99,7 @@ namespace PersiaWar.Unity2D5D
         private GameObject gameRoot;
         private GameBootstrap gameBootstrap;
         private Texture2D pixel;
+        private int uiStyleScreenHeight;
         private Texture2D mapTexture;
         private GUIStyle titleStyle;
         private GUIStyle headerStyle;
@@ -445,7 +446,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawAndroidPresentationHUD()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             float margin = 14f * scale;
 
             // This is the Android HUD actually rendered during a match.
@@ -753,13 +754,33 @@ namespace PersiaWar.Unity2D5D
 #endif
         }
 
+        private float GetUiScale()
+        {
+            return Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+        }
+
+        private Rect GetSafeGuiRect()
+        {
+            Rect safe = Screen.safeArea;
+            return new Rect(safe.x, Screen.height - safe.yMax, safe.width, safe.height);
+        }
+
+        private Rect GetHeaderRect()
+        {
+            Rect safe = GetSafeGuiRect();
+            float scale = GetUiScale();
+            float height = Mathf.Min(110f * scale, safe.height * 0.18f);
+            return new Rect(safe.x, safe.y, safe.width, height);
+        }
+
         private void DrawBackdrop()
         {
             MenuTheme.DrawBackdrop(pixel);
-            Rect topBar = new Rect(0f, 0f, Screen.width, Mathf.Min(110f, Screen.height * 0.16f));
-            Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.62f));
-            GUI.Label(new Rect(28f, 12f, Screen.width * 0.62f, 56f), "♛  PERSIA WAR", menuTitleStyle);
-            GUI.Label(new Rect(30f, 64f, Screen.width * 0.60f, 32f), "CLASSIC BATTLE ROYALE", menuSmallStyle);
+            Rect header = GetHeaderRect();
+            Fill(header, new Color(0.02f, 0.035f, 0.06f, 0.62f));
+            float scale = GetUiScale();
+            GUI.Label(new Rect(header.x + 28f * scale, header.y + 8f * scale, header.width * 0.62f, 56f * scale), "♛  PERSIA WAR", menuTitleStyle);
+            GUI.Label(new Rect(header.x + 30f * scale, header.y + 62f * scale, header.width * 0.60f, 32f * scale), "CLASSIC BATTLE ROYALE", menuSmallStyle);
         }
 
         private void InitializeLocalProfile()
@@ -1906,13 +1927,16 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawHeroSelect()
         {
-            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
+            Rect sharedHeader = GetHeaderRect();
+            float sharedScale = GetUiScale();
+            GUI.Label(new Rect(sharedHeader.x, sharedHeader.yMax + 8f * sharedScale, sharedHeader.width, 58f * sharedScale),
+                stageNumber >= 2 ? "STAGE " + stageNumber + "  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
             string heroHint = stageNumber >= 2
                 ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
                     ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
                     : "RESCUE ANAHITA IN STAGE 1 TO UNLOCK HER  •  OTHERS LOCKED")
                 : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
-            GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), heroHint, menuSmallStyle);
+            GUI.Label(new Rect(24f, sharedHeader.yMax + 68f * sharedScale, Screen.width - 48f, 36f * sharedScale), heroHint, menuSmallStyle);
 
             float gap = 14f;
             float totalWidth = Mathf.Min(Screen.width - 44f, 1120f);
@@ -2087,8 +2111,10 @@ namespace PersiaWar.Unity2D5D
                 DrawStageTwoDropMap();
                 return;
             }
-            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), "DROP INTO THE CITY", menuHeaderStyle);
-            GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), "TAP ANY OPEN LOCATION TO CHOOSE WHERE YOU START", menuSmallStyle);
+            Rect sharedHeader = GetHeaderRect();
+            float sharedScale = GetUiScale();
+            GUI.Label(new Rect(sharedHeader.x, sharedHeader.yMax + 8f * sharedScale, sharedHeader.width, 58f * sharedScale), "DROP INTO THE CITY", menuHeaderStyle);
+            GUI.Label(new Rect(24f, sharedHeader.yMax + 68f * sharedScale, Screen.width - 48f, 36f * sharedScale), "TAP ANY OPEN LOCATION TO CHOOSE WHERE YOU START", menuSmallStyle);
 
             float size = Mathf.Min(Screen.width - 70f, Screen.height - 330f);
             Rect mapRect = new Rect((Screen.width - size) * 0.5f, 220f, size, size);
@@ -3497,7 +3523,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (pixel == null)
                 CreateTextures();
-            if (titleStyle == null)
+            if (titleStyle == null || uiStyleScreenHeight != Screen.height)
                 BuildStyles();
             if (menuTitleStyle == null || menuStyleScreenHeight != Screen.height)
                 BuildMenuStyles();
@@ -3513,11 +3539,13 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildStyles()
         {
-            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 32, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
-            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            float scale = GetUiScale();
+            uiStyleScreenHeight = Screen.height;
+            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(34f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(32f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(20f * scale), alignment = TextAnchor.MiddleCenter };
+            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(19f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = Mathf.RoundToInt(20f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         }
 
         private void BuildMenuStyles()
