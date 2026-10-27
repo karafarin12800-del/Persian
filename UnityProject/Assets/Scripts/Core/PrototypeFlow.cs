@@ -86,6 +86,7 @@ namespace PersiaWar.Unity2D5D
         private bool stageTestRun;
         private bool stageTwoResultPresented;
         private int savedCampaignStageNumber = 1;
+        private int savedCampaignStagePref = 1;
         private int savedStage3Unlocked;
         private int savedStage4Unlocked;
         private int savedStage4Completed;
@@ -1038,6 +1039,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (stageTestRun) return;
             savedCampaignStageNumber = stageNumber;
+            savedCampaignStagePref = PlayerPrefs.GetInt("PW.CampaignStage", stageNumber);
             savedStage3Unlocked = PlayerPrefs.GetInt("PW.Stage3Unlocked", 0);
             savedStage4Unlocked = PlayerPrefs.GetInt("PW.Stage4Unlocked", 0);
             savedStage4Completed = PlayerPrefs.GetInt("PW.Stage4Completed", 0);
@@ -1048,6 +1050,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (!stageTestRun) return;
             stageNumber = Mathf.Clamp(savedCampaignStageNumber, 1, 5);
+            PlayerPrefs.SetInt("PW.CampaignStage", savedCampaignStagePref);
             PlayerPrefs.SetInt("PW.Stage3Unlocked", savedStage3Unlocked);
             PlayerPrefs.SetInt("PW.Stage4Unlocked", savedStage4Unlocked);
             PlayerPrefs.SetInt("PW.Stage4Completed", savedStage4Completed);
