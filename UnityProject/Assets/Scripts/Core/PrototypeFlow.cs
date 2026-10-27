@@ -314,16 +314,23 @@ namespace PersiaWar.Unity2D5D
                 Vector2 gui = new Vector2(
                     touch.position.x,
                     Screen.height - touch.position.y);
-                if (!button.Contains(gui))
-                    continue;
-
-                matchPaused = !matchPaused;
-                Time.timeScale = matchPaused ? 0f : 1f;
-                if (mobileInput != null)
-                    mobileInput.SetPaused(matchPaused);
-
-                StartupCheckpoint.Set(
-                    matchPaused ? "MatchPausedByNativeTouch" : "MatchResumedByNativeTouch");
+                if (matchPaused)
+                {
+                    float panelW = Mathf.Min(Screen.width - 64f, 420f);
+                    float panelH = 254f;
+                    Rect panel = new Rect((Screen.width - panelW) * 0.5f, (Screen.height - panelH) * 0.5f, panelW, panelH);
+                    float actionGap = 8f;
+                    float actionWidth = (panel.width - 40f - actionGap * 2f) / 3f;
+                    float actionY = panel.y + 112f;
+                    if (new Rect(panel.x + 20f, actionY, actionWidth, 48f).Contains(gui))
+                    { SetMatchPaused(false); return; }
+                    if (new Rect(panel.x + 20f + actionWidth + actionGap, actionY, actionWidth, 48f).Contains(gui))
+                    { BeginStageTestOrCampaignRestart(Mathf.Clamp(stageNumber, 1, 4)); return; }
+                    if (new Rect(panel.x + 20f + (actionWidth + actionGap) * 2f, actionY, actionWidth, 48f).Contains(gui))
+                    { GoToMainMenu(); return; }
+                }
+                if (!button.Contains(gui)) continue;
+                SetMatchPaused(!matchPaused);
                 return;
             }
         }
@@ -2545,6 +2552,14 @@ namespace PersiaWar.Unity2D5D
                 "OFFLINE TEST: AI FILLS THE LOBBY; ONLINE SERVER NOT CONNECTED", menuSmallStyle);
         }
 
+        private void SetMatchPaused(bool paused)
+        {
+            matchPaused = paused;
+            Time.timeScale = matchPaused ? 0f : 1f;
+            if (mobileInput != null) mobileInput.SetPaused(matchPaused);
+            StartupCheckpoint.Set(matchPaused ? "MatchPausedByNativeTouch" : "MatchResumedByNativeTouch");
+        }
+
         private void DrawAndroidPauseControl()
         {
             EnsureUiInitialized();
@@ -2558,7 +2573,7 @@ namespace PersiaWar.Unity2D5D
                     new Color(0f, 0f, 0f, 0.28f));
 
                 float panelW = Mathf.Min(Screen.width - 64f, 420f);
-                float panelH = 170f;
+                float panelH = 254f;
                 Rect panel = new Rect(
                     (Screen.width - panelW) * 0.5f,
                     (Screen.height - panelH) * 0.5f,
@@ -2575,9 +2590,19 @@ namespace PersiaWar.Unity2D5D
                     headerStyle);
 
                 GUI.Label(
-                    new Rect(panel.x + 20f, panel.y + 70f, panel.width - 40f, 28f),
-                    "Touch ▶ to resume",
+                    new Rect(panel.x + 20f, panel.y + 66f, panel.width - 40f, 26f),
+                    "PAUSED",
                     bodyStyle);
+
+                float actionGap = 8f;
+                float actionWidth = (panel.width - 40f - actionGap * 2f) / 3f;
+                float actionY = panel.y + 112f;
+                if (GUI.Button(new Rect(panel.x + 20f, actionY, actionWidth, 48f), "RESUME", buttonStyle))
+                    SetMatchPaused(false);
+                if (GUI.Button(new Rect(panel.x + 20f + actionWidth + actionGap, actionY, actionWidth, 48f), "RESTART", buttonStyle))
+                    BeginStageTestOrCampaignRestart(Mathf.Clamp(stageNumber, 1, 4));
+                if (GUI.Button(new Rect(panel.x + 20f + (actionWidth + actionGap) * 2f, actionY, actionWidth, 48f), "MAIN MENU", buttonStyle))
+                    GoToMainMenu();
             }
 
             // Draw the control last so the pause overlay can never cover it.
@@ -2909,8 +2934,13 @@ namespace PersiaWar.Unity2D5D
 
         private Camera CreateAndroidRuntimeCamera(Transform target)
         {
-            GameObject cameraObject = new GameObject("AndroidGameplayCamera");
-            Camera camera = cameraObject.AddComponent<Camera>();
+            GameObject cameraObject = androidRuntimeCamera != null
+                ? androidRuntimeCamera.gameObject
+                : new GameObject("AndroidGameplayCamera");
+            Camera camera = androidRuntimeCamera != null
+                ? androidRuntimeCamera
+                : cameraObject.GetComponent<Camera>();
+            if (camera == null) camera = cameraObject.AddComponent<Camera>();
             camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.15f, 0.16f, 0.17f, 1f);
@@ -2918,7 +2948,7 @@ namespace PersiaWar.Unity2D5D
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
             camera.allowHDR = false;
-            camera.allowMSAA = false;
+            GraphicsQualityProfile.ApplyToCamera(camera);
 
             if (target != null)
             {
@@ -2929,7 +2959,8 @@ namespace PersiaWar.Unity2D5D
                     Vector3.up);
             }
 
-            CameraOcclusionFader occlusionFader = cameraObject.AddComponent<CameraOcclusionFader>();
+            CameraOcclusionFader occlusionFader = cameraObject.GetComponent<CameraOcclusionFader>();
+            if (occlusionFader == null) occlusionFader = cameraObject.AddComponent<CameraOcclusionFader>();
             occlusionFader.SetTarget(target);
             camera.enabled = false;
             return camera;
