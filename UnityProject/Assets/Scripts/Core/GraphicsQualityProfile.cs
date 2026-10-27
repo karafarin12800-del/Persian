@@ -34,6 +34,19 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         get { ChooseTierOnce(); return selectedTier; }
     }
 
+    public static void ApplyToCamera(Camera camera)
+    {
+        if (camera == null) return;
+        ChooseTierOnce();
+        if (CurrentTier == QualityTier.Low)
+        {
+            camera.allowMSAA = false;
+            return;
+        }
+        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 : 2;
+        camera.allowMSAA = true;
+    }
+
     public static bool IsEnhanced
     {
         get { return CurrentTier >= QualityTier.Medium; }
@@ -197,7 +210,20 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             block.SetColor("_Color", tint);
             renderer.SetPropertyBlock(block);
         }
-        int index = profile.shadowCount++;
+        int index = -1;
+        for (int i = 0; i < profile.shadowCount; i++)
+        {
+            if (profile.shadowObjects[i] == null || profile.shadowTargets[i] == null)
+            {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0)
+        {
+            if (profile.shadowCount >= profile.shadowTargets.Length) return;
+            index = profile.shadowCount++;
+        }
         profile.shadowTargets[index] = target;
         profile.shadowObjects[index] = shadow.transform;
         profile.shadowOffsets[index] = localOffset;
@@ -212,8 +238,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         ParticleSystem.MainModule main = stars.main;
         main.loop = false;
         main.playOnAwake = false;
-        main.duration = 100f;
-        main.startLifetime = 100f;
+        main.duration = 100000f;
+        main.startLifetime = 100000f;
         main.startSpeed = 0f;
         main.startSize = 1f;
         main.maxParticles = 64;
@@ -229,8 +255,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             ParticleSystem.Particle particle = new ParticleSystem.Particle();
             particle.position = UnityEngine.Random.onUnitSphere * UnityEngine.Random.Range(420f, 720f);
             particle.startSize = UnityEngine.Random.Range(0.45f, 1.5f);
-            particle.startLifetime = 100f;
-            particle.remainingLifetime = 100f;
+            particle.startLifetime = 100000f;
+            particle.remainingLifetime = 100000f;
             particle.startColor = i % 5 == 0
                 ? new Color(0.48f, 0.80f, 1f, 0.68f)
                 : new Color(0.72f, 0.82f, 1f, 0.42f);
