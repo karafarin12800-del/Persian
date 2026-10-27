@@ -984,7 +984,7 @@ namespace PersiaWar.Unity2D5D
         private void StartCampaignFromMenu()
         {
             if(stageTestRun)RestoreCampaignProgressAfterTest();
-            stageNumber=Mathf.Clamp(PlayerPrefs.GetInt("PW.CampaignStage", LoadoutStore.GetNextCampaignStage()),1,5);
+            stageNumber=Mathf.Clamp(PlayerPrefs.GetInt("PW.CampaignStage", stageNumber),1,5);
             if(stageNumber>4){ShowLobbyNotice("CAMPAIGN COMPLETE  •  SELECT AN UNLOCKED STAGE TO REPLAY.");return;}
             forceStageOneWorldRebuildForTest=stageNumber==1;
             selectedHero=LoadoutStore.SelectedHero;
