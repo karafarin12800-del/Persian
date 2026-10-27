@@ -69,6 +69,8 @@ namespace PersiaWar.Unity2D5D
         private float stageTwoLobbyStartedAt;
         private bool matchInputArmed;
         private bool matchPaused;
+        private bool stageTwoResultAcknowledged;
+        private bool stageThreeResultAcknowledged;
         private float resultOverlayStartTime = -1f;
         private StageTwoVictorySequence stageTwoVictorySequence;
         private StageThreeWorldBuilder stageThreeWorldBuilder;
@@ -240,6 +242,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     if (stageNumber == 2 && session.PlayerWon)
                     {
+                        if (!stageTwoResultAcknowledged) return;
                         if (stageTwoVictorySequence == null)
                             StartStageTwoVictorySequence();
                         else if (stageTwoVictorySequence.IsComplete)
@@ -248,6 +251,7 @@ namespace PersiaWar.Unity2D5D
                     else if (stageNumber == 3 && session.PlayerWon &&
                         stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
                     {
+                        if (!stageThreeResultAcknowledged) return;
                         StartStageFourAfterStageThree();
                     }
                     return;
@@ -1909,6 +1913,8 @@ namespace PersiaWar.Unity2D5D
             ExtractionBeacon.ClearForStageTransition();
             Time.timeScale = 1f;
             stageNumber = 2;
+            stageTwoResultAcknowledged = false;
+            stageThreeResultAcknowledged = false;
             PlayerPrefs.SetInt("PW.CampaignStage", 2);
             PlayerPrefs.Save();
             stageTwoOriginalHero = selectedHero;
@@ -2982,6 +2988,34 @@ namespace PersiaWar.Unity2D5D
             return "ARENA CLEARED  •  FINAL RANK #" + rank + "  •  CHECK THE STORE";
         }
 
+        private void DrawPreEvacuationResultPanel(GameSession session, string resultText,
+            string continueLabel, System.Action onContinue)
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float width = Mathf.Min(Screen.width - 40f * scale, 680f * scale);
+            float height = Mathf.Min(Screen.height - 40f * scale, 260f * scale);
+            Rect panel = new Rect((Screen.width - width) * 0.5f,
+                (Screen.height - height) * 0.5f, width, height);
+            Fill(panel, new Color(0.025f, 0.05f, 0.08f, 0.97f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 5f * scale),
+                new Color(0.22f, 0.78f, 0.34f, 1f));
+            GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 20f * scale,
+                panel.width - 36f * scale, 42f * scale), "VICTORY", headerStyle);
+            GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 70f * scale,
+                panel.width - 36f * scale, 36f * scale), resultText, bodyStyle);
+            GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 112f * scale,
+                panel.width - 36f * scale, 28f * scale),
+                "SCORE " + session.Score + "   •   HOSTILES " + session.EnemiesDefeated, smallStyle);
+            float buttonWidth = Mathf.Min(width - 36f * scale, 440f * scale);
+            Rect button = new Rect(panel.center.x - buttonWidth * 0.5f,
+                panel.yMax - 58f * scale, buttonWidth, 42f * scale);
+            if (GUI.Button(button, continueLabel, buttonStyle))
+            {
+                onContinue?.Invoke();
+                StartupCheckpoint.Set("VictoryResultAcknowledged_Stage" + stageNumber);
+            }
+        }
+
         private void RestartCurrentStageInPlace()
         {
             int restartStage = Mathf.Clamp(stageNumber, 1, 4);
@@ -3004,6 +3038,8 @@ namespace PersiaWar.Unity2D5D
             if (stageFourWorldBuilder != null) { Destroy(stageFourWorldBuilder); stageFourWorldBuilder = null; }
             if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
             stageNumber = restartStage;
+            stageTwoResultAcknowledged = false;
+            stageThreeResultAcknowledged = false;
             spawnChosen = true;
             spawnWorld = restartStage == 3 ? new Vector2(0f, -97f) : restartStage == 4 ? Vector2.zero : spawnWorld;
             matchPaused = false;
@@ -3025,8 +3061,12 @@ namespace PersiaWar.Unity2D5D
             // EnemySpawner only after the final wave has spawned and every alien is dead.
             if (session.PlayerWon && stageNumber == 2)
             {
-                if (stageTwoVictorySequence == null)
-                    StartStageTwoVictorySequence();
+                if (!stageTwoResultAcknowledged)
+                {
+                    DrawPreEvacuationResultPanel(session, GetStageTwoResultMessage(),
+                        "CONTINUE TO EVACUATION", () => stageTwoResultAcknowledged = true);
+                    return;
+                }
                 if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
                 {
                     DrawStageTwoCinematicOverlay();
@@ -3034,6 +3074,13 @@ namespace PersiaWar.Unity2D5D
                 }
                 if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsComplete)
                     return;
+            }
+            if (session.PlayerWon && stageNumber == 3 && !stageThreeResultAcknowledged)
+            {
+                DrawPreEvacuationResultPanel(session,
+                    "STAGE 3 COMPLETE  •  CAMPAIGN REWARD SECURED",
+                    "CONTINUE TO STAGE 4", () => stageThreeResultAcknowledged = true);
+                return;
             }
 
             // The blue extraction gate is reserved for Stage 1's final opponent.
