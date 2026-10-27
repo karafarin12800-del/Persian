@@ -49,6 +49,18 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         get { return CurrentTier >= QualityTier.Medium; }
     }
 
+    public static void ApplyToCamera(Camera camera)
+    {
+        if (camera == null) return;
+        if (CurrentTier == QualityTier.Low)
+        {
+            camera.allowMSAA = false;
+            return;
+        }
+        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 : 2;
+        camera.allowMSAA = true;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
@@ -310,9 +322,14 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     {
         if (!IsEnhanced || target == null) return;
         GraphicsQualityProfile profile = EnsureInstance();
-        for (int i = 0; i < profile.shadowCount; i++)
+        int freeIndex = -1;
+        for (int i = 0; i < profile.shadowTargets.Length; i++)
+        {
             if (profile.shadowTargets[i] == target) return;
-        if (profile.shadowCount >= profile.shadowTargets.Length) return;
+            if (freeIndex < 0 && (profile.shadowTargets[i] == null || profile.shadowObjects[i] == null))
+                freeIndex = i;
+        }
+        if (freeIndex < 0) return;
 
         GameObject shadow = GameObject.CreatePrimitive(PrimitiveType.Quad);
         shadow.name = "S4_QualityBlobShadow";
@@ -331,7 +348,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             block.SetColor("_Color", tint);
             renderer.SetPropertyBlock(block);
         }
-        int index = profile.shadowCount++;
+        int index = freeIndex;
+        profile.shadowCount = Mathf.Max(profile.shadowCount, index + 1);
         profile.shadowTargets[index] = target;
         profile.shadowObjects[index] = shadow.transform;
         profile.shadowOffsets[index] = localOffset;
@@ -346,8 +364,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         ParticleSystem.MainModule main = stars.main;
         main.loop = false;
         main.playOnAwake = false;
-        main.duration = 100f;
-        main.startLifetime = 100f;
+        main.duration = 100000f;
+        main.startLifetime = 100000f;
         main.startSpeed = 0f;
         main.startSize = 1f;
         main.maxParticles = 64;
@@ -363,8 +381,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             ParticleSystem.Particle particle = new ParticleSystem.Particle();
             particle.position = UnityEngine.Random.onUnitSphere * UnityEngine.Random.Range(420f, 720f);
             particle.startSize = UnityEngine.Random.Range(0.45f, 1.5f);
-            particle.startLifetime = 100f;
-            particle.remainingLifetime = 100f;
+            particle.startLifetime = 100000f;
+            particle.remainingLifetime = 100000f;
             particle.startColor = i % 5 == 0
                 ? new Color(0.48f, 0.80f, 1f, 0.68f)
                 : new Color(0.72f, 0.82f, 1f, 0.42f);
