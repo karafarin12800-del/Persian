@@ -79,6 +79,7 @@ namespace PersiaWar.Unity2D5D
         private StageFourWorldBuilder stageFourWorldBuilder;
         private bool forceStageOneWorldRebuildForTest;
         private bool stageTestRun;
+        private bool profileCompletionPendingStageTwo;
         private int savedCampaignStageNumber = 1;
         private int savedStage3Unlocked;
         private int savedStage4Unlocked;
@@ -891,14 +892,23 @@ namespace PersiaWar.Unity2D5D
                 {
                     suppressMenuButtonClicksFrame = Time.frameCount;
                     if (mode == ScreenMode.Profile)
+                {
+                    SaveLocalProfile();
+                    if (profileCompletionPendingStageTwo)
                     {
-                        string cleanName = string.IsNullOrWhiteSpace(profileNameInput)
-                            ? "Persian Warrior" : profileNameInput.Trim();
-                        profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
-                        PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
-                        PlayerPrefs.Save();
+                        profileCompletionPendingStageTwo = false;
+                        mode = ScreenMode.HeroSelect;
+                        StartupCheckpoint.Set("FirstCampaignRegistrationSaved_OpenStage2HeroSelection");
                     }
+                    else
+                    {
+                        mode = ScreenMode.MainMenu;
+                    }
+                }
+                else
+                {
                     mode = ScreenMode.MainMenu;
+                }
                     return;
                 }
 
@@ -1454,7 +1464,8 @@ namespace PersiaWar.Unity2D5D
             Rect panel = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.19f, width, Screen.height * 0.58f);
             Fill(panel, new Color(0.025f, 0.055f, 0.085f, 0.94f));
             Fill(new Rect(panel.x, panel.y, panel.width, 6f), new Color(0.95f, 0.69f, 0.20f, 1f));
-            GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f), "PLAYER PROFILE", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f),
+                profileCompletionPendingStageTwo ? "FIRST CAMPAIGN REGISTRATION" : "PLAYER PROFILE", menuHeaderStyle);
             GUI.Label(new Rect(panel.x + 32f, panel.y + 88f, panel.width - 64f, 36f), "DISPLAY NAME (MAX 20 CHARACTERS)", menuSmallStyle);
             profileNameInput = GUI.TextField(new Rect(panel.x + 40f, panel.y + 132f, panel.width - 80f, 58f),
                 profileNameInput, 20);
@@ -1462,14 +1473,37 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(panel.x + 32f, panel.y + 250f, panel.width - 64f, 34f),
                 "PROFILE COSMETIC  " + StoreCosmeticNames[Mathf.Clamp(selectedProfileCosmetic, 0, StoreCosmeticNames.Length - 1)],
                 menuSmallStyle);
-            if (DrawFantasyButton(GetLobbyBackRect(), "SAVE & BACK"))
+            if (profileCompletionPendingStageTwo)
+                GUI.Label(new Rect(panel.x + 32f, panel.y + 290f, panel.width - 64f, 34f),
+                    "SAVE ONCE TO CONTINUE THE CAMPAIGN", menuSmallStyle);
+            string saveLabel = profileCompletionPendingStageTwo ? "REGISTER & CONTINUE" : "SAVE & BACK";
+            if (DrawFantasyButton(GetLobbyBackRect(), saveLabel, profileCompletionPendingStageTwo))
             {
-                string cleanName = string.IsNullOrWhiteSpace(profileNameInput) ? "Persian Warrior" : profileNameInput.Trim();
-                profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
-                PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
-                PlayerPrefs.Save();
-                mode = ScreenMode.MainMenu;
+                SaveLocalProfile();
+                if (profileCompletionPendingStageTwo)
+                {
+                    profileCompletionPendingStageTwo = false;
+                    mode = ScreenMode.HeroSelect;
+                    StartupCheckpoint.Set("FirstCampaignRegistrationSaved_OpenStage2HeroSelection");
+                }
+                else
+                {
+                    mode = ScreenMode.MainMenu;
+                }
             }
+        }
+
+        private void SaveLocalProfile()
+        {
+            string cleanName = string.IsNullOrWhiteSpace(profileNameInput)
+                ? "Persian Warrior" : profileNameInput.Trim();
+            profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
+            PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
+            // Only the post-Stage-1 registration flow sets this flag. Editing the
+            // profile from the main menu must not skip the first-campaign registration.
+            if (profileCompletionPendingStageTwo)
+                PlayerPrefs.SetInt("PW.ProfileRegistered", 1);
+            PlayerPrefs.Save();
         }
 
         private Rect GetStoreItemRect(int index)
@@ -1771,9 +1805,11 @@ namespace PersiaWar.Unity2D5D
             if (index == 0)
                 return true;
 
-            // Anahita is deliberately the second card from the left.
+            // Anahita is the second card. Her unlock persists locally after Stage 1,
+            // including when the next stage rebuilds the world and GameBootstrap.
             return index == 1 && stageNumber >= 2 &&
-                gameBootstrap != null && gameBootstrap.VillageGirlRescued;
+                (PlayerPrefs.GetInt("PW.AnahitaUnlocked", 0) == 1 ||
+                 (gameBootstrap != null && gameBootstrap.VillageGirlRescued));
         }
 
         private void CheckStageOneGirlRescue()
@@ -1784,8 +1820,9 @@ namespace PersiaWar.Unity2D5D
 
             if (gameBootstrap.TryRescueVillageGirl(player.transform.position))
             {
+                PlayerPrefs.SetInt("PW.AnahitaUnlocked", 1);
+                PlayerPrefs.Save();
                 girlRescueNoticeUntil = Time.unscaledTime + 4.5f;
-
             }
         }
 
@@ -2026,12 +2063,15 @@ namespace PersiaWar.Unity2D5D
                 GameSession.Instance.ResetMatch();
             resultAutoReturnAt = -1f;
             stageNumber = 2;
+            PlayerPrefs.SetInt("PW.AnahitaUnlocked", 1);
+            PlayerPrefs.Save();
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
             stageTwoLobbyRunning = false;
             stageTwoLobbyReady = false;
             stageTwoLobbyPlayers = 1;
-            mode = ScreenMode.HeroSelect;
+            profileCompletionPendingStageTwo = PlayerPrefs.GetInt("PW.ProfileRegistered", 0) != 1;
+            mode = profileCompletionPendingStageTwo ? ScreenMode.Profile : ScreenMode.HeroSelect;
             spawnChosen = false;
             startingMatch = false;
             matchPaused = false;
