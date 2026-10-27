@@ -462,7 +462,10 @@ namespace PersiaWar.Unity2D5D
             // Tactical minimap remains see-through so the 3D battle stays visible.
             float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);
             Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
-            Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));
+            if (stageNumber == 2)
+                DrawStageTwoVillageMap(map);
+            else
+                Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));
 
             Color frameColor = new Color(0.92f, 0.95f, 0.98f, 0.46f);
             float frame = Mathf.Max(1f, 1.5f * scale);
@@ -471,6 +474,8 @@ namespace PersiaWar.Unity2D5D
             Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
             Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
 
+            if (stageNumber == 1)
+            {
             Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.66f);
             float roadThickness = map.width * (10f / 192f);
             for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
@@ -529,6 +534,8 @@ namespace PersiaWar.Unity2D5D
                 Fill(houseRect, new Color(0.96f, 0.68f, 0.30f, 1f));
             }
 
+            }
+
             for (int i = 0; i < minimapEnemies.Length; i++)
             {
                 EnemyChase enemy = minimapEnemies[i];
@@ -583,7 +590,7 @@ namespace PersiaWar.Unity2D5D
             }
             DrawCircle(playerPoint, 6.5f * scale, new Color(0.95f, 0.86f, 0.20f, 1f));
             GUI.Label(new Rect(map.x + 7f * scale, map.y + 5f * scale, map.width - 12f * scale, 22f * scale),
-                "N ↑   MAP   P:YOU   E:ENEMY", smallStyle);
+                (stageNumber == 2 ? "VILLAGE  •  YOU  •  ALIENS" : "N ↑   MAP   P:YOU   E:ENEMY"), smallStyle);
 
             Rect legend = new Rect(
                 map.x + 4f * scale,
