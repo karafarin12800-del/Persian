@@ -2297,7 +2297,7 @@ namespace PersiaWar.Unity2D5D
         {
             startingMatch = true;
             matchInputArmed = false;
-            startupStatus = "Stage 1: starting battlefield preparation...";
+            startupStatus = "starting battlefield preparation...";
 
             StartupCheckpoint.Set("MatchActivationStarted");
 
@@ -2306,7 +2306,7 @@ namespace PersiaWar.Unity2D5D
             // then explicitly re-gate gameplay components before building the world.
             if (gameRoot != null && !gameRoot.activeSelf)
             {
-                startupStatus = "Stage 2: activating battlefield systems...";
+                startupStatus = "activating battlefield systems...";
                 gameRoot.SetActive(true);
                 yield return null;
 
@@ -2329,7 +2329,7 @@ namespace PersiaWar.Unity2D5D
                     stageThreeWorldBuilder = gameRoot.AddComponent<StageThreeWorldBuilder>();
                 if (GameSession.Instance != null)
                     GameSession.Instance.ResetMatch();
-                startupStatus = "Stage 3: building the alien fortress and nine routes...";
+                startupStatus = "building the alien fortress and nine routes...";
                 if (!stageThreeWorldBuilder.BuildWorld())
                 {
                     startupStatus = "Stage 3 world construction failed.";
@@ -2346,7 +2346,7 @@ namespace PersiaWar.Unity2D5D
                     stageFourWorldBuilder = gameRoot.AddComponent<StageFourWorldBuilder>();
                 if (GameSession.Instance != null)
                     GameSession.Instance.ResetMatch();
-                startupStatus = "Stage 4: starting orbital megabase construction...";
+                startupStatus = "starting orbital megabase construction...";
                 StartupCheckpoint.Set("StageFourWorldBuildStarted");
                 bool stageFourBuildCompleted = false;
                 bool stageFourBuildSucceeded = false;
@@ -2422,19 +2422,19 @@ namespace PersiaWar.Unity2D5D
 
                 if (stageNumber == 2)
                 {
-                    startupStatus = "Stage 2: preparing Iranian village stage...";
+                    startupStatus = "preparing Iranian village stage...";
                     gameBootstrap.PrepareStageTwoVillage(stageTwoLayoutVariant);
                 }
                 else if (stageNumber == 1 && forceStageOneWorldRebuildForTest)
                 {
-                    startupStatus = "Stage 1: rebuilding a clean test world...";
+                    startupStatus = "rebuilding a clean test world...";
                     forceStageOneWorldRebuildForTest = false;
                     gameBootstrap.PrepareStageOneWorldForTest();
                 }
                 else if (stageNumber == 1 && !gameBootstrap.IsWorldReady &&
                     !gameBootstrap.IsWorldPreparing && !gameBootstrap.WorldBuildFailed)
                 {
-                    startupStatus = "Stage 1: requesting battlefield build...";
+                    startupStatus = "requesting battlefield build...";
                     gameBootstrap.PrepareWorld();
                 }
 
@@ -2513,12 +2513,12 @@ namespace PersiaWar.Unity2D5D
             if (combatHud != null)
                 combatHud.ConfigurePlayer(player);
 
-            startupStatus = "Stage 9: deferring mobile input...";
+            startupStatus = "deferring mobile input...";
             yield return null;
 
-            startupStatus = "Stage 10: activating world bounds...";
+            startupStatus = "activating world bounds...";
             yield return ActivateRoot(worldBoundsRoot, "WorldBounds");
-            startupStatus = "Stage 11: preparing main camera...";
+            startupStatus = "preparing main camera...";
 
             // Set the player position before touching any camera lifecycle. On Android,
             // the scene camera root is intentionally left dormant: activating that
