@@ -1047,7 +1047,7 @@ namespace PersiaWar.Unity2D5D
         private void RestoreCampaignProgressAfterTest()
         {
             if (!stageTestRun) return;
-            stageNumber = Mathf.Clamp(savedCampaignStageNumber, 1, 4);
+            stageNumber = Mathf.Clamp(savedCampaignStageNumber, 1, 5);
             PlayerPrefs.SetInt("PW.Stage3Unlocked", savedStage3Unlocked);
             PlayerPrefs.SetInt("PW.Stage4Unlocked", savedStage4Unlocked);
             PlayerPrefs.SetInt("PW.Stage4Completed", savedStage4Completed);
