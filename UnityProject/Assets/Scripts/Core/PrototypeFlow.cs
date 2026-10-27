@@ -1499,7 +1499,10 @@ namespace PersiaWar.Unity2D5D
                 ? "Persian Warrior" : profileNameInput.Trim();
             profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
             PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
-            PlayerPrefs.SetInt("PW.ProfileRegistered", 1);
+            // Only the post-Stage-1 registration flow sets this flag. Editing the
+            // profile from the main menu must not skip the first-campaign registration.
+            if (profileCompletionPendingStageTwo)
+                PlayerPrefs.SetInt("PW.ProfileRegistered", 1);
             PlayerPrefs.Save();
         }
 
