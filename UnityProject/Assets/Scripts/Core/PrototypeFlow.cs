@@ -2262,7 +2262,7 @@ namespace PersiaWar.Unity2D5D
             matchPaused = paused;
             Time.timeScale = paused ? 0f : 1f;
             if (mobileInput != null) mobileInput.SetPaused(paused);
-            StartupCheckpoint.Set(paused ? "MatchPaused" : "MatchResumed");
+            StartupCheckpoint.Set(paused ? "MatchPausedByNativeTouch" : "MatchResumedByNativeTouch");
         }
 
         private void DrawAndroidPauseControl()
