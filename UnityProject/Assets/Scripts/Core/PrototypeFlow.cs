@@ -195,7 +195,7 @@ namespace PersiaWar.Unity2D5D
             GateGameplay(false);
             InitializeLocalProfile();
             LoadoutStore.EnsureDefaults();
-            stageNumber = Mathf.Clamp(PlayerPrefs.GetInt("PW.CampaignStage", LoadoutStore.GetNextCampaignStage()), 1, 5);
+            stageNumber = Mathf.Clamp(PlayerPrefs.GetInt("PW.CampaignStage", stageNumber), 1, 5);
             selectedHero = LoadoutStore.SelectedHero;
             selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
 #if UNITY_ANDROID
@@ -540,6 +540,8 @@ namespace PersiaWar.Unity2D5D
             Fill(new Rect(map.x, map.y, frame, map.height), frameColor);
             Fill(new Rect(map.xMax - frame, map.y, frame, map.height), frameColor);
 
+            if (stageNumber == 1)
+            {
             Color roadColor = new Color(0.78f, 0.81f, 0.84f, 0.66f);
             float roadThickness = map.width * (10f / 192f);
             for (int i = 0; i < AndroidMinimapRoadCoordinates.Length; i++)
@@ -596,6 +598,11 @@ namespace PersiaWar.Unity2D5D
                     houseRect.width + outline, houseRect.height + outline),
                     new Color(0.12f, 0.075f, 0.035f, 0.98f));
                 Fill(houseRect, new Color(0.96f, 0.68f, 0.30f, 1f));
+            }
+            }
+            else
+            {
+                DrawStageTwoVillageMap(map);
             }
 
             for (int i = 0; i < minimapEnemies.Length; i++)
