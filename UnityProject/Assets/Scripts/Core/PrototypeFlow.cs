@@ -1546,7 +1546,7 @@ namespace PersiaWar.Unity2D5D
                 float cardWidth = (totalWidth - gap * (HeroNames.Length - 1)) / HeroNames.Length;
                 float startX = (Screen.width - totalWidth) * 0.5f;
                 float top = 230f;
-                float cardHeight = Mathf.Min(310f, Screen.height - 360f);
+                float cardHeight = Mathf.Max(170f, Mathf.Min(310f * GetUiScale(), Screen.height - 360f));
 
                 for (int hero = 0; hero < HeroNames.Length; hero++)
                 {
@@ -1606,7 +1606,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawHeroSelect()
         {
-            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE 2  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
+            GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE " + stageNumber + "  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
             string heroHint = stageNumber >= 2
                 ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
                     ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
@@ -2037,9 +2037,9 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageTwoDropMap()
         {
-            GUI.Label(new Rect(0f, 76f, Screen.width, 48f),
+            GUI.Label(new Rect(0f, 121f, Screen.width, 48f),
                 "STAGE 2  •  OLD IRANIAN VILLAGE", menuHeaderStyle);
-            GUI.Label(new Rect(24f, 120f, Screen.width - 48f, 30f),
+            GUI.Label(new Rect(24f, 168f, Screen.width - 48f, 30f),
                 "CHOOSE YOUR LANDING POINT", menuSmallStyle);
 
             Rect mapRect = GetStageTwoMapRect();
