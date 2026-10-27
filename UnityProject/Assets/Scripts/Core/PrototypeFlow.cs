@@ -1135,8 +1135,18 @@ namespace PersiaWar.Unity2D5D
             GateGameplay(false);
             if (followCamera != null) followCamera.enabled = false;
             stageTwoVictorySequence = gameObject.AddComponent<StageTwoVictorySequence>();
-            Transform localRoot = playerRoot != null ? playerRoot.transform
-                : (player != null ? player.transform : null);
+            // Pass the actual PlayerController transform to the evacuation sequence.
+            // playerRoot may be a container on some Android startup paths.
+            Transform localRoot = player != null ? player.transform
+                : (playerRoot != null && playerRoot.GetComponent<PlayerController>() != null
+                    ? playerRoot.transform
+                    : null);
+            if (localRoot == null)
+            {
+                PlayerController scenePlayer = FindFirstObjectByType<PlayerController>();
+                if (scenePlayer != null)
+                    localRoot = scenePlayer.transform;
+            }
             Camera cinematicCamera = androidRuntimeCamera != null && androidRuntimeCamera.isActiveAndEnabled
                 ? androidRuntimeCamera
                 : (activeCamera != null && activeCamera.isActiveAndEnabled ? activeCamera : Camera.main);
