@@ -334,9 +334,8 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
                 if (stageNumber == 4 && StageFourEscapeSequence.IsFinaleActive) return;
-                if (stageNumber == 3) DrawStageThreeHUD();
-                else DrawAndroidPresentationHUD();
-                if (stageNumber == 4) DrawStageFourObjective();
+                DrawAndroidPresentationHUD();
+                if (stageNumber >= 3) DrawStageFourObjective();
                 DrawAndroidPauseControl();
                 if (stageNumber != 3 && stageNumber != 4) DrawGirlRescueNotice();
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
@@ -1072,66 +1071,28 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageFourObjective()
         {
-            if (stageFourWorldBuilder == null)
-                return;
-
+            if (stageNumber < 3) return;
             float scale = GetUiScale();
-            // Leave the HP/shield panel and its ammo row completely unobstructed.
-            // The objective belongs immediately beneath those elements, not over them.
+            // Shared objective row sits below the shared player/loadout panel.
             Rect panel = new Rect(14f * scale, 154f * scale, 340f * scale, 32f * scale);
             Fill(panel, new Color(0.015f, 0.035f, 0.055f, 0.82f));
             Fill(new Rect(panel.x, panel.y, 3.5f * scale, panel.height),
                 new Color(0.10f, 1f, 0.42f, 0.95f));
 
-            int remaining = stageFourWorldBuilder.RemainingHostiles;
-            int total = stageFourWorldBuilder.TotalHostiles;
+            int remaining = stageNumber == 3
+                ? (stageThreeWorldBuilder != null ? stageThreeWorldBuilder.RemainingHostiles : 0)
+                : (stageFourWorldBuilder != null ? stageFourWorldBuilder.RemainingHostiles : 0);
+            int total = stageNumber == 3
+                ? (stageThreeWorldBuilder != null ? stageThreeWorldBuilder.TotalHostiles : 0)
+                : (stageFourWorldBuilder != null ? stageFourWorldBuilder.TotalHostiles : 0);
             string objective = remaining > 0
                 ? "HOSTILES  " + remaining + " / " + total
-                : "MOTHERSHIP SECURED";
+                : (stageNumber == 3 ? "ALIENS CLEARED — REACH THE CENTRAL LIFT" : "MOTHERSHIP SECURED");
             GUI.Label(new Rect(panel.x + 10f * scale, panel.y + 2f * scale,
                 panel.width - 16f * scale, panel.height - 4f * scale),
-                objective, menuSmallStyle);
+                objective, smallStyle);
         }
-
-        private void DrawStageThreeHUD()
-        {
-            float scale = GetUiScale();
-            float width = Mathf.Min(Screen.width - 28f * scale, 430f * scale);
-            Rect panel = new Rect(14f * scale, 14f * scale, width, 166f * scale);
-            Fill(panel, new Color(0.015f, 0.028f, 0.05f, 0.90f));
-            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.22f, 0.91f, 1f, 0.98f));
-            int remaining = stageThreeWorldBuilder != null ? stageThreeWorldBuilder.RemainingHostiles : 66;
-            int total = stageThreeWorldBuilder != null ? stageThreeWorldBuilder.TotalHostiles : 66;
-            TargetHealth health = player != null ? player.Health : null;
-            int hpNow = health != null ? health.CurrentHealth : 0;
-            int hpMax = health != null ? health.MaxHealth : 150;
-            float hpRatio = hpMax > 0 ? Mathf.Clamp01(hpNow / (float)hpMax) : 0f;
-            int shieldNow = player != null ? player.Shield : 0;
-            float shieldRatio = Mathf.Clamp01(shieldNow / 100f);
-
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 3f * scale, panel.width - 22f * scale, 22f * scale),
-                "ALIEN PLANET  •  STAGE 3", menuSmallStyle);
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 25f * scale, panel.width - 22f * scale, 20f * scale),
-                "HOSTILES LEFT: " + remaining + " / " + total, menuSmallStyle);
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 45f * scale, panel.width - 22f * scale, 18f * scale),
-                "HP  " + hpNow + " / " + hpMax, menuSmallStyle);
-            DrawStatusBar(new Rect(panel.x + 12f * scale, panel.y + 63f * scale, panel.width - 24f * scale, 7f * scale),
-                hpRatio, new Color(0.25f, 0.90f, 0.36f, 1f));
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 71f * scale, panel.width - 22f * scale, 18f * scale),
-                "SHIELD  " + shieldNow + " / 100", menuSmallStyle);
-            DrawStatusBar(new Rect(panel.x + 12f * scale, panel.y + 89f * scale, panel.width - 24f * scale, 7f * scale),
-                shieldRatio, new Color(0.30f, 0.66f, 1f, 1f));
-            string objective = remaining > 0
-                ? "ELIMINATE ALL ALIENS"
-                : "ALIENS CLEARED — REACH THE CENTRAL LIFT";
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 101f * scale, panel.width - 22f * scale, 22f * scale),
-                objective, menuSmallStyle);
-            WeaponController weapon = player != null ? player.Weapon : null;
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 126f * scale, panel.width - 22f * scale, 24f * scale),
-                weapon != null ? weapon.CurrentWeaponName + "  AMMO " + weapon.Magazine + "/" + weapon.Reserve : "NO WEAPON",
-                menuSmallStyle);
-        }
-
+        
         private void DrawStageThreeIntroOverlay()
         {
             float scale = GetUiScale();
