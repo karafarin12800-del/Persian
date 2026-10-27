@@ -273,6 +273,7 @@ namespace PersiaWar.Unity2D5D
 
                 CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
+            HandleAndroidResultTouches();
                 return;
             }
             if (mode == ScreenMode.MainMenu || mode == ScreenMode.Profile ||
@@ -289,6 +290,28 @@ namespace PersiaWar.Unity2D5D
             }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
+        }
+
+        private void HandleAndroidResultTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0 || mode != ScreenMode.Match || stageNumber != 2 || stageTwoResultPresented)
+                return;
+            GameSession session = GameSession.Instance;
+            if (session == null || !session.IsFinished || !session.PlayerWon)
+                return;
+            float width = Mathf.Min(Screen.width - 48f, 660f);
+            float height = Mathf.Min(Screen.height - 40f, 260f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Rect continueRect = new Rect(panel.x + 24f, panel.yMax - 66f, panel.width - 48f, 46f);
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began) continue;
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (!continueRect.Contains(gui)) continue;
+                stageTwoResultPresented = true;
+                return;
+            }
         }
 
         private void HandleAndroidPauseTouches()
@@ -3506,6 +3529,12 @@ namespace PersiaWar.Unity2D5D
             if (stageTestRun)
             {
                 BeginStageTestEntry(targetStage);
+                return;
+            }
+            if (targetStage == 2)
+            {
+                if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                BeginStageTwoSelection();
                 return;
             }
             StageThreeWorldBuilder.ClearExistingWorld();
