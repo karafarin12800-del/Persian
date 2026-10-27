@@ -300,13 +300,7 @@ namespace PersiaWar.Unity2D5D
                 if (!button.Contains(gui))
                     continue;
 
-                matchPaused = !matchPaused;
-                Time.timeScale = matchPaused ? 0f : 1f;
-                if (mobileInput != null)
-                    mobileInput.SetPaused(matchPaused);
-
-                StartupCheckpoint.Set(
-                    matchPaused ? "MatchPausedByNativeTouch" : "MatchResumedByNativeTouch");
+                SetMatchPaused(!matchPaused);
                 return;
             }
         }
@@ -316,108 +310,65 @@ namespace PersiaWar.Unity2D5D
             EnsureUiInitialized();
             if (mode == ScreenMode.Match)
             {
-#if UNITY_ANDROID
                 if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
                 {
                     DrawStageTwoCinematicOverlay();
                     return;
                 }
-
                 if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
                 {
-                    if (stageThreeWorldBuilder.IsIntroCinematic)
-                        DrawStageThreeIntroOverlay();
-                    else
-                        DrawStageThreeCinematicOverlay();
+                    if (stageThreeWorldBuilder.IsIntroCinematic) DrawStageThreeIntroOverlay();
+                    else DrawStageThreeCinematicOverlay();
                     return;
                 }
-
                 if (stageNumber == 4 && stageFourWorldBuilder != null && stageFourWorldBuilder.IsCinematic)
                 {
                     DrawStageFourIntroOverlay();
                     return;
                 }
-                // Stage 4 finale uses its own cinematic captions; keep the tactical HUD
-                // and pause overlay out of the exterior separation/destruction shot.
-                if (stageNumber == 4 && StageFourEscapeSequence.IsFinaleActive)
-                    return;
-                if (stageNumber == 3)
-                    DrawStageThreeHUD();
-                else
-                    DrawAndroidPresentationHUD();
-                if (stageNumber == 4)
-                    DrawStageFourObjective();
+                if (stageNumber == 4 && StageFourEscapeSequence.IsFinaleActive) return;
+                if (stageNumber == 3) DrawStageThreeHUD();
+                else DrawAndroidPresentationHUD();
+                if (stageNumber == 4) DrawStageFourObjective();
                 DrawAndroidPauseControl();
-                if (stageNumber != 3 && stageNumber != 4)
-                    DrawGirlRescueNotice();
-
+                if (stageNumber != 3 && stageNumber != 4) DrawGirlRescueNotice();
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                 {
-                    if (resultOverlayStartTime < 0f)
-                    {
-                        resultOverlayStartTime = Time.unscaledTime;
-                        // Stage 1's ExtractionBeacon is already attached to Anahita's
-                        // randomized house and is shown when the final wave is eliminated.
-                        // Do not draw a second, unrelated beam after mission completion.
-                    }
+                    if (resultOverlayStartTime < 0f) resultOverlayStartTime = Time.unscaledTime;
                     DrawAndroidResultOverlay();
                 }
-#endif
                 return;
             }
             DrawBackdrop();
-
-            if (stageTwoLobbyRunning)
-            {
-                DrawStageTwoLobbyOverlay();
-                return;
-            }
-
+            if (stageTwoLobbyRunning) { DrawStageTwoLobbyOverlay(); return; }
             if (startingMatch)
             {
                 if (gameBootstrap != null && gameBootstrap.IsWorldPreparing && !string.IsNullOrEmpty(gameBootstrap.CurrentStage))
                     startupStatus = gameBootstrap.CurrentStage;
-
-                float width = Mathf.Min(Screen.width - 48f, 760f);
-                float height = 170f;
-                Rect panel = new Rect(
-                    (Screen.width - width) * 0.5f,
-                    Screen.height * 0.5f - height * 0.5f,
-                    width,
-                    height);
+                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+                float width = Mathf.Min(Screen.width - 48f * scale, 760f * scale);
+                float height = 170f * scale;
+                Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
                 Fill(panel, new Color(0.04f, 0.07f, 0.11f, 0.96f));
-                Fill(new Rect(panel.x, panel.y, panel.width, 6f), new Color(0.92f, 0.66f, 0.18f, 1f));
-                GUI.Label(new Rect(panel.x + 18f, panel.y + 30f, panel.width - 36f, 40f), "PERSIA WAR", headerStyle);
-                GUI.Label(new Rect(panel.x + 18f, panel.y + 76f, panel.width - 36f, 30f), startupStatus, bodyStyle);
-                GUI.Label(new Rect(panel.x + 18f, panel.y + 116f, panel.width - 36f, 28f), "Preparing battlefield...", smallStyle);
+                Fill(new Rect(panel.x, panel.y, panel.width, 6f * scale), new Color(0.92f, 0.66f, 0.18f, 1f));
+                GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 30f * scale, panel.width - 36f * scale, 40f * scale), "PERSIA WAR", headerStyle);
+                GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 76f * scale, panel.width - 36f * scale, 30f * scale), startupStatus, bodyStyle);
+                GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 116f * scale, panel.width - 36f * scale, 28f * scale), "Preparing battlefield...", smallStyle);
                 return;
             }
             switch (mode)
             {
-                case ScreenMode.MainMenu:
-                    DrawMainMenu();
-                    break;
-                case ScreenMode.Profile:
-                    DrawProfileScreen();
-                    break;
-                case ScreenMode.Store:
-                    DrawStoreScreen();
-                    break;
-                case ScreenMode.Settings:
-                    DrawSettingsScreen();
-                    break;
+                case ScreenMode.MainMenu: DrawMainMenu(); break;
+                case ScreenMode.Profile: DrawProfileScreen(); break;
+                case ScreenMode.Store: DrawStoreScreen(); break;
+                case ScreenMode.Settings: DrawSettingsScreen(); break;
                 case ScreenMode.HeroSelect:
-                    if (stageNumber >= 2 && stageTwoShopOpen)
-                        DrawCharacterShop();
-                    else
-                        DrawHeroSelect();
+                    if (stageNumber >= 2 && stageTwoShopOpen) DrawCharacterShop();
+                    else DrawHeroSelect();
                     break;
-                default:
-                    DrawDropMap();
-                    break;
+                default: DrawDropMap(); break;
             }
         }
-
         private void DrawAndroidPresentationHUD()
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
@@ -2258,6 +2209,14 @@ namespace PersiaWar.Unity2D5D
                 "OFFLINE TEST: AI FILLS THE LOBBY; ONLINE SERVER NOT CONNECTED", menuSmallStyle);
         }
 
+        private void SetMatchPaused(bool paused)
+        {
+            matchPaused = paused;
+            Time.timeScale = paused ? 0f : 1f;
+            if (mobileInput != null) mobileInput.SetPaused(paused);
+            StartupCheckpoint.Set(paused ? "MatchPaused" : "MatchResumed");
+        }
+
         private void DrawAndroidPauseControl()
         {
             EnsureUiInitialized();
@@ -2287,10 +2246,15 @@ namespace PersiaWar.Unity2D5D
                     "PAUSED",
                     headerStyle);
 
-                GUI.Label(
-                    new Rect(panel.x + 20f, panel.y + 70f, panel.width - 40f, 28f),
-                    "Touch ▶ to resume",
-                    bodyStyle);
+                float gap = 8f * scale;
+                float buttonY = panel.y + panel.height - 54f * scale;
+                float buttonW = (panel.width - 32f * scale - gap * 2f) / 3f;
+                if (GUI.Button(new Rect(panel.x + 16f * scale, buttonY, buttonW, 38f * scale), "RESUME", buttonStyle))
+                    SetMatchPaused(false);
+                if (GUI.Button(new Rect(panel.x + 16f * scale + buttonW + gap, buttonY, buttonW, 38f * scale), "RESTART STAGE", buttonStyle))
+                    RestartCurrentStageInPlace();
+                if (GUI.Button(new Rect(panel.x + 16f * scale + (buttonW + gap) * 2f, buttonY, buttonW, 38f * scale), "MAIN MENU", buttonStyle))
+                    GoToMainMenu();
             }
 
             // Draw the control last so the pause overlay can never cover it.
@@ -2309,11 +2273,7 @@ namespace PersiaWar.Unity2D5D
                 buttonStyle);
             if (!Application.isMobilePlatform && pauseButtonPressed)
             {
-                matchPaused = !matchPaused;
-                Time.timeScale = matchPaused ? 0f : 1f;
-
-                if (mobileInput != null)
-                    mobileInput.SetPaused(matchPaused);
+                SetMatchPaused(!matchPaused);
             }
         }
 
@@ -2995,40 +2955,7 @@ namespace PersiaWar.Unity2D5D
             return new Vector2(rect.x + x * rect.width, rect.y + y * rect.height);
         }
 
-        private void DrawAndroidMatchHud()
-        {
-            EnsureUiInitialized();
-
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 1080f, 0.75f, 1.35f);
-
-            Rect card = new Rect(18f * scale, 18f * scale, 315f * scale, 92f * scale);
-            Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.88f));
-            Fill(new Rect(card.x, card.y, 5f * scale, card.height), new Color(0.92f, 0.66f, 0.18f, 1f));
-
-            GUI.Label(
-                new Rect(card.x + 18f * scale, card.y + 8f * scale, card.width - 26f * scale, 28f * scale),
-                "PERSIA WAR  •  BATTLEFIELD 01",
-                smallStyle);
-
-            int hp = player != null && player.Health != null ? player.Health.CurrentHealth : 100;
-            int maxHp = player != null && player.Health != null ? player.Health.MaxHealth : 100;
-            float hp01 = maxHp > 0 ? Mathf.Clamp01(hp / (float)maxHp) : 0f;
-
-            Rect hpBack = new Rect(card.x + 18f * scale, card.y + 47f * scale, 205f * scale, 14f * scale);
-            Fill(hpBack, new Color(0.10f, 0.12f, 0.14f, 1f));
-            Fill(new Rect(hpBack.x, hpBack.y, hpBack.width * hp01, hpBack.height),
-                new Color(0.18f, 0.72f, 0.32f, 1f));
-            GUI.Label(
-                new Rect(hpBack.x + hpBack.width + 10f * scale, hpBack.y - 5f * scale, 72f * scale, 24f * scale),
-                hp + " / " + maxHp,
-                smallStyle);
-
-            GUI.Label(
-                new Rect(card.x + 18f * scale, card.y + 67f * scale, card.width - 25f * scale, 22f * scale),
-                "3D CITY  •  MOVE  •  MINIMAP",
-                smallStyle);
-        }
-
+        
         private string GetStageTwoResultMessage()
         {
             StageTwoArenaManager arena = GetComponent<StageTwoArenaManager>();
@@ -3140,7 +3067,9 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(
                 new Rect(panel.x + 20f, panel.y + 106f, panel.width - 40f, 34f),
                 session.PlayerWon
-                    ? (stageNumber >= 2 ? GetStageTwoResultMessage() : "Extraction reached. Mission complete.")
+                    ? (stageNumber == 2 ? GetStageTwoResultMessage()
+                        : stageNumber >= 3 ? "MISSION COMPLETE  •  CAMPAIGN REWARD SECURED"
+                        : "Extraction reached. Mission complete.")
                     : "Your fighter was defeated.",
                 bodyStyle);
 
@@ -3187,39 +3116,7 @@ namespace PersiaWar.Unity2D5D
         // Dedicated shortcut so Stage 3 can be entered from the Stage 2 result
         // screen without replaying Stage 1. Stage 3 world construction is added
         // separately; this only establishes the independent test entry point.
-        private void DrawAndroidStabilityStatus()
-        {
-            // This is diagnostics only. The old implementation painted a full-screen
-            // opaque panel over the actual match, making a healthy match look frozen
-            // on "MATCH STABLE". Keep a compact status banner while isolation is active,
-            // then remove the banner completely once the gameplay stack is ready.
-            if (string.Equals(startupStatus, "MATCH STABLE", System.StringComparison.Ordinal))
-                return;
-
-            EnsureUiInitialized();
-
-            float width = Mathf.Min(Screen.width - 32f, 720f);
-            float height = Mathf.Min(86f, Screen.height * 0.12f);
-            Rect panel = new Rect(
-                (Screen.width - width) * 0.5f,
-                14f,
-                width,
-                height);
-
-            Fill(panel, new Color(0.035f, 0.08f, 0.13f, 0.88f));
-            Fill(new Rect(panel.x, panel.y, panel.width, 4f), new Color(0.92f, 0.66f, 0.18f, 1f));
-
-            GUI.Label(
-                new Rect(panel.x + 14f, panel.y + 8f, panel.width - 28f, 28f),
-                "PERSIA WAR  •  ANDROID ISOLATION",
-                smallStyle);
-
-            GUI.Label(
-                new Rect(panel.x + 14f, panel.y + 36f, panel.width - 28f, 30f),
-                startupStatus,
-                bodyStyle);
-        }
-
+        
         private void EnsureUiInitialized()
         {
             if (pixel == null)
