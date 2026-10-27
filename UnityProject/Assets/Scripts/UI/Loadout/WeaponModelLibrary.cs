@@ -11,6 +11,18 @@ Transform selected=root.Find(n);
 if(selected==null){Add(root,n,kind);selected=root.Find(n);}
 for(int i=0;i<root.childCount;i++)root.GetChild(i).gameObject.SetActive(false);
 if(selected!=null)selected.gameObject.SetActive(true);}
+public static bool BuildPickupModel(Transform parent, WeaponController.WeaponKind kind)
+{
+if(parent==null)return false;
+Transform root=parent.Find(RootName);
+if(root==null){GameObject g=new GameObject(RootName);root=g.transform;root.SetParent(parent,false);}
+string n=kind==WeaponController.WeaponKind.LightPistol?"LightPistol":kind==WeaponController.WeaponKind.AssaultRifle?"AssaultRifle":kind==WeaponController.WeaponKind.HeavyMachineGun?"HeavyMachineGun":kind==WeaponController.WeaponKind.Axe?"Axe":kind==WeaponController.WeaponKind.VoidRifle?"VoidRifle":"AlienSword";
+Transform selected=root.Find(n);
+if(selected==null){Add(root,n,kind);selected=root.Find(n);}
+for(int i=0;i<root.childCount;i++)root.GetChild(i).gameObject.SetActive(false);
+if(selected!=null)selected.gameObject.SetActive(true);
+return selected!=null && selected.GetComponentsInChildren<Renderer>(true).Length>0;
+}
 static void Add(Transform p,string n,WeaponController.WeaponKind k){Transform m=new GameObject(n).transform;m.SetParent(p,false);Color metal=new Color(.12f,.17f,.22f),a=k==WeaponController.WeaponKind.VoidRifle?Color.cyan:k==WeaponController.WeaponKind.AlienSword?Color.green:k==WeaponController.WeaponKind.Axe?new Color(.8f,.8f,.82f):new Color(.62f,.48f,.27f);
 if(k==WeaponController.WeaponKind.Axe){Part(m,"WrappedHandle",PrimitiveType.Cube,Vector3.zero,new Vector3(.065f,.075f,.78f),metal);Part(m,"AxeHead",PrimitiveType.Cube,new Vector3(0,.05f,.3f),new Vector3(.3f,.25f,.12f),a);}
 else if(k==WeaponController.WeaponKind.AlienSword){Part(m,"Blade",PrimitiveType.Cylinder,new Vector3(0,0,.42f),new Vector3(.055f,.55f,.055f),a);Part(m,"Guard",PrimitiveType.Cube,Vector3.zero,new Vector3(.38f,.07f,.09f),metal);}

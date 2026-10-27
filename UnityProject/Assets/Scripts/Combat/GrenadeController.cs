@@ -14,12 +14,14 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float fuse = 0.8f;
 
         private PlayerInventory inventory;
+        private Transform owner;
 
         public int Grenades => inventory != null ? inventory.Grenades : grenades;
 
         private void Awake()
         {
             inventory = GetComponent<PlayerInventory>();
+            owner = transform;
             if (throwOrigin == null)
                 throwOrigin = transform;
         }
@@ -82,7 +84,7 @@ namespace PersiaWar.Unity2D5D
                 if (distance > explosionRadius) continue;
 
                 int scaledDamage = Mathf.RoundToInt(damage * Mathf.Clamp01(1f - distance / explosionRadius));
-                health.ApplyDamage(Mathf.Max(1, scaledDamage));
+                health.ApplyDamage(Mathf.Max(1, scaledDamage), owner);
             }
 
             if (grenade != null)

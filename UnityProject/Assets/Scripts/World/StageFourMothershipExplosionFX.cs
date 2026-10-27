@@ -236,7 +236,7 @@ public sealed class StageFourMothershipExplosionFX : MonoBehaviour
 
     private void BuildDebris()
     {
-        debrisCount = radius >= 50f ? 36 : (radius >= 15f ? 24 : (radius >= 7f ? 8 : 3));
+        debrisCount = radius >= 50f ? 12 : (radius >= 15f ? 9 : (radius >= 7f ? 5 : 2));
         debrisTransforms = new Transform[debrisCount];
         debrisStarts = new Vector3[debrisCount];
         debrisVelocities = new Vector3[debrisCount];
@@ -253,7 +253,7 @@ public sealed class StageFourMothershipExplosionFX : MonoBehaviour
             direction.Normalize();
             Vector3 start = direction * UnityEngine.Random.Range(0.1f, Mathf.Min(12f, radius * 0.24f));
             chunk.transform.localPosition = start;
-            Vector3 size = Vector3.one * UnityEngine.Random.Range(0.55f, Mathf.Max(0.85f, radius * 0.065f));
+            Vector3 size = Vector3.one * UnityEngine.Random.Range(0.30f, Mathf.Max(0.55f, radius * 0.045f));
             chunk.transform.localScale = size;
             Collider collider = chunk.GetComponent<Collider>();
             if (collider != null) Destroy(collider);
@@ -265,8 +265,8 @@ public sealed class StageFourMothershipExplosionFX : MonoBehaviour
             }
             debrisTransforms[i] = chunk.transform;
             debrisStarts[i] = start;
-            debrisVelocities[i] = direction * UnityEngine.Random.Range(10f, 32f) +
-                                   Vector3.up * UnityEngine.Random.Range(3f, 14f);
+            debrisVelocities[i] = direction * UnityEngine.Random.Range(7f, 21f) +
+                                   Vector3.up * UnityEngine.Random.Range(2f, 9f);
             debrisSpins[i] = new Vector3(
                 UnityEngine.Random.Range(-220f, 220f),
                 UnityEngine.Random.Range(-220f, 220f),
@@ -312,7 +312,7 @@ public sealed class StageFourMothershipExplosionFX : MonoBehaviour
     private void PeelNearestHull()
     {
         if (hullRenderers == null || worldRoot == null) return;
-        int peelCount = radius >= 50f ? 36 : (radius >= 15f ? 9 : 1);
+        int peelCount = radius >= 50f ? 12 : (radius >= 15f ? 5 : 1);
         float maxDistance = radius * 1.85f + 8f;
         for (int pick = 0; pick < peelCount; pick++)
         {

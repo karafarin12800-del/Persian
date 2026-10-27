@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
             Profile,
             Store,
             Settings,
+            StageTestSelect,
             HeroSelect,
             Loadout,
             DropMap,
@@ -45,9 +46,9 @@ namespace PersiaWar.Unity2D5D
         private CameraFollow25D followCamera;
         private Camera activeCamera;
         private Camera androidRuntimeCamera;
-        private const float AndroidCameraPitch = 37f;
+        private const float AndroidCameraPitch = 31f;
         private const float AndroidCameraYaw = 32f;
-        private const float AndroidCameraDistance = 16.63f;
+        private const float AndroidCameraDistance = 18.5f;
         private const float AndroidCameraLookHeight = 0.90f;
         private const float AndroidCameraLookAhead = 4.5f;
         private EnemyChase[] minimapEnemies = new EnemyChase[0];
@@ -192,6 +193,7 @@ namespace PersiaWar.Unity2D5D
             GateGameplay(false);
             InitializeLocalProfile();
             LoadoutStore.EnsureDefaults();
+            stageNumber = LoadoutStore.GetNextCampaignStage();
             selectedHero = LoadoutStore.SelectedHero;
             selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
 #if UNITY_ANDROID
@@ -262,13 +264,18 @@ namespace PersiaWar.Unity2D5D
                     else if (stageNumber == 3 && session.PlayerWon &&
                         stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
                     {
-                        ReturnToMainMenuFromResult();
+                        CompleteStageThreeTransition();
                     }
                     return;
                 }
 
                 CheckStageOneGirlRescue();
                 HandleAndroidPauseTouches();
+                return;
+            }
+            if (mode == ScreenMode.StageTestSelect)
+            {
+                HandleStageTestSelectTouches();
                 return;
             }
             if (mode == ScreenMode.MainMenu || mode == ScreenMode.Profile ||
@@ -356,10 +363,9 @@ namespace PersiaWar.Unity2D5D
                 // and pause overlay out of the exterior separation/destruction shot.
                 if (stageNumber == 4 && StageFourEscapeSequence.IsFinaleActive)
                     return;
+                DrawAndroidPresentationHUD();
                 if (stageNumber == 3)
                     DrawStageThreeHUD();
-                else
-                    DrawAndroidPresentationHUD();
                 if (stageNumber == 4)
                     DrawStageFourObjective();
                 DrawAndroidPauseControl();
@@ -420,6 +426,9 @@ namespace PersiaWar.Unity2D5D
                     break;
                 case ScreenMode.Settings:
                     DrawSettingsScreen();
+                    break;
+                case ScreenMode.StageTestSelect:
+                    DrawStageTestSelect();
                     break;
                 case ScreenMode.HeroSelect:
                     if (stageNumber >= 2 && stageTwoShopOpen)
@@ -777,15 +786,16 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetLobbyButtonRect(int index)
         {
+            const int buttonCount = 9;
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
             float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
-            float heightLimit = Mathf.Max(28f, (Screen.height - 120f * scale) / 10f);
+            float heightLimit = Mathf.Max(26f, (Screen.height - 112f * scale) / (buttonCount + 1f));
             float height = Mathf.Min(58f * scale, heightLimit);
-            float gapLimit = Mathf.Max(2f, (Screen.height - 100f * scale - height * 8f) / 7f);
-            float gap = Mathf.Min(14f * scale, gapLimit);
-            float totalHeight = height * 8f + gap * 7f;
-            float topLimit = Mathf.Max(54f * scale, Screen.height - totalHeight - 8f);
-            float top = Mathf.Clamp((Screen.height - totalHeight) * 0.48f, 54f * scale, topLimit);
+            float gapLimit = Mathf.Max(2f, (Screen.height - 92f * scale - height * buttonCount) / (buttonCount - 1f));
+            float gap = Mathf.Min(12f * scale, gapLimit);
+            float totalHeight = height * buttonCount + gap * (buttonCount - 1);
+            float topLimit = Mathf.Max(42f * scale, Screen.height - totalHeight - 6f);
+            float top = Mathf.Clamp((Screen.height - totalHeight) * 0.46f, 42f * scale, topLimit);
             float left = Mathf.Max(Screen.width * 0.52f, Screen.width - width - 28f);
             left = Mathf.Min(left, Screen.width - width - 18f);
             return new Rect(left, top + index * (height + gap), width, height);
@@ -812,9 +822,9 @@ namespace PersiaWar.Unity2D5D
                 Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
                 if (mode == ScreenMode.MainMenu)
                 {
-                    // Keep native touch hit-testing aligned with all eight menu buttons.
-                    // Stage 4 is index 7; excluding it makes the visible Android button inert.
-                    for (int button = 0; button < 8; button++)
+                    // Keep native Android hit-testing aligned with all nine menu buttons,
+                    // including the temporary direct stage-test entry.
+                    for (int button = 0; button < 9; button++)
                     {
                         if (!GetLobbyButtonRect(button).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
@@ -841,6 +851,12 @@ namespace PersiaWar.Unity2D5D
                 {
                     for (int item = 0; item < StoreCosmeticNames.Length; item++)
                     {
+                        if (item >= 3 && GetStoreSellRect(item).Contains(point))
+                        {
+                            suppressMenuButtonClicksFrame = Time.frameCount;
+                            SellStoreWeapon(item);
+                            return;
+                        }
                         if (!GetStoreActionRect(item).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
                         PurchaseOrEquipCosmetic(item);
@@ -859,96 +875,112 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        private string GetCampaignStageButtonLabel(int targetStage)
+        {
+            if (!LoadoutStore.IsCampaignStageAvailable(targetStage)) return "STAGE " + targetStage + "  •  LOCKED";
+            return "STAGE " + targetStage + "  •  " +
+                (LoadoutStore.IsCampaignStageCompleted(targetStage) ? "REPLAY" : "PLAY");
+        }
+
         private void DrawMainMenu()
         {
-            string displayName = PlayerPrefs.GetString("PW.PlayerName", "Persian Warrior");
-            int coins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
-            Rect card = new Rect(Screen.width * 0.07f, Screen.height * 0.19f,
-                Screen.width * 0.28f, Screen.height * 0.60f);
-            Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.88f));
-            Fill(new Rect(card.x, card.y, 6f, card.height), new Color(0.95f, 0.69f, 0.20f, 1f));
-            GUI.Label(new Rect(card.x + 18f, card.y + 18f, card.width - 36f, 42f), "PLAYER", menuHeaderStyle);
-            GUI.Label(new Rect(card.x + 18f, card.y + 76f, card.width - 36f, 48f), displayName, menuBodyStyle);
-            GUI.Label(new Rect(card.x + 18f, card.y + 132f, card.width - 36f, 32f), "ID  " + playerId, menuSmallStyle);
-            GUI.Label(new Rect(card.x + 18f, card.y + 184f, card.width - 36f, 38f), "TEST COINS  " + coins, menuBodyStyle);
-            GUI.Label(new Rect(card.x + 18f, card.y + card.height - 68f, card.width - 36f, 48f),
-                "OFFLINE PROFILE", menuSmallStyle);
-
-            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height * 0.055f, Screen.width * 0.54f, 46f),
-                "CAMPAIGN  •  STAGE TEST ACCESS", menuBodyStyle);
-            string[] labels =
+            string displayName=PlayerPrefs.GetString("PW.PlayerName","Persian Warrior");
+            int coins=LoadoutStore.Coins,tokens=LoadoutStore.Tokens;
+            Rect card=new Rect(Screen.width*.07f,Screen.height*.19f,Screen.width*.28f,Screen.height*.60f);
+            Fill(card,new Color(.025f,.055f,.085f,.88f));
+            Fill(new Rect(card.x,card.y,6f,card.height),new Color(.95f,.69f,.20f,1f));
+            GUI.Label(new Rect(card.x+18f,card.y+18f,card.width-36f,42f),"PLAYER",menuHeaderStyle);
+            GUI.Label(new Rect(card.x+18f,card.y+76f,card.width-36f,48f),displayName,menuBodyStyle);
+            GUI.Label(new Rect(card.x+18f,card.y+132f,card.width-36f,32f),"ID  "+playerId,menuSmallStyle);
+            GUI.Label(new Rect(card.x+18f,card.y+184f,card.width-36f,32f),"COINS  "+coins,menuBodyStyle);
+            GUI.Label(new Rect(card.x+18f,card.y+220f,card.width-36f,32f),"TOKENS  ✦ "+tokens,menuBodyStyle);
+            GUI.Label(new Rect(card.x+18f,card.y+card.height-68f,card.width-36f,48f),"OFFLINE PROFILE",menuSmallStyle);
+            GUI.Label(new Rect(Screen.width*.40f,Screen.height*.055f,Screen.width*.54f,46f),"CAMPAIGN  •  STAGE SELECT",menuBodyStyle);
+            string[] labels={"CONTINUE CAMPAIGN","PLAYER PROFILE","STORE / WEAPON ARMORY","SETTINGS",
+                GetCampaignStageButtonLabel(1),GetCampaignStageButtonLabel(2),GetCampaignStageButtonLabel(3),GetCampaignStageButtonLabel(4),
+                "TEST STAGES  •  NO CAMPAIGN PROGRESS"};
+            for(int i=0;i<labels.Length;i++)
             {
-                "PLAY / CONTINUE CAMPAIGN",
-                "PLAYER PROFILE",
-                "STORE / LOADOUT",
-                "SETTINGS",
-                "TEST STAGE 1",
-                "TEST STAGE 2",
-                "TEST STAGE 3",
-                "TEST STAGE 4"
-            };
-
-            for (int i = 0; i < labels.Length; i++)
-            {
-                Rect button = GetLobbyButtonRect(i);
-                if (DrawFantasyButton(button, labels[i], i == 0 || i >= 4))
-                    ActivateLobbyButton(i);
+                Rect button=GetLobbyButtonRect(i);
+                bool available=i<4||i==8||LoadoutStore.IsCampaignStageAvailable(i-3);
+                if(DrawFantasyButton(button,labels[i],false,available))ActivateLobbyButton(i);
             }
-
-            if (!string.IsNullOrEmpty(lobbyNotice) && Time.unscaledTime < lobbyNoticeUntil)
+            if(!string.IsNullOrEmpty(lobbyNotice)&&Time.unscaledTime<lobbyNoticeUntil)
             {
-                Rect lastButton = GetLobbyButtonRect(7);
-                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
-                float noticeHeight = 34f * scale;
-                float noticeY = Mathf.Min(lastButton.yMax + 6f * scale, Screen.height - 58f * scale - noticeHeight);
-                Rect notice = new Rect(Screen.width * 0.52f, noticeY,
-                    Screen.width * 0.42f, noticeHeight);
-                Fill(notice, new Color(0.025f, 0.06f, 0.09f, 0.95f));
-                GUI.Label(notice, lobbyNotice, menuSmallStyle);
+                Rect lastButton=GetLobbyButtonRect(8);
+                float scale=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.55f,1.2f);
+                float h=34f*scale,y=Mathf.Min(lastButton.yMax+6f*scale,Screen.height-58f*scale-34f*scale);
+                Rect notice=new Rect(Screen.width*.52f,y,Screen.width*.42f,h);
+                Fill(notice,new Color(.025f,.06f,.09f,.95f));GUI.Label(notice,lobbyNotice,menuSmallStyle);
             }
-
-            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height - 42f, Screen.width * 0.54f, 24f),
-                "PERSIA WAR  •  UNITY EDITION", menuSmallStyle);
+            GUI.Label(new Rect(Screen.width*.40f,Screen.height-42f,Screen.width*.54f,24f),"PERSIA WAR  •  UNITY EDITION",menuSmallStyle);
         }
 
         private void ActivateLobbyButton(int index)
         {
-            if (index == 0)
+            if(index==0){StartCampaignFromMenu();return;}
+            if(index==1)mode=ScreenMode.Profile;
+            else if(index==2)mode=ScreenMode.Store;
+            else if(index==3)mode=ScreenMode.Settings;
+            else if(index>=4&&index<=7)BeginCampaignStageEntry(index-3);
+            else if(index==8)
             {
-                StartCampaignFromMenu();
+                mode=ScreenMode.StageTestSelect;
+                StartupCheckpoint.Set("DirectStageTestMenuOpened");
                 return;
             }
-            if (index == 1) mode = ScreenMode.Profile;
-            else if (index == 2) mode = ScreenMode.Store;
-            else if (index == 3) mode = ScreenMode.Settings;
-            else if (index == 4) BeginStageTestEntry(1);
-            else if (index == 5) BeginStageTestEntry(2);
-            else if (index == 6) BeginStageTestEntry(3);
-            else if (index == 7) BeginStageTestEntry(4);
-
-            StartupCheckpoint.Set("LobbyNavigation_" + mode);
+            StartupCheckpoint.Set("LobbyNavigation_"+mode);
         }
 
         private void StartCampaignFromMenu()
         {
-            if (stageTestRun)
-                RestoreCampaignProgressAfterTest();
+            if(stageTestRun)RestoreCampaignProgressAfterTest();
+            stageNumber=LoadoutStore.GetNextCampaignStage();
+            if(stageNumber>4){ShowLobbyNotice("CAMPAIGN COMPLETE  •  SELECT AN UNLOCKED STAGE TO REPLAY.");return;}
+            forceStageOneWorldRebuildForTest=stageNumber==1;
+            selectedHero=LoadoutStore.SelectedHero;
+            selectedStoreWeaponKind=(int)LoadoutStore.SelectedWeapon;
+            loadoutWeaponTab=false;mode=ScreenMode.Loadout;spawnChosen=false;
+            StartupCheckpoint.Set("CampaignContinue_Stage"+stageNumber);
+        }
 
-            if (stageNumber > 4)
+        private void BeginCampaignStageEntry(int targetStage)
+        {
+            if(targetStage<1||targetStage>4)return;
+            if(stageTestRun)RestoreCampaignProgressAfterTest();
+            if(!LoadoutStore.IsCampaignStageAvailable(targetStage))
             {
-                ShowLobbyNotice("NO FURTHER STAGE IS AVAILABLE YET.");
+                ShowLobbyNotice("STAGE "+targetStage+" IS LOCKED  •  COMPLETE STAGE "+Mathf.Max(1,targetStage-1)+" FIRST.");
                 return;
             }
-
-            // If Stage 2 was tested last, don't accidentally reuse its generated
-            // village when the real campaign resumes at Stage 1.
-            forceStageOneWorldRebuildForTest = stageNumber == 1;
-            selectedHero = LoadoutStore.SelectedHero;
-            selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
-            loadoutWeaponTab = false;
-            mode = ScreenMode.Loadout;
-            spawnChosen = false;
-            StartupCheckpoint.Set("CampaignContinue_Stage" + stageNumber);
+            stageTestRun=false;
+            StageThreeWorldBuilder.ClearExistingWorld();
+            StageFourWorldBuilder.ClearExistingWorld();
+            StageTwoArenaManager.Instance?.ResetForStageChange();
+            Time.timeScale=1f;lobbyNotice=string.Empty;lobbyNoticeUntil=0f;
+            matchPaused=false;startingMatch=false;spawnChosen=false;resultOverlayStartTime=-1f;
+            stageTwoLobbyRunning=false;stageTwoLobbyReady=false;stageTwoLobbyPlayers=1;
+            if(stageTwoVictorySequence!=null)
+            {stageTwoVictorySequence.FinishAndCleanup();Destroy(stageTwoVictorySequence);stageTwoVictorySequence=null;}
+            StageFourEscapeSequence escape=gameRoot!=null?gameRoot.GetComponent<StageFourEscapeSequence>():null;
+            if(escape!=null)Destroy(escape);
+            if(stageFourWorldBuilder!=null)Destroy(stageFourWorldBuilder);
+            stageThreeWorldBuilder=null;stageFourWorldBuilder=null;
+            selectedHero=LoadoutStore.SelectedHero;selectedStoreWeaponKind=(int)LoadoutStore.SelectedWeapon;
+            stageTwoOriginalHero=selectedHero;stageTwoLandingMode=0;stageTwoLayoutVariant=0;stageTwoShopOpen=false;
+            loadoutWeaponTab=false;forceStageOneWorldRebuildForTest=targetStage==1;
+            if(GameSession.Instance!=null)GameSession.Instance.ResetMatch();
+            if(activeCamera!=null)activeCamera.enabled=false;
+            if(androidRuntimeCamera!=null)androidRuntimeCamera.enabled=false;
+            if(followCamera!=null)followCamera.enabled=false;
+            GateGameplay(false);
+            if(targetStage==2){BeginStageTwoSelection();StartupCheckpoint.Set("CampaignStageEntry_2");return;}
+            stageNumber=targetStage;
+            if(targetStage==1){stageTwoOriginalHero=0;ExtractionBeacon.ClearForStageTransition();spawnWorld=Vector2.zero;}
+            else if(targetStage==3)spawnWorld=new Vector2(0f,-97f);
+            else spawnWorld=Vector2.zero;
+            spawnChosen=targetStage>=3;mode=ScreenMode.Loadout;
+            StartupCheckpoint.Set("CampaignStageEntry_"+targetStage);
         }
 
         private void CaptureCampaignProgressBeforeTest()
@@ -972,10 +1004,94 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("TestMode_CampaignProgressRestored_Stage" + stageNumber);
         }
 
+        private Rect GetStageTestButtonRect(int index)
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.15f);
+            float contentWidth = Mathf.Min(Screen.width - 40f, 760f * scale);
+            float gap = 12f * scale;
+            float buttonWidth = (contentWidth - gap) * 0.5f;
+            float buttonHeight = Mathf.Min(72f * scale, (Screen.height - 190f * scale) * 0.34f);
+            float top = Screen.height * 0.35f;
+            int column = index % 2;
+            int row = index / 2;
+            return new Rect((Screen.width - contentWidth) * 0.5f + column * (buttonWidth + gap),
+                top + row * (buttonHeight + gap), buttonWidth, buttonHeight);
+        }
+
+        private void DrawStageTestSelect()
+        {
+            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.65f, 1.15f);
+            GUI.Label(new Rect(0f, 42f * scale, Screen.width, 54f * scale),
+                "DIRECT STAGE TEST", menuHeaderStyle);
+            GUI.Label(new Rect(Screen.width * 0.08f, 96f * scale, Screen.width * 0.84f, 42f * scale),
+                "Choose a stage without replaying earlier stages. Test runs do not award rewards or unlock campaign progress.",
+                menuSmallStyle);
+
+            for (int i = 0; i < 4; i++)
+            {
+                string[] labels = { "TEST STAGE 1  •  CITY", "TEST STAGE 2  •  VILLAGE",
+                    "TEST STAGE 3  •  ALIEN PLANET", "TEST STAGE 4  •  MOTHERSHIP" };
+                if (DrawFantasyButton(GetStageTestButtonRect(i), labels[i], false, true))
+                {
+                    BeginStageTestEntry(i + 1);
+                    StartupCheckpoint.Set("DirectStageTestSelected_" + (i + 1));
+                    return;
+                }
+            }
+
+            if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MAIN MENU", false, true))
+                mode = ScreenMode.MainMenu;
+        }
+
+        private void HandleStageTestSelectTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0)
+                return;
+
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began)
+                    continue;
+
+                Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (GetLobbyBackRect().Contains(point))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    mode = ScreenMode.MainMenu;
+                    StartupCheckpoint.Set("DirectStageTestMenuBack");
+                    return;
+                }
+
+                for (int stage = 1; stage <= 4; stage++)
+                {
+                    if (!GetStageTestButtonRect(stage - 1).Contains(point))
+                        continue;
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    BeginStageTestEntry(stage);
+                    StartupCheckpoint.Set("DirectStageTestSelectedByTouch_" + stage);
+                    return;
+                }
+            }
+        }
+
         private void BeginStageTestEntry(int targetStage)
         {
             CaptureCampaignProgressBeforeTest();
             StageThreeWorldBuilder.ClearExistingWorld();
+            StageFourWorldBuilder.ClearExistingWorld();
+            if (stageFourWorldBuilder != null)
+            {
+                Destroy(stageFourWorldBuilder);
+                stageFourWorldBuilder = null;
+            }
+            StageFourEscapeSequence existingEscape = gameRoot != null
+                ? gameRoot.GetComponent<StageFourEscapeSequence>() : null;
+            if (existingEscape != null)
+            {
+                existingEscape.enabled = false;
+                Destroy(existingEscape);
+            }
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
             lobbyNotice = string.Empty;
@@ -1064,8 +1180,18 @@ namespace PersiaWar.Unity2D5D
             GateGameplay(false);
             if (followCamera != null) followCamera.enabled = false;
             stageTwoVictorySequence = gameObject.AddComponent<StageTwoVictorySequence>();
-            Transform localRoot = playerRoot != null ? playerRoot.transform
-                : (player != null ? player.transform : null);
+            // The playerRoot field can reference a scene/container wrapper rather than
+            // the actual actor. Boarding must receive the PlayerController transform.
+            Transform localRoot = player != null ? player.transform
+                : (playerRoot != null && playerRoot.GetComponent<PlayerController>() != null
+                    ? playerRoot.transform
+                    : null);
+            if (localRoot == null)
+            {
+                PlayerController scenePlayer = FindFirstObjectByType<PlayerController>();
+                if (scenePlayer != null)
+                    localRoot = scenePlayer.transform;
+            }
             Camera cinematicCamera = androidRuntimeCamera != null && androidRuntimeCamera.isActiveAndEnabled
                 ? androidRuntimeCamera
                 : (activeCamera != null && activeCamera.isActiveAndEnabled ? activeCamera : Camera.main);
@@ -1109,37 +1235,15 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageThreeHUD()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
-            float width = Mathf.Min(Screen.width - 28f * scale, 430f * scale);
-            Rect panel = new Rect(14f * scale, 14f * scale, width, 146f * scale);
-            Fill(panel, new Color(0.015f, 0.028f, 0.05f, 0.90f));
-            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height), new Color(0.22f, 0.91f, 1f, 0.98f));
-            int remaining = stageThreeWorldBuilder != null ? stageThreeWorldBuilder.RemainingHostiles : 66;
-            int total = stageThreeWorldBuilder != null ? stageThreeWorldBuilder.TotalHostiles : 66;
-            TargetHealth health = player != null ? player.Health : null;
-            int hpNow = health != null ? health.CurrentHealth : 0;
-            int hpMax = health != null ? health.MaxHealth : 150;
-            float hpRatio = hpMax > 0 ? Mathf.Clamp01(hpNow / (float)hpMax) : 0f;
-            int shieldNow = player != null ? player.Shield : 0;
-            float shieldRatio = Mathf.Clamp01(shieldNow / 100f);
-
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 3f * scale, panel.width - 22f * scale, 22f * scale),
-                "ALIEN PLANET  •  STAGE 3", menuSmallStyle);
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 25f * scale, panel.width - 22f * scale, 20f * scale),
-                "HOSTILES LEFT: " + remaining + " / " + total, menuSmallStyle);
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 45f * scale, panel.width - 22f * scale, 18f * scale),
-                "HP  " + hpNow + " / " + hpMax, menuSmallStyle);
-            DrawStatusBar(new Rect(panel.x + 12f * scale, panel.y + 63f * scale, panel.width - 24f * scale, 7f * scale),
-                hpRatio, new Color(0.25f, 0.90f, 0.36f, 1f));
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 71f * scale, panel.width - 22f * scale, 18f * scale),
-                "SHIELD  " + shieldNow + " / 100", menuSmallStyle);
-            DrawStatusBar(new Rect(panel.x + 12f * scale, panel.y + 89f * scale, panel.width - 24f * scale, 7f * scale),
-                shieldRatio, new Color(0.30f, 0.66f, 1f, 1f));
-            string objective = remaining > 0
-                ? "ELIMINATE ALL ALIENS"
-                : "ALIENS CLEARED — REACH THE CENTRAL LIFT";
-            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 101f * scale, panel.width - 22f * scale, 30f * scale),
-                objective, menuSmallStyle);
+            float scale=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.70f,1.2f);
+            float width=Mathf.Min(Screen.width-28f*scale,430f*scale);
+            Rect panel=new Rect(14f*scale,154f*scale,width,32f*scale);
+            Fill(panel,new Color(.015f,.035f,.055f,.82f));
+            Fill(new Rect(panel.x,panel.y,3.5f*scale,panel.height),new Color(.22f,.91f,1f,.98f));
+            int remaining=stageThreeWorldBuilder!=null?stageThreeWorldBuilder.RemainingHostiles:66;
+            int total=stageThreeWorldBuilder!=null?stageThreeWorldBuilder.TotalHostiles:66;
+            string objective=remaining>0?"HOSTILES LEFT: "+remaining+" / "+total+"  •  ELIMINATE ALL ALIENS":"ALIENS CLEARED  •  REACH THE CENTRAL LIFT";
+            GUI.Label(new Rect(panel.x+10f*scale,panel.y+2f*scale,panel.width-16f*scale,panel.height-4f*scale),objective,menuSmallStyle);
         }
 
         private void DrawStageThreeIntroOverlay()
@@ -1258,6 +1362,44 @@ namespace PersiaWar.Unity2D5D
         }
 
         private void ReturnToMainMenuFromResult()
+        {
+            StageTwoArenaManager.Instance?.ResetForStageChange();
+            Time.timeScale = 1f;
+            if (stageTwoVictorySequence != null)
+            {
+                stageTwoVictorySequence.FinishAndCleanup();
+                Destroy(stageTwoVictorySequence);
+                stageTwoVictorySequence = null;
+            }
+            GateGameplay(false);
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
+            if (playerRoot != null) playerRoot.SetActive(false);
+            if (gameRoot != null) gameRoot.SetActive(false);
+            startingMatch = false;
+            matchPaused = false;
+            resultOverlayStartTime = -1f;
+            spawnChosen = false;
+            lastStageReward = 0;
+            PlayerPrefs.SetInt("PW.LastStageReward", 0);
+            PlayerPrefs.SetInt("PW.LastStageTokenReward", 0);
+            if (stageTestRun)
+            {
+                RestoreCampaignProgressAfterTest();
+            }
+            else
+            {
+                stageNumber = LoadoutStore.GetNextCampaignStage();
+            }
+            mode = ScreenMode.MainMenu;
+            HeroPortraitStudio.Close();
+            WeaponPreviewStudio.Close();
+            PlayerPrefs.Save();
+            StartupCheckpoint.Set("ResultScreen_ReturnToMainMenu_WithoutStageAdvance");
+        }
+
+        private void CompleteStageThreeTransition()
         {
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
@@ -1402,7 +1544,19 @@ namespace PersiaWar.Unity2D5D
         private Rect GetStoreActionRect(int index)
         {
             Rect card = GetStoreItemRect(index);
-            return new Rect(card.x + 10f, card.yMax - 44f, card.width - 20f, 34f);
+            float width = card.width - 20f;
+            if (index >= 3)
+                width -= Mathf.Min(86f, card.width * 0.34f);
+            return new Rect(card.x + 10f, card.yMax - 44f, Mathf.Max(42f, width), 34f);
+        }
+
+        private Rect GetStoreSellRect(int index)
+        {
+            Rect action = GetStoreActionRect(index);
+            Rect card = GetStoreItemRect(index);
+            float sellWidth = Mathf.Min(80f, card.width * 0.30f);
+            float gap = Mathf.Min(6f, card.width * 0.025f);
+            return new Rect(action.xMax + gap, action.y, sellWidth, action.height);
         }
 
         private bool IsStoreItemOwned(int index)
@@ -1423,9 +1577,17 @@ namespace PersiaWar.Unity2D5D
             if (index >= 3)
             {
                 WeaponController.WeaponKind kind = index == 3 ? WeaponController.WeaponKind.VoidRifle : WeaponController.WeaponKind.AlienSword;
-                if (!LoadoutStore.TryBuyWeapon(kind)) return;
+                WeaponCatalog.Entry entry = WeaponCatalog.Get(kind);
+                if (!LoadoutStore.TryBuyWeapon(kind))
+                {
+                    loadoutNotice = !LoadoutStore.IsStageUnlocked(entry.RequiredCompletedStage)
+                        ? "CLEAR STAGE " + entry.RequiredCompletedStage + " FIRST"
+                        : (entry.TokenPrice > 0 ? "NOT ENOUGH TOKENS" : "NOT ENOUGH COINS");
+                    return;
+                }
                 selectedStoreWeaponKind = (int)kind;
                 LoadoutStore.SelectedWeapon = kind;
+                loadoutNotice = "EQUIPPED: " + entry.Name;
                 return;
             }
 
@@ -1444,12 +1606,34 @@ namespace PersiaWar.Unity2D5D
             PlayerPrefs.Save();
         }
 
+        private void SellStoreWeapon(int index)
+        {
+            WeaponController.WeaponKind kind = index == 3
+                ? WeaponController.WeaponKind.VoidRifle
+                : WeaponController.WeaponKind.AlienSword;
+            int refund;
+            bool refundInTokens;
+            if (!LoadoutStore.TrySellWeapon(kind, out refund, out refundInTokens))
+            {
+                loadoutNotice = "WEAPON NOT OWNED OR NOT AVAILABLE FOR SALE";
+                return;
+            }
+
+            if (selectedStoreWeaponKind == (int)kind)
+                selectedStoreWeaponKind = (int)LoadoutStore.SelectedWeapon;
+            storeCoins = LoadoutStore.Coins;
+            WeaponCatalog.Entry entry = WeaponCatalog.Get(kind);
+            loadoutNotice = "SOLD " + entry.Name + "  •  +" + refund +
+                (refundInTokens ? " TOKENS" : " COINS");
+        }
+
         private void DrawStoreScreen()
         {
-            storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
-            GUI.Label(new Rect(0f, 118f, Screen.width, 54f), "PERSIA STORE", menuHeaderStyle);
-            GUI.Label(new Rect(0f, 166f, Screen.width, 36f), "OFFLINE DEMO STORE  •  NO REAL-MONEY PAYMENTS", menuSmallStyle);
-            GUI.Label(new Rect(Screen.width - 300f, 24f, 270f, 42f), "COINS  " + storeCoins, menuBodyStyle);
+            storeCoins = LoadoutStore.Coins;
+            GUI.Label(new Rect(0f, 118f, Screen.width, 54f), "PERSIA STORE & WEAPON ARMORY", menuHeaderStyle);
+            GUI.Label(new Rect(0f, 166f, Screen.width, 36f), "BUY, EQUIP OR SELL WEAPONS  •  OFFLINE DEMO STORE", menuSmallStyle);
+            GUI.Label(new Rect(Screen.width - 430f, 24f, 405f, 42f),
+                "COINS  " + storeCoins + "     TOKENS  ✦ " + LoadoutStore.Tokens, menuBodyStyle);
 
             for (int i = 0; i < StoreCosmeticNames.Length; i++)
             {
@@ -1466,15 +1650,68 @@ namespace PersiaWar.Unity2D5D
                     : i == 3 ? new Color(0.08f, 0.72f, 0.98f) : new Color(0.20f, 0.95f, 0.58f);
                 Fill(emblem, emblemColor);
                 GUI.Label(new Rect(card.x + 6f, card.y + 76f, card.width - 12f, 34f), StoreCosmeticNames[i], menuSmallStyle);
-                int catalogPrice = i == 3 ? WeaponCatalog.Get(WeaponController.WeaponKind.VoidRifle).Price
-                    : i == 4 ? WeaponCatalog.Get(WeaponController.WeaponKind.AlienSword).Price : StoreCosmeticPrices[i];
-                GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f),
-                    owned ? (equipped ? "EQUIPPED" : "OWNED") : (catalogPrice + " COINS"),
-                    menuBodyStyle);
+
+                string priceLabel;
+                WeaponCatalog.Entry weaponEntry = new WeaponCatalog.Entry();
+                if (i >= 3)
+                {
+                    weaponEntry = WeaponCatalog.Get(i == 3
+                        ? WeaponController.WeaponKind.VoidRifle
+                        : WeaponController.WeaponKind.AlienSword);
+                    int refund = weaponEntry.TokenPrice > 0
+                        ? Mathf.Max(1, weaponEntry.TokenPrice / 2)
+                        : Mathf.Max(1, weaponEntry.Price / 2);
+                    if (owned)
+                        priceLabel = (equipped ? "EQUIPPED" : "OWNED") + "  •  SELL " + refund +
+                            (weaponEntry.TokenPrice > 0 ? " TOKENS" : " COINS");
+                    else if (!LoadoutStore.IsStageUnlocked(weaponEntry.RequiredCompletedStage))
+                        priceLabel = "CLEAR STAGE " + weaponEntry.RequiredCompletedStage;
+                    else
+                        priceLabel = weaponEntry.TokenPrice > 0
+                            ? weaponEntry.TokenPrice + " TOKENS"
+                            : weaponEntry.Price + " COINS";
+                }
+                else
+                {
+                    priceLabel = owned ? (equipped ? "EQUIPPED" : "OWNED")
+                        : StoreCosmeticPrices[i] + " COINS";
+                }
+
+                GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f), priceLabel, menuBodyStyle);
                 Rect action = GetStoreActionRect(i);
-                if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : (i >= 3 ? "EQUIP WEAPON" : "EQUIP")) : "UNLOCK"))
+                if (i >= 3)
+                {
+                    WeaponCatalog.Entry entry = weaponEntry;
+                    bool purchaseEnabled = owned || LoadoutStore.IsStageUnlocked(entry.RequiredCompletedStage);
+                    if (purchaseEnabled)
+                    {
+                        if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : "EQUIP WEAPON") : "UNLOCK", equipped, true))
+                            PurchaseOrEquipCosmetic(i);
+                    }
+                    else
+                    {
+                        DrawFantasyButton(action, "CLEAR STAGE " + weaponEntry.RequiredCompletedStage, false, false);
+                    }
+
+                    bool sellEnabled = owned && !LoadoutTestSwitch.UnlockEverything;
+                    if (sellEnabled)
+                    {
+                        if (DrawFantasyButton(GetStoreSellRect(i), "SELL", false, true))
+                            SellStoreWeapon(i);
+                    }
+                    else
+                    {
+                        DrawFantasyButton(GetStoreSellRect(i), owned ? "TEST MODE" : "NOT OWNED", false, false);
+                    }
+                }
+                else if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : "EQUIP") : "UNLOCK"))
+                {
                     PurchaseOrEquipCosmetic(i);
+                }
             }
+
+            if (!string.IsNullOrEmpty(loadoutNotice))
+                GUI.Label(new Rect(0f, Screen.height - 124f, Screen.width, 28f), loadoutNotice, menuSmallStyle);
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
         }
 
@@ -1593,13 +1830,21 @@ namespace PersiaWar.Unity2D5D
         private Rect LoadoutCard(int i)
         {
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-            float gap=9f*sc, total=Mathf.Min(Screen.width-28f*sc,1000f), w=(total-gap*2f)/3f, h=Mathf.Min(160f,Screen.height*.23f);
-            return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap)+loadoutSlideOffset,Screen.height*.25f+(i/3)*(h+gap),w,h);
+            float gap=12f*sc;
+            float total=Mathf.Min(Screen.width-28f*sc,1260f*sc);
+            float w=(total-gap*2f)/3f;
+            float top=Mathf.Max(210f*sc,Screen.height*.22f);
+            float rowGap=12f*sc;
+            float bottomReserve=130f*sc;
+            float h=Mathf.Clamp((Screen.height-top-bottomReserve-rowGap)/2f,120f,320f);
+            return new Rect((Screen.width-total)*.5f+(i%3)*(w+gap)+loadoutSlideOffset,
+                top+(i/3)*(h+rowGap),w,h);
         }
         private Rect LoadoutNext()
         {
             float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-            return new Rect(Screen.width*.5f-180f*sc,Screen.height-72f*sc,360f*sc,50f*sc);
+            float width=Mathf.Min(Screen.width-40f*sc,460f*sc);
+            return new Rect((Screen.width-width)*.5f,Screen.height-84f*sc,width,62f*sc);
         }
         private void DrawLoadoutScreen()
         {
@@ -1620,13 +1865,14 @@ namespace PersiaWar.Unity2D5D
                 {
                     HeroPortraitStudio.Draw(new Rect(card.x+card.width*.12f,card.y+3f*sc,card.width*.76f,card.height*.69f),i,chosen);
                     bool ok=LoadoutStore.CanUseHero(i,gameBootstrap!=null&&gameBootstrap.VillageGirlRescued);
-                    GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),HeroCatalog.Name(i),menuSmallStyle);
-                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),ok?(chosen?"SELECTED":"TAP TO SELECT"):(HeroCatalog.TokenPrice(i)>0?HeroCatalog.TokenPrice(i)+" TOKENS • BUY":HeroCatalog.Price(i)+" COINS • BUY"),menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-50f*sc,card.width-6f,26f*sc),HeroCatalog.Name(i),menuSmallStyle);
+                    string heroState=ok?(chosen?"SELECTED":"TAP TO SELECT"):(i==1?"RESCUE IN STAGE 1":(HeroCatalog.TokenPrice(i)>0?HeroCatalog.TokenPrice(i)+" TOKENS • BUY":HeroCatalog.Price(i)+" COINS • BUY"));
+                    GUI.Label(new Rect(card.x+3f,card.yMax-25f*sc,card.width-6f,24f*sc),heroState,menuSmallStyle);
                 }
                 else
                 {
                     WeaponCatalog.Entry e=WeaponCatalog.GetAt(i);
-                    Rect previewRect = new Rect(card.x + card.width * .18f, card.y + 8f * sc, card.width * .64f, card.height * .55f);
+                    Rect previewRect = new Rect(card.x + card.width * .16f, card.y + 8f * sc, card.width * .68f, card.height * .40f);
                     if (!WeaponPreviewStudio.Draw(previewRect, e.Kind, chosen))
                     {
                         Fill(new Rect(card.x+card.width*.18f,card.y+card.height*.24f,card.width*.64f,card.height*.18f),new Color(.48f,.59f,.67f,1));
@@ -1636,28 +1882,29 @@ namespace PersiaWar.Unity2D5D
                     float damageStat = WeaponController.GetDamageForKind(e.Kind);
                     float fireStat = 1f / WeaponController.GetFireCooldownForKind(e.Kind);
                     float weightStat = WeaponController.GetWeightForKind(e.Kind);
-                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .56f, card.width - 8f, 15f * sc),
-                        "D" + damageStat + " R" + rangeStat.ToString("0") + " F" + fireStat.ToString("0.0"), menuSmallStyle);
-                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .66f, card.width * .76f, 4f * sc), new Color(.18f,.24f,.30f,1f));
-                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .76f, card.width * .76f * Mathf.Clamp01(weightStat / 1.6f), 4f * sc), new Color(.94f,.68f,.23f,1f));
-                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .69f, card.width - 8f, 14f * sc), "W " + weightStat.ToString("0.0"), menuSmallStyle);
+                    GUI.Label(new Rect(card.x + 4f, card.y + card.height * .43f, card.width - 8f, 25f * sc),
+                        "D" + damageStat + " R" + rangeStat.ToString("0") + " F" + fireStat.ToString("0.0") + " W" + weightStat.ToString("0.0"), menuSmallStyle);
+                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .59f, card.width * .76f, 5f * sc), new Color(.18f,.24f,.30f,1f));
+                    Fill(new Rect(card.x + card.width * .12f, card.y + card.height * .68f, card.width * .76f * Mathf.Clamp01(weightStat / 1.6f), 5f * sc), new Color(.94f,.68f,.23f,1f));
                     bool ok=LoadoutStore.CanUseWeapon(e.Kind);
-                    GUI.Label(new Rect(card.x+3f,card.yMax-42f*sc,card.width-6f,20f*sc),e.Name,menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-50f*sc,card.width-6f,26f*sc),e.Name,menuSmallStyle);
                     string state=ok?(chosen?"SELECTED":"TAP TO SELECT"):(!LoadoutStore.IsStageUnlocked(e.RequiredCompletedStage)?"CLEAR STAGE "+e.RequiredCompletedStage:(e.TokenPrice>0?e.TokenPrice+" TOKENS • TAP TO BUY":e.Price+" COINS • TAP TO BUY"));
-                    GUI.Label(new Rect(card.x+3f,card.yMax-22f*sc,card.width-6f,19f*sc),state,menuSmallStyle);
+                    GUI.Label(new Rect(card.x+3f,card.yMax-25f*sc,card.width-6f,24f*sc),state,menuSmallStyle);
                 }
                 if(GUI.Button(card,GUIContent.none,GUIStyle.none))ChooseLoadoutItem(i);
             }
             GUI.Label(new Rect(panel.x+8f,panel.yMax-42f*sc,panel.width-16f,20f*sc),loadoutNotice,menuSmallStyle);
             if(loadoutWeaponTab)
             {
-                Rect back=new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc);
-                if(DrawFantasyButton(back,"BACK TO HERO",false))SwitchLoadoutTab(false);
-                if(DrawFantasyButton(LoadoutNext(),"START STAGE "+stageNumber,true))StartStageFromLoadout();
+                if(DrawFantasyButton(LoadoutWeaponActionRect(0),"BACK TO HERO",false))SwitchLoadoutTab(false);
+                WeaponController.WeaponKind kind=(WeaponController.WeaponKind)selectedStoreWeaponKind;
+                string sellLabel=kind==WeaponController.WeaponKind.AssaultRifle?"BASE WEAPON":"SELL SELECTED";
+                if(DrawFantasyButton(LoadoutWeaponActionRect(1),sellLabel,false)&&kind!=WeaponController.WeaponKind.AssaultRifle)SellSelectedWeapon();
+                if(DrawFantasyButton(LoadoutWeaponActionRect(2),"START STAGE "+stageNumber,true))StartStageFromLoadout();
             }
             else
             {
-                Rect backMenu = new Rect(12f*sc, Screen.height-72f*sc, 145f*sc, 48f*sc);
+                Rect backMenu = new Rect(12f*sc, Screen.height-84f*sc, 200f*sc, 60f*sc);
                 if (DrawFantasyButton(backMenu, "BACK TO MENU", false))
                 {
                     HeroPortraitStudio.Close();
@@ -1667,6 +1914,25 @@ namespace PersiaWar.Unity2D5D
                 if (DrawFantasyButton(LoadoutNext(), "CONTINUE TO WEAPONS", true)) SwitchLoadoutTab(true);
             }
         }
+        private Rect LoadoutWeaponActionRect(int index)
+        {
+            float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
+            float bw=160f*sc,sw=190f*sc,tw=240f*sc,gap=10f*sc;
+            float total=bw+sw+tw+gap*2f,x=(Screen.width-total)*.5f,y=Screen.height-84f*sc,h=60f*sc;
+            if(index==0)return new Rect(x,y,bw,h);
+            x+=bw+gap;if(index==1)return new Rect(x,y,sw,h);
+            x+=sw+gap;return new Rect(x,y,tw,h);
+        }
+
+        private void SellSelectedWeapon()
+        {
+            WeaponController.WeaponKind kind=(WeaponController.WeaponKind)selectedStoreWeaponKind;
+            int refund;bool tokens;
+            if(!LoadoutStore.TrySellWeapon(kind,out refund,out tokens)){loadoutNotice="THE BASE ASSAULT RIFLE CANNOT BE SOLD";return;}
+            selectedStoreWeaponKind=(int)LoadoutStore.SelectedWeapon;
+            loadoutNotice="SOLD WEAPON  •  +"+refund+(tokens?" TOKENS":" COINS");
+        }
+
         private void SwitchLoadoutTab(bool weaponTab)
         {
             if (loadoutWeaponTab == weaponTab) return;
@@ -1681,7 +1947,7 @@ namespace PersiaWar.Unity2D5D
             {
                 bool rescued=gameBootstrap!=null&&gameBootstrap.VillageGirlRescued;
                 if(LoadoutStore.CanUseHero(i,rescued)||LoadoutStore.TryBuyHero(i,rescued)){selectedHero=i;LoadoutStore.SelectedHero=i;loadoutNotice=string.Empty;}
-                else loadoutNotice="NOT ENOUGH COINS OR HERO LOCKED";
+                else loadoutNotice=i==1&&!rescued?"RESCUE ANAHITA IN STAGE 1":"NOT ENOUGH COINS OR HERO LOCKED";
             }
             else
             {
@@ -1706,17 +1972,35 @@ namespace PersiaWar.Unity2D5D
             for(int t=0;t<Input.touchCount;t++)
             {
                 Touch touch=Input.GetTouch(t);if(touch.phase!=TouchPhase.Began)continue;
-                Vector2 p=new Vector2(touch.position.x,Screen.height-touch.position.y);
-                float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
-                if(new Rect(12f*sc,Screen.height-72f*sc,145f*sc,48f*sc).Contains(p))
+                Vector2 point=new Vector2(touch.position.x,Screen.height-touch.position.y);
+                if(loadoutWeaponTab)
                 {
-                    suppressMenuButtonClicksFrame=Time.frameCount;
-                    if(loadoutWeaponTab) SwitchLoadoutTab(false);
-                    else { HeroPortraitStudio.Close(); WeaponPreviewStudio.Close(); mode=ScreenMode.MainMenu; }
-                    return;
+                    for(int button=0;button<3;button++)
+                    {
+                        if(!LoadoutWeaponActionRect(button).Contains(point))continue;
+                        suppressMenuButtonClicksFrame=Time.frameCount;
+                        if(button==0)SwitchLoadoutTab(false);
+                        else if(button==1)
+                        {
+                            if((WeaponController.WeaponKind)selectedStoreWeaponKind!=WeaponController.WeaponKind.AssaultRifle)SellSelectedWeapon();
+                            else loadoutNotice="THE BASE ASSAULT RIFLE CANNOT BE SOLD";
+                        }
+                        else StartStageFromLoadout();
+                        return;
+                    }
                 }
-                if(LoadoutNext().Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;if(loadoutWeaponTab)StartStageFromLoadout();else SwitchLoadoutTab(true);return;}
-                for(int i=0;i<6;i++)if(LoadoutCard(i).Contains(p)){suppressMenuButtonClicksFrame=Time.frameCount;ChooseLoadoutItem(i);return;}
+                else
+                {
+                    float sc=Mathf.Clamp(Mathf.Min(Screen.width,Screen.height)/720f,.58f,1.15f);
+                    if(new Rect(12f*sc,Screen.height-84f*sc,200f*sc,60f*sc).Contains(point))
+                    {
+                        suppressMenuButtonClicksFrame=Time.frameCount;
+                        HeroPortraitStudio.Close();WeaponPreviewStudio.Close();mode=ScreenMode.MainMenu;return;
+                    }
+                    if(LoadoutNext().Contains(point)){suppressMenuButtonClicksFrame=Time.frameCount;SwitchLoadoutTab(true);return;}
+                }
+                for(int i=0;i<6;i++)
+                    if(LoadoutCard(i).Contains(point)){suppressMenuButtonClicksFrame=Time.frameCount;ChooseLoadoutItem(i);return;}
             }
         }
 
@@ -2043,11 +2327,21 @@ namespace PersiaWar.Unity2D5D
             spawnChosen = true;
         }
 
-        private void BeginStageTwoSelection()
+        private void BeginStageTwoSelection(bool awardStageOne = false)
         {
             ExtractionBeacon.ClearForStageTransition();
             Time.timeScale = 1f;
-            lastStageReward = LoadoutStore.MarkStageCompleted(1, stageTestRun);
+            if (awardStageOne && !stageTestRun)
+            {
+                lastStageReward = LoadoutStore.MarkStageCompleted(1, false);
+            }
+            else
+            {
+                lastStageReward = 0;
+                PlayerPrefs.SetInt("PW.LastStageReward", 0);
+                PlayerPrefs.SetInt("PW.LastStageTokenReward", 0);
+                PlayerPrefs.Save();
+            }
             stageNumber = 2;
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
@@ -2766,6 +3060,8 @@ namespace PersiaWar.Unity2D5D
                 return;
             if (stageNumber == 4 && stageFourWorldBuilder != null && stageFourWorldBuilder.IsCinematic)
                 return;
+            if (stageNumber == 4 && StageFourEscapeSequence.IsFinaleActive)
+                return;
 
 #if UNITY_ANDROID
             if (androidRuntimeCamera == null || player == null)
@@ -3181,7 +3477,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     // The mission only becomes a win after the player enters the
                     // captive-house extraction beam, which has already rescued Anahita.
-                    BeginStageTwoSelection();
+                    BeginStageTwoSelection(true);
                     return;
                 }
             }
@@ -3366,11 +3662,11 @@ namespace PersiaWar.Unity2D5D
             menuButtonStyle.normal.textColor = new Color(1f, 0.92f, 0.72f, 1f);
         }
 
-        private bool DrawFantasyButton(Rect rect, string label, bool selected = false)
+        private bool DrawFantasyButton(Rect rect, string label, bool selected = false, bool enabled = true)
         {
             float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
-            bool hovered = Event.current != null && rect.Contains(Event.current.mousePosition);
-            bool pressed = hovered && Event.current.type == EventType.MouseDown;
+            bool hovered = enabled && Event.current != null && rect.Contains(Event.current.mousePosition);
+            bool pressed = enabled && hovered && Event.current.type == EventType.MouseDown;
             int scaleKey = label.GetHashCode() ^ Mathf.RoundToInt(rect.x * 3f) ^ Mathf.RoundToInt(rect.y * 7f);
             if (!menuButtonScales.TryGetValue(scaleKey, out float currentScale)) currentScale = 1f;
             float targetScale = pressed ? 0.965f : hovered ? 1.025f : 1f;
@@ -3378,9 +3674,11 @@ namespace PersiaWar.Unity2D5D
             menuButtonScales[scaleKey] = currentScale;
             rect = new Rect(rect.center.x - rect.width * currentScale * 0.5f,
                 rect.center.y - rect.height * currentScale * 0.5f, rect.width * currentScale, rect.height * currentScale);
-            Color edge = selected || hovered
-                ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
-                : new Color(0.35f, 0.66f, 0.78f, 0.68f);
+            Color edge = !enabled
+                ? new Color(0.28f, 0.31f, 0.35f, 0.62f)
+                : (selected || hovered
+                    ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
+                    : new Color(0.35f, 0.66f, 0.78f, 0.68f));
 
             // Layered translucent glass with a lower shadow and top bevel gives
             // menu controls a raised, readable appearance without changing layout.
@@ -3390,23 +3688,23 @@ namespace PersiaWar.Unity2D5D
             float inset = Mathf.Max(2f, 2.5f * scale);
             Rect inner = new Rect(rect.x + inset, rect.y + inset,
                 Mathf.Max(0f, rect.width - inset * 2f), Mathf.Max(0f, rect.height - inset * 2f));
-            Fill(inner, new Color(0.025f, 0.075f, 0.12f, 0.78f));
+            Fill(inner, enabled ? new Color(0.025f, 0.075f, 0.12f, 0.78f) : new Color(0.035f, 0.04f, 0.045f, 0.72f));
             Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
                 Mathf.Max(0f, inner.width - 4f * scale), Mathf.Max(1f, rect.height * 0.20f)),
-                new Color(0.52f, 0.86f, 0.98f, selected || hovered ? 0.25f : 0.13f));
+                new Color(0.52f, 0.86f, 0.98f, enabled ? (selected || hovered ? 0.25f : 0.13f) : 0.025f));
             Fill(new Rect(inner.x + 2f * scale, inner.yMax - 3f * scale,
                 Mathf.Max(0f, inner.width - 4f * scale), 2f * scale),
                 new Color(0f, 0f, 0f, 0.30f));
             Fill(new Rect(inner.x + 2f * scale, inner.y + 2f * scale,
                 2f * scale, Mathf.Max(0f, inner.height - 4f * scale)),
-                new Color(0.65f, 0.94f, 1f, 0.34f));
+                new Color(0.65f, 0.94f, 1f, enabled ? 0.34f : 0.07f));
 
-            bool clicked = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+            bool clicked = enabled && GUI.Button(rect, GUIContent.none, GUIStyle.none);
             GUI.Label(rect, label, menuButtonStyle);
             // Native Android menu touch handling can change screens in Update before
             // the synthesized IMGUI mouse event is processed. Suppress that same-frame
             // click so the new screen cannot accidentally activate a second button.
-            if (Time.frameCount == suppressMenuButtonClicksFrame)
+            if (!enabled || Time.frameCount == suppressMenuButtonClicksFrame)
                 return false;
             return clicked;
         }

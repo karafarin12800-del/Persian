@@ -453,15 +453,11 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
     private IEnumerator BuildExteriorMegabaseRoutine()
     {
-        // Stage 4 gameplay is only one small sector of a much larger orbital station.
-        // Keep the central sector readable in the finale; do not surround it with a
-        // city-sized grid that makes the playable map look like the whole station.
-        // No giant flat foundation or ground-like transit slab beneath the station.
-        // Keep only the central structural spine and floating docking structures.
-        Box("S4_CentralSpine", new Vector3(0f, -12f, 0f), new Vector3(170f, 8f, 310f), metal);
-
-        // Removed all four oversized grey side plates/arms, their pads, collars and runway lights.
-        // The central mothership and the dedicated escape docking sleeve remain.
+        // Stage 4 intentionally contains only the central mothership sector.
+        // Do not generate a broad foundation, runway, ground plane or city-sized
+        // support slab beneath it. The mothership hull is its own structural body;
+        // the eight docked craft are built separately and attached to its side rails.
+        StartupCheckpoint.Set("StageFourCentralSectorOnly_NoFoundation");
         yield return null;
     }
 
