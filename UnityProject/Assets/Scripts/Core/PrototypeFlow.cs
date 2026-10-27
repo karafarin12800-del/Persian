@@ -693,7 +693,7 @@ namespace PersiaWar.Unity2D5D
 
         private float GetUiScale()
         {
-            return GetUiScale();
+            return Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
         }
 
         private Rect GetSafeGuiRect()
