@@ -2735,9 +2735,8 @@ namespace PersiaWar.Unity2D5D
             if (player != null)
                 player.LockMovementFor(0.20f);
 
-            // 120 frames gives the render thread plenty of time to hit a native
-            // graphics/mesh/material problem while all other gameplay systems remain off.
-            for (int i = 0; i < 120; i++)
+            // Keep a short camera settling window while preserving the diagnostic checkpoint.
+            for (int i = 0; i < 8; i++)
                 yield return null;
 
             StartupCheckpoint.Set("AndroidCameraStable120Frames");
@@ -2768,8 +2767,8 @@ namespace PersiaWar.Unity2D5D
 
             StartupCheckpoint.Set("AndroidInputActivated");
 
-            // Let joystick/buttons execute for 120 clean frames before adding anything else.
-            for (int i = 0; i < 120; i++)
+            // Let joystick/buttons settle briefly before enabling the HUD.
+            for (int i = 0; i < 8; i++)
                 yield return null;
 
             StartupCheckpoint.Set("AndroidInputStable120Frames");
@@ -2787,10 +2786,8 @@ namespace PersiaWar.Unity2D5D
                 combatHud.enabled = false;
             }
 
-            for (int i = 0; i < 120; i++)
+            for (int i = 0; i < 8; i++)
                 yield return null;
-
-            StartupCheckpoint.Set("AndroidHudStable120Frames");
 
             StartupCheckpoint.Set("AndroidHudStable120Frames");
 
@@ -2806,7 +2803,7 @@ namespace PersiaWar.Unity2D5D
                     ? gameRoot.GetComponentInChildren<EnemySpawner>(true)
                     : FindFirstObjectByType<EnemySpawner>(FindObjectsInactive.Include);
 
-            yield return new WaitForSecondsRealtime(0.75f);
+            yield return new WaitForSecondsRealtime(0.15f);
 
             if (enemySpawner != null && player != null)
             {
