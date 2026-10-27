@@ -102,6 +102,7 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle menuSmallStyle;
         private GUIStyle menuButtonStyle;
         private int menuStyleScreenHeight = -1;
+        private int uiStyleScreenHeight = -1;
         private int suppressMenuButtonClicksFrame = -1;
 
         // These X/Z centers mirror GameBootstrap.BuildAndroidCityPresentation exactly.
@@ -349,7 +350,7 @@ namespace PersiaWar.Unity2D5D
             {
                 if (gameBootstrap != null && gameBootstrap.IsWorldPreparing && !string.IsNullOrEmpty(gameBootstrap.CurrentStage))
                     startupStatus = gameBootstrap.CurrentStage;
-                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+                float scale = GetUiScale();
                 float width = Mathf.Min(Screen.width - 48f * scale, 760f * scale);
                 float height = 170f * scale;
                 Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
@@ -375,7 +376,7 @@ namespace PersiaWar.Unity2D5D
         }
         private void DrawAndroidPresentationHUD()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             float margin = 14f * scale;
 
             // This is the Android HUD actually rendered during a match.
@@ -688,6 +689,26 @@ namespace PersiaWar.Unity2D5D
 #endif
         }
 
+        private float GetUiScale()
+        {
+            return GetUiScale();
+        }
+
+        private Rect GetSafeGuiRect()
+        {
+            Rect safe = Screen.safeArea;
+            return new Rect(safe.xMin, Screen.height - safe.yMax, safe.width, safe.height);
+        }
+
+        private Rect GetHeaderRect()
+        {
+            Rect safe = GetSafeGuiRect();
+            float scale = GetUiScale();
+            float margin = 14f * scale;
+            return new Rect(safe.x + margin, safe.y + 6f * scale,
+                Mathf.Max(0f, safe.width - margin * 2f), 72f * scale);
+        }
+
         private void DrawBackdrop()
         {
             // Bright blue lobby palette inspired by the supplied battle-royale waiting screen.
@@ -702,10 +723,13 @@ namespace PersiaWar.Unity2D5D
                     Color.Lerp(new Color(0.10f, 0.38f, 0.61f, 0.30f),
                                new Color(0.37f, 0.72f, 0.83f, 0.22f), t));
             }
-            Rect topBar = new Rect(0f, 0f, Screen.width, Mathf.Min(110f, Screen.height * 0.16f));
-            Fill(topBar, new Color(0.02f, 0.035f, 0.06f, 0.48f));
-            GUI.Label(new Rect(28f, 12f, Screen.width * 0.62f, 56f), "♛  PERSIA WAR", menuTitleStyle);
-            GUI.Label(new Rect(30f, 64f, Screen.width * 0.60f, 32f), "CLASSIC BATTLE ROYALE", menuSmallStyle);
+            float scale = GetUiScale();
+            Rect header = GetHeaderRect();
+            Fill(new Rect(0f, header.y - 6f * scale, Screen.width,
+                header.height + 12f * scale), new Color(0.02f, 0.035f, 0.06f, 0.48f));
+            GUI.Label(new Rect(header.x, header.y, header.width, 42f * scale), "♛  PERSIA WAR", menuTitleStyle);
+            GUI.Label(new Rect(header.x + 2f * scale, header.y + 40f * scale,
+                header.width, 26f * scale), "CLASSIC BATTLE ROYALE", menuSmallStyle);
         }
 
         private void InitializeLocalProfile()
@@ -737,7 +761,7 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetLobbyButtonRect(int index)
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
+            float scale = GetUiScale();
             float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
             float heightLimit = Mathf.Max(28f, (Screen.height - 120f * scale) / 10f);
             float height = Mathf.Min(58f * scale, heightLimit);
@@ -753,7 +777,7 @@ namespace PersiaWar.Unity2D5D
 
         private Rect GetLobbyBackRect()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.72f, 1.2f);
+            float scale = GetUiScale();
             float width = Mathf.Min(300f * scale, Screen.width - 36f);
             return new Rect((Screen.width - width) * 0.5f, Screen.height - 86f * scale, width, 54f * scale);
         }
@@ -858,7 +882,7 @@ namespace PersiaWar.Unity2D5D
             if (!string.IsNullOrEmpty(lobbyNotice) && Time.unscaledTime < lobbyNoticeUntil)
             {
                 Rect lastButton = GetLobbyButtonRect(7);
-                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.55f, 1.2f);
+                float scale = GetUiScale();
                 float noticeHeight = 34f * scale;
                 float noticeY = Mathf.Min(lastButton.yMax + 6f * scale, Screen.height - 58f * scale - noticeHeight);
                 Rect notice = new Rect(Screen.width * 0.52f, noticeY,
@@ -1030,7 +1054,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageFourIntroOverlay()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             Rect panel = new Rect(Screen.width * 0.08f, Screen.height * 0.08f, Screen.width * 0.84f, 72f * scale);
             Fill(panel, new Color(0.005f, 0.025f, 0.035f, 0.88f));
             Fill(new Rect(panel.x, panel.y + panel.height - 4f * scale, panel.width, 4f * scale), new Color(0.10f, 1f, 0.42f, 0.95f));
@@ -1045,7 +1069,7 @@ namespace PersiaWar.Unity2D5D
             if (stageFourWorldBuilder == null)
                 return;
 
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.70f, 1.2f);
+            float scale = GetUiScale();
             // Leave the HP/shield panel and its ammo row completely unobstructed.
             // The objective belongs immediately beneath those elements, not over them.
             Rect panel = new Rect(14f * scale, 154f * scale, 340f * scale, 32f * scale);
@@ -1065,7 +1089,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageThreeHUD()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             float width = Mathf.Min(Screen.width - 28f * scale, 430f * scale);
             Rect panel = new Rect(14f * scale, 14f * scale, width, 166f * scale);
             Fill(panel, new Color(0.015f, 0.028f, 0.05f, 0.90f));
@@ -1104,7 +1128,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageThreeIntroOverlay()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             float width = Screen.width * 0.76f;
             float height = 62f * scale;
             Rect panel = new Rect(Screen.width * 0.12f, Screen.height * 0.83f - height, width, height);
@@ -1122,7 +1146,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageThreeCinematicOverlay()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.01f, 0.025f, 0.045f, 0.12f));
             Rect panel = new Rect(Screen.width * 0.12f, Screen.height * 0.76f, Screen.width * 0.76f, 66f * scale);
             Fill(panel, new Color(0.015f, 0.05f, 0.075f, 0.88f));
@@ -1154,7 +1178,7 @@ namespace PersiaWar.Unity2D5D
             string caption = stageTwoVictorySequence.GetCaption();
             if (!string.IsNullOrEmpty(caption) && flash < 0.05f)
             {
-                float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.7f, 1.25f);
+                float scale = GetUiScale();
                 Rect captionRect = new Rect(0f, Screen.height * 0.13f, Screen.width, 56f * scale);
                 Fill(new Rect(Screen.width * 0.12f, captionRect.y, Screen.width * 0.76f, captionRect.height),
                     new Color(0.015f, 0.035f, 0.055f, 0.78f));
@@ -1637,7 +1661,7 @@ namespace PersiaWar.Unity2D5D
         private void DrawCharacterShop()
         {
             Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.01f, 0.025f, 0.05f, 0.86f));
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float scale = GetUiScale();
             float width = Mathf.Min(Screen.width - 48f, 780f);
             float height = Mathf.Min(Screen.height - 56f, 430f);
             Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
@@ -1684,7 +1708,7 @@ namespace PersiaWar.Unity2D5D
             if (Time.unscaledTime >= girlRescueNoticeUntil)
                 return;
 
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float scale = GetUiScale();
             float width = Mathf.Min(Screen.width - 36f, 720f);
             float height = 86f * scale;
             Rect notice = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.28f, width, height);
@@ -2179,7 +2203,7 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawStageTwoLobbyOverlay()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.2f);
+            float scale = GetUiScale();
             Rect shade = new Rect(0f, 0f, Screen.width, Screen.height);
             Fill(shade, new Color(0.015f, 0.025f, 0.045f, 0.72f));
 
@@ -2239,7 +2263,7 @@ namespace PersiaWar.Unity2D5D
         {
             EnsureUiInitialized();
 
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             float size = 58f * scale;
 
             if (matchPaused)
@@ -2991,7 +3015,7 @@ namespace PersiaWar.Unity2D5D
         private void DrawPreEvacuationResultPanel(GameSession session, string resultText,
             string continueLabel, System.Action onContinue)
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.35f);
+            float scale = GetUiScale();
             float width = Mathf.Min(Screen.width - 40f * scale, 680f * scale);
             float height = Mathf.Min(Screen.height - 40f * scale, 260f * scale);
             Rect panel = new Rect((Screen.width - width) * 0.5f,
@@ -3184,7 +3208,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (pixel == null)
                 CreateTextures();
-            if (titleStyle == null)
+            if (titleStyle == null || uiStyleScreenHeight != Screen.height)
                 BuildStyles();
             if (menuTitleStyle == null || menuStyleScreenHeight != Screen.height)
                 BuildMenuStyles();
@@ -3200,16 +3224,17 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildStyles()
         {
-            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 32, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
-            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            float scale = GetUiScale();
+            uiStyleScreenHeight = Screen.height;
+            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(34f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(32f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(20f * scale), alignment = TextAnchor.MiddleCenter };
+            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(19f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = Mathf.RoundToInt(20f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         }
-
         private void BuildMenuStyles()
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float scale = GetUiScale();
             menuStyleScreenHeight = Screen.height;
 
             menuTitleStyle = new GUIStyle(GUI.skin.label)
@@ -3261,7 +3286,7 @@ namespace PersiaWar.Unity2D5D
 
         private bool DrawFantasyButton(Rect rect, string label, bool selected = false)
         {
-            float scale = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 720f, 0.75f, 1.25f);
+            float scale = GetUiScale();
             bool hovered = Event.current != null && rect.Contains(Event.current.mousePosition);
             Color edge = selected || hovered
                 ? new Color(0.30f, 0.94f, 0.98f, 0.92f)
