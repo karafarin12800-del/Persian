@@ -284,14 +284,12 @@ namespace PersiaWar.Unity2D5D
             if (!Application.isMobilePlatform || Input.touchCount <= 0)
                 return;
 
-            float scale = Mathf.Clamp(
-                Mathf.Min(Screen.width, Screen.height) / 720f,
-                0.75f,
-                1.35f);
+            float scale = GetUiScale();
             float size = 58f * scale;
+            Rect safe = GetSafeGuiRect();
             Rect button = new Rect(
-                Screen.width * 0.5f - size * 0.5f,
-                14f * scale,
+                safe.center.x - size * 0.5f,
+                safe.y + 14f * scale,
                 size,
                 size);
 
@@ -378,6 +376,7 @@ namespace PersiaWar.Unity2D5D
         private void DrawAndroidPresentationHUD()
         {
             float scale = GetUiScale();
+            Rect safe = GetSafeGuiRect();
             float margin = 14f * scale;
 
             // This is the Android HUD actually rendered during a match.
@@ -415,7 +414,7 @@ namespace PersiaWar.Unity2D5D
 
             float leftW = 340f * scale;
             float leftH = 100f * scale;
-            Rect left = new Rect(margin, margin, leftW, leftH);
+            Rect left = new Rect(safe.x + margin, safe.y + margin, leftW, leftH);
             Fill(left, new Color(0.03f, 0.06f, 0.08f, 0.90f));
             Fill(new Rect(left.x, left.y, 62f * scale, 62f * scale), new Color(0.94f, 0.62f, 0.18f, 1f));
             GUI.Label(new Rect(left.x + 10f * scale, left.y + 8f * scale, 42f * scale, 42f * scale),
@@ -450,7 +449,7 @@ namespace PersiaWar.Unity2D5D
                 weaponSummary + "  AMMO " + magazine + "/" + reserveAmmo + "  G " + grenades, smallStyle);
 
             float rightW = 250f * scale;
-            Rect right = new Rect(Screen.width - rightW - margin, margin, rightW, 58f * scale);
+            Rect right = new Rect(safe.xMax - rightW - margin, safe.y + margin, rightW, 58f * scale);
             Fill(right, new Color(0.03f, 0.06f, 0.08f, 0.88f));
             GUI.Label(new Rect(right.x + 12f * scale, right.y + 6f * scale, right.width - 24f * scale, 22f * scale),
                 "SURVIVORS", smallStyle);
@@ -461,7 +460,7 @@ namespace PersiaWar.Unity2D5D
             {
             // Tactical minimap remains see-through so the 3D battle stays visible.
             float mapSize = Mathf.Clamp(148f * scale * 1.38f * 1.15f * 1.20f, 180f, 314f);
-            Rect map = new Rect(Screen.width - mapSize - margin, 84f * scale, mapSize, mapSize);
+            Rect map = new Rect(safe.xMax - mapSize - margin, safe.y + 84f * scale, mapSize, mapSize);
             if (stageNumber == 2)
                 DrawStageTwoVillageMap(map);
             else
@@ -2274,9 +2273,10 @@ namespace PersiaWar.Unity2D5D
             }
 
             // Draw the control last so the pause overlay can never cover it.
+            Rect safe = GetSafeGuiRect();
             Rect button = new Rect(
-                Screen.width * 0.5f - size * 0.5f,
-                14f * scale,
+                safe.center.x - size * 0.5f,
+                safe.y + 14f * scale,
                 size,
                 size);
 
