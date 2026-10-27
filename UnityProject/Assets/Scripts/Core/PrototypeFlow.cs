@@ -3537,7 +3537,8 @@ namespace PersiaWar.Unity2D5D
                 BeginStageTwoSelection();
                 return;
             }
-            StageThreeWorldBuilder.ClearExistingWorld();
+            if (targetStage == 3) StageThreeWorldBuilder.ClearExistingWorld();
+            if (targetStage == 4) StageFourWorldBuilder.ClearExistingWorld();
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
             GateGameplay(false);
