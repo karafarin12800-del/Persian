@@ -1213,7 +1213,10 @@ namespace PersiaWar.Unity2D5D
                 return false;
             }
 
-            beaconPosition = captiveVillageGirlBeaconPosition;
+            // Put the extraction beam at the captive outside the house entrance.
+            // The interior beacon forced players through a narrow/blocked doorway,
+            // making the Stage 1 -> Stage 2 transition unreachable on Android.
+            beaconPosition = captiveVillageGirlPosition;
             Debug.Log("PERSIA_RESCUE: extraction beam placed on Anahita's house " +
                 distance.ToString("F1") + "m from player when final enemy was eliminated.");
             return true;
