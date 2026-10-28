@@ -255,7 +255,9 @@ namespace PersiaWar.Unity2D5D
                     else if (stageNumber == 3 && session.PlayerWon &&
                         stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
                     {
-                        if (!stageThreeResultAcknowledged) return;
+                        // The lift/uplink cinematic itself completes the mission.
+                        // Do not wait for a second result-panel tap: enter Stage 4's
+                        // player/weapon selection as soon as the final camera shot ends.
                         StartStageFourAfterStageThree();
                     }
                     return;
@@ -1237,8 +1239,30 @@ namespace PersiaWar.Unity2D5D
                 PlayerPrefs.Save();
                 startupStatus = "Preparing next mission...";
                 StartupCheckpoint.Set("StageTwoCutsceneComplete_AutoStartStage3Transport_" + result);
-                StartCoroutine(BeginMainGameAfterMenuFrame());
+                StartCoroutine(BeginStageThreeAfterMemoryCleanup());
             }
+        }
+
+        private IEnumerator BeginStageThreeAfterMemoryCleanup()
+        {
+            // Destroy() is deferred until the end of the frame. Give Unity a full
+            // frame to remove the Stage 2 arena, then release unreferenced native
+            // resources before allocating Stage 3's substantially larger world.
+            StartupCheckpoint.Set("StageThreeMemoryCleanupWaitingForDestroy");
+            yield return null;
+
+            AsyncOperation unloadOperation = Resources.UnloadUnusedAssets();
+            while (unloadOperation != null && !unloadOperation.isDone)
+                yield return null;
+
+            System.GC.Collect();
+            yield return null;
+
+            if (this == null || !isActiveAndEnabled || stageNumber != 3 || !spawnChosen)
+                yield break;
+
+            StartupCheckpoint.Set("StageThreeMemoryCleanupComplete_StartWorld");
+            StartMatch();
         }
 
         private void GoToMainMenu()
