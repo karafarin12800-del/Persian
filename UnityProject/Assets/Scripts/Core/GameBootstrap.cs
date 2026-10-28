@@ -121,6 +121,84 @@ namespace PersiaWar.Unity2D5D
             PrepareWorld();
         }
 
+        /// <summary>
+        /// Releases the completed Stage 1/2 world before Stage 3 allocates its larger
+        /// alien environment. The campaign keeps the same scene and the retained
+        /// evacuation ship; only the previous battlefield and its runtime assets go.
+        /// </summary>
+        public void ReleaseWorldForStageTransition()
+        {
+            ExtractionBeacon.ClearForStageTransition();
+
+            PickupItem[] oldPickups = FindObjectsByType<PickupItem>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < oldPickups.Length; i++)
+            {
+                if (oldPickups[i] != null)
+                    Destroy(oldPickups[i].gameObject);
+            }
+
+            HashSet<Material> oldMaterials = new HashSet<Material>();
+            if (worldRoot != null)
+            {
+                Renderer[] renderers = worldRoot.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] == null) continue;
+                    Material[] shared = renderers[i].sharedMaterials;
+                    for (int m = 0; m < shared.Length; m++)
+                    {
+                        Material material = shared[m];
+                        if (material != null &&
+                            !material.name.StartsWith("Default", System.StringComparison.Ordinal))
+                            oldMaterials.Add(material);
+                    }
+                }
+
+                worldRoot.gameObject.SetActive(false);
+                Destroy(worldRoot.gameObject);
+                worldRoot = null;
+            }
+
+            foreach (Material material in oldMaterials)
+            {
+                if (material != null)
+                    Destroy(material);
+            }
+
+            if (androidUnitCubeMesh != null)
+            {
+                Destroy(androidUnitCubeMesh);
+                androidUnitCubeMesh = null;
+            }
+            if (androidUnitQuadMesh != null)
+            {
+                Destroy(androidUnitQuadMesh);
+                androidUnitQuadMesh = null;
+            }
+
+            roadMaterial = null;
+            buildingMaterial = null;
+            roofMaterial = null;
+            accentMaterial = null;
+            stageTwoLitMaterialCache.Clear();
+            androidBoxBatches.Clear();
+            androidCurrentBuildingRoot = null;
+            captiveVillageGirlRoot = null;
+            VillageGirlRescued = false;
+            extractionBeaconShown = false;
+            stageTwoRequested = false;
+            stageTwoLayoutVariant = 0;
+            prepareRequested = false;
+            IsWorldReady = false;
+            IsWorldPreparing = false;
+            WorldBuildFailed = false;
+            WorldBuildError = string.Empty;
+
+            StartupCheckpoint.Set("PreviousStageWorldReleasedBeforeStage3");
+            Debug.Log("PERSIA_TRANSITION: released previous battlefield assets before Stage 3.");
+        }
+
         private IEnumerator BuildWorldAfterStartup()
         {
             IsWorldPreparing = true;
