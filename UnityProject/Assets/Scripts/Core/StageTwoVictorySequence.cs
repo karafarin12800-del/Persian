@@ -317,28 +317,20 @@ namespace PersiaWar.Unity2D5D
                     if (shipRoot != null)
                         shipRoot.position = landingPosition + Vector3.up * (AscentHeight * eased);
 
-                    // Follow the same transport upward, then transition the sky to
-                    // a star field so the player sees the departure into space.
-                    if (cinematicCamera != null && shipRoot != null)
+                    // Keep the camera position and rotation fixed at the final Stage 2
+                    // gameplay framing. Only the transport rises, visibly leaving the
+                    // existing frame instead of dragging the camera upward with it.
+                    if (cinematicCamera != null && shipRoot != null && t >= 0.38f)
                     {
-                        cinematicCamera.transform.position = shipRoot.position + ascentCameraOffset;
-                        Vector3 lookTarget = shipRoot.position + Vector3.up * 1.4f;
-                        Vector3 lookDirection = lookTarget - cinematicCamera.transform.position;
-                        if (lookDirection.sqrMagnitude > 0.001f)
-                            cinematicCamera.transform.rotation = Quaternion.LookRotation(lookDirection, Vector3.up);
+                        cinematicCamera.clearFlags = CameraClearFlags.SolidColor;
+                        float spaceBlend = Mathf.SmoothStep(0f, 1f,
+                            Mathf.InverseLerp(0.38f, 0.92f, t));
+                        Color atmosphere = new Color(0.16f, 0.27f, 0.43f, 1f);
+                        Color space = new Color(0.003f, 0.008f, 0.022f, 1f);
+                        cinematicCamera.backgroundColor = Color.Lerp(atmosphere, space, spaceBlend);
 
-                        if (t >= 0.38f)
-                        {
-                            cinematicCamera.clearFlags = CameraClearFlags.SolidColor;
-                            float spaceBlend = Mathf.SmoothStep(0f, 1f,
-                                Mathf.InverseLerp(0.38f, 0.92f, t));
-                            Color atmosphere = new Color(0.16f, 0.27f, 0.43f, 1f);
-                            Color space = new Color(0.003f, 0.008f, 0.022f, 1f);
-                            cinematicCamera.backgroundColor = Color.Lerp(atmosphere, space, spaceBlend);
-
-                            if (orbitalStars == null)
-                                CreateOrbitalStarfield();
-                        }
+                        if (orbitalStars == null)
+                            CreateOrbitalStarfield();
                     }
 
                     if (t >= 1f)
