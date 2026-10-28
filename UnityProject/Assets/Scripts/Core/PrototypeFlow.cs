@@ -748,9 +748,10 @@ namespace PersiaWar.Unity2D5D
                 PlayerPrefs.SetString("PW.PlayerId", playerId);
             }
 
+            // CampaignStage is the authoritative progression checkpoint. Unlock flags
+            // only describe availability; using them to overwrite the checkpoint can
+            // skip earlier stages after relaunch or after a test-stage run.
             stageNumber = Mathf.Clamp(PlayerPrefs.GetInt("PW.CampaignStage", 1), 1, 5);
-            if (PlayerPrefs.GetInt("PW.Stage3Unlocked", 0) != 0 && stageNumber < 3) stageNumber = 3;
-            if (PlayerPrefs.GetInt("PW.Stage4Unlocked", 0) != 0 && stageNumber < 4) stageNumber = 4;
             if (PlayerPrefs.GetInt("PW.Stage4Completed", 0) != 0) stageNumber = 5;
             profileNameInput = PlayerPrefs.GetString("PW.PlayerName", string.Empty);
             if (string.IsNullOrWhiteSpace(profileNameInput))
