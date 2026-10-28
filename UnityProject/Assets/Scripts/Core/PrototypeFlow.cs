@@ -16,6 +16,7 @@ namespace PersiaWar.Unity2D5D
             Store,
             Settings,
             HeroSelect,
+            WeaponSelect,
             DropMap,
             Match
         }
@@ -275,6 +276,11 @@ namespace PersiaWar.Unity2D5D
                 HandleHeroSelectTouches();
                 return;
             }
+            if (mode == ScreenMode.WeaponSelect)
+            {
+                HandleWeaponSelectTouches();
+                return;
+            }
             if (mode == ScreenMode.DropMap)
                 HandleDropTouches();
         }
@@ -370,6 +376,7 @@ namespace PersiaWar.Unity2D5D
                     if (stageNumber >= 2 && stageTwoShopOpen) DrawCharacterShop();
                     else DrawHeroSelect();
                     break;
+                case ScreenMode.WeaponSelect: DrawWeaponSelect(); break;
                 default: DrawDropMap(); break;
             }
         }
@@ -1037,9 +1044,11 @@ namespace PersiaWar.Unity2D5D
                 if (activeCamera != null) activeCamera.enabled = false;
                 if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
                 GateGameplay(false);
-                mode = ScreenMode.DropMap;
+                // Stages 3 and 4 have authored transport/uplink arrival sequences.
+                // Their fixed entry points do not need the city/village landing map.
+                mode = ScreenMode.MainMenu;
                 StartCoroutine(BeginMainGameAfterMenuFrame());
-                StartupCheckpoint.Set("DirectStageTestEntry_" + targetStage);
+                StartupCheckpoint.Set("DirectStageTestEntry_" + targetStage + "_FixedEntry");
             }
         }
 
@@ -1278,6 +1287,7 @@ namespace PersiaWar.Unity2D5D
             startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
+            stageThreeResultAcknowledged = false;
             if (stageTestRun)
             {
                 RestoreCampaignProgressAfterTest();
@@ -1286,16 +1296,26 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
                 return;
             }
+
+            // Stage 3 hands off to the campaign loadout flow. Stage 4 starts only after
+            // the player confirms their weapon; its authored uplink landing remains intact.
             stageNumber = 4;
             PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
             PlayerPrefs.SetInt("PW.CampaignStage", 4);
             PlayerPrefs.Save();
+            stageTwoOriginalHero = selectedHero;
+            stageTwoShopOpen = false;
+            stageTwoLobbyRunning = false;
+            stageTwoLobbyReady = false;
+            stageTwoLobbyPlayers = 1;
+            selectedStoreWeaponKind = PlayerPrefs.GetInt(
+                "PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
+            if (selectedStoreWeaponKind == (int)WeaponController.WeaponKind.AlienSword)
+                selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
             spawnWorld = Vector2.zero;
-            spawnChosen = true;
-            mode = ScreenMode.MainMenu;
-            startupStatus = "Preparing next mission...";
-            StartupCheckpoint.Set("StageThreeComplete_AutoStartStageFour");
-            StartCoroutine(BeginMainGameAfterMenuFrame());
+            spawnChosen = false;
+            mode = ScreenMode.HeroSelect;
+            StartupCheckpoint.Set("StageThreeComplete_OpenStageFourHeroSelection");
         }
         public void CompleteStageFourEscapeToMainMenu()
         {
@@ -1507,6 +1527,228 @@ namespace PersiaWar.Unity2D5D
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
         }
 
+        private void ContinueFromHeroSelection()
+        {
+            stageTwoShopOpen = false;
+
+            if (stageNumber == 3)
+            {
+                // Stage 3 has its own transport-arrival cinematic and authored landing.
+                // Retain the canonical entry coordinate; never ask the player to pick a map point.
+                spawnWorld = new Vector2(0f, -97f);
+                spawnChosen = true;
+                mode = ScreenMode.MainMenu;
+                StartupCheckpoint.Set("StageThreeHeroSelection_FixedTransportEntry");
+                StartMatch();
+                return;
+            }
+
+            if (stageNumber == 4)
+            {
+                // Stage 4's arrival sequence positions the pilot inside the mothership.
+                // Keep its authored landing; no drop-map step is needed.
+                spawnWorld = Vector2.zero;
+                spawnChosen = false;
+                selectedStoreWeaponKind = PlayerPrefs.GetInt(
+                    "PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
+                if (selectedStoreWeaponKind == (int)WeaponController.WeaponKind.AlienSword)
+                    selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
+                mode = ScreenMode.WeaponSelect;
+                StartupCheckpoint.Set("StageFourHeroSelected_OpenWeaponSelection");
+                return;
+            }
+
+            EnterDropMap();
+        }
+
+        private static readonly WeaponController.WeaponKind[] CampaignWeaponChoices =
+        {
+            WeaponController.WeaponKind.LightPistol,
+            WeaponController.WeaponKind.AssaultRifle,
+            WeaponController.WeaponKind.HeavyMachineGun,
+            WeaponController.WeaponKind.Axe,
+            WeaponController.WeaponKind.VoidRifle,
+            WeaponController.WeaponKind.AlienSword
+        };
+
+        private static readonly string[] CampaignWeaponLabels =
+        {
+            "LIGHT PISTOL",
+            "ASSAULT RIFLE",
+            "HEAVY MACHINE GUN",
+            "AXE",
+            "VOID RIFLE",
+            "ALIEN SWORD"
+        };
+
+        private bool IsCampaignWeaponAvailable(WeaponController.WeaponKind kind)
+        {
+            if (kind == WeaponController.WeaponKind.VoidRifle)
+                return PlayerPrefs.GetInt("PW.Reward.VoidRifle", 0) != 0;
+            if (kind == WeaponController.WeaponKind.AlienSword)
+                return PlayerPrefs.GetInt("PW.Reward.AlienSword", 0) != 0;
+            return true;
+        }
+
+        private Rect GetWeaponSelectPanelRect()
+        {
+            float scale = GetUiScale();
+            float width = Mathf.Min(Screen.width - 28f * scale, 900f * scale);
+            float height = Mathf.Min(Screen.height - 24f * scale, 580f * scale);
+            return new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f,
+                width, height);
+        }
+
+        private Rect GetWeaponSelectCardRect(int index)
+        {
+            Rect panel = GetWeaponSelectPanelRect();
+            float scale = GetUiScale();
+            float pad = 22f * scale;
+            float gapX = 9f * scale;
+            float gapY = 9f * scale;
+            float cardWidth = (panel.width - pad * 2f - gapX * 2f) / 3f;
+            float gridTop = panel.y + 118f * scale;
+            float footerTop = panel.y + panel.height - 82f * scale;
+            float cardHeight = (footerTop - gridTop - gapY) / 2f;
+            return new Rect(panel.x + pad + (index % 3) * (cardWidth + gapX),
+                gridTop + (index / 3) * (cardHeight + gapY), cardWidth, cardHeight);
+        }
+
+        private Rect GetWeaponSelectStartRect()
+        {
+            Rect panel = GetWeaponSelectPanelRect();
+            float scale = GetUiScale();
+            float gap = 10f * scale;
+            float buttonHeight = 52f * scale;
+            float contentWidth = panel.width - 44f * scale - gap;
+            float buttonWidth = contentWidth * 0.62f;
+            float groupWidth = contentWidth + gap;
+            float left = panel.center.x - groupWidth * 0.5f;
+            return new Rect(left, panel.yMax - buttonHeight - 12f * scale,
+                buttonWidth, buttonHeight);
+        }
+
+        private Rect GetWeaponSelectBackRect()
+        {
+            Rect panel = GetWeaponSelectPanelRect();
+            float scale = GetUiScale();
+            float gap = 10f * scale;
+            float buttonHeight = 52f * scale;
+            float contentWidth = panel.width - 44f * scale - gap;
+            float startWidth = contentWidth * 0.62f;
+            return new Rect(GetWeaponSelectStartRect().xMax + gap,
+                panel.yMax - buttonHeight - 12f * scale, contentWidth - startWidth, buttonHeight);
+        }
+
+        private void SelectCampaignWeapon(int index)
+        {
+            if (index < 0 || index >= CampaignWeaponChoices.Length) return;
+            WeaponController.WeaponKind kind = CampaignWeaponChoices[index];
+            if (!IsCampaignWeaponAvailable(kind)) return;
+            // Stage 4 opens with ranged combat. The owned sword remains available in-match,
+            // but is not offered as the sole weapon for the entry encounter.
+            if (stageNumber == 4 && kind == WeaponController.WeaponKind.AlienSword) return;
+            selectedStoreWeaponKind = (int)kind;
+            StartupCheckpoint.Set("CampaignWeaponSelected_" + kind);
+        }
+
+        private void StartStageFourWithSelectedLoadout()
+        {
+            if (stageNumber != 4 || startingMatch) return;
+            WeaponController.WeaponKind kind =
+                (WeaponController.WeaponKind)selectedStoreWeaponKind;
+            if (!IsCampaignWeaponAvailable(kind) || kind == WeaponController.WeaponKind.AlienSword)
+                kind = WeaponController.WeaponKind.AssaultRifle;
+            PlayerPrefs.SetInt("PW.SelectedWeaponKind", (int)kind);
+            PlayerPrefs.Save();
+            spawnWorld = Vector2.zero;
+            spawnChosen = true;
+            mode = ScreenMode.MainMenu;
+            StartupCheckpoint.Set("StageFourLoadoutConfirmed_StartAtAuthoredEntry");
+            StartMatch();
+        }
+
+        private void HandleWeaponSelectTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0) return;
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began) continue;
+                Vector2 gui = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (GetWeaponSelectStartRect().Contains(gui))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    StartStageFourWithSelectedLoadout();
+                    return;
+                }
+                if (GetWeaponSelectBackRect().Contains(gui))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    mode = ScreenMode.HeroSelect;
+                    StartupCheckpoint.Set("StageFourWeaponSelection_BackToHero");
+                    return;
+                }
+                for (int weapon = 0; weapon < CampaignWeaponChoices.Length; weapon++)
+                {
+                    if (!GetWeaponSelectCardRect(weapon).Contains(gui)) continue;
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    SelectCampaignWeapon(weapon);
+                    return;
+                }
+            }
+        }
+
+        private void DrawWeaponSelect()
+        {
+            Rect panel = GetWeaponSelectPanelRect();
+            float scale = GetUiScale();
+            Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.005f, 0.015f, 0.03f, 0.88f));
+            Fill(new Rect(panel.x + 4f * scale, panel.y + 7f * scale, panel.width, panel.height),
+                new Color(0f, 0f, 0f, 0.36f));
+            Fill(panel, new Color(0.025f, 0.055f, 0.085f, 0.98f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 5f * scale), new Color(0.25f, 0.92f, 0.45f, 1f));
+            GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 12f * scale,
+                panel.width - 36f * scale, 42f * scale), "STAGE 4  •  SELECT YOUR WEAPON", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 54f * scale,
+                panel.width - 36f * scale, 28f * scale),
+                "Choose an owned weapon. The mothership arrival and landing stay unchanged.", menuSmallStyle);
+
+            for (int i = 0; i < CampaignWeaponChoices.Length; i++)
+            {
+                Rect card = GetWeaponSelectCardRect(i);
+                WeaponController.WeaponKind kind = CampaignWeaponChoices[i];
+                bool available = IsCampaignWeaponAvailable(kind) &&
+                    !(stageNumber == 4 && kind == WeaponController.WeaponKind.AlienSword);
+                bool selected = selectedStoreWeaponKind == (int)kind;
+                Fill(card, selected
+                    ? new Color(0.08f, 0.28f, 0.24f, 0.98f)
+                    : new Color(0.055f, 0.085f, 0.12f, 0.96f));
+                Fill(new Rect(card.x, card.y, 4f * scale, card.height),
+                    selected ? new Color(0.25f, 0.94f, 0.49f, 1f)
+                    : new Color(0.36f, 0.46f, 0.52f, 0.8f));
+                GUI.Label(new Rect(card.x + 8f * scale, card.y + 8f * scale,
+                    card.width - 16f * scale, 36f * scale), CampaignWeaponLabels[i], menuBodyStyle);
+                string status = !available ? "LOCKED / NOT AN ENTRY WEAPON"
+                    : selected ? "SELECTED" : "TAP TO SELECT";
+                GUI.Label(new Rect(card.x + 8f * scale, card.y + 46f * scale,
+                    card.width - 16f * scale, 28f * scale), status, menuSmallStyle);
+                if (GUI.Button(card, GUIContent.none, GUIStyle.none) && available)
+                    SelectCampaignWeapon(i);
+            }
+
+            GUI.Label(new Rect(panel.x + 18f * scale, panel.yMax - 88f * scale,
+                panel.width - 36f * scale, 24f * scale),
+                "CURRENT LOADOUT  •  " + CampaignWeaponLabels[Mathf.Clamp(
+                    System.Array.IndexOf(CampaignWeaponChoices, (WeaponController.WeaponKind)selectedStoreWeaponKind),
+                    0, CampaignWeaponLabels.Length - 1)], menuSmallStyle);
+
+            if (DrawFantasyButton(GetWeaponSelectStartRect(), "START STAGE 4  ⚔", true))
+                StartStageFourWithSelectedLoadout();
+            if (DrawFantasyButton(GetWeaponSelectBackRect(), "BACK TO PLAYER", false))
+                mode = ScreenMode.HeroSelect;
+        }
+
         private void HandleHeroSelectTouches()
         {
             if (!Application.isMobilePlatform || Input.touchCount <= 0)
@@ -1567,7 +1809,7 @@ namespace PersiaWar.Unity2D5D
                     if (continueRect.Contains(gui))
                     {
                         suppressMenuButtonClicksFrame = Time.frameCount;
-                        EnterDropMap();
+                        ContinueFromHeroSelection();
                         StartupCheckpoint.Set("HeroSelectionContinuedByTouch");
                         return;
                     }
@@ -1620,9 +1862,13 @@ namespace PersiaWar.Unity2D5D
             }
 
             string continueLabel = stageNumber >= 2
-                ? (selectedHero == stageTwoOriginalHero
-                    ? "KEEP CURRENT HERO  •  CONTINUE"
-                    : "USE SELECTED HERO  •  CONTINUE")
+                ? (stageNumber == 3
+                    ? "CONTINUE TO TRANSPORT"
+                    : stageNumber == 4
+                        ? "CONTINUE TO WEAPON SELECT"
+                        : (selectedHero == stageTwoOriginalHero
+                            ? "KEEP CURRENT HERO  •  CONTINUE"
+                            : "USE SELECTED HERO  •  CONTINUE"))
                 : "SELECT SPAWN POINT";
 
             if (stageNumber >= 2)
@@ -1635,7 +1881,7 @@ namespace PersiaWar.Unity2D5D
                 Rect continueRect = new Rect(left, Screen.height - 112f, continueWidth, 62f);
                 Rect shopRect = new Rect(continueRect.xMax + gapButtons, continueRect.y, shopWidth, continueRect.height);
                 if (DrawFantasyButton(continueRect, continueLabel, true))
-                    EnterDropMap();
+                    ContinueFromHeroSelection();
                 if (DrawFantasyButton(shopRect, "HERO SHOP  ✦", false))
                     stageTwoShopOpen = true;
             }
