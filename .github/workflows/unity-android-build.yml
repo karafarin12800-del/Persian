@@ -15,6 +15,7 @@ on:
       - feature/stage4-mothership-megabase-20261016
       - feature/stage4-escape-detonation-20261017
       - Persian-war1
+      - Persian-war4
     paths:
       - 'UnityProject/**'
       - '.github/workflows/unity-android-build.yml'
