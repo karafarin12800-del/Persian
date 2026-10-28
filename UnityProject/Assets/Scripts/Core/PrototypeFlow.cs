@@ -79,6 +79,7 @@ namespace PersiaWar.Unity2D5D
         private StageFourWorldBuilder stageFourWorldBuilder;
         private bool forceStageOneWorldRebuildForTest;
         private bool stageTestRun;
+        private bool stageThreeTransitionInProgress;
         private bool profileCompletionPendingStageTwo;
         private int savedCampaignStageNumber = 1;
         private int savedStage3Unlocked;
@@ -276,7 +277,11 @@ namespace PersiaWar.Unity2D5D
                     else if (stageNumber == 3 && session.PlayerWon &&
                         stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
                     {
-                        ReturnToMainMenuFromResult(true);
+                        // Defer the handoff until Stage 3's generated world has been
+                        // safely released. This avoids doing camera teardown and stage
+                        // transition work in the same frame as the uplink finale.
+                        if (!stageThreeTransitionInProgress)
+                            StartCoroutine(CompleteStageThreeTransitionSafely());
                     }
                     return;
                 }
@@ -1339,6 +1344,38 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        private IEnumerator CompleteStageThreeTransitionSafely()
+        {
+            if (stageThreeTransitionInProgress)
+                yield break;
+
+            stageThreeTransitionInProgress = true;
+            StartupCheckpoint.Set("StageThreeComplete_BeginSafeStageFourHandoff");
+
+            // The uplink is the end of Stage 3. Freeze gameplay and deactivate its
+            // roots before clearing procedural geometry, so the old arena cannot
+            // overlap Stage 4 or keep unnecessary colliders and renderers resident.
+            GateGameplay(false);
+            if (mobileInput != null) mobileInput.DeactivateMatch();
+            if (activeCamera != null) activeCamera.enabled = false;
+            if (followCamera != null) followCamera.enabled = false;
+            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+            if (playerRoot != null) playerRoot.SetActive(false);
+            if (gameRoot != null) gameRoot.SetActive(false);
+
+            StageThreeWorldBuilder.ClearExistingWorld();
+            GateGameplay(false);
+            StartupCheckpoint.Set("StageThreeComplete_WorldCleanupQueued");
+
+            // Destroy() is deferred until the frame ends. Yield once before creating
+            // Stage 4's player-selection flow to separate scene teardown from handoff.
+            yield return null;
+
+            StartupCheckpoint.Set("StageThreeComplete_WorldCleanupFinished");
+            ReturnToMainMenuFromResult(true);
+            stageThreeTransitionInProgress = false;
+        }
+
         private void ReturnToMainMenuFromResult(bool advanceToStageFour = false)
         {
             StageTwoArenaManager.Instance?.ResetForStageChange();
@@ -1815,9 +1852,10 @@ namespace PersiaWar.Unity2D5D
             if (index == 0)
                 return true;
 
-            // Anahita is the second card. Her unlock persists locally after Stage 1,
-            // including when the next stage rebuilds the world and GameBootstrap.
-            return index == 1 && stageNumber >= 2 &&
+            // Anahita's unlock is a persistent reward. Do not couple visibility to
+            // the in-memory stageNumber: it resets when Android restarts the app,
+            // while PlayerPrefs correctly retains the rescue unlock.
+            return index == 1 &&
                 (PlayerPrefs.GetInt("PW.AnahitaUnlocked", 0) == 1 ||
                  (gameBootstrap != null && gameBootstrap.VillageGirlRescued));
         }
