@@ -68,6 +68,7 @@ namespace PersiaWar.Unity2D5D
         private Vector3 shipForward;
         private float groundY;
         private float phaseElapsed;
+        private float nextPlayerDiscoveryRetryTime;
         private bool cleaned;
         private bool cameraStateCaptured;
         private LineRenderer greenRing;
@@ -142,9 +143,15 @@ namespace PersiaWar.Unity2D5D
 
             if (localPlayer == null)
             {
-                IsComplete = true;
-                Phase = SequencePhase.Complete;
-                Debug.LogWarning("PERSIA_STAGE2_END: local player missing; skipping boarding visual.");
+                // Do not mark the cutscene complete when the player reference is
+                // temporarily unavailable. PrototypeFlow treats IsComplete as
+                // permission to leave Stage 2, which previously skipped the ship
+                // reveal and could trigger the broken transition on Android.
+                Phase = SequencePhase.Idle;
+                IsRunning = false;
+                IsComplete = false;
+                nextPlayerDiscoveryRetryTime = Time.unscaledTime + 0.5f;
+                Debug.LogWarning("PERSIA_STAGE2_END: local player not ready; retrying before starting evacuation.");
                 return;
             }
 
@@ -233,7 +240,21 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            if (!IsRunning) return;
+            if (!IsRunning)
+            {
+                // PlayerController/playerRoot can be briefly unavailable while the
+                // match-ending flow disables gameplay. Retry discovery instead of
+                // silently completing the cutscene and advancing without a ship.
+                if (!IsComplete && Phase == SequencePhase.Idle &&
+                    Time.unscaledTime >= nextPlayerDiscoveryRetryTime)
+                {
+                    nextPlayerDiscoveryRetryTime = Time.unscaledTime + 0.5f;
+                    PlayerController discoveredPlayer = FindFirstObjectByType<PlayerController>();
+                    if (discoveredPlayer != null)
+                        Begin(discoveredPlayer.transform, cinematicCamera);
+                }
+                return;
+            }
 
             float deltaTime = Mathf.Max(0f, Time.unscaledDeltaTime);
             phaseElapsed += deltaTime;
