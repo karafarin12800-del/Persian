@@ -1908,7 +1908,12 @@ namespace PersiaWar.Unity2D5D
 
         private void BeginStageTwoSelection()
         {
+            // GameSession persists across stages. Stage 1 ends with IsFinished and
+            // PlayerWon still set, so clear the old result before Stage 2 can become
+            // active; otherwise Update() can mistake the new match for an instant win.
             ExtractionBeacon.ClearForStageTransition();
+            if (GameSession.Instance != null)
+                GameSession.Instance.ResetMatch();
             Time.timeScale = 1f;
             stageNumber = 2;
             stageTwoResultAcknowledged = false;
