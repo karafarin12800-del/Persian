@@ -130,6 +130,35 @@ namespace PersiaWar.Unity2D5D
         {
             ExtractionBeacon.ClearForStageTransition();
 
+            // The Stage 2 arena's combatants and projectiles are not children of
+            // worldRoot. Destroy them explicitly or the large Stage 3 world is built
+            // while their renderers, colliders and navigation buffers are still alive.
+            int releasedEnemies = 0;
+            EnemyChase[] oldEnemies = FindObjectsByType<EnemyChase>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < oldEnemies.Length; i++)
+            {
+                if (oldEnemies[i] == null) continue;
+                Destroy(oldEnemies[i].gameObject);
+                releasedEnemies++;
+            }
+
+            EnemyProjectile[] oldEnemyProjectiles = FindObjectsByType<EnemyProjectile>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < oldEnemyProjectiles.Length; i++)
+            {
+                if (oldEnemyProjectiles[i] != null)
+                    Destroy(oldEnemyProjectiles[i].gameObject);
+            }
+
+            Projectile[] oldPlayerProjectiles = FindObjectsByType<Projectile>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < oldPlayerProjectiles.Length; i++)
+            {
+                if (oldPlayerProjectiles[i] != null)
+                    Destroy(oldPlayerProjectiles[i].gameObject);
+            }
+
             PickupItem[] oldPickups = FindObjectsByType<PickupItem>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
             for (int i = 0; i < oldPickups.Length; i++)
@@ -137,6 +166,11 @@ namespace PersiaWar.Unity2D5D
                 if (oldPickups[i] != null)
                     Destroy(oldPickups[i].gameObject);
             }
+
+            Debug.Log("PERSIA_TRANSITION: released Stage 2 enemies=" + releasedEnemies +
+                ", enemy projectiles=" + oldEnemyProjectiles.Length +
+                ", player projectiles=" + oldPlayerProjectiles.Length +
+                ", pickups=" + oldPickups.Length + ".");
 
             HashSet<Material> oldMaterials = new HashSet<Material>();
             if (worldRoot != null)
