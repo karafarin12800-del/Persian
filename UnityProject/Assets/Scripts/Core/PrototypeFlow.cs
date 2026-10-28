@@ -1200,6 +1200,21 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
+                // Release the completed Stage 2 village before allocating Stage 3's
+                // larger world. Keep the retained evacuation ship separate and alive.
+                GameBootstrap previousStageBootstrap = gameBootstrap != null
+                    ? gameBootstrap
+                    : (gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : null);
+                if (previousStageBootstrap != null)
+                {
+                    previousStageBootstrap.ReleaseWorldForStageTransition();
+                }
+                else
+                {
+                    StartupCheckpoint.Set("StageTwoWorldReleaseSkipped_NoBootstrap");
+                    Debug.LogWarning("PERSIA_TRANSITION: GameBootstrap missing while preparing Stage 3.");
+                }
+
                 // Seamless campaign hand-off: start Stage 3 immediately, carrying
                 // the exact ship preserved above into the Stage 3 landing cinematic.
                 stageNumber = 3;
