@@ -1213,10 +1213,7 @@ namespace PersiaWar.Unity2D5D
                 return false;
             }
 
-            // Put the extraction beam at the captive outside the house entrance.
-            // The interior beacon forced players through a narrow/blocked doorway,
-            // making the Stage 1 -> Stage 2 transition unreachable on Android.
-            beaconPosition = captiveVillageGirlPosition;
+            beaconPosition = captiveVillageGirlBeaconPosition;
             Debug.Log("PERSIA_RESCUE: extraction beam placed on Anahita's house " +
                 distance.ToString("F1") + "m from player when final enemy was eliminated.");
             return true;
@@ -2042,8 +2039,11 @@ namespace PersiaWar.Unity2D5D
                 ? Mathf.Min(3.4f, footprint * 0.32f)
                 : (stageTwoRequested
                     ? Mathf.Min(1.90f, footprint * 0.30f)
-                    : Mathf.Min(1.35f, footprint * 0.18f));
-            float doorHeight = isWarehouse ? 2.35f : 2.15f;
+                    : Mathf.Min(2.80f, footprint * 0.42f));
+            // Stage 1's rescue house needs a genuinely traversable doorway on
+            // touch controls; keep the rendered opening and matching wall colliders
+            // in sync by passing these dimensions to both existing build paths.
+            float doorHeight = isWarehouse ? 2.35f : (stageTwoRequested ? 2.15f : 2.65f);
             if (stageTwoRequested)
             {
                 // Stage two uses one collider + one renderer for each physical wall
