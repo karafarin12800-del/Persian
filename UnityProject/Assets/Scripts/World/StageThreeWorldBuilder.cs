@@ -1466,7 +1466,23 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         if (liftPlatform == null || localPlayer == null)
+        {
+            // A missing cinematic reference must not strand the campaign at Stage 3.
+            // End the sequence cleanly so PrototypeFlow can advance to Stage 4.
+            RestorePlayerVisibility();
+            if (localPlayer != null)
+            {
+                localPlayer.enabled = true;
+                localPlayer.SetMovementEnabled(true);
+                if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = true;
+                if (localPlayer.Aim != null) localPlayer.Aim.enabled = true;
+            }
+            isComplete = true;
+            IsCinematic = false;
+            StartupCheckpoint.Set("StageThreeEndingRecovered_MissingLiftOrPlayer");
+            GameSession.Instance?.EndMission(true);
             yield break;
+        }
 
         Vector3 playerOffset = Vector3.up * 0.55f;
         Vector3 platformStart = new Vector3(0f, 0.28f, 0f);

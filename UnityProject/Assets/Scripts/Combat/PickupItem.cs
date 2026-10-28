@@ -22,6 +22,8 @@ namespace PersiaWar.Unity2D5D
 
         private float startY;
         private bool weaponPickupScaleApplied;
+        private LineRenderer rewardAccentRing;
+        private Material rewardAccentMaterial;
 
         public void Configure(PickupType pickupType, int value)
         {
@@ -45,6 +47,58 @@ namespace PersiaWar.Unity2D5D
             if (trigger == null) trigger = gameObject.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
             trigger.radius = 0.7f;
+            BuildRewardAccent();
+        }
+
+        private void BuildRewardAccent()
+        {
+            // Decorative ring is a child of this pickup only. It does not recolor
+            // the pickup mesh, any weapon model, or any enemy material.
+            GameObject ringObject = new GameObject("RewardAccentRing");
+            ringObject.transform.SetParent(transform, false);
+            ringObject.transform.localPosition = new Vector3(0f, -0.32f, 0f);
+            rewardAccentRing = ringObject.AddComponent<LineRenderer>();
+            rewardAccentRing.useWorldSpace = false;
+            rewardAccentRing.loop = true;
+            rewardAccentRing.positionCount = 32;
+            rewardAccentRing.widthMultiplier = 0.035f;
+            rewardAccentRing.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            rewardAccentRing.receiveShadows = false;
+
+            Shader shader = Shader.Find("Unlit/Color");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            if (shader == null)
+            {
+                Destroy(ringObject);
+                rewardAccentRing = null;
+                return;
+            }
+
+            rewardAccentMaterial = new Material(shader);
+            Color accent;
+            switch (type)
+            {
+                case PickupType.Ammo: accent = new Color(0.20f, 0.86f, 1f, 0.95f); break;
+                case PickupType.Medkit: accent = new Color(0.28f, 1f, 0.48f, 0.95f); break;
+                case PickupType.Grenade: accent = new Color(1f, 0.62f, 0.20f, 0.95f); break;
+                case PickupType.Shield: accent = new Color(0.28f, 0.55f, 1f, 0.95f); break;
+                case PickupType.Weapon: accent = new Color(0.96f, 0.82f, 0.42f, 0.95f); break;
+                case PickupType.QuickDash: accent = new Color(0.82f, 0.96f, 0.30f, 0.95f); break;
+                default: accent = new Color(0.72f, 0.88f, 0.96f, 0.95f); break;
+            }
+            if (rewardAccentMaterial.HasProperty("_Color"))
+                rewardAccentMaterial.SetColor("_Color", accent);
+            if (rewardAccentMaterial.HasProperty("_BaseColor"))
+                rewardAccentMaterial.SetColor("_BaseColor", accent);
+            rewardAccentRing.sharedMaterial = rewardAccentMaterial;
+
+            const float radius = 0.82f;
+            for (int i = 0; i < rewardAccentRing.positionCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / rewardAccentRing.positionCount;
+                rewardAccentRing.SetPosition(i, new Vector3(
+                    Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius));
+            }
         }
 
         private void ApplyWeaponPickupScale()
@@ -103,6 +157,12 @@ namespace PersiaWar.Unity2D5D
             }
 
             Destroy(gameObject);
+        }
+
+        private void OnDestroy()
+        {
+            if (rewardAccentMaterial != null)
+                Destroy(rewardAccentMaterial);
         }
     }
 
