@@ -98,7 +98,7 @@ namespace PersiaWar.Unity2D5D
             WorldBuildFailed = false;
             WorldBuildError = string.Empty;
             extractionBeaconShown = false;
-            VillageGirlRescued = false;
+            VillageGirlRescued = PlayerPrefs.GetInt("PW.AnahitaUnlocked", 0) != 0;
             captiveVillageGirlRoot = null;
             PrepareWorld();
         }
@@ -111,6 +111,7 @@ namespace PersiaWar.Unity2D5D
             // Remove the blue extraction beam left by Stage 1; Stage 2 should not
             // begin with a persistent blue objective light.
             ExtractionBeacon.ClearForStageTransition();
+            VillageGirlRescued = PlayerPrefs.GetInt("PW.AnahitaUnlocked", 0) != 0;
             stageTwoRequested = true;
             stageTwoLayoutVariant = Mathf.Clamp(layoutVariant, 0, 2);
             prepareRequested = false;
@@ -219,7 +220,7 @@ namespace PersiaWar.Unity2D5D
             androidBoxBatches.Clear();
             androidCurrentBuildingRoot = null;
             captiveVillageGirlRoot = null;
-            VillageGirlRescued = false;
+            VillageGirlRescued = PlayerPrefs.GetInt("PW.AnahitaUnlocked", 0) != 0;
             extractionBeaconShown = false;
             stageTwoRequested = false;
             stageTwoLayoutVariant = 0;
@@ -1172,6 +1173,8 @@ namespace PersiaWar.Unity2D5D
                 return false;
 
             VillageGirlRescued = true;
+            PlayerPrefs.SetInt("PW.AnahitaUnlocked", 1);
+            PlayerPrefs.Save();
             captiveVillageGirlRoot.SetActive(false);
             StartupCheckpoint.Set("VillageGirlRescuedInsideHouse");
             Debug.Log("PERSIA_RESCUE: Anahita rescued inside the Stage 1 house");
@@ -1283,7 +1286,15 @@ namespace PersiaWar.Unity2D5D
 
         private void CreateAndroidCaptiveVillageGirl()
         {
-            VillageGirlRescued = false;
+            VillageGirlRescued = PlayerPrefs.GetInt("PW.AnahitaUnlocked", 0) != 0;
+            if (VillageGirlRescued)
+            {
+                // A saved rescue is a permanent campaign reward. Do not respawn the
+                // captive or revoke the hero unlock when a player returns to Stage 1.
+                captiveVillageGirlRoot = null;
+                StartupCheckpoint.Set("StageOneAnahitaAlreadyUnlocked");
+                return;
+            }
 
             // Pick a random existing residential house. Do not alter the city layout
             // or create extra houses; the captive's visual stays inside that house.

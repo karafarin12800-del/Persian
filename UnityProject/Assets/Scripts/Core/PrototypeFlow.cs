@@ -78,6 +78,7 @@ namespace PersiaWar.Unity2D5D
         private StageFourWorldBuilder stageFourWorldBuilder;
         private bool forceStageOneWorldRebuildForTest;
         private bool stageTestRun;
+        private bool stageThreeTransitionInProgress;
         private int savedCampaignStageNumber = 1;
         private int savedCampaignStagePref = 1;
         private int savedStage3Unlocked;
@@ -236,6 +237,11 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            // Stage 3 world teardown is asynchronous on Android. Ignore menu/combat input
+            // until its native assets have been released and the next screen is ready.
+            if (stageThreeTransitionInProgress)
+                return;
+
             // Use direct Touch.fingerId input for front-end controls on Android.
             // GUI.Button still draws the visual surface, but must not be the only
             // path that can advance the menu if touch-to-mouse synthesis is missing.
@@ -827,14 +833,9 @@ namespace PersiaWar.Unity2D5D
                 {
                     suppressMenuButtonClicksFrame = Time.frameCount;
                     if (mode == ScreenMode.Profile)
-                    {
-                        string cleanName = string.IsNullOrWhiteSpace(profileNameInput)
-                            ? "Persian Warrior" : profileNameInput.Trim();
-                        profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
-                        PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
-                        PlayerPrefs.Save();
-                    }
-                    mode = ScreenMode.MainMenu;
+                        SaveProfileAndContinue();
+                    else
+                        mode = ScreenMode.MainMenu;
                     return;
                 }
 
@@ -934,6 +935,15 @@ namespace PersiaWar.Unity2D5D
         {
             if (stageTestRun)
                 RestoreCampaignProgressAfterTest();
+
+            // If the app was closed during the required Stage 1 registration screen,
+            // resume that screen before allowing the Stage 2 hero choice.
+            if (PlayerPrefs.GetInt("PW.RegistrationPending", 0) != 0)
+            {
+                mode = ScreenMode.Profile;
+                StartupCheckpoint.Set("StageOneRegistrationPending_OpenProfile");
+                return;
+            }
 
             if (stageNumber > 4)
             {
@@ -1294,6 +1304,10 @@ namespace PersiaWar.Unity2D5D
 
         private void StartStageFourAfterStageThree()
         {
+            if (stageThreeTransitionInProgress)
+                return;
+            stageThreeTransitionInProgress = true;
+
             StageTwoArenaManager.Instance?.ResetForStageChange();
             Time.timeScale = 1f;
             if (stageTwoVictorySequence != null)
@@ -1308,36 +1322,79 @@ namespace PersiaWar.Unity2D5D
             if (followCamera != null) followCamera.enabled = false;
             if (playerRoot != null) playerRoot.SetActive(false);
             if (gameRoot != null) gameRoot.SetActive(false);
-            startingMatch = false;
+
+            // Do not overlap the sizeable Stage 3 fortress with Stage 4's even larger
+            // mothership allocation. The Stage 3 builder is removed before unloading
+            // native assets; keep the old city hidden during this hand-off.
+            StageThreeWorldBuilder.ClearExistingWorld(false);
+            if (stageThreeWorldBuilder != null)
+            {
+                Destroy(stageThreeWorldBuilder);
+                stageThreeWorldBuilder = null;
+            }
+
+            startingMatch = true;
             matchPaused = false;
             resultOverlayStartTime = -1f;
             stageThreeResultAcknowledged = false;
-            if (stageTestRun)
+            bool completedStageThreeTest = stageTestRun;
+
+            if (completedStageThreeTest)
             {
                 RestoreCampaignProgressAfterTest();
+            }
+            else
+            {
+                // Keep progression durable, but wait until Stage 3's native world
+                // assets are released before displaying Stage 4 hero selection.
+                stageNumber = 4;
+                PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
+                PlayerPrefs.SetInt("PW.CampaignStage", 4);
+                PlayerPrefs.Save();
+                stageTwoOriginalHero = selectedHero;
+                stageTwoShopOpen = false;
+                stageTwoLobbyRunning = false;
+                stageTwoLobbyReady = false;
+                stageTwoLobbyPlayers = 1;
+                selectedStoreWeaponKind = PlayerPrefs.GetInt(
+                    "PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
+                if (selectedStoreWeaponKind == (int)WeaponController.WeaponKind.AlienSword)
+                    selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
+                spawnWorld = Vector2.zero;
+                spawnChosen = false;
+            }
+
+            mode = ScreenMode.MainMenu;
+            startupStatus = "Releasing Stage 3 assets...";
+            StartupCheckpoint.Set(completedStageThreeTest
+                ? "StageThreeTestTransition_ReleaseWorldAssets"
+                : "StageThreeToStageFour_ReleaseWorldAssets");
+            StartCoroutine(FinishStageThreeTransitionAfterCleanup(completedStageThreeTest));
+        }
+
+        private IEnumerator FinishStageThreeTransitionAfterCleanup(bool completedStageThreeTest)
+        {
+            // Destroy() is deferred until the end of the frame. Only then unload
+            // unreferenced stage geometry/materials, collect managed wrappers, and
+            // expose the next menu so Stage 4 cannot race Stage 3's teardown.
+            yield return null;
+            AsyncOperation unloadOperation = Resources.UnloadUnusedAssets();
+            while (unloadOperation != null && !unloadOperation.isDone)
+                yield return null;
+
+            System.GC.Collect();
+            yield return null;
+
+            startingMatch = false;
+            stageThreeTransitionInProgress = false;
+            if (completedStageThreeTest)
+            {
                 mode = ScreenMode.MainMenu;
                 ShowLobbyNotice("STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
                 StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
-                return;
+                yield break;
             }
 
-            // Stage 3 hands off to the campaign loadout flow. Stage 4 starts only after
-            // the player confirms their weapon; its authored uplink landing remains intact.
-            stageNumber = 4;
-            PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
-            PlayerPrefs.SetInt("PW.CampaignStage", 4);
-            PlayerPrefs.Save();
-            stageTwoOriginalHero = selectedHero;
-            stageTwoShopOpen = false;
-            stageTwoLobbyRunning = false;
-            stageTwoLobbyReady = false;
-            stageTwoLobbyPlayers = 1;
-            selectedStoreWeaponKind = PlayerPrefs.GetInt(
-                "PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
-            if (selectedStoreWeaponKind == (int)WeaponController.WeaponKind.AlienSword)
-                selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
-            spawnWorld = Vector2.zero;
-            spawnChosen = false;
             mode = ScreenMode.HeroSelect;
             StartupCheckpoint.Set("StageThreeComplete_OpenStageFourHeroSelection");
         }
@@ -1398,13 +1455,46 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("StageFourCampaignComplete_ReturnToMainMenu");
         }
 
+        private void SaveProfileAndContinue()
+        {
+            string cleanName = string.IsNullOrWhiteSpace(profileNameInput)
+                ? "Persian Warrior" : profileNameInput.Trim();
+            profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
+            PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
+            PlayerPrefs.SetInt("PW.ProfileCreated", 1);
+
+            bool continueToStageTwo = PlayerPrefs.GetInt("PW.RegistrationPending", 0) != 0 &&
+                stageNumber == 2;
+            PlayerPrefs.SetInt("PW.RegistrationPending", 0);
+            PlayerPrefs.Save();
+
+            if (continueToStageTwo)
+            {
+                stageTwoOriginalHero = selectedHero;
+                stageTwoShopOpen = false;
+                stageTwoLobbyRunning = false;
+                stageTwoLobbyReady = false;
+                stageTwoLobbyPlayers = 1;
+                spawnChosen = false;
+                mode = ScreenMode.HeroSelect;
+                StartupCheckpoint.Set("PlayerProfileSaved_StageTwoHeroSelectionOpened");
+            }
+            else
+            {
+                mode = ScreenMode.MainMenu;
+                StartupCheckpoint.Set("PlayerProfileSaved_ReturnToMainMenu");
+            }
+        }
+
         private void DrawProfileScreen()
         {
+            bool registrationPending = PlayerPrefs.GetInt("PW.RegistrationPending", 0) != 0;
             float width = Mathf.Min(Screen.width - 64f, 760f);
             Rect panel = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.19f, width, Screen.height * 0.58f);
             Fill(panel, new Color(0.025f, 0.055f, 0.085f, 0.94f));
             Fill(new Rect(panel.x, panel.y, panel.width, 6f), new Color(0.95f, 0.69f, 0.20f, 1f));
-            GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f), "PLAYER PROFILE", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f),
+                registrationPending ? "CREATE PLAYER PROFILE" : "PLAYER PROFILE", menuHeaderStyle);
             GUI.Label(new Rect(panel.x + 32f, panel.y + 88f, panel.width - 64f, 36f), "DISPLAY NAME (MAX 20 CHARACTERS)", menuSmallStyle);
             profileNameInput = GUI.TextField(new Rect(panel.x + 40f, panel.y + 132f, panel.width - 80f, 58f),
                 profileNameInput, 20);
@@ -1412,14 +1502,9 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(panel.x + 32f, panel.y + 250f, panel.width - 64f, 34f),
                 "PROFILE COSMETIC  " + StoreCosmeticNames[Mathf.Clamp(selectedProfileCosmetic, 0, StoreCosmeticNames.Length - 1)],
                 menuSmallStyle);
-            if (DrawFantasyButton(GetLobbyBackRect(), "SAVE & BACK"))
-            {
-                string cleanName = string.IsNullOrWhiteSpace(profileNameInput) ? "Persian Warrior" : profileNameInput.Trim();
-                profileNameInput = cleanName.Length > 20 ? cleanName.Substring(0, 20) : cleanName;
-                PlayerPrefs.SetString("PW.PlayerName", profileNameInput);
-                PlayerPrefs.Save();
-                mode = ScreenMode.MainMenu;
-            }
+            if (DrawFantasyButton(GetLobbyBackRect(),
+                registrationPending ? "SAVE PROFILE & CONTINUE" : "SAVE & BACK"))
+                SaveProfileAndContinue();
         }
 
         private Rect GetStoreItemRect(int index)
@@ -1863,7 +1948,7 @@ namespace PersiaWar.Unity2D5D
         {
             GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE " + stageNumber + "  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
             string heroHint = stageNumber >= 2
-                ? (gameBootstrap != null && gameBootstrap.VillageGirlRescued
+                ? (IsAnahitaUnlocked()
                     ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
                     : "RESCUE ANAHITA IN STAGE 1 TO UNLOCK HER  •  OTHERS LOCKED")
                 : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
@@ -1939,14 +2024,21 @@ namespace PersiaWar.Unity2D5D
                 stageTwoShopOpen = false;
         }
 
+        private bool IsAnahitaUnlocked()
+        {
+            // PlayerPrefs is the durable unlock state; GameBootstrap's runtime flag is
+            // retained as a same-session fallback for existing in-flight rescues.
+            return PlayerPrefs.GetInt("PW.AnahitaUnlocked", 0) != 0 ||
+                (gameBootstrap != null && gameBootstrap.VillageGirlRescued);
+        }
+
         private bool IsHeroUnlocked(int index)
         {
             if (index == 0)
                 return true;
 
             // Anahita is deliberately the second card from the left.
-            return index == 1 && stageNumber >= 2 &&
-                gameBootstrap != null && gameBootstrap.VillageGirlRescued;
+            return index == 1 && stageNumber >= 2 && IsAnahitaUnlocked();
         }
 
         private void CheckStageOneGirlRescue()
@@ -2203,14 +2295,23 @@ namespace PersiaWar.Unity2D5D
             stageNumber = 2;
             stageTwoResultAcknowledged = false;
             stageThreeResultAcknowledged = false;
+
+            // Registration is part of the real Stage 1 -> Stage 2 hand-off. Keep the
+            // pending flag durable so force-closing the app cannot bypass this screen.
+            bool registrationRequired = !stageTestRun;
+            if (registrationRequired)
+                PlayerPrefs.SetInt("PW.RegistrationPending", 1);
+            if (IsAnahitaUnlocked())
+                PlayerPrefs.SetInt("PW.AnahitaUnlocked", 1);
             PlayerPrefs.SetInt("PW.CampaignStage", 2);
             PlayerPrefs.Save();
+
             stageTwoOriginalHero = selectedHero;
             stageTwoShopOpen = false;
             stageTwoLobbyRunning = false;
             stageTwoLobbyReady = false;
             stageTwoLobbyPlayers = 1;
-            mode = ScreenMode.HeroSelect;
+            mode = registrationRequired ? ScreenMode.Profile : ScreenMode.HeroSelect;
             spawnChosen = false;
             startingMatch = false;
             matchPaused = false;
@@ -2220,8 +2321,10 @@ namespace PersiaWar.Unity2D5D
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             GateGameplay(false);
-            StartupCheckpoint.Set("StageTwoHeroSelectionOpened");
-            Debug.Log("PERSIA_STAGE2: extraction transition complete; opening hero selection");
+            StartupCheckpoint.Set(registrationRequired
+                ? "StageOneComplete_OpenRegistrationBeforeStageTwoHeroSelection"
+                : "StageTwoHeroSelectionOpened");
+            Debug.Log("PERSIA_STAGE2: extraction transition complete; opening next campaign screen");
         }
 
         private void EnterDropMap()

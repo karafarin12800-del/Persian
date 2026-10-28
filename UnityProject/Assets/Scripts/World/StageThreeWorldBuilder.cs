@@ -108,14 +108,14 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     }
     public bool HostilesCleared => RemainingHostiles == 0;
 
-    public static void ClearExistingWorld()
+    public static void ClearExistingWorld(bool restoreLegacyCity = true)
     {
         StageThreeWorldBuilder[] builders = FindObjectsByType<StageThreeWorldBuilder>(
             FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < builders.Length; i++)
         {
             if (builders[i] != null)
-                builders[i].ClearWorldAndRestorePrevious();
+                builders[i].ClearWorldAndRestorePrevious(restoreLegacyCity);
         }
     }
 
@@ -1598,7 +1598,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             gameplayCamera.transform.rotation = Quaternion.LookRotation(lookDirection, Vector3.up);
     }
 
-    private void ClearWorldAndRestorePrevious()
+    private void ClearWorldAndRestorePrevious(bool restoreLegacyCity = true)
     {
         if (worldRoot != null)
         {
@@ -1621,7 +1621,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             GameObject city = FindSceneObject("BattleRoyaleCity");
             if (city != null) legacyCityRoot = city.transform;
         }
-        if (legacyCityRoot != null && legacyCityRoot.gameObject != null)
+        if (restoreLegacyCity && legacyCityRoot != null && legacyCityRoot.gameObject != null)
             legacyCityRoot.gameObject.SetActive(true);
 
         RestorePlayerVisibility();
