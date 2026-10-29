@@ -189,7 +189,8 @@ namespace PersiaWar.Unity2D5D
         {
             yield return null;
 
-            EnsureUiInitialized();
+            // IMGUI APIs such as GUI.skin and GUIStyle construction are only valid
+            // during OnGUI. OnGUI initializes these lazily before drawing the menu.
             CacheGameplayRoots();
 
             // Resolve the known dormant roots directly instead of performing several
