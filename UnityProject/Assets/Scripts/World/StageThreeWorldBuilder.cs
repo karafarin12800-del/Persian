@@ -122,7 +122,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int i = 0; i < builders.Length; i++)
         {
             if (builders[i] != null)
+            {
+                if (builders[i].IsCinematic && !builders[i].isComplete)
+                    builders[i].OnBuildFailed?.Invoke("Stage 3 world was cleared while its cinematic was active.");
                 builders[i].ClearWorldAndRestorePrevious(restoreLegacyCity);
+            }
         }
     }
 
@@ -133,6 +137,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (IsCinematic && !isComplete)
+            OnBuildFailed?.Invoke("Stage 3 builder was removed during its cinematic.");
         if (Instance == this) Instance = null;
         IsCinematic = false;
         IsIntroCinematic = false;
@@ -337,7 +343,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (flatPlayer.magnitude <= 3.35f && localPlayer.transform.position.y < 2.5f)
             {
                 liftSequenceStarted = true;
-                StartCoroutine(RunCentralLiftEnding());
+                StartCoroutine(RunCentralLiftEndingSafely());
             }
         }
     }
@@ -1526,6 +1532,21 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         StartupCheckpoint.Set("StageThreeTransportDisembarkComplete_CombatReady");
     }
 
+    private IEnumerator RunCentralLiftEndingSafely()
+    {
+        System.Exception failure = null;
+        yield return RunBuildStep(RunCentralLiftEnding(), ex => failure = ex);
+        if (failure != null)
+        {
+            IsCinematic = false;
+            IsIntroCinematic = false;
+            string message = "Stage 3 central-lift ending failed: " + failure.Message;
+            Debug.LogError("PERSIA_STAGE3: " + message + "\n" + failure);
+            StartupCheckpoint.Set("StageThreeEndingFailed_" + failure.GetType().Name);
+            OnBuildFailed?.Invoke(message);
+        }
+    }
+
     private IEnumerator RunCentralLiftEnding()
     {
         // This coroutine can only begin once RemainingHostiles reaches zero.
@@ -1541,7 +1562,13 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
 
         if (liftPlatform == null || localPlayer == null)
+        {
+            IsCinematic = false;
+            string message = "Stage 3 central lift or player reference is missing.";
+            Debug.LogError("PERSIA_STAGE3: " + message);
+            OnBuildFailed?.Invoke(message);
             yield break;
+        }
 
         Vector3 playerOffset = Vector3.up * 0.55f;
         Vector3 platformStart = new Vector3(0f, 0.28f, 0f);

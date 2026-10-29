@@ -282,6 +282,7 @@ namespace PersiaWar.Unity2D5D
                 }
 
                 CheckStageOneGirlRescue();
+                if (HandleDebugStageButtonTouches()) return;
                 HandleAndroidPauseTouches();
                 return;
             }
@@ -362,6 +363,7 @@ namespace PersiaWar.Unity2D5D
                 DrawAndroidPresentationHUD();
                 if (stageNumber >= 3) DrawStageFourObjective();
                 DrawAndroidPauseControl();
+                if (stageTestRun || stageChainTest) DrawDebugStageButton();
                 if (stageNumber != 3 && stageNumber != 4) DrawGirlRescueNotice();
                 if (GameSession.Instance != null && GameSession.Instance.IsFinished)
                 {
@@ -374,7 +376,9 @@ namespace PersiaWar.Unity2D5D
             if (stageTwoLobbyRunning) { DrawStageTwoLobbyOverlay(); return; }
             if (startingMatch)
             {
-                if (gameBootstrap != null && gameBootstrap.IsWorldPreparing && !string.IsNullOrEmpty(gameBootstrap.CurrentStage))
+                if (stageNumber == 3 && stageThreeWorldBuilder != null && !string.IsNullOrEmpty(stageThreeWorldBuilder.BuildStatus))
+                    startupStatus = stageThreeWorldBuilder.BuildStatus;
+                else if (gameBootstrap != null && gameBootstrap.IsWorldPreparing && !string.IsNullOrEmpty(gameBootstrap.CurrentStage))
                     startupStatus = gameBootstrap.CurrentStage;
                 float scale = GetUiScale();
                 float width = Mathf.Min(Screen.width - 48f * scale, 760f * scale);
@@ -1434,7 +1438,9 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = GetUiScale();
             float width = Mathf.Min(Screen.width - 56f * scale, 380f * scale);
-            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.68f, width, 48f * scale);
+            float height = Mathf.Min(Screen.height - 40f * scale, 300f * scale);
+            float top = (Screen.height - height) * 0.5f;
+            return new Rect((Screen.width - width) * 0.5f, top + height - 58f * scale, width, 48f * scale);
         }
 
         private void HandleTransitionErrorTouches()
@@ -2822,6 +2828,37 @@ namespace PersiaWar.Unity2D5D
             Time.timeScale = paused ? 0f : 1f;
             if (mobileInput != null) mobileInput.SetPaused(paused);
             StartupCheckpoint.Set(paused ? "MatchPausedByNativeTouch" : "MatchResumedByNativeTouch");
+        }
+
+        private Rect GetDebugStageButtonRect()
+        {
+            float scale = GetUiScale();
+            float width = Mathf.Min(Screen.width - 40f * scale, 300f * scale);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height - 82f * scale, width, 42f * scale);
+        }
+
+        private bool HandleDebugStageButtonTouches()
+        {
+            if (!(stageTestRun || stageChainTest) || !Application.isMobilePlatform || Input.touchCount <= 0)
+                return false;
+            Rect button = GetDebugStageButtonRect();
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began) continue;
+                Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (!button.Contains(point)) continue;
+                DebugCompleteCurrentStage();
+                return true;
+            }
+            return false;
+        }
+
+        private void DrawDebugStageButton()
+        {
+            Rect button = GetDebugStageButtonRect();
+            if (GUI.Button(button, "DEBUG: COMPLETE THIS STAGE", buttonStyle))
+                DebugCompleteCurrentStage();
         }
 
         private void DrawAndroidPauseControl()
