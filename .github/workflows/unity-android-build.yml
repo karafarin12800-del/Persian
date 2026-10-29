@@ -415,7 +415,7 @@ jobs:
           release_start = bootstrap.index('public void ReleaseWorldForStageTransition()')
           release_end = bootstrap.index('private IEnumerator BuildWorldAfterStartup()', release_start)
           release_method = bootstrap[release_start:release_end]
-          assert 'Destroy(material)' not in release_method and 'never destroy arbitrary sharedMaterials' in release_method, 'World teardown must never destroy shared/factory-cached renderer materials.'
+          assert 'Destroy(material)' not in release_method and 'destroy arbitrary sharedMaterials discovered through renderers' in release_method, 'World teardown must never destroy shared/factory-cached renderer materials.'
           assert 'StageThreeWorldBuilder.ClearExistingWorld(false);' not in stage3_to_4, 'Stage 3 geometry must not be synchronously destroyed inside its ending callback.'
           assert 'if (targetStage == 4)' in transition_cleanup and 'ReleaseCompletedWorldBeforeStageFour();' in transition_cleanup and 'CompletedStageThreeWorldReleasedBeforeStageFour' in flow, 'Stage 3 world teardown must occur after the transition loading frame.'
           stage4_cleanup = transition_cleanup[transition_cleanup.index('else if (targetStage == 4)'):]
