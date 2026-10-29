@@ -1390,9 +1390,16 @@ namespace PersiaWar.Unity2D5D
             StartCoroutine(RunStageTransitionCleanup(targetStage, nextScreen));
         }
 
-        private IEnumerator TransitionResourceCleanupRoutine()
+        private IEnumerator TransitionResourceCleanupRoutine(int targetStage)
         {
+            // Always render the loading panel before doing expensive scene/resource work.
             yield return null;
+            if (targetStage == 2)
+            {
+                ReleaseCompletedWorldBeforeStageTwo();
+                // Let deferred Destroy calls be processed before requesting asset unload.
+                yield return null;
+            }
             AsyncOperation unload = Resources.UnloadUnusedAssets();
             while (unload != null && !unload.isDone) yield return null;
             System.GC.Collect();
@@ -1436,7 +1443,7 @@ namespace PersiaWar.Unity2D5D
             try
             {
                 cleanupCoroutine = StartCoroutine(RunCoroutineSafely(
-                    TransitionResourceCleanupRoutine(),
+                    TransitionResourceCleanupRoutine(targetStage),
                     ex => cleanupError = ex,
                     () => cleanupComplete = true));
                 while (!cleanupComplete && cleanupError == null &&
@@ -2567,7 +2574,7 @@ namespace PersiaWar.Unity2D5D
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             GateGameplay(false);
-            ReleaseCompletedWorldBeforeStageTwo();
+            // World disposal runs after the transition loading panel has had a frame to render.
             BeginStageTransition(2, registrationRequired ? ScreenMode.Profile : ScreenMode.HeroSelect);
             StartupCheckpoint.Set(registrationRequired
                 ? "StageOneComplete_OpenRegistrationBeforeStageTwoHeroSelection"
