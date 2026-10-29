@@ -927,14 +927,32 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private IEnumerator PrepareStageThreeIntroRoutine()
     {
         System.Exception failure = null;
-        yield return RunBuildStep(BuildStageThreeGroundAliensRoutine(), ex => failure = ex);
-        if (failure != null)
+        bool buildFinished = false;
+
+        // Run the intro first so it hides the pilot and moves the camera to the
+        // landing shot immediately, rather than showing the ground/player while
+        // the 60-alien roster is created over multiple frames.
+        StartCoroutine(BuildStageThreeGroundAliensSafely(ex =>
         {
-            FailWorldBuild(failure);
-            yield break;
-        }
+            failure = ex;
+            buildFinished = true;
+        }));
+
         if (localPlayer != null && !localPlayer.IsDefeated)
-            StartCoroutine(RunStageThreeIntro());
+            yield return StartCoroutine(RunStageThreeIntro());
+
+        while (!buildFinished)
+            yield return null;
+
+        if (failure != null)
+            FailWorldBuild(failure);
+    }
+
+    private IEnumerator BuildStageThreeGroundAliensSafely(System.Action<System.Exception> completed)
+    {
+        System.Exception failure = null;
+        yield return RunBuildStep(BuildStageThreeGroundAliensRoutine(), ex => failure = ex);
+        completed?.Invoke(failure);
     }
 
     private IEnumerator BuildStageThreeGroundAliensRoutine()
