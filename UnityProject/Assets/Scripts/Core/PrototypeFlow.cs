@@ -1477,6 +1477,7 @@ namespace PersiaWar.Unity2D5D
                 // and materials without destroying RuntimeMaterialFactory's cached assets.
                 StageTwoArenaManager.Instance?.ResetForStageChange();
                 if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                StageTwoVictorySequence.DiscardRetainedShipForSceneReload();
                 if (stageTwoVictorySequence != null)
                 {
                     stageTwoVictorySequence.FinishAndCleanup();
@@ -1798,6 +1799,7 @@ namespace PersiaWar.Unity2D5D
         public void CompleteStageFourEscapeToMainMenu()
         {
             Time.timeScale = 1f;
+            GraphicsQualityProfile.ReleaseStageEffects();
             StageTwoArenaManager.Instance?.ResetForStageChange();
 
             if (stageTwoVictorySequence != null)

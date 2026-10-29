@@ -399,6 +399,9 @@ jobs:
           assert 'StageTransitionSceneReloadPersisted_Stage' in flow and 'SceneManager.LoadSceneAsync(gameObject.scene.name, LoadSceneMode.Single)' in flow, 'Campaign stage transitions must reload the gameplay scene after persisting the pending screen.'
           assert 'PW.PendingScreen' in flow and 'PendingScreenOpened_' in flow and 'System.GC.Collect();' in flow, 'Scene reload must resume directly on the pending selection screen and unload assets after activation.'
           assert 'StageThreeEndingEventQueuedForFlowCoroutine' in flow and 'StartStageFourOnNextFrame()' in flow, 'Stage 3 ending callback must defer transition work to a PrototypeFlow-owned coroutine.'
+          sequence = (root / 'Core/StageTwoVictorySequence.cs').read_text(encoding='utf-8')
+          assert 'DiscardRetainedShipForSceneReload()' in sequence and 'RetainedStageTwoShipDiscardedBeforeSceneReload' in sequence, 'The retained Stage 2 ship must be discarded before campaign scene reload so Stage 3 builds its own transport.'
+          assert 'GraphicsQualityProfile.ReleaseStageEffects();' in flow[flow.index('public void CompleteStageFourEscapeToMainMenu()'):], 'Stage 4 end must release persistent profile billboards and shadows before returning to menu.'
           checkpoint = Path('UnityProject/Assets/Scripts/Boot/StartupCheckpoint.cs').read_text(encoding='utf-8')
           assert 'Profiler.GetTotalAllocatedMemoryLong()' in checkpoint and 'Profiler.GetTotalReservedMemoryLong()' in checkpoint and 'Profiler.GetMonoUsedSizeLong()' in checkpoint, 'Crash diagnostics must persist Unity allocated/reserved/Mono memory.'
           assert 'Application.lowMemory += OnLowMemory;' in checkpoint and 'LOW_MEMORY_WARNING' in checkpoint, 'Low-memory events must be recorded in the crash diagnostics.'

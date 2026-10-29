@@ -114,6 +114,15 @@ namespace PersiaWar.Unity2D5D
                 ship.gameObject.SetActive(true);
             return ship;
         }
+
+        public static void DiscardRetainedShipForSceneReload()
+        {
+            Transform ship = retainedStageThreeShip;
+            retainedStageThreeShip = null;
+            if (ship != null)
+                Destroy(ship.gameObject);
+            StartupCheckpoint.Set("RetainedStageTwoShipDiscardedBeforeSceneReload");
+        }
         public SequencePhase Phase { get; private set; } = SequencePhase.Idle;
         public float FlashAlpha
         {
