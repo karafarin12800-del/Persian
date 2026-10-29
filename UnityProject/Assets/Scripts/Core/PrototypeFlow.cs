@@ -718,9 +718,9 @@ namespace PersiaWar.Unity2D5D
                 (string.IsNullOrEmpty(exception) || exception == "none")) return;
 
             float scale = GetUiScale();
-            float width = Mathf.Min(Screen.width - 32f * scale, 520f * scale);
+            float width = Mathf.Min(Screen.width * 0.46f, 360f * scale);
             float height = 104f * scale;
-            Rect panel = new Rect(Screen.width - width - 16f * scale,
+            Rect panel = new Rect(16f * scale,
                 Screen.height - height - 12f * scale, width, height);
             Fill(panel, new Color(0.03f, 0.045f, 0.07f, 0.94f));
             Fill(new Rect(panel.x, panel.y, panel.width, 4f * scale), new Color(1f, 0.55f, 0.12f, 1f));

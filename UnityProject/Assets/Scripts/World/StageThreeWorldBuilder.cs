@@ -852,7 +852,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     {
         System.Exception failure = null;
         yield return RunBuildStep(BuildStageThreeGroundAliensRoutine(), ex => failure = ex);
-        if (failure != null) yield break;
+        if (failure != null)
+        {
+            FailWorldBuild(failure);
+            yield break;
+        }
         if (localPlayer != null && !localPlayer.IsDefeated)
             StartCoroutine(RunStageThreeIntro());
     }
