@@ -102,8 +102,49 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         instance = this;
         ChooseTierOnce();
         DontDestroyOnLoad(gameObject);
+        ApplyAndroidResolutionBudget();
         StartCoroutine(ApplyAntiAliasingAfterPresentationLayer());
         StartCoroutine(DiscoverCharacterShadows());
+    }
+
+    private void ApplyAndroidResolutionBudget()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        int longestSide = CurrentTier == QualityTier.High ? 1920 : 1600;
+        int currentLongest = Mathf.Max(Screen.width, Screen.height);
+        if (currentLongest > longestSide && currentLongest > 0)
+        {
+            float scale = longestSide / (float)currentLongest;
+            int width = Mathf.Max(720, Mathf.RoundToInt(Screen.width * scale));
+            int height = Mathf.Max(480, Mathf.RoundToInt(Screen.height * scale));
+            Screen.SetResolution(width, height, Screen.fullScreenMode);
+            StartupCheckpoint.Set("AndroidRenderResolutionCapped_" + width + "x" + height);
+        }
+#endif
+    }
+
+    public static void ReleaseStageEffects()
+    {
+        GraphicsQualityProfile profile = instance;
+        if (profile == null) return;
+        for (int i = 0; i < profile.billboardCount; i++)
+        {
+            Transform item = profile.billboards[i];
+            if (item != null) Destroy(item.gameObject);
+            profile.billboards[i] = null;
+            profile.billboardTargets[i] = null;
+        }
+        for (int i = 0; i < profile.shadowCount; i++)
+        {
+            Transform item = profile.shadowObjects[i];
+            if (item != null) Destroy(item.gameObject);
+            profile.shadowObjects[i] = null;
+            profile.shadowTargets[i] = null;
+        }
+        profile.billboardCount = 0;
+        profile.shadowCount = 0;
+        profile.lookRoot = null;
+        StartupCheckpoint.Set("GraphicsQualityProfileStageEffectsReleased");
     }
 
     private IEnumerator ApplyAntiAliasingAfterPresentationLayer()
@@ -114,6 +155,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         if (CurrentTier == QualityTier.Low)
         {
+            QualitySettings.antiAliasing = 0;
             for (int i = 0; i < cameras.Length; i++)
                 if (cameras[i] != null) cameras[i].allowMSAA = false;
             yield break;

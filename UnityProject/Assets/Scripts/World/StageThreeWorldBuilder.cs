@@ -44,6 +44,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private bool liftSequenceStarted;
     private bool isComplete;
     private bool worldBuilt;
+    private bool liteWorldVariant;
     private bool groundAliensSpawned;
     private bool introStarted;
     private Vector3 savedCameraPosition;
@@ -204,7 +205,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private bool PrepareWorldBuild()
     {
         BuildFailureCode = string.Empty;
-        BuildStatus = "Stage 3: preparing world...";
+        liteWorldVariant = StartupCheckpoint.ShouldUseLiteWorld();
+        BuildStatus = liteWorldVariant
+            ? "Stage 3: LOW MEMORY — reduced towers and patrols..."
+            : "Stage 3: preparing world...";
+        if (liteWorldVariant) StartupCheckpoint.Set("Stage3LiteVariantSelected_BeforeWorldBuild");
         try
         {
             ClearWorldAndRestorePrevious();
@@ -487,6 +492,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 if (new Vector2(x, z).magnitude < 37f)
                     continue;
                 if (Mathf.Abs(x) < 13f && z < -28f)
+                    continue;
+
+                if (liteWorldVariant && (ix + iz) % 2 != 0)
                     continue;
 
                 int seed = ix * 17 + iz * 31;
@@ -1125,6 +1133,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
     private void SpawnGroundAlien(int index, Vector3 position, bool guard)
     {
+        if (liteWorldVariant && index % 2 != 0)
+            return;
+
         int archetype = index % 3 + 1;
         GameObject alien;
 #if UNITY_ANDROID

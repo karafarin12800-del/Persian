@@ -226,6 +226,7 @@ namespace PersiaWar.Unity2D5D
                     ? requestedMode : ScreenMode.HeroSelect;
                 PlayerPrefs.DeleteKey("PW.PendingScreen");
                 PlayerPrefs.Save();
+                StartupMemoryMonitor.SetLoading(false);
                 StartupCheckpoint.Set("PendingScreenOpened_" + mode);
                 yield break;
             }
@@ -1487,6 +1488,7 @@ namespace PersiaWar.Unity2D5D
                     stageThreeWorldBuilder.OnEndingComplete -= HandleStageThreeEndingComplete;
                     stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
                 }
+                GraphicsQualityProfile.ReleaseStageEffects();
                 StartupCheckpoint.Set("StageTransitionSceneReloadBegin_Stage" + targetStage);
                 AsyncOperation sceneReload = SceneManager.LoadSceneAsync(gameObject.scene.name, LoadSceneMode.Single);
                 if (sceneReload == null)

@@ -274,6 +274,18 @@ namespace PersiaWar.Unity2D5D
         private const string MemoryTimeKey = "PersiaWar.Memory.SampleUtc";
         private const string MemoryCheckpointKey = "PersiaWar.Memory.Checkpoint";
 
+        public static bool ShouldUseLiteWorld()
+        {
+            long allocatedMb = Profiler.GetTotalAllocatedMemoryLong() / (1024L * 1024L);
+            long reservedMb = Profiler.GetTotalReservedMemoryLong() / (1024L * 1024L);
+            int systemMb = SystemInfo.systemMemorySize;
+            return systemMb > 0 &&
+                (systemMb <= 3072 ||
+                 (systemMb <= 4096 && (allocatedMb >= 650 || reservedMb >= 1150)) ||
+                 allocatedMb >= Mathf.Max(900, systemMb / 3) ||
+                 reservedMb >= Mathf.Max(1500, systemMb / 2));
+        }
+
         public static string MemorySummary =>
             "Mem MB A/R/Mono/System: " +
             PlayerPrefs.GetInt(AllocatedMemoryKey, -1) + "/" +

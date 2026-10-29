@@ -25,6 +25,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private Material dark, metal, brightMetal, glass, green, cyan, floor, planetSurface, planetLand;
     private Material alienArmor, alienDark, alienEye;
     private bool built, introRunning;
+    private bool liteWorldVariant;
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
     private float savedFarClip;
@@ -127,6 +128,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private bool PrepareWorldBuild()
     {
         BuildFailureCode = string.Empty;
+        liteWorldVariant = StartupCheckpoint.ShouldUseLiteWorld();
+        if (liteWorldVariant) StartupCheckpoint.Set("Stage4LiteVariantSelected_BeforeWorldBuild");
         try
         {
             ClearWorld();
@@ -1055,6 +1058,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
         for (int i = 0; i < positions.Length; i++)
         {
+            if (liteWorldVariant && i % 2 != 0) continue;
             int archetype = i % 3 + 1;
             GameObject alien = new GameObject("S4_AlienTrooper_" + (i + 1).ToString("00"));
             alien.transform.SetParent(root, false);
