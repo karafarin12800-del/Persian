@@ -1449,7 +1449,9 @@ namespace PersiaWar.Unity2D5D
                 ReleaseCompletedWorldBeforeStageFour();
                 yield return null;
                 StartupCheckpoint.Set("StageFourOldWorldReleased_AfterLoadingFrame");
-                yield break;
+                // Unlike Stage 3, Stage 4 has no separate pre-build unload phase.
+                // Finish reclaiming the old fortress assets here before constructing
+                // the much larger mothership, reducing peak Android memory use.
             }
 
             AsyncOperation unload = Resources.UnloadUnusedAssets();
