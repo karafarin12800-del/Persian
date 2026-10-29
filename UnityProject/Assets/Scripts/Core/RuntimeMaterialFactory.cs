@@ -26,7 +26,6 @@ namespace PersiaWar.Unity2D5D
             Material material = new Material(shader)
             {
                 name = materialName,
-                color = color,
                 enableInstancing = true
             };
             ApplyTintToSupportedColorProperties(material, color);
@@ -63,7 +62,6 @@ namespace PersiaWar.Unity2D5D
             Material material = new Material(shader)
             {
                 name = materialName,
-                color = color,
                 enableInstancing = true
             };
             ApplyTintToSupportedColorProperties(material, color);
