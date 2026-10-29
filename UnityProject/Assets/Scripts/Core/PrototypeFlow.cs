@@ -3088,7 +3088,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     startupStatus = "Battlefield bootstrap is missing.";
                     StartupCheckpoint.Set("GameBootstrapMissing");
-                    startingMatch = false;
+                    ShowTransitionError(stageNumber, ScreenMode.HeroSelect, true, startupStatus);
                     yield break;
                 }
 
@@ -3120,7 +3120,7 @@ namespace PersiaWar.Unity2D5D
                 {
                     startupStatus = "Battlefield preparation failed: " + gameBootstrap.WorldBuildError;
                     StartupCheckpoint.Set("MatchActivationFailed");
-                    startingMatch = false;
+                    ShowTransitionError(stageNumber, ScreenMode.HeroSelect, true, startupStatus);
                     yield break;
                 }
             }
@@ -3136,7 +3136,7 @@ namespace PersiaWar.Unity2D5D
             {
                 startupStatus = "Player initialization failed.";
                 StartupCheckpoint.Set("PlayerInitializationFailed");
-                startingMatch = false;
+                ShowTransitionError(stageNumber, ScreenMode.HeroSelect, true, startupStatus);
                 yield break;
             }
 
@@ -3152,7 +3152,7 @@ namespace PersiaWar.Unity2D5D
             {
                 startupStatus = "Player systems did not finish initializing.";
                 StartupCheckpoint.Set("PlayerInitializationFailed");
-                startingMatch = false;
+                ShowTransitionError(stageNumber, ScreenMode.HeroSelect, true, startupStatus);
                 yield break;
             }
 

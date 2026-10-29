@@ -1610,6 +1610,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         {
             IsCinematic = false;
             IsIntroCinematic = false;
+            ClearWorldAndRestorePrevious();
             string message = "Stage 3 central-lift ending failed: " + failure.Message;
             Debug.LogError("PERSIA_STAGE3: " + message + "\n" + failure);
             StartupCheckpoint.Set("StageThreeEndingFailed_" + failure.GetType().Name);
@@ -1720,7 +1721,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
         // Test shortcut clears the combat roster but deliberately uses the real
         // central lift and uplink cinematic, so the Stage 3 -> 4 hand-off is tested.
-        for (int i = 0; i < hostileHealth.Count; i++)
+        for (int i = hostileHealth.Count - 1; i >= 0; i--)
         {
             TargetHealth health = hostileHealth[i];
             if (health != null && health.CurrentHealth > 0)
