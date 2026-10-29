@@ -1716,13 +1716,24 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
     public void DebugCompleteEnding()
     {
-        if (!worldBuilt || isComplete) return;
-        isComplete = true;
-        IsCinematic = false;
-        IsIntroCinematic = false;
-        StartupCheckpoint.Set("StageThreeDebugCompleteEnding");
-        GameSession.Instance?.EndMission(true);
-        OnEndingComplete?.Invoke();
+        if (!worldBuilt || isComplete || localPlayer == null) return;
+
+        // Test shortcut clears the combat roster but deliberately uses the real
+        // central lift and uplink cinematic, so the Stage 3 -> 4 hand-off is tested.
+        for (int i = 0; i < hostileHealth.Count; i++)
+        {
+            TargetHealth health = hostileHealth[i];
+            if (health != null && health.CurrentHealth > 0)
+                health.ApplyDamage(health.CurrentHealth + 1, localPlayer.transform);
+        }
+
+        liftSequenceStarted = false;
+        localPlayer.enabled = true;
+        localPlayer.SetMovementEnabled(true);
+        if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = true;
+        if (localPlayer.Aim != null) localPlayer.Aim.enabled = true;
+        localPlayer.SetGroundedPosition(Vector3.zero);
+        StartupCheckpoint.Set("StageThreeDebugClearedHostiles_MoveToCentralLift");
     }
 
     private void HidePlayerForUplink()
