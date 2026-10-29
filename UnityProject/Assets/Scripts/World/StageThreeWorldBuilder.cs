@@ -9,6 +9,11 @@ using PersiaWar.Unity2D5D;
 /// </summary>
 public sealed class StageThreeWorldBuilder : MonoBehaviour
 {
+    public static StageThreeWorldBuilder Instance { get; private set; }
+    public static bool IsAnyCinematicActive => Instance != null && Instance.IsCinematic;
+    public event System.Action OnEndingComplete;
+    public event System.Action<string> OnBuildFailed;
+
     private const string WorldRootName = "StageThreeAlienWorld";
     private const float WorldHalfSize = 108f;
     private const float FortressRadius = 25f;
@@ -86,6 +91,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     }
 
     public bool IsComplete => isComplete;
+    public string BuildStatus { get; private set; } = "Stage 3: waiting to build fortress...";
+    public string BuildFailureCode { get; private set; } = string.Empty;
     public string IntroMessage { get; private set; } = "TRANSPORT SHIP INBOUND";
     public bool IsCinematic { get; private set; }
     public bool IsIntroCinematic { get; private set; }
@@ -119,64 +126,157 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
     }
 
-    public bool BuildWorld()
+    private void Awake()
     {
-        ClearWorldAndRestorePrevious();
-        savedAmbientLight = RenderSettings.ambientLight;
-        ambientCaptured = true;
-        GameObject oldWorld = FindSceneObject(WorldRootName);
-        if (oldWorld != null)
-            Destroy(oldWorld);
+        Instance = this;
+    }
 
-        GameObject city = FindSceneObject("BattleRoyaleCity");
-        if (city != null)
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+        IsCinematic = false;
+        IsIntroCinematic = false;
+    }
+
+    public IEnumerator BuildWorldRoutine(System.Action<bool> completed)
+    {
+        if (!PrepareWorldBuild())
         {
-            legacyCityRoot = city.transform;
-            legacyCityRoot.gameObject.SetActive(false);
+            completed?.Invoke(false);
+            yield break;
         }
-
-        GameObject rootObject = new GameObject(WorldRootName);
-        rootObject.transform.SetParent(transform, false);
-        worldRoot = rootObject.transform;
-
-        // Readable warm sand contrasts with blue-silver architecture.
-        groundMaterial = CreateMaterial("S3_SandyAlienGround", new Color(0.57f, 0.43f, 0.27f));
-        silverMaterial = CreateMaterial("S3_BlueSilverAlienMetal", new Color(0.48f, 0.66f, 0.82f));
-        darkMetalMaterial = CreateMaterial("S3_BlueTitanium", new Color(0.17f, 0.25f, 0.35f));
-        windowMaterial = CreateMaterial("S3_DeepBlueGlass", new Color(0.055f, 0.19f, 0.28f), new Color(0.025f, 0.30f, 0.43f));
-        cyanGlowMaterial = CreateMaterial("S3_CyanEnergy", new Color(0.12f, 0.88f, 1f), new Color(0.08f, 0.86f, 1f));
-        greenGlowMaterial = CreateMaterial("S3_UplinkEnergy", new Color(0.34f, 1f, 0.73f), new Color(0.18f, 1f, 0.67f));
-        warningMaterial = CreateMaterial("S3_HazardWarning", new Color(1f, 0.24f, 0.10f), new Color(1f, 0.10f, 0.035f));
-        // Deep blue-silver: substantially darker than the surrounding silver walls
-        // while keeping the orb visually in the same architectural color family.
-        uplinkOrbMaterial = CreateMaterial("S3_UplinkOrbDeepBlueSilver", new Color(0.13f, 0.20f, 0.28f));
-        alienBodyMaterials[0] = CreateMaterial("S3_AlienChitin_Teal", new Color(0.075f, 0.30f, 0.34f));
-        alienBodyMaterials[1] = CreateMaterial("S3_AlienChitin_Violet", new Color(0.25f, 0.15f, 0.36f));
-        alienBodyMaterials[2] = CreateMaterial("S3_AlienChitin_Olive", new Color(0.24f, 0.31f, 0.12f));
-
-        try
+        System.Exception failure = null;
+        BuildStatus = "Stage 3: lighting and ground...";
+        yield return RunBuildStep(BuildLighting, ex => failure = ex);
+        if (failure == null)
         {
-            BuildLighting();
-            BuildGroundAndBoundary();
-            BuildAlienCity();
-            BuildFortressAndNineRoutes();
-            BuildHovercraftPatrols();
-            BuildLiftAndBeam();
+            BuildStatus = "Stage 3: laying out ground and boundaries...";
+            yield return RunBuildStep(BuildGroundAndBoundaryRoutine(), ex => failure = ex);
         }
-        catch (System.Exception exception)
+        if (failure == null)
         {
-            Debug.LogError("PERSIA_STAGE3: world build failed: " + exception);
-            ClearWorldAndRestorePrevious();
-            return false;
+            BuildStatus = "Stage 3: assembling alien city towers...";
+            yield return RunBuildStep(BuildAlienCityRoutine(), ex => failure = ex);
         }
-
+        if (failure == null)
+        {
+            BuildStatus = "Stage 3: constructing nine fortress routes...";
+            yield return RunBuildStep(BuildFortressAndNineRoutesRoutine(), ex => failure = ex);
+        }
+        if (failure == null)
+        {
+            BuildStatus = "Stage 3: positioning spacecraft...";
+            yield return RunBuildStep(BuildHovercraftPatrols, ex => failure = ex);
+        }
+        if (failure == null)
+        {
+            BuildStatus = "Stage 3: building central lift...";
+            yield return RunBuildStep(BuildLiftAndBeam, ex => failure = ex);
+        }
+        if (failure != null)
+        {
+            FailWorldBuild(failure);
+            completed?.Invoke(false);
+            yield break;
+        }
         worldBuilt = true;
+        BuildStatus = "Stage 3: fortress ready; preparing arrival...";
         isComplete = false;
         IsCinematic = false;
+        IsIntroCinematic = false;
         liftSequenceStarted = false;
-        Debug.Log("PERSIA_STAGE3: sandy alien world built; 9 routes, 60 ground aliens (including 20 tall area-patrol guards) and 5 looping destructible craft ready.");
         StartupCheckpoint.Set("StageThreeWorldBuilt_9Routes");
-        return true;
+        completed?.Invoke(true);
+    }
+
+    private bool PrepareWorldBuild()
+    {
+        BuildFailureCode = string.Empty;
+        BuildStatus = "Stage 3: preparing world...";
+        try
+        {
+            ClearWorldAndRestorePrevious();
+            savedAmbientLight = RenderSettings.ambientLight;
+            ambientCaptured = true;
+            GameObject oldWorld = FindSceneObject(WorldRootName);
+            if (oldWorld != null) Destroy(oldWorld);
+            GameObject city = FindSceneObject("BattleRoyaleCity");
+            if (city != null)
+            {
+                legacyCityRoot = city.transform;
+                legacyCityRoot.gameObject.SetActive(false);
+            }
+            GameObject rootObject = new GameObject(WorldRootName);
+            rootObject.transform.SetParent(transform, false);
+            worldRoot = rootObject.transform;
+            groundMaterial = CreateMaterial("S3_SandyAlienGround", new Color(0.57f, 0.43f, 0.27f));
+            silverMaterial = CreateMaterial("S3_BlueSilverAlienMetal", new Color(0.48f, 0.66f, 0.82f));
+            darkMetalMaterial = CreateMaterial("S3_BlueTitanium", new Color(0.17f, 0.25f, 0.35f));
+            windowMaterial = CreateMaterial("S3_DeepBlueGlass", new Color(0.055f, 0.19f, 0.28f), new Color(0.025f, 0.30f, 0.43f));
+            cyanGlowMaterial = CreateMaterial("S3_CyanEnergy", new Color(0.12f, 0.88f, 1f), new Color(0.08f, 0.86f, 1f));
+            greenGlowMaterial = CreateMaterial("S3_UplinkEnergy", new Color(0.34f, 1f, 0.73f), new Color(0.18f, 1f, 0.67f));
+            warningMaterial = CreateMaterial("S3_HazardWarning", new Color(1f, 0.24f, 0.10f), new Color(1f, 0.10f, 0.035f));
+            uplinkOrbMaterial = CreateMaterial("S3_UplinkOrbDeepBlueSilver", new Color(0.13f, 0.20f, 0.28f));
+            alienBodyMaterials[0] = CreateMaterial("S3_AlienChitin_Teal", new Color(0.075f, 0.30f, 0.34f));
+            alienBodyMaterials[1] = CreateMaterial("S3_AlienChitin_Violet", new Color(0.25f, 0.15f, 0.36f));
+            alienBodyMaterials[2] = CreateMaterial("S3_AlienChitin_Olive", new Color(0.24f, 0.31f, 0.12f));
+            StartupCheckpoint.Set("StageThreeWorldBuildStarted");
+            return true;
+        }
+        catch (System.Exception ex)
+        {
+            FailWorldBuild(ex);
+            return false;
+        }
+    }
+
+    private IEnumerator RunBuildStep(System.Action action, System.Action<System.Exception> onError)
+    {
+        System.Exception failure = null;
+        try { action(); }
+        catch (System.Exception ex) { failure = ex; }
+        if (failure != null) onError?.Invoke(failure);
+        yield return null;
+    }
+
+    private IEnumerator RunBuildStep(IEnumerator step, System.Action<System.Exception> onError)
+    {
+        while (true)
+        {
+            bool moved = false;
+            object current = null;
+            System.Exception failure = null;
+            try
+            {
+                moved = step.MoveNext();
+                if (moved) current = step.Current;
+            }
+            catch (System.Exception ex) { failure = ex; }
+            if (failure != null)
+            {
+                onError?.Invoke(failure);
+                yield break;
+            }
+            if (!moved) yield break;
+            yield return current;
+        }
+    }
+
+    public void AbortBuild(string reason)
+    {
+        FailWorldBuild(new System.TimeoutException(string.IsNullOrEmpty(reason)
+            ? "Stage 3 world construction timed out." : reason));
+    }
+
+    private void FailWorldBuild(System.Exception exception)
+    {
+        BuildFailureCode = exception != null ? exception.GetType().Name : "UnknownError";
+        BuildStatus = "Stage 3 construction failed (" + BuildFailureCode + "): " +
+            (exception != null ? exception.Message : "unknown error");
+        Debug.LogError("PERSIA_STAGE3: world build failed: " + exception);
+        StartupCheckpoint.Set("StageThreeWorldBuildFailed_" + BuildFailureCode);
+        ClearWorldAndRestorePrevious();
+        OnBuildFailed?.Invoke(BuildStatus);
     }
 
     public void ConfigurePlayer(PlayerController player, Camera camera)
@@ -209,8 +309,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             localPlayer.SetMovementEnabled(false);
             if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = false;
             if (localPlayer.Aim != null) localPlayer.Aim.enabled = false;
-            BuildStageThreeGroundAliens();
-            StartCoroutine(RunStageThreeIntro());
+            StartCoroutine(PrepareStageThreeIntroRoutine());
         }
     }
 
@@ -256,7 +355,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         RenderSettings.ambientLight = new Color(0.34f, 0.33f, 0.31f);
     }
 
-    private void BuildGroundAndBoundary()
+    private IEnumerator BuildGroundAndBoundaryRoutine()
     {
         CreateBox("S3_SandyAlienGround", new Vector3(0f, -0.42f, 0f),
             new Vector3(WorldHalfSize * 2f, 0.8f, WorldHalfSize * 2f), groundMaterial, true);
@@ -276,6 +375,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                     new Vector3(8.5f, 0.045f, 6.8f), CreateMaterial("S3_SandPlate", new Color(0.44f, 0.32f, 0.20f)), false,
                     Quaternion.Euler(0f, (x * 17 + z * 11) % 35, 0f));
             }
+            yield return null;
         }
 
         float edge = WorldHalfSize - 2f;
@@ -298,10 +398,11 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(0.13f, 0.07f, 1.65f), cyanGlowMaterial, false);
             CreateBox("S3_ApproachGuideRight", new Vector3(5.7f, 0.08f, z),
                 new Vector3(0.13f, 0.07f, 1.65f), cyanGlowMaterial, false);
+            if (i % 4 == 3) yield return null;
         }
     }
 
-    private void BuildAlienCity()
+    private IEnumerator BuildAlienCityRoutine()
     {
         // A varied grid of tall silver towers; preserve a clear southern approach to the citadel.
         float[] coordinates = { -82f, -54f, -26f, 26f, 54f, 82f };
@@ -342,11 +443,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 CreateBox("S3_TowerCrown", new Vector3(x, height + 0.35f, z),
                     new Vector3(width * 0.62f, 0.7f, depth * 0.62f), darkMetalMaterial, false,
                     Quaternion.Euler(0f, yaw, 0f));
+                yield return null;
             }
         }
     }
 
-    private void BuildFortressAndNineRoutes()
+    private IEnumerator BuildFortressAndNineRoutesRoutine()
     {
         // Nine gates are equally spaced around a massive ring. The gaps between the
         // ring segments align exactly with the nine inward-running corridors.
@@ -393,6 +495,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             CreateBox("S3_RouteNumberPlate_" + route,
                 gateCenter + radial * 1.55f + Vector3.up * 10.1f,
                 new Vector3(1.1f, 0.28f, 0.12f), cyanGlowMaterial, false, gateRotation);
+            yield return null;
         }
 
         // Solid ring walls fill the gaps between doorways but never close a route.
@@ -410,6 +513,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(center.x, 13.8f, center.z),
                 new Vector3(13.0f, 0.35f, 2.45f), cyanGlowMaterial, false,
                 Quaternion.LookRotation(radial, Vector3.up));
+            yield return null;
         }
 
         // The huge top platform is built in four pieces, leaving an open shaft above the lift.
@@ -738,10 +842,19 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
     }
 
-    private void BuildStageThreeGroundAliens()
+    private IEnumerator PrepareStageThreeIntroRoutine()
+    {
+        System.Exception failure = null;
+        yield return RunBuildStep(BuildStageThreeGroundAliensRoutine(), ex => failure = ex);
+        if (failure != null) yield break;
+        if (localPlayer != null && !localPlayer.IsDefeated)
+            StartCoroutine(RunStageThreeIntro());
+    }
+
+    private IEnumerator BuildStageThreeGroundAliensRoutine()
     {
         if (groundAliensSpawned || localPlayer == null)
-            return;
+            yield break;
         groundAliensSpawned = true;
 
         List<Vector3> occupied = new List<Vector3>();
@@ -753,6 +866,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             position.y = 0f;
             occupied.Add(position);
             SpawnGroundAlien(i, position, true);
+            yield return null;
         }
 
         // The rest are spread through open streets and outer ground, avoiding building footprints.
@@ -785,6 +899,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             occupied.Add(position);
             SpawnGroundAlien(spawned, position, false);
             spawned++;
+            if (spawned % 3 == 0) yield return null;
         }
 
         // Deterministic fallback completes the first 40 aliens before the 20 tall guards.
@@ -797,6 +912,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             occupied.Add(position);
             SpawnGroundAlien(spawned, position, false);
             spawned++;
+            if (spawned % 3 == 0) yield return null;
         }
 
         // Twenty tall alien guards bring the ground roster to exactly 60.
@@ -826,6 +942,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 occupied.Add(position);
                 int guardIndex = 40 + upperPatrols;
                 SpawnGroundAlien(guardIndex, position, true);
+                yield return null;
                 GroundAlien guard = groundAliens[groundAliens.Count - 1];
                 guard.UpperPatrol = true;
                 guard.PatrolCenter = position;
@@ -863,6 +980,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             occupied.Add(position);
             int guardIndex = 40 + upperPatrols;
             SpawnGroundAlien(guardIndex, position, true);
+            yield return null;
             GroundAlien guard = groundAliens[groundAliens.Count - 1];
             guard.UpperPatrol = true;
             guard.PatrolCenter = position;
@@ -1019,67 +1137,24 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Material chitin = alienBodyMaterials[Mathf.Clamp(archetype - 1, 0, alienBodyMaterials.Length - 1)];
         Material eyes = archetype == 1 ? cyanGlowMaterial
             : (archetype == 2 ? greenGlowMaterial : warningMaterial);
-
-        // Tall guards have an elongated alien skull and broader, more insectoid armor.
         float tallScale = eliteGuard ? 1.22f : 1f;
         CreateSphereChild(alien, "S3_AlienCranium", new Vector3(0f, 0.76f * tallScale, 0.16f),
             new Vector3(0.78f, 0.62f, 0.62f), chitin);
-        CreateSphereChild(alien, "S3_AlienJaw", new Vector3(0f, 0.36f, 0.38f),
-            new Vector3(0.42f, 0.19f, 0.30f), darkMetalMaterial);
         CreateBoxChild(alien, "S3_AlienChestArmor", new Vector3(0f, 0.05f, 0.35f),
             new Vector3(0.46f, 0.34f, 0.18f), darkMetalMaterial);
-        CreateSphereChild(alien, "S3_AlienBackEnergyNode", new Vector3(0f, 0.46f, -0.38f),
-            new Vector3(0.24f, 0.30f, 0.20f), greenGlowMaterial);
-        // A segmented insect abdomen and six jointed legs make the silhouette
-        // unmistakably extraterrestrial instead of a human wearing armor.
         CreateSphereChild(alien, "S3_AlienSegmentedAbdomen", new Vector3(0f, -0.12f, -0.46f),
             new Vector3(0.48f, 0.38f, 0.62f), chitin);
-        CreateSphereChild(alien, "S3_AlienForeheadCrest", new Vector3(0f, 1.02f * tallScale, 0.23f),
-            new Vector3(0.28f, 0.22f, 0.30f), silverMaterial);
-        for (int side = -1; side <= 1; side += 2)
-        {
-            for (int leg = 0; leg < 3; leg++)
-            {
-                float legZ = 0.24f - leg * 0.31f;
-                CreateCylinderChild(alien, "S3_AlienInsectLeg",
-                    new Vector3(side * (0.43f + (leg == 1 ? 0.10f : 0f)), -0.36f, legZ),
-                    new Vector3(0.10f, 0.34f, 0.10f), chitin);
-                CreateSphereChild(alien, "S3_AlienLegJoint",
-                    new Vector3(side * 0.53f, -0.43f, legZ),
-                    new Vector3(0.13f, 0.13f, 0.13f), eyes);
-            }
-            CreateSphereChild(alien, "S3_AlienShoulderPlate",
-                new Vector3(side * 0.39f, 0.16f, 0.02f),
-                new Vector3(0.30f, 0.23f, 0.34f), silverMaterial);
-            CreateBoxChild(alien, "S3_AlienMandible",
-                new Vector3(side * 0.16f, 0.30f, 0.55f),
-                new Vector3(0.10f, 0.20f, 0.12f), silverMaterial);
-            CreateCylinderChild(alien, "S3_AlienAntenna",
-                new Vector3(side * 0.24f, 1.10f, 0.13f),
-                new Vector3(0.07f, 0.29f, 0.07f), darkMetalMaterial);
-            CreateSphereChild(alien, "S3_AlienEye",
-                new Vector3(side * 0.19f, 0.69f, 0.47f),
-                new Vector3(0.13f, 0.13f, 0.08f), eyes);
-        }
-        CreateSphereChild(alien, "S3_AlienThirdEye", new Vector3(0f, 0.82f, 0.48f),
-            new Vector3(0.12f, 0.12f, 0.08f), eyes);
-
+        CreateSphereChild(alien, "S3_AlienEyeLeft", new Vector3(-0.19f, 0.69f, 0.47f),
+            new Vector3(0.13f, 0.13f, 0.08f), eyes);
+        CreateSphereChild(alien, "S3_AlienEyeRight", new Vector3(0.19f, 0.69f, 0.47f),
+            new Vector3(0.13f, 0.13f, 0.08f), eyes);
         if (guard)
         {
             CreateBoxChild(alien, "S3_AlienSentryBackpack", new Vector3(0f, 0.43f, -0.34f),
                 new Vector3(0.38f, 0.50f, 0.20f), silverMaterial);
-            if (!eliteGuard)
-            {
-                CreateBoxChild(alien, "S3_AlienEnergyRifle", new Vector3(0.47f, 0.06f, 0.45f),
-                    new Vector3(0.10f, 0.10f, 0.44f), darkMetalMaterial);
-                CreateSphereChild(alien, "S3_AlienRifleEmitter", new Vector3(0.47f, 0.07f, 0.70f),
-                    new Vector3(0.07f, 0.07f, 0.07f), eyes);
-            }
-        }
-        else
-        {
-            CreateBoxChild(alien, "S3_AlienRoverSpine", new Vector3(0f, 0.28f, -0.36f),
-                new Vector3(0.26f, 0.28f, 0.20f), silverMaterial);
+            CreateBoxChild(alien, eliteGuard ? "S3_EliteHeavyRifle" : "S3_AlienEnergyRifle",
+                new Vector3(0.47f, 0.06f, 0.45f), new Vector3(0.12f, 0.12f, 0.52f),
+                eliteGuard ? greenGlowMaterial : darkMetalMaterial);
         }
     }
 
@@ -1539,6 +1614,18 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         IsCinematic = false;
         StartupCheckpoint.Set("StageThreeEndingComplete");
         GameSession.Instance?.EndMission(true);
+        OnEndingComplete?.Invoke();
+    }
+
+    public void DebugCompleteEnding()
+    {
+        if (!worldBuilt || isComplete) return;
+        isComplete = true;
+        IsCinematic = false;
+        IsIntroCinematic = false;
+        StartupCheckpoint.Set("StageThreeDebugCompleteEnding");
+        GameSession.Instance?.EndMission(true);
+        OnEndingComplete?.Invoke();
     }
 
     private void HidePlayerForUplink()
