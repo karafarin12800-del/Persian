@@ -173,32 +173,15 @@ namespace PersiaWar.Unity2D5D
                 ", player projectiles=" + oldPlayerProjectiles.Length +
                 ", pickups=" + oldPickups.Length + ".");
 
-            HashSet<Material> oldMaterials = new HashSet<Material>();
+            // World renderers can reference RuntimeMaterialFactory and
+            // stageTwoLitMaterialCache entries that are also used by the player,
+            // weapons and projectiles. Destroy the world hierarchy only; never
+            // destroy arbitrary sharedMaterials discovered through renderers.
             if (worldRoot != null)
             {
-                Renderer[] renderers = worldRoot.GetComponentsInChildren<Renderer>(true);
-                for (int i = 0; i < renderers.Length; i++)
-                {
-                    if (renderers[i] == null) continue;
-                    Material[] shared = renderers[i].sharedMaterials;
-                    for (int m = 0; m < shared.Length; m++)
-                    {
-                        Material material = shared[m];
-                        if (material != null &&
-                            !material.name.StartsWith("Default", System.StringComparison.Ordinal))
-                            oldMaterials.Add(material);
-                    }
-                }
-
                 worldRoot.gameObject.SetActive(false);
                 Destroy(worldRoot.gameObject);
                 worldRoot = null;
-            }
-
-            foreach (Material material in oldMaterials)
-            {
-                if (material != null)
-                    Destroy(material);
             }
 
             if (androidUnitCubeMesh != null)

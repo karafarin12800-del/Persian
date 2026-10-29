@@ -80,7 +80,9 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         }
 
         System.Exception phaseFailure = null;
-        BuildStatus = "Stage 4: assembling orbital districts...";
+        BuildStatus = liteWorldVariant
+            ? "Stage 4: LOW MEMORY — reduced patrol roster..."
+            : "Stage 4: assembling orbital districts...";
         yield return RunBuildStep(BuildExteriorMegabaseRoutine(), ex => phaseFailure = ex);
         if (phaseFailure != null)
         {

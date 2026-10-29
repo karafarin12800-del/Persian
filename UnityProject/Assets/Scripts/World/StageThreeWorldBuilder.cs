@@ -154,7 +154,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             yield break;
         }
         System.Exception failure = null;
-        BuildStatus = "Stage 3: lighting and ground...";
+        BuildStatus = liteWorldVariant
+            ? "Stage 3: LOW MEMORY — building reduced fortress..."
+            : "Stage 3: lighting and ground...";
         yield return RunBuildStep(BuildLighting, ex => failure = ex);
         if (failure == null)
         {

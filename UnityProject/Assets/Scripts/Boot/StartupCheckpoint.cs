@@ -63,7 +63,9 @@ namespace PersiaWar.Unity2D5D
         {
             string previous = PlayerPrefs.GetString(Key, "none");
             string previousTime = PlayerPrefs.GetString(TimeKey, "unknown");
+            string memoryFromPreviousRun = MemorySummary;
 
+            PlayerPrefs.SetString(PreviousMemoryKey, memoryFromPreviousRun);
             PlayerPrefs.SetString(PreviousKey, previous);
             PlayerPrefs.SetString(PreviousTimeKey, previousTime);
             PlayerPrefs.Save();
@@ -273,6 +275,7 @@ namespace PersiaWar.Unity2D5D
         private const string SystemMemoryKey = "PersiaWar.Memory.SystemMB";
         private const string MemoryTimeKey = "PersiaWar.Memory.SampleUtc";
         private const string MemoryCheckpointKey = "PersiaWar.Memory.Checkpoint";
+        private const string PreviousMemoryKey = "PersiaWar.PreviousMemorySummary";
 
         public static bool ShouldUseLiteWorld()
         {
@@ -285,6 +288,9 @@ namespace PersiaWar.Unity2D5D
                  allocatedMb >= Mathf.Max(900, systemMb / 3) ||
                  reservedMb >= Mathf.Max(1500, systemMb / 2));
         }
+
+        public static string PreviousMemorySummary =>
+            PlayerPrefs.GetString(PreviousMemoryKey, "not captured from previous run");
 
         public static string MemorySummary =>
             "Mem MB A/R/Mono/System: " +
@@ -333,7 +339,8 @@ namespace PersiaWar.Unity2D5D
                 "Exit reason: " + PreviousExitState + "\n" +
                 "Assessment: " + PreviousAssessment + "\n" +
                 "Last exception: " + LastException + "\n" +
-                MemorySummary + "\n\n" +
+                "Previous run memory: " + PreviousMemorySummary + "\n" +
+                "Current memory: " + MemorySummary + "\n\n" +
                 "Checkpoint history (last 30):\n" + CheckpointHistory + "\n\n" +
                 "Diagnostic file: " + ReportPath;
         }

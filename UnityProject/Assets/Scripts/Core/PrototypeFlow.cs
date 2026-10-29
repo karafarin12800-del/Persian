@@ -769,7 +769,7 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 77f * scale, panel.width - 16f * scale, 22f * scale),
                 "Exit: " + StartupCheckpoint.PreviousExitState, smallStyle);
             GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 99f * scale, panel.width - 16f * scale, 22f * scale),
-                StartupCheckpoint.MemorySummary, smallStyle);
+                StartupCheckpoint.PreviousMemorySummary, smallStyle);
             if (GUI.Button(new Rect(panel.x + 8f * scale, panel.y + 122f * scale,
                 panel.width - 16f * scale, 24f * scale), "COPY REPORT"))
             {
