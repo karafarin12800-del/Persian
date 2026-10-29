@@ -398,6 +398,8 @@ jobs:
           assert 'StageThreeVictory_Stage4ProgressSavedBeforeCleanup' in stage3_to_4 and 'PlayerPrefs.Save();' in stage3_to_4, 'Stage 3 victory must persist Stage 4 progression before world cleanup.'
           assert 'StageThreeWorldBuilder.ClearExistingWorld(false);' not in stage3_to_4, 'Stage 3 geometry must not be synchronously destroyed inside its ending callback.'
           assert 'if (targetStage == 4)' in transition_cleanup and 'ReleaseCompletedWorldBeforeStageFour();' in transition_cleanup and 'CompletedStageThreeWorldReleasedBeforeStageFour' in flow, 'Stage 3 world teardown must occur after the transition loading frame.'
+          stage4_cleanup = transition_cleanup[transition_cleanup.index('else if (targetStage == 4)'):]
+          assert 'Resources.UnloadUnusedAssets()' in stage4_cleanup and 'yield break;' not in stage4_cleanup[:stage4_cleanup.index('AsyncOperation unload')], 'Stage 3 assets must be unloaded before building the larger Stage 4 world.'
           assert 'System.GC.Collect();' not in flow[flow.index('private IEnumerator BeginMatchSafely()'):], 'Stage 3 preload must not force a full managed collection immediately after asset unloading.'
           sequence = (root / 'Core/StageTwoVictorySequence.cs').read_text(encoding='utf-8')
           assert 'ShipHasLeftCameraFrame()' in sequence and 'CompleteAscentAfterShipLeavesFrame()' in sequence, 'Stage 2 finale must detect when the ship exits the camera frame.'
