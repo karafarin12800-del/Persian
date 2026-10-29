@@ -173,6 +173,15 @@ namespace PersiaWar.Unity2D5D
                     (pair.Key == "YOU" ? "YOU" : "AI " + pair.Key.Replace("AI-", "")) + "   " + pair.Value));
         }
 
+        public string GetFullLeaderboardText()
+        {
+            return string.Join("\n", kills.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key == "YOU" ? 0 : 1)
+                .ThenBy(pair => pair.Key, System.StringComparer.Ordinal)
+                .Select((pair, index) => (index + 1) + ". " +
+                    (pair.Key == "YOU" ? "YOU" : "AI " + pair.Key.Replace("AI-", "")) + "   " + pair.Value));
+        }
+
         public void FinishArena()
         {
             if (finished) return;

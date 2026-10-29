@@ -70,7 +70,6 @@ namespace PersiaWar.Unity2D5D
         private float stageTwoLobbyStartedAt;
         private bool matchInputArmed;
         private bool matchPaused;
-        private bool stageTwoResultAcknowledged;
         private bool stageThreeResultAcknowledged;
         private float resultOverlayStartTime = -1f;
         private StageTwoVictorySequence stageTwoVictorySequence;
@@ -80,6 +79,8 @@ namespace PersiaWar.Unity2D5D
         private bool stageTestRun;
         private bool stageThreeTransitionInProgress;
         private bool stageTransitionInProgress;
+        private bool stageThreePreloadInProgress;
+        private string stageThreePreloadStatus = string.Empty;
         private string transitionError = string.Empty;
         private int transitionRetryTargetStage = 1;
         private ScreenMode transitionRetryScreen = ScreenMode.HeroSelect;
@@ -112,6 +113,8 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle menuSmallStyle;
         private GUIStyle menuButtonStyle;
         private GUIStyle objectiveStyle;
+        private GUIStyle stageTwoFinalLeaderboardStyle;
+        private int stageTwoFinalLeaderboardStyleScreenHeight = -1;
         private int menuStyleScreenHeight = -1;
         private int uiStyleScreenHeight = -1;
         private int suppressMenuButtonClicksFrame = -1;
@@ -272,7 +275,8 @@ namespace PersiaWar.Unity2D5D
                 {
                     if (stageNumber == 2 && session.PlayerWon)
                     {
-                        if (!stageTwoResultAcknowledged) return;
+                        // Start evacuation automatically as soon as the final result is ready.
+                        // The standings remain visible during the entire ship reveal/boarding/ascent.
                         if (stageTwoVictorySequence == null)
                             StartStageTwoVictorySequence();
                         else if (stageTwoVictorySequence.IsComplete)
@@ -378,6 +382,8 @@ namespace PersiaWar.Unity2D5D
             {
                 if (stageTransitionInProgress)
                     startupStatus = "Preparing next mission...";
+                else if (stageThreePreloadInProgress && !string.IsNullOrEmpty(stageThreePreloadStatus))
+                    startupStatus = stageThreePreloadStatus;
                 else if (stageNumber == 3 && stageThreeWorldBuilder != null && !string.IsNullOrEmpty(stageThreeWorldBuilder.BuildStatus))
                     startupStatus = stageThreeWorldBuilder.BuildStatus;
                 else if (gameBootstrap != null && gameBootstrap.IsWorldPreparing && !string.IsNullOrEmpty(gameBootstrap.CurrentStage))
@@ -980,7 +986,6 @@ namespace PersiaWar.Unity2D5D
             if (stageNumber == 2)
             {
                 if (GameSession.Instance != null) GameSession.Instance.EndMission(true);
-                stageTwoResultAcknowledged = true;
                 if (stageTwoVictorySequence == null) StartStageTwoVictorySequence();
                 StartupCheckpoint.Set("DebugCompleteStage2_RealEvacuationSequence");
                 return;
@@ -1261,6 +1266,51 @@ namespace PersiaWar.Unity2D5D
                     new Color(0.015f, 0.035f, 0.055f, 0.78f));
                 GUI.Label(captionRect, caption, menuHeaderStyle);
             }
+
+            // Keep every competitor's final position visible while the ship appears,
+            // boards the hero, and ascends; this panel has no confirmation button.
+            DrawStageTwoFinalResultsOverlay();
+        }
+
+        private GUIStyle GetStageTwoFinalLeaderboardStyle(float scale)
+        {
+            if (stageTwoFinalLeaderboardStyle == null ||
+                stageTwoFinalLeaderboardStyleScreenHeight != Screen.height)
+            {
+                stageTwoFinalLeaderboardStyle = new GUIStyle(menuSmallStyle);
+                stageTwoFinalLeaderboardStyle.alignment = TextAnchor.UpperLeft;
+                stageTwoFinalLeaderboardStyle.wordWrap = false;
+                stageTwoFinalLeaderboardStyle.clipping = TextClipping.Clip;
+                stageTwoFinalLeaderboardStyle.fontSize =
+                    Mathf.Clamp(Mathf.RoundToInt(14f * scale), 12, 18);
+                stageTwoFinalLeaderboardStyle.padding = new RectOffset(8, 4, 2, 2);
+                stageTwoFinalLeaderboardStyle.normal.textColor = new Color(0.94f, 0.98f, 1f, 1f);
+                stageTwoFinalLeaderboardStyleScreenHeight = Screen.height;
+            }
+            return stageTwoFinalLeaderboardStyle;
+        }
+
+        private void DrawStageTwoFinalResultsOverlay()
+        {
+            StageTwoArenaManager arena = StageTwoArenaManager.Instance;
+            string standings = arena != null
+                ? arena.GetFullLeaderboardText()
+                : "1. YOU   0";
+
+            float scale = Mathf.Clamp(GetUiScale(), 0.72f, 1.15f);
+            float width = Mathf.Min(Screen.width * 0.47f, 390f * scale);
+            float height = Mathf.Min(270f * scale, Screen.height * 0.66f);
+            Rect panel = new Rect(8f * scale, Screen.height * 0.27f, width, height);
+
+            Fill(panel, new Color(0.012f, 0.035f, 0.055f, 0.90f));
+            Fill(new Rect(panel.x, panel.y, 4f * scale, panel.height),
+                new Color(0.24f, 0.96f, 0.49f, 0.98f));
+            GUI.Label(new Rect(panel.x + 10f * scale, panel.y + 5f * scale,
+                panel.width - 18f * scale, 30f * scale),
+                "FINAL RANKING  •  ALL PLAYERS", menuSmallStyle);
+            GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 34f * scale,
+                panel.width - 14f * scale, panel.height - 39f * scale),
+                standings, GetStageTwoFinalLeaderboardStyle(scale));
         }
 
         private void CompleteStageTwoVictoryTransition()
@@ -2496,7 +2546,6 @@ namespace PersiaWar.Unity2D5D
             if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
             Time.timeScale = 1f;
             stageNumber = 2;
-            stageTwoResultAcknowledged = false;
             stageThreeResultAcknowledged = false;
 
             bool registrationRequired = !stageTestRun;
@@ -2932,6 +2981,50 @@ namespace PersiaWar.Unity2D5D
             startupStatus = "starting battlefield preparation...";
 
             StartupCheckpoint.Set("MatchActivationStarted");
+
+            if (stageNumber == 3)
+            {
+                stageThreePreloadInProgress = true;
+                stageThreePreloadStatus = "Stage 3: reading saved mission data...";
+                float stageThreePreloadStartedAt = Time.realtimeSinceStartup;
+                const float stageThreeMinimumLoadingSeconds = 1.8f;
+                const float stageThreePreloadTimeoutSeconds = 20f;
+                StartupCheckpoint.Set("StageThreePreloadStarted_BeforeWorldActivation");
+
+                // Let the loading panel render before releasing the previous arena.
+                yield return null;
+                stageThreePreloadStatus = "Stage 3: releasing Stage 2 memory...";
+                AsyncOperation stageThreeAssetUnload = Resources.UnloadUnusedAssets();
+                while (stageThreeAssetUnload != null && !stageThreeAssetUnload.isDone &&
+                    Time.realtimeSinceStartup - stageThreePreloadStartedAt < stageThreePreloadTimeoutSeconds)
+                {
+                    startupStatus = stageThreePreloadStatus;
+                    yield return null;
+                }
+
+                if (stageThreeAssetUnload != null && !stageThreeAssetUnload.isDone)
+                {
+                    stageThreePreloadInProgress = false;
+                    stageThreePreloadStatus = string.Empty;
+                    StartupCheckpoint.Set("StageThreePreloadTimedOut_20Seconds");
+                    ShowTransitionError(3, ScreenMode.HeroSelect, true,
+                        "Stage 3 resource loading exceeded 20 seconds. Retry after the previous arena is released.");
+                    yield break;
+                }
+
+                stageThreePreloadStatus = "Stage 3: preparing graphics and mission resources...";
+                System.GC.Collect();
+                yield return null;
+                yield return null;
+                while (Time.realtimeSinceStartup - stageThreePreloadStartedAt < stageThreeMinimumLoadingSeconds)
+                {
+                    yield return null;
+                }
+
+                stageThreePreloadInProgress = false;
+                stageThreePreloadStatus = string.Empty;
+                StartupCheckpoint.Set("StageThreePreloadCompleted_BeforeWorldActivation");
+            }
 
             // GameBootstrap lives under the dormant GameRoot. A disabled/inactive
             // MonoBehaviour cannot own a running coroutine, so wake the root first,
@@ -3715,12 +3808,13 @@ namespace PersiaWar.Unity2D5D
             stageTwoLobbyReady = restartStage != 2;
             StageFourEscapeSequence oldEscape = gameRoot != null ? gameRoot.GetComponent<StageFourEscapeSequence>() : null;
             if (oldEscape != null) Destroy(oldEscape);
-            stageTwoResultAcknowledged = false;
             stageThreeResultAcknowledged = false;
             spawnChosen = true;
             spawnWorld = restartStage == 3 ? new Vector2(0f, -97f) : restartStage == 4 ? Vector2.zero : spawnWorld;
             matchPaused = false;
             resultOverlayStartTime = -1f;
+            stageThreePreloadInProgress = false;
+            stageThreePreloadStatus = string.Empty;
             startingMatch = false;
             mode = ScreenMode.MainMenu;
             startupStatus = "Restarting current mission...";
@@ -3738,19 +3832,11 @@ namespace PersiaWar.Unity2D5D
             // EnemySpawner only after the final wave has spawned and every alien is dead.
             if (session.PlayerWon && stageNumber == 2)
             {
-                if (!stageTwoResultAcknowledged)
-                {
-                    DrawPreEvacuationResultPanel(session, GetStageTwoResultMessage(),
-                        "CONTINUE TO EVACUATION", () => stageTwoResultAcknowledged = true);
-                    return;
-                }
-                if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
-                {
-                    DrawStageTwoCinematicOverlay();
-                    return;
-                }
-                if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsComplete)
-                    return;
+                // The final standings are informational, not a confirmation step.
+                // Update() starts the evacuation automatically; until it starts,
+                // keep the results on screen and do not expose PLAY AGAIN/MAIN MENU.
+                DrawStageTwoFinalResultsOverlay();
+                return;
             }
             if (session.PlayerWon && stageNumber == 3 && !stageThreeResultAcknowledged)
             {

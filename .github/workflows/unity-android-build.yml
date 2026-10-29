@@ -348,6 +348,7 @@ jobs:
           world = (root / 'Core/GameBootstrap.cs').read_text(encoding='utf-8')
           health_bar = (root / 'UI/EnemyHealthBar.cs').read_text(encoding='utf-8')
           flow = (root / 'Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+          arena_manager = (root / 'Combat/StageTwoArenaManager.cs').read_text(encoding='utf-8')
 
           assert 'WeaponController.GetEffectiveRangeForKind(DroppedWeaponKind)' in enemy, 'Enemy weapon range must match player range by weapon kind.'
           assert 'PlanLocalRoute(' in enemy and 'CanTravelDirectly(' in enemy, 'Enemy pursuit must route around blocking colliders.'
@@ -382,7 +383,10 @@ jobs:
           assert 'Fill(map, new Color(0.12f, 0.28f, 0.12f, 0.42f));' in flow, 'Active Android minimap transparency has regressed.'
           assert 'AndroidMinimapRoadCoordinates' in flow and 'AndroidMinimapBuildingPoints' in flow, 'Active Android minimap must follow the built city layout.'
           assert 'new Color(0.52f, 0.54f, 0.57f)' in world, 'Road asphalt has not been lightened to very light gray.'
-          print('Minimap transparency/size/world-layer and bright-road regression checks: PASS')
+          assert 'GetFullLeaderboardText()' in flow and 'public string GetFullLeaderboardText()' in arena_manager, 'Stage 2 final standings must include the complete competitor roster.'
+          assert 'if (!stageTwoResultAcknowledged) return;' not in flow and 'DrawStageTwoFinalResultsOverlay();' in flow, 'Stage 2 victory must continue automatically and show a non-blocking results overlay.'
+          assert 'StageThreePreloadStarted_BeforeWorldActivation' in flow and 'StageThreePreloadCompleted_BeforeWorldActivation' in flow and 'stageThreePreloadInProgress' in flow, 'Stage 3 must show a guarded resource-loading phase before world construction.'
+          print('Minimap transparency/size/world-layer, automatic Stage 2 evacuation and guarded Stage 3 loading checks: PASS')
           print('Requested gameplay/terrain regression checks: PASS')
           PY
 
