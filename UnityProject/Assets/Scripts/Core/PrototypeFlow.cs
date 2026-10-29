@@ -1447,6 +1447,13 @@ namespace PersiaWar.Unity2D5D
             stageNumber = transitionRetryTargetStage;
             PlayerPrefs.SetInt("PW.SelectedHero", Mathf.Clamp(selectedHero, 0, HeroNames.Length - 1));
             PlayerPrefs.SetInt("PW.SelectedWeaponKind", selectedStoreWeaponKind);
+            if (!stageTestRun && targetStage >= 2 && targetStage <= 4)
+            {
+                PlayerPrefs.SetInt("PW.CampaignStage", targetStage);
+                PlayerPrefs.SetString("PW.PendingScreen", nextScreen.ToString());
+                PlayerPrefs.Save();
+                StartupCheckpoint.Set("StageTransitionPendingScreenPersistedBeforeLoading_Stage" + targetStage);
+            }
             Time.timeScale = 1f;
             matchPaused = false;
             GateGameplay(false);
