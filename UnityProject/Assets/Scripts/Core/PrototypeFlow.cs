@@ -754,7 +754,7 @@ namespace PersiaWar.Unity2D5D
 
             float scale = GetUiScale();
             float width = Mathf.Min(Screen.width * 0.62f, 470f * scale);
-            float height = 150f * scale;
+            float height = 174f * scale;
             Rect panel = new Rect(16f * scale,
                 Screen.height - height - 12f * scale, width, height);
             Fill(panel, new Color(0.03f, 0.045f, 0.07f, 0.94f));
@@ -770,7 +770,9 @@ namespace PersiaWar.Unity2D5D
                 "Exit: " + StartupCheckpoint.PreviousExitState, smallStyle);
             GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 99f * scale, panel.width - 16f * scale, 22f * scale),
                 StartupCheckpoint.PreviousMemorySummary, smallStyle);
-            if (GUI.Button(new Rect(panel.x + 8f * scale, panel.y + 122f * scale,
+            GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 121f * scale, panel.width - 16f * scale, 22f * scale),
+                StartupCheckpoint.PreviousTransitionPeakSummary, smallStyle);
+            if (GUI.Button(new Rect(panel.x + 8f * scale, panel.y + 145f * scale,
                 panel.width - 16f * scale, 24f * scale), "COPY REPORT"))
             {
                 GUIUtility.systemCopyBuffer = StartupCheckpoint.BuildCopyReport();
@@ -1437,7 +1439,7 @@ namespace PersiaWar.Unity2D5D
             transitionRetryScreen = nextScreen;
             transitionRetryStartsMatch = false;
             stageTransitionInProgress = true;
-            StartupMemoryMonitor.SetLoading(true);
+            StartupMemoryMonitor.SetLoading(true, "TransitionToStage" + targetStage);
             startingMatch = true;
             startupStatus = "Preparing next mission...";
             matchInputArmed = false;

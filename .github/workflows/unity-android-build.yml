@@ -414,6 +414,7 @@ jobs:
           assert 'Screen.SetResolution(width, height, Screen.fullScreenMode)' in graphics and 'longestSide = CurrentTier == QualityTier.High ? 1920 : 1600' in graphics, 'Android render resolution must be capped by quality tier.'
           assert 'QualitySettings.antiAliasing = 0;' in graphics and 'ReleaseStageEffects()' in graphics, 'Low tier must disable MSAA and stage-end graphics effects must be released.'
           assert 'PreviousMemorySummary' in checkpoint and 'memoryFromPreviousRun' in checkpoint, 'LAST RUN must preserve the previous process memory snapshot across startup.'
+          assert 'PreviousTransitionPeakSummary' in checkpoint and 'PERSIA_TRANSITION_MEMORY_PEAK:' in Path('UnityProject/Assets/Scripts/Boot/StartupMemoryMonitor.cs').read_text(encoding='utf-8'), 'Transition peak allocated/reserved memory must be persisted and logged for each transition.'
           bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')
           release_start = bootstrap.index('public void ReleaseWorldForStageTransition()')
           release_end = bootstrap.index('private IEnumerator BuildWorldAfterStartup()', release_start)

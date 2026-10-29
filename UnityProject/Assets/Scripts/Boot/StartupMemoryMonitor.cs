@@ -41,16 +41,44 @@ namespace PersiaWar.Unity2D5D
             while (true)
             {
                 if (PlayerPrefs.GetInt(LoadingKey, 0) != 0)
+                {
                     StartupCheckpoint.RecordMemorySample("TransitionLoading_2s");
+                    CapturePeak();
+                }
                 yield return new WaitForSecondsRealtime(2f);
             }
         }
 
-        public static void SetLoading(bool loading)
+        public static void SetLoading(bool loading, string transitionLabel = "")
         {
+            if (loading)
+            {
+                long allocated = UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / (1024L * 1024L);
+                long reserved = UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / (1024L * 1024L);
+                PlayerPrefs.SetInt("PersiaWar.Memory.PeakAllocatedMB", (int)allocated);
+                PlayerPrefs.SetInt("PersiaWar.Memory.PeakReservedMB", (int)reserved);
+                PlayerPrefs.SetString("PersiaWar.Memory.PeakTransitionLabel",
+                    string.IsNullOrEmpty(transitionLabel) ? "StageTransition" : transitionLabel);
+            }
+            else
+            {
+                CapturePeak();
+                Debug.Log("PERSIA_TRANSITION_MEMORY_PEAK: " + StartupCheckpoint.TransitionPeakSummary);
+            }
             PlayerPrefs.SetInt(LoadingKey, loading ? 1 : 0);
             PlayerPrefs.Save();
             StartupCheckpoint.RecordMemorySample(loading ? "TransitionLoadingStarted" : "TransitionLoadingEnded");
+        }
+
+        private static void CapturePeak()
+        {
+            long allocated = UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / (1024L * 1024L);
+            long reserved = UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / (1024L * 1024L);
+            int peakAllocated = PlayerPrefs.GetInt("PersiaWar.Memory.PeakAllocatedMB", 0);
+            int peakReserved = PlayerPrefs.GetInt("PersiaWar.Memory.PeakReservedMB", 0);
+            PlayerPrefs.SetInt("PersiaWar.Memory.PeakAllocatedMB", Mathf.Max(peakAllocated, (int)allocated));
+            PlayerPrefs.SetInt("PersiaWar.Memory.PeakReservedMB", Mathf.Max(peakReserved, (int)reserved));
+            PlayerPrefs.Save();
         }
     }
 }

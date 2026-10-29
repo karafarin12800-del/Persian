@@ -64,8 +64,10 @@ namespace PersiaWar.Unity2D5D
             string previous = PlayerPrefs.GetString(Key, "none");
             string previousTime = PlayerPrefs.GetString(TimeKey, "unknown");
             string memoryFromPreviousRun = MemorySummary;
+            string peakFromPreviousRun = TransitionPeakSummary;
 
             PlayerPrefs.SetString(PreviousMemoryKey, memoryFromPreviousRun);
+            PlayerPrefs.SetString(PreviousPeakMemoryKey, peakFromPreviousRun);
             PlayerPrefs.SetString(PreviousKey, previous);
             PlayerPrefs.SetString(PreviousTimeKey, previousTime);
             PlayerPrefs.Save();
@@ -276,6 +278,10 @@ namespace PersiaWar.Unity2D5D
         private const string MemoryTimeKey = "PersiaWar.Memory.SampleUtc";
         private const string MemoryCheckpointKey = "PersiaWar.Memory.Checkpoint";
         private const string PreviousMemoryKey = "PersiaWar.PreviousMemorySummary";
+        private const string PeakAllocatedMemoryKey = "PersiaWar.Memory.PeakAllocatedMB";
+        private const string PeakReservedMemoryKey = "PersiaWar.Memory.PeakReservedMB";
+        private const string PeakLabelKey = "PersiaWar.Memory.PeakTransitionLabel";
+        private const string PreviousPeakMemoryKey = "PersiaWar.PreviousTransitionPeakSummary";
 
         public static bool ShouldUseLiteWorld()
         {
@@ -291,6 +297,14 @@ namespace PersiaWar.Unity2D5D
 
         public static string PreviousMemorySummary =>
             PlayerPrefs.GetString(PreviousMemoryKey, "not captured from previous run");
+
+        public static string PreviousTransitionPeakSummary =>
+            PlayerPrefs.GetString(PreviousPeakMemoryKey, "no previous transition peak captured");
+
+        public static string TransitionPeakSummary =>
+            PlayerPrefs.GetString(PeakLabelKey, "no transition") + " peak allocated/reserved MB: " +
+            PlayerPrefs.GetInt(PeakAllocatedMemoryKey, -1) + "/" +
+            PlayerPrefs.GetInt(PeakReservedMemoryKey, -1);
 
         public static string MemorySummary =>
             "Mem MB A/R/Mono/System: " +
@@ -340,6 +354,7 @@ namespace PersiaWar.Unity2D5D
                 "Assessment: " + PreviousAssessment + "\n" +
                 "Last exception: " + LastException + "\n" +
                 "Previous run memory: " + PreviousMemorySummary + "\n" +
+                "Previous transition peak: " + PreviousTransitionPeakSummary + "\n" +
                 "Current memory: " + MemorySummary + "\n\n" +
                 "Checkpoint history (last 30):\n" + CheckpointHistory + "\n\n" +
                 "Diagnostic file: " + ReportPath;
