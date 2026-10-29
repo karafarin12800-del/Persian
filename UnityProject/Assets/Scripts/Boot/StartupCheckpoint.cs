@@ -301,7 +301,7 @@ namespace PersiaWar.Unity2D5D
             " @ " + PlayerPrefs.GetString(MemoryTimeKey, "unknown") +
             " [" + PlayerPrefs.GetString(MemoryCheckpointKey, "none") + "]";
 
-        public static void RecordMemorySample(string checkpoint)
+        public static void RecordMemorySample(string checkpoint, bool persistImmediately = true)
         {
             try
             {
@@ -311,7 +311,7 @@ namespace PersiaWar.Unity2D5D
                 PlayerPrefs.SetInt(SystemMemoryKey, SystemInfo.systemMemorySize);
                 PlayerPrefs.SetString(MemoryTimeKey, DateTime.UtcNow.ToString("O"));
                 PlayerPrefs.SetString(MemoryCheckpointKey, string.IsNullOrEmpty(checkpoint) ? "unknown" : checkpoint);
-                PlayerPrefs.Save();
+                if (persistImmediately) PlayerPrefs.Save();
             }
             catch (Exception ex)
             {
@@ -355,7 +355,7 @@ namespace PersiaWar.Unity2D5D
             if (string.IsNullOrEmpty(stage))
                 stage = "Unknown";
 
-            RecordMemorySample(stage);
+            RecordMemorySample(stage, false);
             PlayerPrefs.SetString(Key, stage);
             PlayerPrefs.SetString(TimeKey, DateTime.UtcNow.ToString("O"));
             string entry = DateTime.UtcNow.ToString("HH:mm:ss") + "  " + stage;
