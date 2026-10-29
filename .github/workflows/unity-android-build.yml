@@ -398,6 +398,7 @@ jobs:
           assert 'StageThreeVictory_Stage4ProgressSavedBeforeCleanup' in stage3_to_4 and 'PlayerPrefs.Save();' in stage3_to_4, 'Stage 3 victory must persist Stage 4 progression before world cleanup.'
           assert 'StageTransitionSceneReloadPersisted_Stage' in flow and 'SceneManager.LoadSceneAsync(gameObject.scene.name, LoadSceneMode.Single)' in flow, 'Campaign stage transitions must reload the gameplay scene after persisting the pending screen.'
           assert 'PW.PendingScreen' in flow and 'PendingScreenOpened_' in flow and 'System.GC.Collect();' in flow, 'Scene reload must resume directly on the pending selection screen and unload assets after activation.'
+          assert 'pendingSceneResume = !string.IsNullOrEmpty(PlayerPrefs.GetString("PW.PendingScreen"' in flow and 'Restoring next mission...' in flow, 'The pending-screen loading panel must suppress the menu for the first frame after scene reload.'
           assert 'StageThreeEndingEventQueuedForFlowCoroutine' in flow and 'StartStageFourOnNextFrame()' in flow, 'Stage 3 ending callback must defer transition work to a PrototypeFlow-owned coroutine.'
           sequence = (root / 'Core/StageTwoVictorySequence.cs').read_text(encoding='utf-8')
           assert 'DiscardRetainedShipForSceneReload()' in sequence and 'RetainedStageTwoShipDiscardedBeforeSceneReload' in sequence, 'The retained Stage 2 ship must be discarded before campaign scene reload so Stage 3 builds its own transport.'

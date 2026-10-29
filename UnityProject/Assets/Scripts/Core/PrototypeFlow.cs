@@ -81,6 +81,7 @@ namespace PersiaWar.Unity2D5D
         private bool stageThreeTransitionInProgress;
         private bool stageThreeEndingPending;
         private bool stageTransitionInProgress;
+        private bool pendingSceneResume;
         private bool stageThreePreloadInProgress;
         private string stageThreePreloadStatus = string.Empty;
         private string transitionError = string.Empty;
@@ -157,6 +158,12 @@ namespace PersiaWar.Unity2D5D
             // Keep scene activation as cheap as possible. Do not touch GUI skin/textures
             // or scan the scene during Awake: this method runs on the critical Unity
             // scene-activation path on Android.
+            pendingSceneResume = !string.IsNullOrEmpty(PlayerPrefs.GetString("PW.PendingScreen", string.Empty));
+            if (pendingSceneResume)
+            {
+                startingMatch = true;
+                startupStatus = "Restoring next mission...";
+            }
             StartupCheckpoint.Set("PrototypeFlowAwake");
             Debug.Log("PERSIA_FLOW: PrototypeFlow Awake");
         }
@@ -227,6 +234,8 @@ namespace PersiaWar.Unity2D5D
                 PlayerPrefs.DeleteKey("PW.PendingScreen");
                 PlayerPrefs.Save();
                 StartupMemoryMonitor.SetLoading(false);
+                pendingSceneResume = false;
+                startingMatch = false;
                 StartupCheckpoint.Set("PendingScreenOpened_" + mode);
                 yield break;
             }
@@ -278,6 +287,7 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (pendingSceneResume) return;
             if (stageThreeEndingPending && !stageThreeTransitionInProgress && !stageTransitionInProgress)
             {
                 stageThreeEndingPending = false;
