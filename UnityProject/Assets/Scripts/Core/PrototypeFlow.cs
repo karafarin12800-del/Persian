@@ -79,6 +79,12 @@ namespace PersiaWar.Unity2D5D
         private bool forceStageOneWorldRebuildForTest;
         private bool stageTestRun;
         private bool stageThreeTransitionInProgress;
+        private bool stageTransitionInProgress;
+        private string transitionError = string.Empty;
+        private int transitionRetryTargetStage = 1;
+        private ScreenMode transitionRetryScreen = ScreenMode.HeroSelect;
+        private bool transitionRetryStartsMatch;
+        private bool stageChainTest;
         private int savedCampaignStageNumber = 1;
         private int savedCampaignStagePref = 1;
         private int savedStage3Unlocked;
@@ -237,10 +243,14 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            // Stage 3 world teardown is asynchronous on Android. Ignore menu/combat input
-            // until its native assets have been released and the next screen is ready.
-            if (stageThreeTransitionInProgress)
+            // During inter-stage cleanup the loading panel owns the screen and all taps are ignored.
+            if (stageThreeTransitionInProgress || stageTransitionInProgress)
                 return;
+            if (!string.IsNullOrEmpty(transitionError))
+            {
+                HandleTransitionErrorTouches();
+                return;
+            }
 
             // Use direct Touch.fingerId input for front-end controls on Android.
             // GUI.Button still draws the visual surface, but must not be the only
@@ -257,14 +267,6 @@ namespace PersiaWar.Unity2D5D
                             StartStageTwoVictorySequence();
                         else if (stageTwoVictorySequence.IsComplete)
                             CompleteStageTwoVictoryTransition();
-                    }
-                    else if (stageNumber == 3 && session.PlayerWon &&
-                        stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsComplete)
-                    {
-                        // The lift/uplink cinematic itself completes the mission.
-                        // Do not wait for a second result-panel tap: enter Stage 4's
-                        // player/weapon selection as soon as the final camera shot ends.
-                        StartStageFourAfterStageThree();
                     }
                     return;
                 }
@@ -1184,95 +1186,235 @@ namespace PersiaWar.Unity2D5D
         private void CompleteStageTwoVictoryTransition()
         {
             if (stageTwoVictorySequence == null) return;
-
-            // Keep the real evacuation ship alive for the campaign transition only.
-            // Stage-test runs must always clean up and must not leave a stale ship.
             string result = GetStageTwoResultMessage();
-            if (!stageTestRun)
-                stageTwoVictorySequence.PreserveShipForStageThree();
+            if (!stageTestRun || stageChainTest) stageTwoVictorySequence.PreserveShipForStageThree();
             stageTwoVictorySequence.FinishAndCleanup();
             Destroy(stageTwoVictorySequence);
             stageTwoVictorySequence = null;
             StageTwoArenaManager.Instance?.ResetForStageChange();
-
             GateGameplay(false);
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             if (followCamera != null) followCamera.enabled = false;
             if (playerRoot != null) playerRoot.SetActive(false);
             if (gameRoot != null) gameRoot.SetActive(false);
-
             Time.timeScale = 1f;
-
             stageTwoLobbyRunning = false;
             stageTwoLobbyReady = false;
             stageTwoLobbyPlayers = 1;
-            startingMatch = false;
             matchPaused = false;
             spawnChosen = false;
             resultOverlayStartTime = -1f;
 
-            if (stageTestRun)
+            if (stageTestRun && !stageChainTest)
             {
                 RestoreCampaignProgressAfterTest();
                 mode = ScreenMode.MainMenu;
                 ShowLobbyNotice("STAGE 2 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
                 StartupCheckpoint.Set("StageTwoTestComplete_CampaignUnchanged_" + result);
+                return;
             }
-            else
-            {
-                // Release the completed Stage 2 village before allocating Stage 3's
-                // larger world. Keep the retained evacuation ship separate and alive.
-                GameBootstrap previousStageBootstrap = gameBootstrap != null
-                    ? gameBootstrap
-                    : (gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : null);
-                if (previousStageBootstrap != null)
-                {
-                    previousStageBootstrap.ReleaseWorldForStageTransition();
-                }
-                else
-                {
-                    StartupCheckpoint.Set("StageTwoWorldReleaseSkipped_NoBootstrap");
-                    Debug.LogWarning("PERSIA_TRANSITION: GameBootstrap missing while preparing Stage 3.");
-                }
 
-                // Seamless campaign hand-off: start Stage 3 immediately, carrying
-                // the exact ship preserved above into the Stage 3 landing cinematic.
-                stageNumber = 3;
-                PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
-                PlayerPrefs.SetInt("PW.CampaignStage", 3);
+            GameBootstrap previousStageBootstrap = gameBootstrap != null
+                ? gameBootstrap : (gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : null);
+            if (previousStageBootstrap != null)
+                previousStageBootstrap.ReleaseWorldForStageTransition();
+            else
+                Debug.LogWarning("PERSIA_TRANSITION: GameBootstrap missing while preparing Stage 3.");
+
+            stageNumber = 3;
+            PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
+            PlayerPrefs.SetInt("PW.CampaignStage", 3);
+            PlayerPrefs.Save();
+            spawnWorld = new Vector2(0f, -97f);
+            spawnChosen = false;
+            if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+            StartupCheckpoint.Set("StageTwoCutsceneComplete_AutoStartStage3Transport_" + result);
+            BeginStageTransition(3, ScreenMode.HeroSelect);
+        }
+
+        private void BeginStageTransition(int targetStage, ScreenMode nextScreen)
+        {
+            if (stageTransitionInProgress) return;
+            transitionError = string.Empty;
+            transitionRetryTargetStage = Mathf.Clamp(targetStage, 1, 4);
+            transitionRetryScreen = nextScreen;
+            transitionRetryStartsMatch = false;
+            stageTransitionInProgress = true;
+            startingMatch = true;
+            matchInputArmed = false;
+            mode = ScreenMode.MainMenu;
+            stageNumber = transitionRetryTargetStage;
+            Time.timeScale = 1f;
+            matchPaused = false;
+            GateGameplay(false);
+            if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+            if (targetStage == 4)
+            {
+                PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
+                PlayerPrefs.SetInt("PW.CampaignStage", 4);
                 PlayerPrefs.Save();
-                spawnWorld = new Vector2(0f, -97f);
-                spawnChosen = true;
-                mode = ScreenMode.MainMenu;
-                PlayerPrefs.SetInt("PW.CampaignStage", 3);
-                PlayerPrefs.Save();
-                startupStatus = "Preparing next mission...";
-                StartupCheckpoint.Set("StageTwoCutsceneComplete_AutoStartStage3Transport_" + result);
-                StartCoroutine(BeginStageThreeAfterMemoryCleanup());
+            }
+            StartupCheckpoint.Set("BeginStageTransition_" + targetStage + "_" + nextScreen);
+            StartCoroutine(RunStageTransitionCleanup(targetStage, nextScreen));
+        }
+
+        private IEnumerator TransitionResourceCleanupRoutine()
+        {
+            yield return null;
+            AsyncOperation unload = Resources.UnloadUnusedAssets();
+            while (unload != null && !unload.isDone) yield return null;
+            System.GC.Collect();
+            yield return null;
+        }
+
+        private IEnumerator RunCoroutineSafely(System.Collections.IEnumerator routine,
+            System.Action<System.Exception> onFailure, System.Action onComplete)
+        {
+            while (true)
+            {
+                bool moved = false;
+                object current = null;
+                System.Exception failure = null;
+                try
+                {
+                    moved = routine.MoveNext();
+                    if (moved) current = routine.Current;
+                }
+                catch (System.Exception ex) { failure = ex; }
+                if (failure != null)
+                {
+                    onFailure?.Invoke(failure);
+                    yield break;
+                }
+                if (!moved)
+                {
+                    onComplete?.Invoke();
+                    yield break;
+                }
+                yield return current;
             }
         }
 
-        private IEnumerator BeginStageThreeAfterMemoryCleanup()
+        private IEnumerator RunStageTransitionCleanup(int targetStage, ScreenMode nextScreen)
         {
-            // Destroy() is deferred until the end of the frame. Give Unity a full
-            // frame to remove the Stage 2 arena, then release unreferenced native
-            // resources before allocating Stage 3's substantially larger world.
-            StartupCheckpoint.Set("StageThreeMemoryCleanupWaitingForDestroy");
-            yield return null;
+            System.Exception cleanupError = null;
+            bool cleanupComplete = false;
+            Coroutine cleanupCoroutine = null;
+            float startedAt = Time.realtimeSinceStartup;
+            try
+            {
+                cleanupCoroutine = StartCoroutine(RunCoroutineSafely(
+                    TransitionResourceCleanupRoutine(),
+                    ex => cleanupError = ex,
+                    () => cleanupComplete = true));
+                while (!cleanupComplete && cleanupError == null &&
+                    Time.realtimeSinceStartup - startedAt < 20f)
+                    yield return null;
+                if (!cleanupComplete && cleanupError == null)
+                {
+                    cleanupError = new System.TimeoutException("Stage transition cleanup exceeded 20 seconds.");
+                    if (cleanupCoroutine != null) StopCoroutine(cleanupCoroutine);
+                }
+            }
+            finally
+            {
+                Time.timeScale = 1f;
+                startingMatch = false;
+                matchInputArmed = false;
+                stageTransitionInProgress = false;
+                stageThreeTransitionInProgress = false;
+                mode = nextScreen;
+                if (cleanupError != null)
+                {
+                    string message = "Transition to Stage " + targetStage + " failed: " + cleanupError.Message;
+                    Debug.LogError("PERSIA_TRANSITION: " + message + "\n" + cleanupError);
+                    ShowTransitionError(targetStage, nextScreen, false, message);
+                }
+                else
+                {
+                    transitionError = string.Empty;
+                    StartupCheckpoint.Set("StageTransitionCleanupComplete_Stage" + targetStage);
+                }
+            }
+        }
 
-            AsyncOperation unloadOperation = Resources.UnloadUnusedAssets();
-            while (unloadOperation != null && !unloadOperation.isDone)
-                yield return null;
+        private void ShowTransitionError(int targetStage, ScreenMode retryScreen, bool retryStartsMatch, string message)
+        {
+            transitionRetryTargetStage = Mathf.Clamp(targetStage, 1, 4);
+            transitionRetryScreen = retryScreen;
+            transitionRetryStartsMatch = retryStartsMatch;
+            transitionError = string.IsNullOrEmpty(message) ? "An unexpected transition error occurred." : message;
+            startingMatch = false;
+            stageTransitionInProgress = false;
+            stageThreeTransitionInProgress = false;
+            matchInputArmed = false;
+            Time.timeScale = 1f;
+            GateGameplay(false);
+            mode = retryScreen;
+            Debug.LogError("PERSIA_TRANSITION_ERROR: " + transitionError);
+            StartupCheckpoint.Set("StageTransitionFailed_Stage" + targetStage);
+        }
 
-            System.GC.Collect();
-            yield return null;
+        private Rect GetTransitionErrorButtonRect()
+        {
+            float scale = GetUiScale();
+            float width = Mathf.Min(Screen.width - 56f * scale, 380f * scale);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.68f, width, 48f * scale);
+        }
 
-            if (this == null || !isActiveAndEnabled || stageNumber != 3 || !spawnChosen)
-                yield break;
+        private void HandleTransitionErrorTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0) return;
+            Rect button = GetTransitionErrorButtonRect();
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began) continue;
+                Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (button.Contains(point))
+                {
+                    RetryFailedTransition();
+                    return;
+                }
+            }
+        }
 
-            StartupCheckpoint.Set("StageThreeMemoryCleanupComplete_StartWorld");
-            StartMatch();
+        private void DrawTransitionErrorPanel()
+        {
+            float scale = GetUiScale();
+            float width = Mathf.Min(Screen.width - 40f * scale, 700f * scale);
+            float height = Mathf.Min(Screen.height - 40f * scale, 300f * scale);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Fill(panel, new Color(0.045f, 0.025f, 0.03f, 0.98f));
+            Fill(new Rect(panel.x, panel.y, panel.width, 5f * scale), new Color(1f, 0.20f, 0.16f, 1f));
+            GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 18f * scale,
+                panel.width - 36f * scale, 44f * scale), "MISSION TRANSITION FAILED", menuHeaderStyle);
+            GUIStyle wrapped = new GUIStyle(menuSmallStyle)
+            {
+                wordWrap = true,
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = Mathf.RoundToInt(15f * scale)
+            };
+            GUI.Label(new Rect(panel.x + 20f * scale, panel.y + 72f * scale,
+                panel.width - 40f * scale, 88f * scale), transitionError, wrapped);
+            if (GUI.Button(GetTransitionErrorButtonRect(), "RETRY", buttonStyle)) RetryFailedTransition();
+        }
+
+        private void RetryFailedTransition()
+        {
+            int target = transitionRetryTargetStage;
+            ScreenMode next = transitionRetryScreen;
+            bool retryBuild = transitionRetryStartsMatch;
+            transitionError = string.Empty;
+            if (retryBuild)
+            {
+                stageNumber = target;
+                spawnChosen = true;
+                mode = ScreenMode.MainMenu;
+                StartMatch();
+            }
+            else BeginStageTransition(target, next);
         }
 
         private void GoToMainMenu()
@@ -1302,51 +1444,56 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set("GoToMainMenu_NoProgression");
         }
 
+        private void HandleStageThreeEndingComplete()
+        {
+            if (stageNumber == 3) StartStageFourAfterStageThree();
+        }
+
+        private void HandleStageThreeBuildFailed(string message)
+        {
+            if (stageNumber == 3)
+                ShowTransitionError(3, ScreenMode.HeroSelect, true, message);
+        }
+
         private void StartStageFourAfterStageThree()
         {
-            if (stageThreeTransitionInProgress)
-                return;
+            if (stageThreeTransitionInProgress || stageTransitionInProgress) return;
             stageThreeTransitionInProgress = true;
-
-            StageTwoArenaManager.Instance?.ResetForStageChange();
-            Time.timeScale = 1f;
-            if (stageTwoVictorySequence != null)
+            try
             {
-                stageTwoVictorySequence.FinishAndCleanup();
-                Destroy(stageTwoVictorySequence);
-                stageTwoVictorySequence = null;
-            }
-            GateGameplay(false);
-            if (activeCamera != null) activeCamera.enabled = false;
-            if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
-            if (followCamera != null) followCamera.enabled = false;
-            if (playerRoot != null) playerRoot.SetActive(false);
-            if (gameRoot != null) gameRoot.SetActive(false);
+                StageTwoArenaManager.Instance?.ResetForStageChange();
+                Time.timeScale = 1f;
+                if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                if (stageTwoVictorySequence != null)
+                {
+                    stageTwoVictorySequence.FinishAndCleanup();
+                    Destroy(stageTwoVictorySequence);
+                    stageTwoVictorySequence = null;
+                }
+                GateGameplay(false);
+                if (activeCamera != null) activeCamera.enabled = false;
+                if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
+                if (followCamera != null) followCamera.enabled = false;
+                if (playerRoot != null) playerRoot.SetActive(false);
+                if (gameRoot != null) gameRoot.SetActive(false);
+                StageThreeWorldBuilder.ClearExistingWorld(false);
+                if (stageThreeWorldBuilder != null)
+                {
+                    stageThreeWorldBuilder.OnEndingComplete -= HandleStageThreeEndingComplete;
+                    stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
+                    Destroy(stageThreeWorldBuilder);
+                    stageThreeWorldBuilder = null;
+                }
 
-            // Do not overlap the sizeable Stage 3 fortress with Stage 4's even larger
-            // mothership allocation. The Stage 3 builder is removed before unloading
-            // native assets; keep the old city hidden during this hand-off.
-            StageThreeWorldBuilder.ClearExistingWorld(false);
-            if (stageThreeWorldBuilder != null)
-            {
-                Destroy(stageThreeWorldBuilder);
-                stageThreeWorldBuilder = null;
-            }
+                if (stageTestRun && !stageChainTest)
+                {
+                    RestoreCampaignProgressAfterTest();
+                    mode = ScreenMode.MainMenu;
+                    ShowLobbyNotice("STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
+                    StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
+                    return;
+                }
 
-            startingMatch = true;
-            matchPaused = false;
-            resultOverlayStartTime = -1f;
-            stageThreeResultAcknowledged = false;
-            bool completedStageThreeTest = stageTestRun;
-
-            if (completedStageThreeTest)
-            {
-                RestoreCampaignProgressAfterTest();
-            }
-            else
-            {
-                // Keep progression durable, but wait until Stage 3's native world
-                // assets are released before displaying Stage 4 hero selection.
                 stageNumber = 4;
                 PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
                 PlayerPrefs.SetInt("PW.CampaignStage", 4);
@@ -1356,48 +1503,24 @@ namespace PersiaWar.Unity2D5D
                 stageTwoLobbyRunning = false;
                 stageTwoLobbyReady = false;
                 stageTwoLobbyPlayers = 1;
-                selectedStoreWeaponKind = PlayerPrefs.GetInt(
-                    "PW.SelectedWeaponKind", (int)WeaponController.WeaponKind.AssaultRifle);
+                selectedStoreWeaponKind = PlayerPrefs.GetInt("PW.SelectedWeaponKind",
+                    (int)WeaponController.WeaponKind.AssaultRifle);
                 if (selectedStoreWeaponKind == (int)WeaponController.WeaponKind.AlienSword)
                     selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
                 spawnWorld = Vector2.zero;
                 spawnChosen = false;
+                BeginStageTransition(4, ScreenMode.HeroSelect);
             }
-
-            mode = ScreenMode.MainMenu;
-            startupStatus = "Releasing Stage 3 assets...";
-            StartupCheckpoint.Set(completedStageThreeTest
-                ? "StageThreeTestTransition_ReleaseWorldAssets"
-                : "StageThreeToStageFour_ReleaseWorldAssets");
-            StartCoroutine(FinishStageThreeTransitionAfterCleanup(completedStageThreeTest));
-        }
-
-        private IEnumerator FinishStageThreeTransitionAfterCleanup(bool completedStageThreeTest)
-        {
-            // Destroy() is deferred until the end of the frame. Only then unload
-            // unreferenced stage geometry/materials, collect managed wrappers, and
-            // expose the next menu so Stage 4 cannot race Stage 3's teardown.
-            yield return null;
-            AsyncOperation unloadOperation = Resources.UnloadUnusedAssets();
-            while (unloadOperation != null && !unloadOperation.isDone)
-                yield return null;
-
-            System.GC.Collect();
-            yield return null;
-
-            startingMatch = false;
-            stageThreeTransitionInProgress = false;
-            if (completedStageThreeTest)
+            catch (System.Exception ex)
             {
-                mode = ScreenMode.MainMenu;
-                ShowLobbyNotice("STAGE 3 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
-                StartupCheckpoint.Set("StageThreeTestComplete_ReturnToMenu");
-                yield break;
+                ShowTransitionError(4, ScreenMode.HeroSelect, false, ex.ToString());
             }
-
-            mode = ScreenMode.HeroSelect;
-            StartupCheckpoint.Set("StageThreeComplete_OpenStageFourHeroSelection");
+            finally
+            {
+                stageThreeTransitionInProgress = false;
+            }
         }
+
         public void CompleteStageFourEscapeToMainMenu()
         {
             Time.timeScale = 1f;
@@ -2285,24 +2408,16 @@ namespace PersiaWar.Unity2D5D
 
         private void BeginStageTwoSelection()
         {
-            // GameSession persists across stages. Stage 1 ends with IsFinished and
-            // PlayerWon still set, so clear the old result before Stage 2 can become
-            // active; otherwise Update() can mistake the new match for an instant win.
             ExtractionBeacon.ClearForStageTransition();
-            if (GameSession.Instance != null)
-                GameSession.Instance.ResetMatch();
+            if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
             Time.timeScale = 1f;
             stageNumber = 2;
             stageTwoResultAcknowledged = false;
             stageThreeResultAcknowledged = false;
 
-            // Registration is part of the real Stage 1 -> Stage 2 hand-off. Keep the
-            // pending flag durable so force-closing the app cannot bypass this screen.
             bool registrationRequired = !stageTestRun;
-            if (registrationRequired)
-                PlayerPrefs.SetInt("PW.RegistrationPending", 1);
-            if (IsAnahitaUnlocked())
-                PlayerPrefs.SetInt("PW.AnahitaUnlocked", 1);
+            if (registrationRequired) PlayerPrefs.SetInt("PW.RegistrationPending", 1);
+            if (IsAnahitaUnlocked()) PlayerPrefs.SetInt("PW.AnahitaUnlocked", 1);
             PlayerPrefs.SetInt("PW.CampaignStage", 2);
             PlayerPrefs.Save();
 
@@ -2311,20 +2426,18 @@ namespace PersiaWar.Unity2D5D
             stageTwoLobbyRunning = false;
             stageTwoLobbyReady = false;
             stageTwoLobbyPlayers = 1;
-            mode = registrationRequired ? ScreenMode.Profile : ScreenMode.HeroSelect;
+            stageTwoLandingMode = 1;
+            stageTwoLayoutVariant = 0;
             spawnChosen = false;
-            startingMatch = false;
             matchPaused = false;
             resultOverlayStartTime = -1f;
-            stageTwoLandingMode = 1; // Stage 2 always uses the single fixed village map.
-            stageTwoLayoutVariant = 0;
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             GateGameplay(false);
+            BeginStageTransition(2, registrationRequired ? ScreenMode.Profile : ScreenMode.HeroSelect);
             StartupCheckpoint.Set(registrationRequired
                 ? "StageOneComplete_OpenRegistrationBeforeStageTwoHeroSelection"
                 : "StageTwoHeroSelectionOpened");
-            Debug.Log("PERSIA_STAGE2: extraction transition complete; opening next campaign screen");
         }
 
         private void EnterDropMap()
