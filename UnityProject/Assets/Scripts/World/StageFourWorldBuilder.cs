@@ -1222,7 +1222,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             throw new System.InvalidOperationException(
                 "No compatible runtime shader found for Stage 4 materials.");
 
-        var m = new Material(shader) { name = name, color = color };
+        var m = new Material(shader) { name = name };
         if (m.HasProperty("_Color"))
             m.SetColor("_Color", color);
         if (m.HasProperty("_BaseColor"))
