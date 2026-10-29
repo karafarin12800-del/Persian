@@ -2919,17 +2919,61 @@ namespace PersiaWar.Unity2D5D
                 stageThreeWorldBuilder = gameRoot.GetComponent<StageThreeWorldBuilder>();
                 if (stageThreeWorldBuilder == null)
                     stageThreeWorldBuilder = gameRoot.AddComponent<StageThreeWorldBuilder>();
-                if (GameSession.Instance != null)
-                    GameSession.Instance.ResetMatch();
-                startupStatus = "building the alien fortress and nine routes...";
-                if (!stageThreeWorldBuilder.BuildWorld())
+                stageThreeWorldBuilder.OnEndingComplete -= HandleStageThreeEndingComplete;
+                stageThreeWorldBuilder.OnEndingComplete += HandleStageThreeEndingComplete;
+                stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
+                stageThreeWorldBuilder.OnBuildFailed += HandleStageThreeBuildFailed;
+                if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+
+                startupStatus = "Stage 3: preparing the alien fortress...";
+                StartupCheckpoint.Set("StageThreeWorldBuildStarted");
+                bool buildCompleted = false;
+                bool buildSucceeded = false;
+                float buildStartedAt = Time.realtimeSinceStartup;
+                const float buildTimeoutSeconds = 60f;
+                Coroutine buildCoroutine = StartCoroutine(stageThreeWorldBuilder.BuildWorldRoutine(success =>
                 {
-                    startupStatus = "Stage 3 world construction failed.";
-                    StartupCheckpoint.Set("StageThreeWorldBuildFailed");
-                    startingMatch = false;
-                    mode = ScreenMode.MainMenu;
+                    buildSucceeded = success;
+                    buildCompleted = true;
+                }));
+                if (buildCoroutine == null)
+                {
+                    buildCompleted = true;
+                    buildSucceeded = false;
+                    StartupCheckpoint.Set("StageThreeBuildCoroutineFailedToStart");
+                }
+                while (!buildCompleted)
+                {
+                    if (stageThreeWorldBuilder == null)
+                    {
+                        buildCompleted = true;
+                        buildSucceeded = false;
+                        startupStatus = "Stage 3 builder stopped unexpectedly.";
+                        break;
+                    }
+                    startupStatus = stageThreeWorldBuilder.BuildStatus;
+                    if (Time.realtimeSinceStartup - buildStartedAt >= buildTimeoutSeconds)
+                    {
+                        if (buildCoroutine != null) StopCoroutine(buildCoroutine);
+                        if (stageThreeWorldBuilder != null)
+                            stageThreeWorldBuilder.AbortBuild("Stage 3 world construction exceeded 60 seconds.");
+                        buildCompleted = true;
+                        buildSucceeded = false;
+                        startupStatus = stageThreeWorldBuilder != null
+                            ? stageThreeWorldBuilder.BuildStatus : "Stage 3 construction timed out.";
+                        StartupCheckpoint.Set("StageThreeBuildTimedOut_60Seconds");
+                        break;
+                    }
+                    yield return null;
+                }
+                if (!buildSucceeded)
+                {
+                    string error = stageThreeWorldBuilder != null
+                        ? stageThreeWorldBuilder.BuildStatus : startupStatus;
+                    ShowTransitionError(3, ScreenMode.HeroSelect, true, error);
                     yield break;
                 }
+                StartupCheckpoint.Set("StageThreeWorldBuildCompleted");
             }
             else if (stageNumber == 4)
             {
@@ -2989,13 +3033,12 @@ namespace PersiaWar.Unity2D5D
                         ? stageFourWorldBuilder.BuildStatus
                         : "Stage 4 builder stopped unexpectedly.";
                     StartupCheckpoint.Set("StageFourWorldBuildFailed");
-                    startingMatch = false;
-                    mode = ScreenMode.MainMenu;
                     string stageFourFailureCode = stageFourWorldBuilder != null &&
                         !string.IsNullOrEmpty(stageFourWorldBuilder.BuildFailureCode)
                         ? stageFourWorldBuilder.BuildFailureCode
                         : "UNKNOWN";
-                    ShowLobbyNotice("STAGE 4 FAILED: " + stageFourFailureCode);
+                    ShowTransitionError(4, ScreenMode.HeroSelect, true,
+                        startupStatus + " (error " + stageFourFailureCode + ").");
                     yield break;
                 }
                 StartupCheckpoint.Set("StageFourWorldBuildCompleted");
