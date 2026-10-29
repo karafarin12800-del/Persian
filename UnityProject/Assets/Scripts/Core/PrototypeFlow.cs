@@ -1478,7 +1478,7 @@ namespace PersiaWar.Unity2D5D
             StartCoroutine(RunStageTransitionCleanup(targetStage, nextScreen));
         }
 
-        private IEnumerator TransitionResourceCleanupRoutine(int targetStage)
+        private IEnumerator TransitionResourceCleanupRoutine(int targetStage, ScreenMode nextScreen)
         {
             // Always render the loading panel before doing expensive scene/resource work.
             yield return null;
@@ -1590,7 +1590,7 @@ namespace PersiaWar.Unity2D5D
             try
             {
                 cleanupCoroutine = StartCoroutine(RunCoroutineSafely(
-                    TransitionResourceCleanupRoutine(targetStage),
+                    TransitionResourceCleanupRoutine(targetStage, nextScreen),
                     ex => cleanupError = ex,
                     () => cleanupComplete = true));
                 while (!cleanupComplete && cleanupError == null &&
