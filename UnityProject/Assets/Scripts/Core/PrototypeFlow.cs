@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace PersiaWar.Unity2D5D
 {
@@ -78,6 +79,7 @@ namespace PersiaWar.Unity2D5D
         private bool forceStageOneWorldRebuildForTest;
         private bool stageTestRun;
         private bool stageThreeTransitionInProgress;
+        private bool stageThreeEndingPending;
         private bool stageTransitionInProgress;
         private bool stageThreePreloadInProgress;
         private string stageThreePreloadStatus = string.Empty;
@@ -208,6 +210,25 @@ namespace PersiaWar.Unity2D5D
             // activation and render the menu without a large main-thread workload.
             GateGameplay(false);
             InitializeLocalProfile();
+            selectedHero = Mathf.Clamp(PlayerPrefs.GetInt("PW.SelectedHero", selectedHero), 0, HeroNames.Length - 1);
+            string pendingScreen = PlayerPrefs.GetString("PW.PendingScreen", string.Empty);
+            if (!string.IsNullOrEmpty(pendingScreen))
+            {
+                // Scene reload has already activated the new gameplay scene and its
+                // roots are dormant. Unload assets only now, then open the saved screen
+                // directly so the Android main menu never flashes between missions.
+                StartupCheckpoint.Set("PendingScreenSceneActivated_" + pendingScreen);
+                AsyncOperation pendingUnload = Resources.UnloadUnusedAssets();
+                while (pendingUnload != null && !pendingUnload.isDone) yield return null;
+                System.GC.Collect();
+                ScreenMode requestedMode;
+                mode = System.Enum.TryParse(pendingScreen, out requestedMode)
+                    ? requestedMode : ScreenMode.HeroSelect;
+                PlayerPrefs.DeleteKey("PW.PendingScreen");
+                PlayerPrefs.Save();
+                StartupCheckpoint.Set("PendingScreenOpened_" + mode);
+                yield break;
+            }
 #if UNITY_ANDROID
             // Android production path: keep the real front-end interactive.
             // Do NOT auto-start the match. The previous isolation build skipped the
@@ -256,6 +277,11 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (stageThreeEndingPending && !stageThreeTransitionInProgress && !stageTransitionInProgress)
+            {
+                stageThreeEndingPending = false;
+                StartCoroutine(StartStageFourOnNextFrame());
+            }
             // During inter-stage cleanup the loading panel owns the screen and all taps are ignored.
             if (stageThreeTransitionInProgress || stageTransitionInProgress)
                 return;
@@ -726,8 +752,8 @@ namespace PersiaWar.Unity2D5D
                 (string.IsNullOrEmpty(exception) || exception == "none")) return;
 
             float scale = GetUiScale();
-            float width = Mathf.Min(Screen.width * 0.46f, 360f * scale);
-            float height = 104f * scale;
+            float width = Mathf.Min(Screen.width * 0.62f, 470f * scale);
+            float height = 150f * scale;
             Rect panel = new Rect(16f * scale,
                 Screen.height - height - 12f * scale, width, height);
             Fill(panel, new Color(0.03f, 0.045f, 0.07f, 0.94f));
@@ -741,6 +767,14 @@ namespace PersiaWar.Unity2D5D
                 "Last error: " + compactException, smallStyle);
             GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 77f * scale, panel.width - 16f * scale, 22f * scale),
                 "Exit: " + StartupCheckpoint.PreviousExitState, smallStyle);
+            GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 99f * scale, panel.width - 16f * scale, 22f * scale),
+                StartupCheckpoint.MemorySummary, smallStyle);
+            if (GUI.Button(new Rect(panel.x + 8f * scale, panel.y + 122f * scale,
+                panel.width - 16f * scale, 24f * scale), "COPY REPORT"))
+            {
+                GUIUtility.systemCopyBuffer = StartupCheckpoint.BuildCopyReport();
+                StartupCheckpoint.Set("LastRunReportCopied");
+            }
 #endif
         }
 
@@ -1352,7 +1386,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (stageTwoVictorySequence == null) return;
             string result = GetStageTwoResultMessage();
-            if (!stageTestRun || stageChainTest) stageTwoVictorySequence.PreserveShipForStageThree();
+            if (stageTestRun && stageChainTest) stageTwoVictorySequence.PreserveShipForStageThree();
             stageTwoVictorySequence.FinishAndCleanup();
             Destroy(stageTwoVictorySequence);
             stageTwoVictorySequence = null;
@@ -1402,11 +1436,14 @@ namespace PersiaWar.Unity2D5D
             transitionRetryScreen = nextScreen;
             transitionRetryStartsMatch = false;
             stageTransitionInProgress = true;
+            StartupMemoryMonitor.SetLoading(true);
             startingMatch = true;
             startupStatus = "Preparing next mission...";
             matchInputArmed = false;
             mode = ScreenMode.MainMenu;
             stageNumber = transitionRetryTargetStage;
+            PlayerPrefs.SetInt("PW.SelectedHero", Mathf.Clamp(selectedHero, 0, HeroNames.Length - 1));
+            PlayerPrefs.SetInt("PW.SelectedWeaponKind", selectedStoreWeaponKind);
             Time.timeScale = 1f;
             matchPaused = false;
             GateGameplay(false);
@@ -1425,6 +1462,39 @@ namespace PersiaWar.Unity2D5D
         {
             // Always render the loading panel before doing expensive scene/resource work.
             yield return null;
+            if (!stageTestRun && targetStage >= 2 && targetStage <= 4)
+            {
+                PlayerPrefs.SetInt("PW.CampaignStage", targetStage);
+                PlayerPrefs.SetInt("PW.SelectedHero", Mathf.Clamp(selectedHero, 0, HeroNames.Length - 1));
+                PlayerPrefs.SetInt("PW.SelectedWeaponKind", selectedStoreWeaponKind);
+                PlayerPrefs.SetString("PW.PendingScreen", nextScreen.ToString());
+                PlayerPrefs.Save();
+                StartupCheckpoint.Set("StageTransitionSceneReloadPersisted_Stage" + targetStage + "_" + nextScreen);
+
+                // Clear scene-bound/static services that could otherwise keep references
+                // to the outgoing arena. Scene reload itself releases scene-owned meshes
+                // and materials without destroying RuntimeMaterialFactory's cached assets.
+                StageTwoArenaManager.Instance?.ResetForStageChange();
+                if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
+                if (stageTwoVictorySequence != null)
+                {
+                    stageTwoVictorySequence.FinishAndCleanup();
+                    Destroy(stageTwoVictorySequence);
+                    stageTwoVictorySequence = null;
+                }
+                if (stageThreeWorldBuilder != null)
+                {
+                    stageThreeWorldBuilder.OnEndingComplete -= HandleStageThreeEndingComplete;
+                    stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
+                }
+                StartupCheckpoint.Set("StageTransitionSceneReloadBegin_Stage" + targetStage);
+                AsyncOperation sceneReload = SceneManager.LoadSceneAsync(gameObject.scene.name, LoadSceneMode.Single);
+                if (sceneReload == null)
+                    throw new System.InvalidOperationException("LoadSceneAsync returned null for gameplay scene.");
+                while (!sceneReload.isDone) yield return null;
+                yield break;
+            }
+
             if (targetStage == 2)
             {
                 ReleaseCompletedWorldBeforeStageTwo();
@@ -1516,6 +1586,7 @@ namespace PersiaWar.Unity2D5D
                 startingMatch = false;
                 matchInputArmed = false;
                 stageTransitionInProgress = false;
+                StartupMemoryMonitor.SetLoading(false);
                 stageThreeTransitionInProgress = false;
                 mode = nextScreen;
                 if (cleanupError != null)
@@ -1641,7 +1712,18 @@ namespace PersiaWar.Unity2D5D
 
         private void HandleStageThreeEndingComplete()
         {
-            if (stageNumber == 3) StartStageFourAfterStageThree();
+            // This callback is raised inside StageThreeWorldBuilder's own coroutine.
+            // Never deactivate/destroy that coroutine owner from inside its callback.
+            if (stageNumber != 3) return;
+            stageThreeEndingPending = true;
+            StartupCheckpoint.Set("StageThreeEndingEventQueuedForFlowCoroutine");
+        }
+
+        private IEnumerator StartStageFourOnNextFrame()
+        {
+            yield return null;
+            if (this == null || !isActiveAndEnabled) yield break;
+            StartStageFourAfterStageThree();
         }
 
         private void HandleStageThreeBuildFailed(string message)

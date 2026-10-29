@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace PersiaWar.Unity2D5D
 {
@@ -122,6 +123,9 @@ namespace PersiaWar.Unity2D5D
 
             Application.logMessageReceived += OnLogMessage;
             Application.quitting += OnQuitting;
+            Application.lowMemory -= OnLowMemory;
+            Application.lowMemory += OnLowMemory;
+            RecordMemorySample("DiagnosticsInitialized");
 
             PlayerPrefs.SetString(PreviousExitStateKey, currentExitState);
             PlayerPrefs.SetString("PersiaWar.PreviousAssessment", Classify(previousCheckpoint, currentExitState));
@@ -263,6 +267,65 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        private const string AllocatedMemoryKey = "PersiaWar.Memory.AllocatedMB";
+        private const string ReservedMemoryKey = "PersiaWar.Memory.ReservedMB";
+        private const string MonoMemoryKey = "PersiaWar.Memory.MonoMB";
+        private const string SystemMemoryKey = "PersiaWar.Memory.SystemMB";
+        private const string MemoryTimeKey = "PersiaWar.Memory.SampleUtc";
+        private const string MemoryCheckpointKey = "PersiaWar.Memory.Checkpoint";
+
+        public static string MemorySummary =>
+            "Mem MB A/R/Mono/System: " +
+            PlayerPrefs.GetInt(AllocatedMemoryKey, -1) + "/" +
+            PlayerPrefs.GetInt(ReservedMemoryKey, -1) + "/" +
+            PlayerPrefs.GetInt(MonoMemoryKey, -1) + "/" +
+            PlayerPrefs.GetInt(SystemMemoryKey, SystemInfo.systemMemorySize) +
+            " @ " + PlayerPrefs.GetString(MemoryTimeKey, "unknown") +
+            " [" + PlayerPrefs.GetString(MemoryCheckpointKey, "none") + "]";
+
+        public static void RecordMemorySample(string checkpoint)
+        {
+            try
+            {
+                PlayerPrefs.SetInt(AllocatedMemoryKey, (int)(Profiler.GetTotalAllocatedMemoryLong() / (1024L * 1024L)));
+                PlayerPrefs.SetInt(ReservedMemoryKey, (int)(Profiler.GetTotalReservedMemoryLong() / (1024L * 1024L)));
+                PlayerPrefs.SetInt(MonoMemoryKey, (int)(Profiler.GetMonoUsedSizeLong() / (1024L * 1024L)));
+                PlayerPrefs.SetInt(SystemMemoryKey, SystemInfo.systemMemorySize);
+                PlayerPrefs.SetString(MemoryTimeKey, DateTime.UtcNow.ToString("O"));
+                PlayerPrefs.SetString(MemoryCheckpointKey, string.IsNullOrEmpty(checkpoint) ? "unknown" : checkpoint);
+                PlayerPrefs.Save();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("PERSIA_MEMORY_SAMPLE_FAILED: " + ex.GetType().Name);
+            }
+        }
+
+        private static void OnLowMemory()
+        {
+            RecordMemorySample("LOW_MEMORY_WARNING");
+            Set("LOW_MEMORY_WARNING");
+            PlayerPrefs.SetString(PreviousExitStateKey, "LOW_MEMORY_WARNING");
+            PlayerPrefs.SetString("PersiaWar.PreviousAssessment", "LIKELY_LOW_MEMORY");
+            PlayerPrefs.Save();
+            Debug.LogWarning("PERSIA_LOW_MEMORY_WARNING: " + MemorySummary);
+            Resources.UnloadUnusedAssets();
+        }
+
+        public static string BuildCopyReport()
+        {
+            return "PERSIA WAR LAST RUN REPORT\n" +
+                "Current checkpoint: " + Last + "\n" +
+                "Previous checkpoint: " + Previous + "\n" +
+                "Previous time: " + PreviousTime + "\n" +
+                "Exit reason: " + PreviousExitState + "\n" +
+                "Assessment: " + PreviousAssessment + "\n" +
+                "Last exception: " + LastException + "\n" +
+                MemorySummary + "\n\n" +
+                "Checkpoint history (last 30):\n" + CheckpointHistory + "\n\n" +
+                "Diagnostic file: " + ReportPath;
+        }
+
         public static string ReportPath
         {
             get { return Path.Combine(Application.persistentDataPath, ReportFileName); }
@@ -273,6 +336,7 @@ namespace PersiaWar.Unity2D5D
             if (string.IsNullOrEmpty(stage))
                 stage = "Unknown";
 
+            RecordMemorySample(stage);
             PlayerPrefs.SetString(Key, stage);
             PlayerPrefs.SetString(TimeKey, DateTime.UtcNow.ToString("O"));
             string entry = DateTime.UtcNow.ToString("HH:mm:ss") + "  " + stage;

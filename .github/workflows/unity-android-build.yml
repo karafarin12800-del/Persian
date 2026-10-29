@@ -396,6 +396,15 @@ jobs:
           assert 'System.GC.Collect();' not in transition_cleanup, 'Transition cleanup must not force a full managed garbage collection on the Android handoff frame.'
           stage3_to_4 = flow[flow.index('private void StartStageFourAfterStageThree()'):flow.index('public void CompleteStageFourEscapeToMainMenu()')]
           assert 'StageThreeVictory_Stage4ProgressSavedBeforeCleanup' in stage3_to_4 and 'PlayerPrefs.Save();' in stage3_to_4, 'Stage 3 victory must persist Stage 4 progression before world cleanup.'
+          assert 'StageTransitionSceneReloadPersisted_Stage' in flow and 'SceneManager.LoadSceneAsync(gameObject.scene.name, LoadSceneMode.Single)' in flow, 'Campaign stage transitions must reload the gameplay scene after persisting the pending screen.'
+          assert 'PW.PendingScreen' in flow and 'PendingScreenOpened_' in flow and 'System.GC.Collect();' in flow, 'Scene reload must resume directly on the pending selection screen and unload assets after activation.'
+          assert 'StageThreeEndingEventQueuedForFlowCoroutine' in flow and 'StartStageFourOnNextFrame()' in flow, 'Stage 3 ending callback must defer transition work to a PrototypeFlow-owned coroutine.'
+          checkpoint = Path('UnityProject/Assets/Scripts/Boot/StartupCheckpoint.cs').read_text(encoding='utf-8')
+          assert 'Profiler.GetTotalAllocatedMemoryLong()' in checkpoint and 'Profiler.GetTotalReservedMemoryLong()' in checkpoint and 'Profiler.GetMonoUsedSizeLong()' in checkpoint, 'Crash diagnostics must persist Unity allocated/reserved/Mono memory.'
+          assert 'Application.lowMemory += OnLowMemory;' in checkpoint and 'LOW_MEMORY_WARNING' in checkpoint, 'Low-memory events must be recorded in the crash diagnostics.'
+          assert 'StartupCheckpoint.BuildCopyReport()' in flow and 'GUIUtility.systemCopyBuffer' in flow, 'LAST RUN diagnostics must provide a copyable report.'
+          monitor = Path('UnityProject/Assets/Scripts/Boot/StartupMemoryMonitor.cs').read_text(encoding='utf-8')
+          assert 'WaitForSecondsRealtime(2f)' in monitor and 'TransitionLoading_2s' in monitor, 'Memory must be sampled every two seconds during transitions.'
           assert 'StageThreeWorldBuilder.ClearExistingWorld(false);' not in stage3_to_4, 'Stage 3 geometry must not be synchronously destroyed inside its ending callback.'
           assert 'if (targetStage == 4)' in transition_cleanup and 'ReleaseCompletedWorldBeforeStageFour();' in transition_cleanup and 'CompletedStageThreeWorldReleasedBeforeStageFour' in flow, 'Stage 3 world teardown must occur after the transition loading frame.'
           stage4_cleanup = transition_cleanup[transition_cleanup.index('else if (targetStage == 4)'):]
