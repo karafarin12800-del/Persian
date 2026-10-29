@@ -386,7 +386,11 @@ jobs:
           assert 'GetFullLeaderboardText()' in flow and 'public string GetFullLeaderboardText()' in arena_manager, 'Stage 2 final standings must include the complete competitor roster.'
           assert 'if (!stageTwoResultAcknowledged) return;' not in flow and 'DrawStageTwoFinalResultsOverlay();' in flow, 'Stage 2 victory must continue automatically and show a non-blocking results overlay.'
           assert 'StageThreePreloadStarted_BeforeWorldActivation' in flow and 'StageThreePreloadCompleted_BeforeWorldActivation' in flow and 'stageThreePreloadInProgress' in flow, 'Stage 3 must show a guarded resource-loading phase before world construction.'
-          print('Minimap transparency/size/world-layer, automatic Stage 2 evacuation and guarded Stage 3 loading checks: PASS')
+          assert 'ReleaseCompletedWorldBeforeStageTwo();' in flow and 'CompletedWorldReleasedBeforeStageTwo' in flow, 'Stage 1 completion must release the old world before opening Stage 2 selection.'
+          sequence = (root / 'Core/StageTwoVictorySequence.cs').read_text(encoding='utf-8')
+          assert 'ShipHasLeftCameraFrame()' in sequence and 'CompleteAscentAfterShipLeavesFrame()' in sequence, 'Stage 2 finale must detect when the ship exits the camera frame.'
+          assert 'StageTwoTransportLeftCameraFrame_AutoContinueStage3' in sequence and 'cinematicCamera.backgroundColor = originalCameraBackgroundColor;' in sequence, 'Stage 2 finale must restore its camera and advance without holding on the empty sky.'
+          print('Minimap transparency/size/world-layer, automatic Stage 2 evacuation, offscreen ship exit and guarded Stage 3 loading checks: PASS')
           print('Requested gameplay/terrain regression checks: PASS')
           PY
 

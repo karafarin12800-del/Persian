@@ -2567,10 +2567,36 @@ namespace PersiaWar.Unity2D5D
             if (activeCamera != null) activeCamera.enabled = false;
             if (androidRuntimeCamera != null) androidRuntimeCamera.enabled = false;
             GateGameplay(false);
+            ReleaseCompletedWorldBeforeStageTwo();
             BeginStageTransition(2, registrationRequired ? ScreenMode.Profile : ScreenMode.HeroSelect);
             StartupCheckpoint.Set(registrationRequired
                 ? "StageOneComplete_OpenRegistrationBeforeStageTwoHeroSelection"
                 : "StageTwoHeroSelectionOpened");
+        }
+
+        private void ReleaseCompletedWorldBeforeStageTwo()
+        {
+            GameBootstrap completedBootstrap = gameBootstrap != null
+                ? gameBootstrap
+                : (gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : null);
+            if (completedBootstrap == null)
+            {
+                StartupCheckpoint.Set("CompletedWorldReleaseSkipped_NoBootstrap");
+                Debug.LogWarning("PERSIA_TRANSITION: GameBootstrap was missing while releasing the completed world before Stage 2.");
+                return;
+            }
+
+            try
+            {
+                completedBootstrap.ReleaseWorldForStageTransition();
+                StartupCheckpoint.Set("CompletedWorldReleasedBeforeStageTwo");
+            }
+            catch (System.Exception ex)
+            {
+                // The selection flow must still recover if a device-specific cleanup error occurs.
+                Debug.LogError("PERSIA_TRANSITION: completed-world release failed before Stage 2. Continuing to player selection.\n" + ex);
+                StartupCheckpoint.Set("CompletedWorldReleaseFailed_" + ex.GetType().Name);
+            }
         }
 
         private void EnterDropMap()

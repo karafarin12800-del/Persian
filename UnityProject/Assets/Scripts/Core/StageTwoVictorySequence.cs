@@ -46,6 +46,7 @@ namespace PersiaWar.Unity2D5D
         private readonly List<ActorState> actors = new List<ActorState>();
         private readonly List<Material> effectMaterials = new List<Material>();
         private Transform shipRoot;
+        private Renderer[] shipRenderers;
         private static Transform retainedStageThreeShip;
         private bool preserveShipForStageThree;
         private Camera cinematicCamera;
@@ -216,6 +217,9 @@ namespace PersiaWar.Unity2D5D
             shipRoot.localScale = Vector3.one * 0.015f;
             SetShipAlpha(0f);
             BuildDecloakEffects();
+            shipRenderers = shipRoot != null
+                ? shipRoot.GetComponentsInChildren<Renderer>(true)
+                : new Renderer[0];
 
             for (int i = 0; i < actors.Count; i++)
             {
@@ -338,9 +342,18 @@ namespace PersiaWar.Unity2D5D
                     if (shipRoot != null)
                         shipRoot.position = landingPosition + Vector3.up * (AscentHeight * eased);
 
-                    // Keep the camera position and rotation fixed at the final Stage 2
-                    // gameplay framing. Only the transport rises, visibly leaving the
-                    // existing frame instead of dragging the camera upward with it.
+                    // The Stage 2 finale ends on the ship leaving the frame. Do not
+                    // hold on an empty sky/starfield after the transport has departed:
+                    // restore the normal camera immediately and let PrototypeFlow open
+                    // the Stage 3 player-selection menu on the next update.
+                    if (t >= 0.15f && ShipHasLeftCameraFrame())
+                    {
+                        CompleteAscentAfterShipLeavesFrame();
+                        break;
+                    }
+
+                    // Keep the camera position and rotation fixed while the ship remains
+                    // visible. The flow transitions as soon as the full ship hull leaves view.
                     if (cinematicCamera != null && shipRoot != null && t >= 0.38f)
                     {
                         cinematicCamera.clearFlags = CameraClearFlags.SolidColor;
@@ -364,6 +377,68 @@ namespace PersiaWar.Unity2D5D
                     break;
                 }
             }
+        }
+
+        private bool ShipHasLeftCameraFrame()
+        {
+            if (shipRoot == null) return true;
+            if (cinematicCamera == null)
+                return false;
+
+            if (shipRenderers == null || shipRenderers.Length == 0)
+                shipRenderers = shipRoot.GetComponentsInChildren<Renderer>(true);
+
+            Plane[] frustum = GeometryUtility.CalculateFrustumPlanes(cinematicCamera);
+            for (int i = 0; i < shipRenderers.Length; i++)
+            {
+                Renderer shipRenderer = shipRenderers[i];
+                if (shipRenderer == null || !shipRenderer.enabled ||
+                    !shipRenderer.gameObject.activeInHierarchy)
+                    continue;
+
+                if (GeometryUtility.TestPlanesAABB(frustum, shipRenderer.bounds))
+                    return false;
+            }
+
+            // If a model has no enabled renderers, it is no longer visible to the player.
+            return true;
+        }
+
+        private void CompleteAscentAfterShipLeavesFrame()
+        {
+            if (cinematicCamera != null && cameraStateCaptured)
+            {
+                cinematicCamera.transform.position = originalCameraPosition;
+                cinematicCamera.transform.rotation = originalCameraRotation;
+                cinematicCamera.orthographic = cameraWasOrthographic;
+                cinematicCamera.clearFlags = originalCameraClearFlags;
+                cinematicCamera.backgroundColor = originalCameraBackgroundColor;
+                cinematicCamera.farClipPlane = originalCameraFarClipPlane;
+                if (cameraWasOrthographic)
+                    cinematicCamera.orthographicSize = originalCameraOrthographicSize;
+                else
+                    cinematicCamera.fieldOfView = originalCameraFieldOfView;
+            }
+
+            // Disable first so an already-running render cannot show the starfield
+            // during the single frame before PrototypeFlow swaps to the Stage 3 menu.
+            if (orbitalStars != null)
+            {
+                orbitalStars.gameObject.SetActive(false);
+                Destroy(orbitalStars.gameObject);
+                orbitalStars = null;
+            }
+            if (orbitalStarMaterial != null)
+            {
+                Destroy(orbitalStarMaterial);
+                orbitalStarMaterial = null;
+            }
+
+            IsRunning = false;
+            IsComplete = true;
+            Phase = SequencePhase.Complete;
+            StartupCheckpoint.Set("StageTwoTransportLeftCameraFrame_AutoContinueStage3");
+            Debug.Log("PERSIA_STAGE2_END: ship left the camera frame; transitioning directly to Stage 3 player selection.");
         }
 
         private void BeginOrbitalAscent()
