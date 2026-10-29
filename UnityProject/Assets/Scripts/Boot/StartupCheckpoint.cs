@@ -20,6 +20,9 @@ namespace PersiaWar.Unity2D5D
         private const string PreviousTimeKey = "PersiaWar.PreviousStartupCheckpointTime";
         private const string PreviousExitStateKey = "PersiaWar.PreviousExitState";
         private const string ReportFileName = "persiawar_crash_diagnostic.txt";
+        private const string HistoryKey = "PersiaWar.StartupCheckpointHistory";
+        private const string LastExceptionKey = "PersiaWar.LastRuntimeException";
+        private const int MaxHistoryEntries = 30;
 
         private static readonly HashSet<string> CriticalCheckpoints = new HashSet<string>
         {
@@ -48,6 +51,8 @@ namespace PersiaWar.Unity2D5D
         public static string PreviousTime => PlayerPrefs.GetString(PreviousTimeKey, "unknown");
         public static string PreviousExitState => PlayerPrefs.GetString(PreviousExitStateKey, "unknown");
         public static string PreviousAssessment => PlayerPrefs.GetString("PersiaWar.PreviousAssessment", "unknown");
+        public static string LastException => PlayerPrefs.GetString(LastExceptionKey, "none");
+        public static string CheckpointHistory => PlayerPrefs.GetString(HistoryKey, string.Empty);
 
         public static string DiagnosticSummary =>
             "Previous: " + Previous + " | Exit: " + PreviousExitState + " | Assessment: " + PreviousAssessment;
@@ -115,7 +120,7 @@ namespace PersiaWar.Unity2D5D
 
             Debug.Log(report);
 
-            Application.logMessageReceivedThreaded += OnLogMessage;
+            Application.logMessageReceived += OnLogMessage;
             Application.quitting += OnQuitting;
 
             PlayerPrefs.SetString(PreviousExitStateKey, currentExitState);
@@ -224,6 +229,8 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             lastException = string.IsNullOrEmpty(condition) ? "unknown" : condition;
+            PlayerPrefs.SetString(LastExceptionKey, lastException.Length > 900 ? lastException.Substring(0, 900) : lastException);
+            PlayerPrefs.Save();
 
             try
             {
@@ -268,6 +275,14 @@ namespace PersiaWar.Unity2D5D
 
             PlayerPrefs.SetString(Key, stage);
             PlayerPrefs.SetString(TimeKey, DateTime.UtcNow.ToString("O"));
+            string entry = DateTime.UtcNow.ToString("HH:mm:ss") + "  " + stage;
+            string history = PlayerPrefs.GetString(HistoryKey, string.Empty);
+            string[] prior = history.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            int first = Math.Max(0, prior.Length - (MaxHistoryEntries - 1));
+            List<string> retained = new List<string>();
+            for (int i = first; i < prior.Length; i++) retained.Add(prior[i]);
+            retained.Add(entry);
+            PlayerPrefs.SetString(HistoryKey, string.Join("\n", retained));
 
             // Building/city checkpoints must survive a native crash exactly at the
             // failing object. The extra Save is limited to startup construction only.
