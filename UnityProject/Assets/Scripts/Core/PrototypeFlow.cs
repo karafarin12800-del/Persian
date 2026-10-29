@@ -111,6 +111,7 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle menuBodyStyle;
         private GUIStyle menuSmallStyle;
         private GUIStyle menuButtonStyle;
+        private GUIStyle objectiveStyle;
         private int menuStyleScreenHeight = -1;
         private int uiStyleScreenHeight = -1;
         private int suppressMenuButtonClicksFrame = -1;
@@ -155,9 +156,18 @@ namespace PersiaWar.Unity2D5D
             Debug.Log("PERSIA_FLOW: PrototypeFlow Awake");
         }
 
+        private void OnDisable()
+        {
+            if (stageThreeWorldBuilder != null)
+            {
+                stageThreeWorldBuilder.OnEndingComplete -= HandleStageThreeEndingComplete;
+                stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
+            }
+        }
+
         private void Start()
         {
-            // Defer all menu initialization by one frame. This lets Unity finish
+            // Defer all menu initialization by one frame; This lets Unity finish
             // activating the gameplay scene and gives BootLoader a chance to complete
             // its LoadSceneAsync operation before any discovery/UI work runs.
             StartCoroutine(InitializeMenuAfterActivation());
@@ -336,9 +346,10 @@ namespace PersiaWar.Unity2D5D
                     DrawStageTwoCinematicOverlay();
                     return;
                 }
-                if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
+                if (stageNumber == 3 && StageThreeWorldBuilder.IsAnyCinematicActive)
                 {
-                    if (stageThreeWorldBuilder.IsIntroCinematic) DrawStageThreeIntroOverlay();
+                    StageThreeWorldBuilder cinematicBuilder = StageThreeWorldBuilder.Instance;
+                    if (cinematicBuilder != null && cinematicBuilder.IsIntroCinematic) DrawStageThreeIntroOverlay();
                     else DrawStageThreeCinematicOverlay();
                     return;
                 }
@@ -374,6 +385,11 @@ namespace PersiaWar.Unity2D5D
                 GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 30f * scale, panel.width - 36f * scale, 40f * scale), "PERSIA WAR", headerStyle);
                 GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 76f * scale, panel.width - 36f * scale, 30f * scale), startupStatus, bodyStyle);
                 GUI.Label(new Rect(panel.x + 18f * scale, panel.y + 116f * scale, panel.width - 36f * scale, 28f * scale), "Preparing battlefield...", smallStyle);
+                return;
+            }
+            if (!string.IsNullOrEmpty(transitionError))
+            {
+                DrawTransitionErrorPanel();
                 return;
             }
             switch (mode)
@@ -693,23 +709,26 @@ namespace PersiaWar.Unity2D5D
         {
 #if UNITY_ANDROID
             string previous = StartupCheckpoint.Previous;
-            if (string.IsNullOrEmpty(previous) || previous == "none")
-                return;
+            string exception = StartupCheckpoint.LastException;
+            if ((string.IsNullOrEmpty(previous) || previous == "none") &&
+                (string.IsNullOrEmpty(exception) || exception == "none")) return;
 
-            float width = Mathf.Min(Screen.width - 32f, 760f);
-            float height = 118f;
-            Rect panel = new Rect((Screen.width - width) * 0.5f, 12f, width, height);
+            float scale = GetUiScale();
+            float width = Mathf.Min(Screen.width - 32f * scale, 520f * scale);
+            float height = 104f * scale;
+            Rect panel = new Rect(Screen.width - width - 16f * scale,
+                Screen.height - height - 12f * scale, width, height);
             Fill(panel, new Color(0.03f, 0.045f, 0.07f, 0.94f));
-            Fill(new Rect(panel.x, panel.y, panel.width, 4f), new Color(1f, 0.55f, 0.12f, 1f));
-
-            GUI.Label(new Rect(panel.x + 12f, panel.y + 8f, panel.width - 24f, 22f),
-                "PREVIOUS RUN DIAGNOSTIC", smallStyle);
-            GUI.Label(new Rect(panel.x + 12f, panel.y + 34f, panel.width - 24f, 24f),
+            Fill(new Rect(panel.x, panel.y, panel.width, 4f * scale), new Color(1f, 0.55f, 0.12f, 1f));
+            GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 5f * scale, panel.width - 16f * scale, 20f * scale),
+                "LAST RUN", smallStyle);
+            GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 27f * scale, panel.width - 16f * scale, 24f * scale),
                 "Checkpoint: " + previous, smallStyle);
-            GUI.Label(new Rect(panel.x + 12f, panel.y + 60f, panel.width - 24f, 24f),
+            string compactException = exception.Length > 58 ? exception.Substring(0, 58) + "…" : exception;
+            GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 52f * scale, panel.width - 16f * scale, 24f * scale),
+                "Last error: " + compactException, smallStyle);
+            GUI.Label(new Rect(panel.x + 8f * scale, panel.y + 77f * scale, panel.width - 16f * scale, 22f * scale),
                 "Exit: " + StartupCheckpoint.PreviousExitState, smallStyle);
-            GUI.Label(new Rect(panel.x + 12f, panel.y + 86f, panel.width - 24f, 24f),
-                "Assessment: " + StartupCheckpoint.PreviousAssessment, smallStyle);
 #endif
         }
 
@@ -788,11 +807,11 @@ namespace PersiaWar.Unity2D5D
         {
             float scale = GetUiScale();
             float width = Mathf.Min(Screen.width * 0.42f, 520f * scale);
-            float heightLimit = Mathf.Max(28f, (Screen.height - 120f * scale) / 10f);
+            float heightLimit = Mathf.Max(24f, (Screen.height - 120f * scale) / 12f);
             float height = Mathf.Min(58f * scale, heightLimit);
-            float gapLimit = Mathf.Max(2f, (Screen.height - 100f * scale - height * 8f) / 7f);
-            float gap = Mathf.Min(14f * scale, gapLimit);
-            float totalHeight = height * 8f + gap * 7f;
+            float gapLimit = Mathf.Max(2f, (Screen.height - 100f * scale - height * 10f) / 9f);
+            float gap = Mathf.Min(10f * scale, gapLimit);
+            float totalHeight = height * 10f + gap * 9f;
             float topLimit = Mathf.Max(54f * scale, Screen.height - totalHeight - 8f);
             float top = Mathf.Clamp((Screen.height - totalHeight) * 0.48f, 54f * scale, topLimit);
             float left = Mathf.Max(Screen.width * 0.52f, Screen.width - width - 28f);
@@ -821,9 +840,8 @@ namespace PersiaWar.Unity2D5D
                 Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
                 if (mode == ScreenMode.MainMenu)
                 {
-                    // Keep native touch hit-testing aligned with all eight menu buttons.
-                    // Stage 4 is index 7; excluding it makes the visible Android button inert.
-                    for (int button = 0; button < 8; button++)
+                    // Keep native touch hit-testing aligned with every visible menu button.
+                    for (int button = 0; button < 10; button++)
                     {
                         if (!GetLobbyButtonRect(button).Contains(point)) continue;
                         suppressMenuButtonClicksFrame = Time.frameCount;
@@ -889,7 +907,9 @@ namespace PersiaWar.Unity2D5D
                 "TEST STAGE 1",
                 "TEST STAGE 2",
                 "TEST STAGE 3",
-                "TEST STAGE 4"
+                "TEST STAGE 4",
+                "TEST CHAIN: STAGE 2 → 3 → 4",
+                "DEBUG COMPLETE THIS STAGE"
             };
 
             for (int i = 0; i < labels.Length; i++)
@@ -901,7 +921,7 @@ namespace PersiaWar.Unity2D5D
 
             if (!string.IsNullOrEmpty(lobbyNotice) && Time.unscaledTime < lobbyNoticeUntil)
             {
-                Rect lastButton = GetLobbyButtonRect(7);
+                Rect lastButton = GetLobbyButtonRect(9);
                 float scale = GetUiScale();
                 float noticeHeight = 34f * scale;
                 float noticeY = Mathf.Min(lastButton.yMax + 6f * scale, Screen.height - 58f * scale - noticeHeight);
@@ -913,6 +933,7 @@ namespace PersiaWar.Unity2D5D
 
             GUI.Label(new Rect(Screen.width * 0.40f, Screen.height - 42f, Screen.width * 0.54f, 24f),
                 "PERSIA WAR  •  UNITY EDITION", menuSmallStyle);
+            DrawPreviousRunDiagnostic();
         }
 
         private void ActivateLobbyButton(int index)
@@ -929,8 +950,48 @@ namespace PersiaWar.Unity2D5D
             else if (index == 5) BeginStageTestEntry(2);
             else if (index == 6) BeginStageTestEntry(3);
             else if (index == 7) BeginStageTestEntry(4);
+            else if (index == 8) BeginStageChainTest();
+            else if (index == 9) DebugCompleteCurrentStage();
 
             StartupCheckpoint.Set("LobbyNavigation_" + mode);
+        }
+
+        private void BeginStageChainTest()
+        {
+            stageChainTest = true;
+            BeginStageTestEntry(2);
+            ShowLobbyNotice("CHAIN TEST: use DEBUG COMPLETE THIS STAGE in Stage 2, then Stage 3.");
+            StartupCheckpoint.Set("StageChainTestStarted_Stage2");
+        }
+
+        private void DebugCompleteCurrentStage()
+        {
+            if (stageNumber == 1)
+            {
+                BeginStageTwoSelection();
+                return;
+            }
+            if (stageNumber == 2)
+            {
+                if (GameSession.Instance != null) GameSession.Instance.EndMission(true);
+                stageTwoResultAcknowledged = true;
+                if (stageTwoVictorySequence == null) StartStageTwoVictorySequence();
+                StartupCheckpoint.Set("DebugCompleteStage2_RealEvacuationSequence");
+                return;
+            }
+            if (stageNumber == 3)
+            {
+                StageThreeWorldBuilder builder = StageThreeWorldBuilder.Instance;
+                if (builder != null) builder.DebugCompleteEnding();
+                else ShowTransitionError(3, ScreenMode.HeroSelect, true, "Stage 3 builder is missing. Retry Stage 3 construction.");
+                return;
+            }
+            if (stageNumber == 4)
+            {
+                CompleteStageFourEscapeToMainMenu();
+                return;
+            }
+            ShowLobbyNotice("NO ACTIVE STAGE TO COMPLETE.");
         }
 
         private void StartCampaignFromMenu()
@@ -1104,23 +1165,36 @@ namespace PersiaWar.Unity2D5D
             if (stageNumber < 3) return;
             float scale = GetUiScale();
             // Shared objective row sits below the shared player/loadout panel.
-            Rect panel = new Rect(14f * scale, 154f * scale, 340f * scale, 32f * scale);
+            Rect panel = new Rect(14f * scale, 154f * scale, 340f * scale, 48f * scale);
             Fill(panel, new Color(0.015f, 0.035f, 0.055f, 0.82f));
             Fill(new Rect(panel.x, panel.y, 3.5f * scale, panel.height),
                 new Color(0.10f, 1f, 0.42f, 0.95f));
 
+            StageThreeWorldBuilder stageThree = StageThreeWorldBuilder.Instance;
             int remaining = stageNumber == 3
-                ? (stageThreeWorldBuilder != null ? stageThreeWorldBuilder.RemainingHostiles : 0)
-                : (stageFourWorldBuilder != null ? stageFourWorldBuilder.RemainingHostiles : 0);
+                ? (stageThree != null ? stageThree.RemainingHostiles : -1)
+                : (stageFourWorldBuilder != null ? stageFourWorldBuilder.RemainingHostiles : -1);
             int total = stageNumber == 3
-                ? (stageThreeWorldBuilder != null ? stageThreeWorldBuilder.TotalHostiles : 0)
+                ? (stageThree != null ? stageThree.TotalHostiles : 0)
                 : (stageFourWorldBuilder != null ? stageFourWorldBuilder.TotalHostiles : 0);
-            string objective = remaining > 0
-                ? "HOSTILES  " + remaining + " / " + total
-                : (stageNumber == 3 ? "ALIENS CLEARED — REACH THE CENTRAL LIFT" : "MOTHERSHIP SECURED");
+            string objective;
+            if (stageNumber == 3 && (stageThree == null || total <= 0))
+                objective = "STAGE 3 INITIALIZING...";
+            else if (total > 0 && remaining > 0)
+                objective = "HOSTILES  " + remaining + " / " + total;
+            else if (stageNumber == 3 && total > 0 && remaining == 0)
+                objective = "ALIENS CLEARED — REACH THE CENTRAL LIFT";
+            else if (stageNumber == 4 && stageFourWorldBuilder == null)
+                objective = "STAGE 4 INITIALIZING...";
+            else
+                objective = "MOTHERSHIP SECURED";
+
+            if (objectiveStyle == null)
+                objectiveStyle = new GUIStyle(smallStyle) { wordWrap = true, alignment = TextAnchor.MiddleLeft };
+            objectiveStyle.fontSize = Mathf.RoundToInt(16f * scale);
             GUI.Label(new Rect(panel.x + 10f * scale, panel.y + 2f * scale,
                 panel.width - 16f * scale, panel.height - 4f * scale),
-                objective, smallStyle);
+                objective, objectiveStyle);
         }
         
         private void DrawStageThreeIntroOverlay()
@@ -1562,6 +1636,7 @@ namespace PersiaWar.Unity2D5D
             if (stageTestRun)
             {
                 RestoreCampaignProgressAfterTest();
+                stageChainTest = false;
                 mode = ScreenMode.MainMenu;
                 ShowLobbyNotice("STAGE 4 TEST COMPLETE  •  CAMPAIGN PROGRESS PRESERVED");
                 StartupCheckpoint.Set("StageFourTestComplete_ReturnToMainMenu");
@@ -3155,7 +3230,7 @@ namespace PersiaWar.Unity2D5D
             // stay centred instead of visibly leaving the frame in two seconds.
             if (stageTwoVictorySequence != null && stageTwoVictorySequence.IsRunning)
                 return;
-            if (stageNumber == 3 && stageThreeWorldBuilder != null && stageThreeWorldBuilder.IsCinematic)
+            if (stageNumber == 3 && StageThreeWorldBuilder.IsAnyCinematicActive)
                 return;
             if (stageNumber == 4 && stageFourWorldBuilder != null && stageFourWorldBuilder.IsCinematic)
                 return;
@@ -3725,6 +3800,7 @@ namespace PersiaWar.Unity2D5D
             headerStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(32f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(20f * scale), alignment = TextAnchor.MiddleCenter };
             smallStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(19f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            objectiveStyle = new GUIStyle(smallStyle) { fontSize = Mathf.RoundToInt(16f * scale), wordWrap = true, alignment = TextAnchor.MiddleLeft };
             buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = Mathf.RoundToInt(20f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         }
         private void BuildMenuStyles()
