@@ -389,7 +389,8 @@ jobs:
           assert 'ReleaseCompletedWorldBeforeStageTwo();' in flow and 'CompletedWorldReleasedBeforeStageTwo' in flow and 'TransitionResourceCleanupRoutine(int targetStage)' in flow and 'if (targetStage == 2)' in flow, 'Stage 1 completion must release the old world after the loading panel renders and before opening Stage 2 selection.'
           sequence = (root / 'Core/StageTwoVictorySequence.cs').read_text(encoding='utf-8')
           assert 'ShipHasLeftCameraFrame()' in sequence and 'CompleteAscentAfterShipLeavesFrame()' in sequence, 'Stage 2 finale must detect when the ship exits the camera frame.'
-          assert 'StageTwoTransportLeftCameraFrame_AutoContinueStage3' in sequence and 'cinematicCamera.backgroundColor = originalCameraBackgroundColor;' in sequence, 'Stage 2 finale must restore its camera and advance without holding on the empty sky.'
+          assert 'DepartureWaitDuration = 3.0f' in sequence and 'SequencePhase.DepartureWait' in sequence and 'DrawStageTwoDepartureWaitProgress(stageTwoVictorySequence.DepartureWaitProgress)' in flow, 'Stage 2 finale must hold the original camera view with a visible timed progress bar after the ship leaves the frame.'
+          assert 'CreateOrbitalStarfield();' not in sequence[sequence.find('case SequencePhase.Ascent'):sequence.find('private bool ShipHasLeftCameraFrame()')], 'Stage 2 ascent must not create an orbital sky after the ship departs.'
           print('Minimap transparency/size/world-layer, automatic Stage 2 evacuation, offscreen ship exit and guarded Stage 3 loading checks: PASS')
           print('Requested gameplay/terrain regression checks: PASS')
           PY

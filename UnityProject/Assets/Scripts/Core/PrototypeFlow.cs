@@ -1268,8 +1268,30 @@ namespace PersiaWar.Unity2D5D
             }
 
             // Keep every competitor's final position visible while the ship appears,
-            // boards the hero, and ascends; this panel has no confirmation button.
+            // boards the hero, ascends and the departure loading bar fills.
             DrawStageTwoFinalResultsOverlay();
+            if (stageTwoVictorySequence.Phase == StageTwoVictorySequence.SequencePhase.DepartureWait)
+                DrawStageTwoDepartureWaitProgress(stageTwoVictorySequence.DepartureWaitProgress);
+        }
+
+        private void DrawStageTwoDepartureWaitProgress(float progress)
+        {
+            float scale = Mathf.Clamp(GetUiScale(), 0.72f, 1.15f);
+            float width = Mathf.Min(Screen.width * 0.70f, 520f * scale);
+            float height = 54f * scale;
+            Rect panel = new Rect((Screen.width - width) * 0.5f,
+                Screen.height * 0.79f, width, height);
+            Fill(panel, new Color(0.012f, 0.035f, 0.055f, 0.94f));
+            GUI.Label(new Rect(panel.x + 12f * scale, panel.y + 4f * scale,
+                panel.width - 24f * scale, 20f * scale),
+                "PREPARING NEXT MISSION...", menuSmallStyle);
+            Rect bar = new Rect(panel.x + 12f * scale, panel.y + 27f * scale,
+                panel.width - 24f * scale, 13f * scale);
+            Fill(bar, new Color(0.12f, 0.20f, 0.24f, 1f));
+            Fill(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(progress), bar.height),
+                new Color(0.20f, 1f, 0.56f, 1f));
+            GUI.Label(new Rect(panel.x, panel.y + 39f * scale, panel.width, 13f * scale),
+                Mathf.RoundToInt(Mathf.Clamp01(progress) * 100f) + "%", menuSmallStyle);
         }
 
         private GUIStyle GetStageTwoFinalLeaderboardStyle(float scale)

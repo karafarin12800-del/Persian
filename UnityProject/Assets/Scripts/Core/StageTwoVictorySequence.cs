@@ -17,6 +17,7 @@ namespace PersiaWar.Unity2D5D
             Decloak,
             Boarding,
             Ascent,
+            DepartureWait,
             Complete
         }
 
@@ -88,10 +89,12 @@ namespace PersiaWar.Unity2D5D
         private const float BoardingDuration = 6.2f;
         private const float AscentDuration = 4.2f;
         private const float AscentHeight = 180f;
+        private const float DepartureWaitDuration = 3.0f;
         private const float MinimumDecloakDistance = 14f;
 
         public bool IsRunning { get; private set; }
         public bool IsComplete { get; private set; }
+        public float DepartureWaitProgress { get; private set; }
 
         /// <summary>
         /// Preserve the exact evacuation ship instance from Stage 2 so Stage 3 can
@@ -342,37 +345,33 @@ namespace PersiaWar.Unity2D5D
                     if (shipRoot != null)
                         shipRoot.position = landingPosition + Vector3.up * (AscentHeight * eased);
 
-                    // The Stage 2 finale ends on the ship leaving the frame. Do not
-                    // hold on an empty sky/starfield after the transport has departed:
-                    // restore the normal camera immediately and let PrototypeFlow open
-                    // the Stage 3 player-selection menu on the next update.
+                    // Never attach the camera to the ship. Keep its position/rotation
+                    // fixed while the transport rises out of the existing frame.
                     if (t >= 0.15f && ShipHasLeftCameraFrame())
                     {
                         CompleteAscentAfterShipLeavesFrame();
                         break;
                     }
-
-                    // Keep the camera position and rotation fixed while the ship remains
-                    // visible. The flow transitions as soon as the full ship hull leaves view.
-                    if (cinematicCamera != null && shipRoot != null && t >= 0.38f)
-                    {
-                        cinematicCamera.clearFlags = CameraClearFlags.SolidColor;
-                        float spaceBlend = Mathf.SmoothStep(0f, 1f,
-                            Mathf.InverseLerp(0.38f, 0.92f, t));
-                        Color atmosphere = new Color(0.16f, 0.27f, 0.43f, 1f);
-                        Color space = new Color(0.003f, 0.008f, 0.022f, 1f);
-                        cinematicCamera.backgroundColor = Color.Lerp(atmosphere, space, spaceBlend);
-
-                        if (orbitalStars == null)
-                            CreateOrbitalStarfield();
-                    }
-
                     if (t >= 1f)
                     {
+                        // If the ship model has no usable renderers, still finish safely.
+                        CompleteAscentAfterShipLeavesFrame();
+                    }
+                    break;
+                }
+                case SequencePhase.DepartureWait:
+                {
+                    // Hold the exact same world/camera view for a short, visible loading
+                    // interval after the ship has left. PrototypeFlow displays the bar.
+                    DepartureWaitProgress = Mathf.Clamp01(phaseElapsed / DepartureWaitDuration);
+                    if (phaseElapsed >= DepartureWaitDuration)
+                    {
+                        DepartureWaitProgress = 1f;
                         IsRunning = false;
                         IsComplete = true;
                         Phase = SequencePhase.Complete;
-                        Debug.Log("PERSIA_STAGE2_END: local hero boarded; transport completed the visible orbital ascent for Stage 3.");
+                        StartupCheckpoint.Set("StageTwoDepartureWaitComplete_OpenStage3Selection");
+                        Debug.Log("PERSIA_STAGE2_END: fixed-view departure wait completed; opening Stage 3 player selection.");
                     }
                     break;
                 }
@@ -420,8 +419,8 @@ namespace PersiaWar.Unity2D5D
                     cinematicCamera.fieldOfView = originalCameraFieldOfView;
             }
 
-            // Disable first so an already-running render cannot show the starfield
-            // during the single frame before PrototypeFlow swaps to the Stage 3 menu.
+            // No orbital sky or camera motion: restore the original camera and preserve
+            // the same frame while a three-second progress bar fills.
             if (orbitalStars != null)
             {
                 orbitalStars.gameObject.SetActive(false);
@@ -434,11 +433,10 @@ namespace PersiaWar.Unity2D5D
                 orbitalStarMaterial = null;
             }
 
-            IsRunning = false;
-            IsComplete = true;
-            Phase = SequencePhase.Complete;
-            StartupCheckpoint.Set("StageTwoTransportLeftCameraFrame_AutoContinueStage3");
-            Debug.Log("PERSIA_STAGE2_END: ship left the camera frame; transitioning directly to Stage 3 player selection.");
+            DepartureWaitProgress = 0f;
+            ChangePhase(SequencePhase.DepartureWait);
+            StartupCheckpoint.Set("StageTwoTransportLeftFrame_BeginFixedViewWait");
+            Debug.Log("PERSIA_STAGE2_END: ship left the frame; keeping the camera fixed during the departure progress bar.");
         }
 
         private void BeginOrbitalAscent()
