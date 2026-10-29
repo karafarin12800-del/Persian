@@ -206,7 +206,14 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
                         objectName.Contains("Uplink") || objectName.Contains("LED") ||
                         objectName.Contains("RedCharge") || objectName.Contains("EngineGlow");
             if (!glow) continue;
-            Color color = renderer.sharedMaterial.color;
+            Material glowMaterial = renderer.sharedMaterial;
+            // Additive Android shaders may intentionally expose no tint property.
+            // Skip their decorative billboard rather than reading Material.color
+            // on a shader that has neither _Color nor _BaseColor.
+            bool hasColor = glowMaterial.HasProperty("_Color");
+            bool hasBaseColor = glowMaterial.HasProperty("_BaseColor");
+            if (!hasColor && !hasBaseColor) continue;
+            Color color = glowMaterial.GetColor(hasColor ? "_Color" : "_BaseColor");
             color.a = Mathf.Clamp(color.a * 0.60f, 0.14f, 0.58f);
             Bounds bounds = renderer.bounds;
             float span = Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z));
