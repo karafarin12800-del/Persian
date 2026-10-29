@@ -1148,6 +1148,19 @@ namespace PersiaWar.Unity2D5D
         private void StartStageTwoVictorySequence()
         {
             if (stageTwoVictorySequence != null) return;
+
+            // Commit campaign progress as soon as the Stage 2 victory is confirmed.
+            // Android may terminate the process during world teardown; saving only
+            // after teardown caused a relaunch to replay Stage 2 instead of resuming Stage 3.
+            if (!stageTestRun || stageChainTest)
+            {
+                PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
+                PlayerPrefs.SetInt("PW.CampaignStage", 3);
+                PlayerPrefs.Save();
+                StartupCheckpoint.Set("StageTwoVictory_Stage3ProgressSavedBeforeCleanup");
+                Debug.Log("PERSIA_TRANSITION: Stage 3 checkpoint saved before Stage 2 cleanup.");
+            }
+
             GateGameplay(false);
             if (followCamera != null) followCamera.enabled = false;
             stageTwoVictorySequence = gameObject.AddComponent<StageTwoVictorySequence>();
@@ -1367,13 +1380,9 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            GameBootstrap previousStageBootstrap = gameBootstrap != null
-                ? gameBootstrap : (gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : null);
-            if (previousStageBootstrap != null)
-                previousStageBootstrap.ReleaseWorldForStageTransition();
-            else
-                Debug.LogWarning("PERSIA_TRANSITION: GameBootstrap missing while preparing Stage 3.");
-
+            // Release of the previous battlefield is deliberately deferred to the
+            // transition coroutine, after its loading panel has rendered for one frame.
+            // The campaign checkpoint has already been committed before any teardown.
             stageNumber = 3;
             PlayerPrefs.SetInt("PW.Stage3Unlocked", 1);
             PlayerPrefs.SetInt("PW.CampaignStage", 3);
@@ -1422,9 +1431,21 @@ namespace PersiaWar.Unity2D5D
                 // Let deferred Destroy calls be processed before requesting asset unload.
                 yield return null;
             }
+            else if (targetStage == 3)
+            {
+                // Stage 3 already has its own loading-screen asset-unload phase in
+                // BeginMatchSafely. Avoid performing the same expensive global unload
+                // during the short handoff to character selection.
+                ReleaseCompletedWorldBeforeStageThree();
+                yield return null;
+                StartupCheckpoint.Set("StageThreeOldWorldReleased_AssetUnloadDeferredUntilMatchStart");
+                yield break;
+            }
+
             AsyncOperation unload = Resources.UnloadUnusedAssets();
             while (unload != null && !unload.isDone) yield return null;
-            System.GC.Collect();
+            // Do not force a full managed GC on the handoff frame; Android can stall or
+            // be killed while both the previous arena and the next mission are in memory.
             yield return null;
         }
 
@@ -2601,6 +2622,32 @@ namespace PersiaWar.Unity2D5D
             StartupCheckpoint.Set(registrationRequired
                 ? "StageOneComplete_OpenRegistrationBeforeStageTwoHeroSelection"
                 : "StageTwoHeroSelectionOpened");
+        }
+
+        private void ReleaseCompletedWorldBeforeStageThree()
+        {
+            GameBootstrap completedBootstrap = gameBootstrap != null
+                ? gameBootstrap
+                : (gameRoot != null ? gameRoot.GetComponent<GameBootstrap>() : null);
+            if (completedBootstrap == null)
+            {
+                StartupCheckpoint.Set("StageThreeWorldReleaseSkipped_NoBootstrap");
+                Debug.LogWarning("PERSIA_TRANSITION: GameBootstrap was missing while releasing the completed world before Stage 3.");
+                return;
+            }
+
+            try
+            {
+                completedBootstrap.ReleaseWorldForStageTransition();
+                StartupCheckpoint.Set("CompletedWorldReleasedBeforeStageThree");
+            }
+            catch (System.Exception ex)
+            {
+                // Keep the campaign handoff recoverable if a device-specific cleanup
+                // failure occurs. Stage 3 has its own guarded pre-build asset unload.
+                Debug.LogError("PERSIA_TRANSITION: completed-world release failed before Stage 3. Continuing to player selection.\n" + ex);
+                StartupCheckpoint.Set("CompletedWorldReleaseFailedBeforeStageThree_" + ex.GetType().Name);
+            }
         }
 
         private void ReleaseCompletedWorldBeforeStageTwo()
