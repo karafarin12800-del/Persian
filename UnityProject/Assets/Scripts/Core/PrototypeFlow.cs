@@ -1441,6 +1441,16 @@ namespace PersiaWar.Unity2D5D
                 StartupCheckpoint.Set("StageThreeOldWorldReleased_AssetUnloadDeferredUntilMatchStart");
                 yield break;
             }
+            else if (targetStage == 4)
+            {
+                // Stage 3 owns a large generated world. Never destroy all of its
+                // geometry synchronously inside the ending callback: render the
+                // transition/loading screen first, then dispose it here.
+                ReleaseCompletedWorldBeforeStageFour();
+                yield return null;
+                StartupCheckpoint.Set("StageFourOldWorldReleased_AfterLoadingFrame");
+                yield break;
+            }
 
             AsyncOperation unload = Resources.UnloadUnusedAssets();
             while (unload != null && !unload.isDone) yield return null;
@@ -1659,14 +1669,6 @@ namespace PersiaWar.Unity2D5D
                 if (followCamera != null) followCamera.enabled = false;
                 if (playerRoot != null) playerRoot.SetActive(false);
                 if (gameRoot != null) gameRoot.SetActive(false);
-                StageThreeWorldBuilder.ClearExistingWorld(false);
-                if (stageThreeWorldBuilder != null)
-                {
-                    stageThreeWorldBuilder.OnEndingComplete -= HandleStageThreeEndingComplete;
-                    stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
-                    Destroy(stageThreeWorldBuilder);
-                    stageThreeWorldBuilder = null;
-                }
 
                 if (stageTestRun && !stageChainTest)
                 {
@@ -1677,10 +1679,13 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
+                // Persist the next stage before any deferred world teardown. If
+                // Android reclaims the process during cleanup, Continue resumes Stage 4.
                 stageNumber = 4;
                 PlayerPrefs.SetInt("PW.Stage4Unlocked", 1);
                 PlayerPrefs.SetInt("PW.CampaignStage", 4);
                 PlayerPrefs.Save();
+                StartupCheckpoint.Set("StageThreeVictory_Stage4ProgressSavedBeforeCleanup");
                 stageTwoOriginalHero = selectedHero;
                 stageTwoShopOpen = false;
                 stageTwoLobbyRunning = false;
@@ -2624,6 +2629,35 @@ namespace PersiaWar.Unity2D5D
                 : "StageTwoHeroSelectionOpened");
         }
 
+        private void ReleaseCompletedWorldBeforeStageFour()
+        {
+            // Detach callbacks first so cleanup cannot re-enter the progression flow.
+            if (stageThreeWorldBuilder != null)
+            {
+                stageThreeWorldBuilder.OnEndingComplete -= HandleStageThreeEndingComplete;
+                stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
+            }
+
+            try
+            {
+                StageThreeWorldBuilder.ClearExistingWorld(false);
+                if (stageThreeWorldBuilder != null)
+                {
+                    Destroy(stageThreeWorldBuilder);
+                    stageThreeWorldBuilder = null;
+                }
+                StartupCheckpoint.Set("CompletedStageThreeWorldReleasedBeforeStageFour");
+            }
+            catch (System.Exception ex)
+            {
+                // The transition must remain recoverable. A cleanup failure is logged
+                // and surfaced rather than silently relaunching Stage 3.
+                Debug.LogError("PERSIA_TRANSITION: Stage 3 world cleanup failed before Stage 4.\n" + ex);
+                StartupCheckpoint.Set("CompletedStageThreeWorldReleaseFailed_" + ex.GetType().Name);
+                throw;
+            }
+        }
+
         private void ReleaseCompletedWorldBeforeStageThree()
         {
             GameBootstrap completedBootstrap = gameBootstrap != null
@@ -3115,7 +3149,9 @@ namespace PersiaWar.Unity2D5D
                 }
 
                 stageThreePreloadStatus = "Stage 3: preparing graphics and mission resources...";
-                System.GC.Collect();
+                // Resources.UnloadUnusedAssets already performs Unity's unused-asset
+                // sweep. Avoid an immediate forced full managed GC on memory-constrained
+                // Android devices; let Unity schedule collection across subsequent frames.
                 yield return null;
                 yield return null;
                 while (Time.realtimeSinceStartup - stageThreePreloadStartedAt < stageThreeMinimumLoadingSeconds)
