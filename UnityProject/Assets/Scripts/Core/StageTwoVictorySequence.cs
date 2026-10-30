@@ -198,11 +198,27 @@ namespace PersiaWar.Unity2D5D
             if (float.IsNaN(landingGround.x) || float.IsNaN(landingGround.y) ||
                 float.IsNaN(landingGround.z))
             {
-                FinishAndCleanup();
-                IsRunning = false;
-                IsComplete = true;
-                Phase = SequencePhase.Complete;
-                return;
+                // A crowded or obstructed arena must never bypass the evacuation
+                // cinematic. Use a bounded emergency landing point ahead of the
+                // player rather than marking the sequence complete without a ship.
+                Vector3 fallbackDirection = GetFlatDirection(viewForward);
+                if (fallbackDirection.sqrMagnitude < 0.001f)
+                    fallbackDirection = Vector3.forward;
+                Vector3 fallbackPoint = localPlayer.position +
+                    fallbackDirection.normalized * MinimumDecloakDistance;
+                fallbackPoint.x = Mathf.Clamp(fallbackPoint.x, -72f, 72f);
+                fallbackPoint.z = Mathf.Clamp(fallbackPoint.z, -72f, 72f);
+                fallbackPoint.y = 0f;
+
+                RaycastHit fallbackHit;
+                Vector3 fallbackRayOrigin = new Vector3(fallbackPoint.x,
+                    Mathf.Max(80f, localPlayer.position.y + 80f), fallbackPoint.z);
+                if (Physics.Raycast(fallbackRayOrigin, Vector3.down, out fallbackHit,
+                    180f, ~0, QueryTriggerInteraction.Ignore))
+                    fallbackPoint.y = fallbackHit.point.y;
+
+                landingGround = fallbackPoint;
+                Debug.LogWarning("PERSIA_STAGE2_END: no clear landing site; using bounded emergency landing point so the ship cinematic still runs.");
             }
 
             groundY = landingGround.y;

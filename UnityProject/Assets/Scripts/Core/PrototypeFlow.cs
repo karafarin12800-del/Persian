@@ -1400,7 +1400,7 @@ namespace PersiaWar.Unity2D5D
         {
             if (stageTwoVictorySequence == null) return;
             string result = GetStageTwoResultMessage();
-            if (stageTestRun && stageChainTest) stageTwoVictorySequence.PreserveShipForStageThree();
+            if (!stageTestRun || stageChainTest) stageTwoVictorySequence.PreserveShipForStageThree();
             stageTwoVictorySequence.FinishAndCleanup();
             Destroy(stageTwoVictorySequence);
             stageTwoVictorySequence = null;
