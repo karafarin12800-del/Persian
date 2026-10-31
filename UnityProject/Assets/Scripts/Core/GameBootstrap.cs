@@ -363,6 +363,7 @@ namespace PersiaWar.Unity2D5D
 
             if (worldRoot != null) Destroy(worldRoot.gameObject);
             worldRoot = new GameObject("BattleRoyaleCity").transform;
+            EnvironmentLightingProfile.Apply(transform, stageTwoRequested);
 
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
@@ -638,6 +639,43 @@ namespace PersiaWar.Unity2D5D
             CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
             CreateAndroidQuadBatch("AndroidSidewalkGrid", sidewalkVertices, sidewalkTriangles, androidSidewalkMaterial);
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
+            BuildAndroidCrosswalks(roadWidth);
+        }
+
+        private void BuildAndroidCrosswalks(float roadWidth)
+        {
+            Material crosswalkMaterial = MakeMaterial(
+                "AndroidCrosswalk",
+                new Color(0.84f, 0.82f, 0.75f));
+            List<Vector3> vertices = new List<Vector3>(512);
+            List<int> triangles = new List<int>(768);
+            float[] intersectionCenters = { -7f, 17f };
+
+            for (int ix = 0; ix < intersectionCenters.Length; ix++)
+            {
+                for (int iz = 0; iz < intersectionCenters.Length; iz++)
+                {
+                    float centerX = intersectionCenters[ix];
+                    float centerZ = intersectionCenters[iz];
+                    for (int side = -1; side <= 1; side += 2)
+                    {
+                        for (int stripe = 0; stripe < 5; stripe++)
+                        {
+                            float offset = roadWidth * 0.5f + 1.25f + stripe * 0.78f;
+                            AddAndroidTerrainFollowingQuad(
+                                vertices, triangles,
+                                new Vector3(centerX, 0f, centerZ + side * offset),
+                                new Vector2(roadWidth * 0.72f, 0.34f), 0.088f);
+                            AddAndroidTerrainFollowingQuad(
+                                vertices, triangles,
+                                new Vector3(centerX + side * offset, 0f, centerZ),
+                                new Vector2(0.34f, roadWidth * 0.72f), 0.089f);
+                        }
+                    }
+                }
+            }
+
+            CreateAndroidQuadBatch("AndroidCrosswalks", vertices, triangles, crosswalkMaterial);
         }
 
         private bool extractionBeaconShown;
@@ -2100,17 +2138,108 @@ namespace PersiaWar.Unity2D5D
                 for (int col = 0; col < columns; col++)
                 {
                     float x = -footprint * 0.5f + spacing * (col + 1);
+                    float windowWidth = Mathf.Min(1.15f, spacing * 0.48f);
                     QueueAndroidBox(
                         "Window",
                         position + new Vector3(x, y, -depth * 0.522f),
-                        new Vector3(Mathf.Min(1.15f, spacing * 0.48f), 0.72f, 0.11f),
+                        new Vector3(windowWidth, 0.72f, 0.11f),
                         darkWindow);
+
+                    if (!stageTwoRequested)
+                    {
+                        float frameZ = -depth * 0.555f;
+                        QueueAndroidBox("CityWindowFrame_Left",
+                            position + new Vector3(x - windowWidth * 0.5f - 0.045f, y, frameZ),
+                            new Vector3(0.09f, 0.84f, 0.13f), trim);
+                        QueueAndroidBox("CityWindowFrame_Right",
+                            position + new Vector3(x + windowWidth * 0.5f + 0.045f, y, frameZ),
+                            new Vector3(0.09f, 0.84f, 0.13f), trim);
+                        QueueAndroidBox("CityWindowFrame_Top",
+                            position + new Vector3(x, y + 0.42f, frameZ),
+                            new Vector3(windowWidth + 0.18f, 0.09f, 0.13f), trim);
+                        QueueAndroidBox("CityWindowMullion",
+                            position + new Vector3(x, y, frameZ - 0.008f),
+                            new Vector3(0.045f, 0.72f, 0.135f), rooftop);
+                    }
 
                     QueueAndroidBox(
                         "WindowSill",
                         position + new Vector3(x, y - 0.46f, -depth * 0.53f),
                         new Vector3(Mathf.Min(1.32f, spacing * 0.56f), 0.10f, 0.16f),
                         trim);
+                }
+            }
+
+            if (!stageTwoRequested)
+            {
+                float frontZ = -depth * 0.555f;
+                float cornerX = footprint * 0.5f - 0.10f;
+                QueueAndroidBox("CityFacadeCorner_Left",
+                    position + new Vector3(-cornerX, bodyHeight * 0.5f, frontZ),
+                    new Vector3(0.20f, bodyHeight, 0.16f), trim);
+                QueueAndroidBox("CityFacadeCorner_Right",
+                    position + new Vector3(cornerX, bodyHeight * 0.5f, frontZ),
+                    new Vector3(0.20f, bodyHeight, 0.16f), trim);
+                QueueAndroidBox("CityFacadeCornice",
+                    position + new Vector3(0f, bodyHeight - 0.12f, frontZ),
+                    new Vector3(footprint + 0.18f, 0.16f, 0.20f), trim);
+
+                int sideWindows = bodyHeight >= 5f ? 2 : 1;
+                for (int sideWindow = 0; sideWindow < sideWindows; sideWindow++)
+                {
+                    float sideZ = sideWindows == 1
+                        ? 0f
+                        : Mathf.Lerp(-depth * 0.22f, depth * 0.22f, sideWindow);
+                    float sideY = bodyHeight >= 5f && sideWindow == 1 ? 4.15f : 1.65f;
+                    float sideX = footprint * 0.5f + 0.055f;
+                    float sideWindowDepth = Mathf.Min(0.92f, depth * 0.22f);
+                    QueueAndroidBox("CitySideWindow",
+                        position + new Vector3(sideX, sideY, sideZ),
+                        new Vector3(0.11f, 0.78f, sideWindowDepth), darkWindow);
+                    QueueAndroidBox("CitySideWindowFrame_Top",
+                        position + new Vector3(sideX + 0.012f, sideY + 0.43f, sideZ),
+                        new Vector3(0.14f, 0.09f, sideWindowDepth + 0.16f), trim);
+                    QueueAndroidBox("CitySideWindowFrame_Bottom",
+                        position + new Vector3(sideX + 0.012f, sideY - 0.43f, sideZ),
+                        new Vector3(0.14f, 0.09f, sideWindowDepth + 0.16f), trim);
+                    QueueAndroidBox("CitySideWindowFrame_Left",
+                        position + new Vector3(sideX + 0.012f, sideY, sideZ - sideWindowDepth * 0.5f - 0.045f),
+                        new Vector3(0.14f, 0.78f, 0.09f), trim);
+                    QueueAndroidBox("CitySideWindowFrame_Right",
+                        position + new Vector3(sideX + 0.012f, sideY, sideZ + sideWindowDepth * 0.5f + 0.045f),
+                        new Vector3(0.14f, 0.78f, 0.09f), trim);
+                }
+
+                QueueAndroidBox("CityDoorFrame_Left",
+                    position + new Vector3(-doorWidth * 0.5f - 0.075f, doorHeight * 0.5f, frontZ - 0.025f),
+                    new Vector3(0.15f, doorHeight, 0.18f), trim);
+                QueueAndroidBox("CityDoorFrame_Right",
+                    position + new Vector3(doorWidth * 0.5f + 0.075f, doorHeight * 0.5f, frontZ - 0.025f),
+                    new Vector3(0.15f, doorHeight, 0.18f), trim);
+                QueueAndroidBox("CityDoorFrame_Header",
+                    position + new Vector3(0f, doorHeight + 0.075f, frontZ - 0.025f),
+                    new Vector3(doorWidth + 0.30f, 0.15f, 0.18f), trim);
+                QueueAndroidBox("CityDoorThreshold",
+                    position + new Vector3(0f, 0.06f, frontZ - 0.10f),
+                    new Vector3(doorWidth + 0.18f, 0.12f, 0.30f), rooftop);
+
+                if (!isWarehouse && bodyHeight >= 5f && buildingIndex % 4 == 0)
+                {
+                    float balconyWidth = Mathf.Min(2.25f, footprint * 0.34f);
+                    float balconyX = -footprint * 0.19f;
+                    float balconyZ = -depth * 0.62f;
+                    QueueAndroidBox("CityBalconySlab",
+                        position + new Vector3(balconyX, 3.05f, balconyZ),
+                        new Vector3(balconyWidth, 0.16f, 0.78f), rooftop);
+                    QueueAndroidBox("CityBalconyRailTop",
+                        position + new Vector3(balconyX, 3.55f, balconyZ - 0.34f),
+                        new Vector3(balconyWidth, 0.09f, 0.09f), trim);
+                    QueueAndroidBox("CityBalconyRailLeft",
+                        position + new Vector3(balconyX - balconyWidth * 0.5f, 3.32f, balconyZ - 0.34f),
+                        new Vector3(0.09f, 0.48f, 0.09f), trim);
+                    QueueAndroidBox("CityBalconyRailRight",
+                        position + new Vector3(balconyX + balconyWidth * 0.5f, 3.32f, balconyZ - 0.34f),
+                        new Vector3(0.09f, 0.48f, 0.09f), trim);
                 }
             }
 
@@ -2221,6 +2350,70 @@ namespace PersiaWar.Unity2D5D
         private Material androidTreeTrunkMaterial;
         private Material androidTreeCrownMaterial;
         private Material androidLampMaterial;
+        private static Mesh androidTreeCanopyMesh;
+        private static Material androidTreeCanopyMaterial;
+
+        private static Mesh GetAndroidTreeCanopyMesh()
+        {
+            if (androidTreeCanopyMesh != null)
+                return androidTreeCanopyMesh;
+
+            MeshKit kit = new MeshKit();
+            kit.AddEllipsoid(
+                new Vector3(0f, 1.72f, 0f),
+                new Vector3(0.72f, 0.48f, 0.70f),
+                8, 4,
+                MeshKit.C(0.16f, 0.38f, 0.13f, MeshKit.Matte),
+                Quaternion.identity);
+            kit.AddEllipsoid(
+                new Vector3(-0.38f, 1.70f, 0.03f),
+                new Vector3(0.43f, 0.34f, 0.43f),
+                7, 4,
+                MeshKit.C(0.19f, 0.43f, 0.15f, MeshKit.Matte),
+                Quaternion.identity);
+            kit.AddEllipsoid(
+                new Vector3(0.39f, 1.72f, -0.04f),
+                new Vector3(0.42f, 0.35f, 0.44f),
+                7, 4,
+                MeshKit.C(0.22f, 0.47f, 0.16f, MeshKit.Matte),
+                Quaternion.identity);
+            kit.AddEllipsoid(
+                new Vector3(0f, 2.12f, 0f),
+                new Vector3(0.48f, 0.34f, 0.47f),
+                8, 4,
+                MeshKit.C(0.25f, 0.50f, 0.18f, MeshKit.Matte),
+                Quaternion.identity);
+            androidTreeCanopyMesh = kit.Build("PersiaWar_LowPolyCityTreeCanopy");
+            return androidTreeCanopyMesh;
+        }
+
+        private static Material GetAndroidTreeCanopyMaterial()
+        {
+            if (androidTreeCanopyMaterial != null)
+                return androidTreeCanopyMaterial;
+
+            Shader shader = Resources.Load<Shader>("PersiaWarVertexLit");
+            if (shader == null || !shader.isSupported)
+                shader = Shader.Find("PersiaWar/VertexLit");
+            if (shader == null || !shader.isSupported)
+                return null;
+
+            androidTreeCanopyMaterial = new Material(shader)
+            {
+                name = "PersiaWar_LowPolyCityTreeCanopy",
+                color = Color.white,
+                enableInstancing = true
+            };
+            if (androidTreeCanopyMaterial.HasProperty("_Color"))
+                androidTreeCanopyMaterial.SetColor("_Color", Color.white);
+            if (androidTreeCanopyMaterial.HasProperty("_RimStrength"))
+                androidTreeCanopyMaterial.SetFloat("_RimStrength", 0.12f);
+            if (androidTreeCanopyMaterial.HasProperty("_SpecStrength"))
+                androidTreeCanopyMaterial.SetFloat("_SpecStrength", 0.04f);
+            if (androidTreeCanopyMaterial.HasProperty("_Gloss"))
+                androidTreeCanopyMaterial.SetFloat("_Gloss", 0.18f);
+            return androidTreeCanopyMaterial;
+        }
         private Material androidLampGlowMaterial;
         private Material androidWindowMaterial;
         private Material androidShadowMaterial;
@@ -2257,19 +2450,47 @@ namespace PersiaWar.Unity2D5D
                 androidTreeTrunkMaterial,
                 true);
 
-            CreateAndroidBox(
+            GameObject lowerCrownCollider = CreateAndroidBox(
                 "TreeCrownLower",
                 position + Vector3.up * (scale * 1.75f),
                 new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
                 androidTreeCrownMaterial,
                 true);
 
-            CreateAndroidBox(
+            GameObject upperCrownCollider = CreateAndroidBox(
                 "TreeCrownUpper",
                 position + Vector3.up * (scale * 2.30f),
                 new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
                 androidTreeCrownMaterial,
                 true);
+
+            Mesh canopyMesh = GetAndroidTreeCanopyMesh();
+            Material canopyMaterial = GetAndroidTreeCanopyMaterial();
+            if (canopyMesh != null && canopyMaterial != null)
+            {
+                // Retain original crown colliders for movement/occlusion while
+                // replacing their cuboid renderers with one faceted mesh.
+                Renderer lowerRenderer = lowerCrownCollider.GetComponent<Renderer>();
+                Renderer upperRenderer = upperCrownCollider.GetComponent<Renderer>();
+                if (lowerRenderer != null) lowerRenderer.enabled = false;
+                if (upperRenderer != null) upperRenderer.enabled = false;
+
+                Transform visualParent = androidCurrentBuildingRoot != null
+                    ? androidCurrentBuildingRoot
+                    : worldRoot;
+                GameObject foliage = new GameObject("TreeCanopy_MeshKit");
+                foliage.transform.SetParent(visualParent, true);
+                foliage.transform.position = position;
+                foliage.transform.localScale = Vector3.one * scale;
+                MeshFilter filter = foliage.AddComponent<MeshFilter>();
+                filter.sharedMesh = canopyMesh;
+                MeshRenderer renderer = foliage.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = canopyMaterial;
+                renderer.shadowCastingMode = Application.isMobilePlatform
+                    ? UnityEngine.Rendering.ShadowCastingMode.Off
+                    : UnityEngine.Rendering.ShadowCastingMode.On;
+                renderer.receiveShadows = !Application.isMobilePlatform;
+            }
 
             if (stageTwoRequested)
                 androidCurrentBuildingRoot = previousBuildingRoot;
