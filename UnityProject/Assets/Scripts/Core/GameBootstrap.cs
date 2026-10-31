@@ -363,6 +363,7 @@ namespace PersiaWar.Unity2D5D
 
             if (worldRoot != null) Destroy(worldRoot.gameObject);
             worldRoot = new GameObject("BattleRoyaleCity").transform;
+            EnvironmentLightingProfile.Apply(transform, stageTwoRequested);
 
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
