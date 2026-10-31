@@ -1,0 +1,119 @@
+name: One-time PersiaWar graphics import
+on:
+  push:
+    branches:
+      - Persian-war4
+    paths:
+      - '.graphics-import-trigger'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: Persian-war4
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract and validate graphics library
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+
+          archive = Path("PersiaWar_GraphicsLibrary.zip")
+          if not archive.is_file():
+              raise SystemExit("PersiaWar_GraphicsLibrary.zip is missing")
+
+          required = {
+              "Scripts/Art/MeshKit.cs",
+              "Scripts/Art/ModelLibrary.cs",
+              "Scripts/Art/PickupVisual.cs",
+              "Scripts/Art/ModelPreview.cs",
+              "Scripts/Combat/BloodFX.cs",
+              "Scripts/Combat/HitReactor.cs",
+              "Resources/PersiaWarVertexLit.shader",
+              "Resources/PersiaWarDecal.shader",
+          }
+
+          copied = set()
+          with ZipFile(archive) as package:
+              names = {entry.filename for entry in package.infolist()}
+              if "INTEGRATION.md" not in names:
+                  raise SystemExit("INTEGRATION.md is missing from the package")
+
+              for entry in package.infolist():
+                  name = entry.filename
+                  if entry.is_dir() or not name.startswith("Assets/"):
+                      continue
+                  relative = PurePosixPath(name)
+                  if relative.is_absolute() or any(part in ("", ".", "..") for part in relative.parts):
+                      raise SystemExit(f"Unsafe archive path: {name}")
+                  asset_relative = PurePosixPath(*relative.parts[1:])
+                  target = Path("UnityProject/Assets").joinpath(*asset_relative.parts)
+                  if target.exists():
+                      raise SystemExit(f"Refusing to overwrite existing project asset: {target}")
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(package.read(entry))
+                  copied.add(str(asset_relative))
+
+              missing = required - copied
+              if missing:
+                  raise SystemExit("Missing required package files: " + ", ".join(sorted(missing)))
+
+              for path in sorted(copied):
+                  if not path.endswith(".meta") and path + ".meta" not in copied:
+                      raise SystemExit(f"Unity .meta file missing for Assets/{path}")
+
+              guide = Path("docs/graphics-library/INTEGRATION.md")
+              if guide.exists():
+                  raise SystemExit(f"Refusing to overwrite existing integration guide: {guide}")
+              guide.parent.mkdir(parents=True, exist_ok=True)
+              guide.write_bytes(package.read("INTEGRATION.md"))
+
+          print("Imported graphics assets:")
+          for path in sorted(copied):
+              print("  UnityProject/Assets/" + path)
+          print("Preserved docs/graphics-library/INTEGRATION.md")
+          PY
+
+      - name: Commit imported graphics assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add UnityProject/Assets docs/graphics-library/INTEGRATION.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No graphics asset changes to commit."; exit 1; }
+          git commit -m "Import PersiaWar graphics library assets"
+          git push origin HEAD:refs/heads/Persian-war4
+
+      - name: Remove one-time import runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .graphics-import-trigger .github/workflows/import-persiawar-graphics.yml
+          git commit -m "Remove one-time graphics import runner"
+          git push origin HEAD:refs/heads/Persian-war4
+
+      - name: Dispatch Unity project validation
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "unity-android-build.yml",
+              ref: "Persian-war4",
+              inputs: { build_ref: "Persian-war4" }
+            });
+            core.info("Dispatched Unity Android validation for Persian-war4.");
