@@ -2281,25 +2281,19 @@ namespace PersiaWar.Unity2D5D
         {
             position.y = CalculateAndroidTerrainHeight(position.x, position.z);
 
-            // Stage 2 only: group the trunk and both canopy sections beneath one
-            // identifiable root. The camera fader can then fade the complete tree
-            // when a tree collider actually intersects the camera-to-player sightline.
-            // Stage 1 keeps its original hierarchy and rendering path unchanged.
+            // Give every tree one identifiable root so both Stage 1 and Stage 2
+            // camera faders can fade the complete tree when its collider blocks sight.
             Transform previousBuildingRoot = androidCurrentBuildingRoot;
-            if (stageTwoRequested)
-            {
-                androidCurrentBuildingRoot = new GameObject("Tree_OcclusionRoot").transform;
-                androidCurrentBuildingRoot.SetParent(worldRoot, true);
-            }
+            androidCurrentBuildingRoot = new GameObject("Tree_OcclusionRoot").transform;
+            androidCurrentBuildingRoot.SetParent(worldRoot, true);
 
+            // Reuse the same lit materials in both stages for consistent leaf colour and shading.
             if (androidTreeTrunkMaterial == null)
-                androidTreeTrunkMaterial = stageTwoRequested
-                    ? MakeStageTwoLitMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f))
-                    : MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+                androidTreeTrunkMaterial = MakeStageTwoLitMaterial(
+                    "AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
             if (androidTreeCrownMaterial == null)
-                androidTreeCrownMaterial = stageTwoRequested
-                    ? MakeStageTwoLitMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f))
-                    : MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
+                androidTreeCrownMaterial = MakeStageTwoLitMaterial(
+                    "AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
 
             CreateAndroidBox(
                 "TreeTrunk",
@@ -2308,12 +2302,13 @@ namespace PersiaWar.Unity2D5D
                 androidTreeTrunkMaterial,
                 true);
 
+            if (androidTreeCrownHighlightMaterial == null)
+                androidTreeCrownHighlightMaterial = MakeStageTwoLitMaterial(
+                    "AndroidTreeCrownHighlight", new Color(0.23f, 0.47f, 0.16f));
+
             if (stageTwoRequested)
             {
-                if (androidTreeCrownHighlightMaterial == null)
-                    androidTreeCrownHighlightMaterial = MakeStageTwoLitMaterial(
-                        "AndroidTreeCrownHighlight", new Color(0.23f, 0.47f, 0.16f));
-
+                // Keep the accepted Stage 2 four-cluster broadleaf shape unchanged.
                 CreateAndroidTreeCanopy("TreeCrownLower",
                     position + Vector3.up * (scale * 1.72f),
                     new Vector3(scale * 2.05f, scale * 1.15f, scale * 1.92f),
@@ -2333,19 +2328,63 @@ namespace PersiaWar.Unity2D5D
             }
             else
             {
-                // Keep Stage 1's existing foliage and gameplay presentation untouched.
-                CreateAndroidBox("TreeCrownLower",
-                    position + Vector3.up * (scale * 1.75f),
-                    new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
-                    androidTreeCrownMaterial, true);
-                CreateAndroidBox("TreeCrownUpper",
-                    position + Vector3.up * (scale * 2.30f),
-                    new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
-                    androidTreeCrownMaterial, true);
+                // Stage 1: the same rounded foliage language, with three restrained silhouettes.
+                int treeStyle = Mathf.Abs(Mathf.RoundToInt(
+                    position.x * 0.73f + position.z * 1.17f)) % 3;
+                if (treeStyle == 0)
+                {
+                    CreateAndroidTreeCanopy("TreeCrownLower",
+                        position + Vector3.up * (scale * 1.72f),
+                        new Vector3(scale * 2.05f, scale * 1.15f, scale * 1.92f),
+                        androidTreeCrownMaterial);
+                    CreateAndroidTreeCanopy("TreeCrownUpper",
+                        position + Vector3.up * (scale * 2.30f),
+                        new Vector3(scale * 1.48f, scale * 1.12f, scale * 1.48f),
+                        androidTreeCrownHighlightMaterial);
+                    CreateAndroidTreeCanopy("TreeCrownLeft",
+                        position + new Vector3(-scale * 0.48f, scale * 1.72f, scale * 0.08f),
+                        new Vector3(scale * 1.18f, scale * 1.05f, scale * 1.30f),
+                        androidTreeCrownHighlightMaterial);
+                    CreateAndroidTreeCanopy("TreeCrownRight",
+                        position + new Vector3(scale * 0.48f, scale * 1.70f, -scale * 0.06f),
+                        new Vector3(scale * 1.15f, scale * 1.00f, scale * 1.25f),
+                        androidTreeCrownMaterial);
+                }
+                else if (treeStyle == 1)
+                {
+                    // Lower, wider fruit-tree crown.
+                    CreateAndroidTreeCanopy("TreeCrownOrchard",
+                        position + Vector3.up * (scale * 1.82f),
+                        new Vector3(scale * 2.05f, scale * 1.05f, scale * 1.95f),
+                        androidTreeCrownMaterial);
+                    CreateAndroidTreeCanopy("TreeCrownOrchardTop",
+                        position + Vector3.up * (scale * 2.25f),
+                        new Vector3(scale * 1.20f, scale * 0.98f, scale * 1.20f),
+                        androidTreeCrownHighlightMaterial);
+                    CreateAndroidTreeCanopy("TreeCrownOrchardSide",
+                        position + new Vector3(scale * 0.52f, scale * 1.76f, scale * 0.02f),
+                        new Vector3(scale * 1.18f, scale * 0.94f, scale * 1.20f),
+                        androidTreeCrownHighlightMaterial);
+                }
+                else
+                {
+                    // Taller, narrower evergreen-like silhouette.
+                    CreateAndroidTreeCanopy("TreeCrownEvergreenLower",
+                        position + Vector3.up * (scale * 1.78f),
+                        new Vector3(scale * 1.62f, scale * 1.18f, scale * 1.62f),
+                        androidTreeCrownMaterial);
+                    CreateAndroidTreeCanopy("TreeCrownEvergreenMiddle",
+                        position + Vector3.up * (scale * 2.46f),
+                        new Vector3(scale * 1.18f, scale * 1.12f, scale * 1.18f),
+                        androidTreeCrownHighlightMaterial);
+                    CreateAndroidTreeCanopy("TreeCrownEvergreenTip",
+                        position + Vector3.up * (scale * 3.05f),
+                        new Vector3(scale * 0.72f, scale * 1.04f, scale * 0.72f),
+                        androidTreeCrownMaterial);
+                }
             }
 
-            if (stageTwoRequested)
-                androidCurrentBuildingRoot = previousBuildingRoot;
+            androidCurrentBuildingRoot = previousBuildingRoot;
         }
 
         private void CreateAndroidTreeCanopy(string objectName, Vector3 position, Vector3 size, Material material)
@@ -2361,7 +2400,7 @@ namespace PersiaWar.Unity2D5D
             {
                 renderer.sharedMaterial = material;
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = stageTwoRequested;
+                renderer.receiveShadows = true;
             }
         }
 
