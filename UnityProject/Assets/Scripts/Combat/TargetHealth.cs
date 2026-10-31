@@ -19,14 +19,32 @@ namespace PersiaWar.Unity2D5D
             CurrentHealth = maxHealth;
         }
 
+        private static string ResolveWeaponName(Transform attacker)
+        {
+            if (attacker == null) return "AssaultRifle";
+            WeaponController weapon = attacker.GetComponentInParent<WeaponController>();
+            return weapon != null ? weapon.CurrentWeapon.ToString() : attacker.name;
+        }
+
         public void ApplyDamage(int amount, Transform attacker = null)
         {
             if (CurrentHealth <= 0) return;
             amount = Mathf.Max(0, amount);
             if (amount == 0) return;
 
+            Vector3 attackerPosition = attacker != null ? attacker.position : Vector3.zero;
+            string weaponName = ResolveWeaponName(attacker);
+            bool explosive = weaponName.IndexOf("Grenade", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                (attacker != null && attacker.name.IndexOf("Grenade", System.StringComparison.OrdinalIgnoreCase) >= 0);
+            EnemyChase liveEnemy = GetComponent<EnemyChase>();
+
             CurrentHealth = Mathf.Max(0, CurrentHealth - amount);
-            if (CurrentHealth > 0) return;
+            if (CurrentHealth > 0)
+            {
+                if (liveEnemy != null)
+                    HitReactor.NotifyDamaged(gameObject, attackerPosition, amount, weaponName);
+                return;
+            }
 
             PlayerController player = GetComponent<PlayerController>();
             if (player != null)
@@ -35,7 +53,7 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            EnemyChase enemy = GetComponent<EnemyChase>();
+            EnemyChase enemy = liveEnemy;
             if (enemy != null)
             {
                 int scoreBonus = Mathf.Max(0, enemy.ScoreValue - 10);
@@ -51,18 +69,20 @@ namespace PersiaWar.Unity2D5D
                     "S3_HostileHovercraft_", System.StringComparison.Ordinal);
                 if (!isStageThreeCraft)
                     SpawnDroppedWeapon(enemy);
-                BeginEnemyDeathSequence(enemy);
+                BeginEnemyDeathSequence(enemy, attackerPosition, amount, weaponName, explosive);
                 return;
             }
 
             Destroy(gameObject);
         }
 
-        private void BeginEnemyDeathSequence(EnemyChase enemy)
+        private void BeginEnemyDeathSequence(
+            EnemyChase enemy, Vector3 attackerPosition, int damage, string weaponName, bool explosive)
         {
             Vector3 deathPosition = enemy != null ? enemy.transform.position : transform.position;
             bool deferCraftRemoval = enemy != null &&
                 enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal);
+            float settleDuration = 0f;
             if (enemy != null)
             {
                 // Disable combat and collision immediately, but let StageThreeWorldBuilder
@@ -74,15 +94,22 @@ namespace PersiaWar.Unity2D5D
 
                 MonoBehaviour[] behaviours = enemy.GetComponentsInChildren<MonoBehaviour>();
                 for (int i = 0; i < behaviours.Length; i++)
-                    if (behaviours[i] != null && behaviours[i] != this) behaviours[i].enabled = false;
+                {
+                    MonoBehaviour behaviour = behaviours[i];
+                    if (behaviour != null && behaviour != this && !(behaviour is HitReactor))
+                        behaviour.enabled = false;
+                }
 
                 if (!deferCraftRemoval)
-                    StartCoroutine(FallAndRemoveEnemy(enemy.transform));
+                {
+                    settleDuration = HitReactor.NotifyKilled(
+                        enemy.gameObject, attackerPosition, damage, weaponName, explosive);
+                    Destroy(enemy.gameObject, Mathf.Max(1.5f, settleDuration + 0.1f));
+                }
             }
 
-            // Alien bodies in Stage 3 use a falling-removal animation, not the
-            // six-mesh blood pool used by human enemies. Avoid hundreds of
-            // short-lived primitives/materials accumulating during the long wave.
+            // Keep the stage-specific exclusions: spacecraft wrecks have their own
+            // explosion sequence, while aliens receive the library's alien-goo effect.
             bool isStageThreeAlien = enemy != null &&
                 enemy.gameObject.name.StartsWith("S3_Alien", System.StringComparison.Ordinal);
             bool isStageThreeCraft = enemy != null &&
@@ -91,8 +118,8 @@ namespace PersiaWar.Unity2D5D
             bool isStageFourAlien = enemy != null &&
                 enemy.gameObject.name.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
 
-            // Space-stage aliens and craft do not create human blood effects.
-            if (!isStageThreeAlien && !isStageThreeCraft && !isStageFourAlien)
+            // Fallback only if the new death reactor could not take ownership of the body.
+            if (!isStageThreeAlien && !isStageThreeCraft && !isStageFourAlien && settleDuration <= 0f)
                 SpawnBloodEffect(deathPosition);
         }
 
@@ -253,6 +280,8 @@ namespace PersiaWar.Unity2D5D
 
             PickupItem pickup = dropped.AddComponent<PickupItem>();
             pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);
+            PickupVisual.Attach(dropped.transform,
+                ModelLibrary.KindFromName(enemy.DroppedWeaponKind.ToString()), true);
             Debug.Log("PERSIA_COMBAT: dropped enemy weapon " + enemy.DroppedWeaponKind);
         }
 
