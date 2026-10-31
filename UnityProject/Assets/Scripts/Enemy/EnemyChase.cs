@@ -38,6 +38,8 @@ namespace PersiaWar.Unity2D5D
         private PlayerController targetPlayer;
         private StylizedCharacterVisual visual;
         private Transform weaponVisualRoot;
+        private GameObject libraryEnemyWeaponVisual;
+        private ModelKind libraryEnemyWeaponKind = ModelKind.None;
         private static Material enemyRifleReceiverMaterial;
         private static Material enemyRifleMetalMaterial;
         private static Material enemyRangeRingMaterial;
@@ -73,11 +75,16 @@ namespace PersiaWar.Unity2D5D
         public int ScoreValue => archetype == 3 ? 40 : (archetype == 2 ? 20 : 10);
         public int Archetype => archetype;
 
-        public WeaponController.WeaponKind DroppedWeaponKind => archetype == 1
-            ? WeaponController.WeaponKind.LightPistol
-            : (archetype == 2
-                ? WeaponController.WeaponKind.HeavyMachineGun
-                : WeaponController.WeaponKind.AssaultRifle);
+        private bool IsAlienEnemy => gameObject != null &&
+            gameObject.name.IndexOf("Alien", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+        public WeaponController.WeaponKind DroppedWeaponKind => IsAlienEnemy
+            ? (archetype == 2 ? WeaponController.WeaponKind.AlienSword : WeaponController.WeaponKind.VoidRifle)
+            : (archetype == 1
+                ? WeaponController.WeaponKind.LightPistol
+                : (archetype == 2
+                    ? WeaponController.WeaponKind.HeavyMachineGun
+                    : WeaponController.WeaponKind.AssaultRifle));
 
         public void Configure(Transform targetTransform, int enemyArchetype)
         {
@@ -177,7 +184,10 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             if (weaponVisualRoot != null)
+            {
+                EnsureEnemyLibraryWeaponVisual();
                 return;
+            }
 
             // Mount the rifle to the character's 3D hand/body layer on mobile,
             // not to the outer aiming transform. This keeps it visibly in the hands
@@ -187,6 +197,7 @@ namespace PersiaWar.Unity2D5D
             if (existing != null)
             {
                 weaponVisualRoot = existing;
+                EnsureEnemyLibraryWeaponVisual();
                 return;
             }
 
@@ -240,6 +251,29 @@ namespace PersiaWar.Unity2D5D
                 CreateEnemyWeaponPart("RifleBarrel", new Vector3(0f, 0.015f, 0.43f),
                     new Vector3(0.065f, 0.065f, 0.30f), enemyRifleMetalMaterial);
             }
+
+            EnsureEnemyLibraryWeaponVisual();
+        }
+
+        private void EnsureEnemyLibraryWeaponVisual()
+        {
+            if (weaponVisualRoot == null) return;
+            ModelKind kind = ModelLibrary.KindFromName(DroppedWeaponKind.ToString());
+            if (kind == ModelKind.None) return;
+            if (libraryEnemyWeaponVisual != null && libraryEnemyWeaponKind == kind)
+            {
+                libraryEnemyWeaponVisual.SetActive(true);
+                return;
+            }
+
+            if (libraryEnemyWeaponVisual != null)
+                Destroy(libraryEnemyWeaponVisual);
+
+            // The legacy silhouette remains in the hierarchy for compatibility, but
+            // its renderers are disabled by AttachWeapon. Combat and targeting are unchanged.
+            libraryEnemyWeaponVisual = ModelLibrary.AttachWeapon(weaponVisualRoot, kind,
+                true, Vector3.zero, Quaternion.identity, 0.68f);
+            libraryEnemyWeaponKind = libraryEnemyWeaponVisual != null ? kind : ModelKind.None;
         }
 
         private void CreateEnemyWeaponPart(
