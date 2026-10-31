@@ -139,10 +139,10 @@ namespace PersiaWar.Unity2D5D
         }
 
         /// <summary>
-        /// Replaces blood decals/spray with a short-lived sci-fi energy discharge.
+        /// Replaces the legacy ground decal and spray with a short-lived sci-fi energy discharge.
         /// All particles are bounded and share the project's existing additive material.
         /// </summary>
-        private static void SpawnEnergyDefeatEffect(Vector3 position, Color color)
+        private void SpawnEnergyDefeatEffect(Vector3 position, Color color)
         {
             GameObject effectRoot = new GameObject("PW_EnemyEnergyDischarge");
             effectRoot.transform.position = position + Vector3.up * 0.22f;
@@ -216,8 +216,31 @@ namespace PersiaWar.Unity2D5D
                 ring.SetPosition(i, new Vector3(Mathf.Cos(angle) * 0.5f, 0f, Mathf.Sin(angle) * 0.5f));
             }
             ringObject.transform.localScale = new Vector3(0.12f, 1f, 0.12f);
-            Destroy(ringObject, 0.55f);
+            StartCoroutine(AnimateEnergyGroundPulse(ringObject.transform, ring, color));
             Destroy(effectRoot, 0.95f);
+        }
+
+        private System.Collections.IEnumerator AnimateEnergyGroundPulse(
+            Transform pulseTransform, LineRenderer pulseLine, Color energyColor)
+        {
+            const float duration = 0.42f;
+            float elapsed = 0f;
+            Color initial = new Color(energyColor.r, energyColor.g, energyColor.b, 0.9f);
+            Color transparent = new Color(energyColor.r, energyColor.g, energyColor.b, 0f);
+
+            while (elapsed < duration && pulseTransform != null && pulseLine != null)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float scale = Mathf.Lerp(0.12f, 3.0f, t);
+                pulseTransform.localScale = new Vector3(scale, 1f, scale);
+                pulseLine.startColor = Color.Lerp(initial, transparent, t);
+                pulseLine.endColor = transparent;
+                yield return null;
+            }
+
+            if (pulseTransform != null)
+                Destroy(pulseTransform.gameObject);
         }
 
         /// <summary>
