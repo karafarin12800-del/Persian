@@ -11,8 +11,8 @@ namespace PersiaWar.Unity2D5D
     {
         [SerializeField] private float patrolSpeed = 2.15f;
         [SerializeField] private float turnSpeed = 260f;
-        [SerializeField] private float detectionRange = 25f;
-        [SerializeField] private float disengageRange = 41f;
+        [SerializeField] private float detectionRange = 32f;
+        [SerializeField] private float disengageRange = 46f;
         [SerializeField] private float lostContactGrace = 6.5f;
         [SerializeField] private float waypointReachDistance = 1.3f;
         [SerializeField] private float waypointPause = 0.65f;
@@ -133,7 +133,7 @@ namespace PersiaWar.Unity2D5D
             Vector3 flatForward = transform.forward;
             flatForward.y = 0f;
             if (flatDirection.sqrMagnitude > 0.01f && flatForward.sqrMagnitude > 0.01f &&
-                Vector3.Dot(flatForward.normalized, flatDirection.normalized) < -0.45f)
+                Vector3.Dot(flatForward.normalized, flatDirection.normalized) < -0.90f)
                 return false;
 
             RaycastHit hit;

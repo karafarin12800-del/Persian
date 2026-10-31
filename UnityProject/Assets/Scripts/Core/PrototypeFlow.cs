@@ -2241,6 +2241,20 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        private static ModelKind GetCampaignWeaponPreviewKind(WeaponController.WeaponKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponController.WeaponKind.LightPistol: return ModelKind.Pistol;
+                case WeaponController.WeaponKind.AssaultRifle: return ModelKind.AssaultRifle;
+                case WeaponController.WeaponKind.HeavyMachineGun: return ModelKind.HeavyMachineGun;
+                case WeaponController.WeaponKind.Axe: return ModelKind.Axe;
+                case WeaponController.WeaponKind.VoidRifle: return ModelKind.VoidRifle;
+                case WeaponController.WeaponKind.AlienSword: return ModelKind.AlienSword;
+                default: return ModelKind.None;
+            }
+        }
+
         private void DrawWeaponSelect()
         {
             Rect panel = GetWeaponSelectPanelRect();
@@ -2275,6 +2289,12 @@ namespace PersiaWar.Unity2D5D
                     : selected ? "SELECTED" : "TAP TO SELECT";
                 GUI.Label(new Rect(card.x + 8f * scale, card.y + 46f * scale,
                     card.width - 16f * scale, 28f * scale), status, menuSmallStyle);
+
+                // Render the actual 3D weapon mesh in each selection card.
+                Rect imageRect = new Rect(card.x + 10f * scale, card.y + 76f * scale,
+                    card.width - 20f * scale, Mathf.Max(36f * scale, card.height - 84f * scale));
+                ModelPreview.Draw(imageRect, GetCampaignWeaponPreviewKind(kind));
+
                 if (GUI.Button(card, GUIContent.none, GUIStyle.none) && available)
                     SelectCampaignWeapon(i);
             }

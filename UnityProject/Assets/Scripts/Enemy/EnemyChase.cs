@@ -79,7 +79,9 @@ namespace PersiaWar.Unity2D5D
             gameObject.name.IndexOf("Alien", System.StringComparison.OrdinalIgnoreCase) >= 0;
 
         public WeaponController.WeaponKind DroppedWeaponKind => IsAlienEnemy
-            ? (archetype == 2 ? WeaponController.WeaponKind.AlienSword : WeaponController.WeaponKind.VoidRifle)
+            ? (archetype == 1 ? WeaponController.WeaponKind.LightPistol
+                : (archetype == 2 ? WeaponController.WeaponKind.HeavyMachineGun
+                    : WeaponController.WeaponKind.VoidRifle))
             : (archetype == 1
                 ? WeaponController.WeaponKind.LightPistol
                 : (archetype == 2
@@ -180,8 +182,26 @@ namespace PersiaWar.Unity2D5D
 
         private void EnsureEnemyWeaponVisual()
         {
+            // Procedural Stage 4 troopers have no StylizedCharacterVisual hand rig.
+            // Give them a dedicated mount so every ranged alien visibly carries the
+            // shared-library model that its combat archetype drops.
             if (visual == null)
+            {
+                if (weaponVisualRoot == null)
+                {
+                    Transform existingStageFourMount = transform.Find("EnemyRifleVisual");
+                    weaponVisualRoot = existingStageFourMount != null
+                        ? existingStageFourMount
+                        : new GameObject("EnemyRifleVisual").transform;
+                    if (weaponVisualRoot.parent == null)
+                        weaponVisualRoot.SetParent(transform, false);
+                    weaponVisualRoot.localPosition = new Vector3(0.42f, 1.04f, 0.46f);
+                    weaponVisualRoot.localRotation = Quaternion.Euler(0f, -6f, 0f);
+                    weaponVisualRoot.localScale = Vector3.one;
+                }
+                EnsureEnemyLibraryWeaponVisual();
                 return;
+            }
 
             if (weaponVisualRoot != null)
             {

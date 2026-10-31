@@ -1059,7 +1059,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                     new Vector3(0.16f, 0.15f, 0.90f), darkMetalMaterial);
                 CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.48f, 0.12f, 0.94f),
                     new Vector3(0.10f, 0.10f, 0.46f), greenGlowMaterial);
-                AttachStageThreeAlienWeapon(guard.Root);
+                AttachStageThreeAlienWeapon(guard.Root, guard.Archetype);
                 upperPatrols++;
             }
         }
@@ -1098,7 +1098,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(0.16f, 0.15f, 0.90f), darkMetalMaterial);
             CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.48f, 0.12f, 0.94f),
                 new Vector3(0.10f, 0.10f, 0.46f), greenGlowMaterial);
-            AttachStageThreeAlienWeapon(guard.Root);
+            AttachStageThreeAlienWeapon(guard.Root, guard.Archetype);
             upperPatrols++;
         }
 
@@ -1199,7 +1199,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             alien.transform.localScale = new Vector3(1.12f, 1.62f, 1.12f);
         BuildAlienCreatureDetails(alien.transform, archetype, guard, eliteGuard);
         if (guard && !eliteGuard)
-            AttachStageThreeAlienWeapon(alien.transform);
+            AttachStageThreeAlienWeapon(alien.transform, archetype);
 
         TargetHealth health = alien.AddComponent<TargetHealth>();
         health.SetMaxHealth(archetype == 3 ? 150 : (archetype == 2 ? 115 : 90));
@@ -1269,7 +1269,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
     }
 
-    private static void AttachStageThreeAlienWeapon(Transform alien)
+    private static void AttachStageThreeAlienWeapon(Transform alien, int archetype)
     {
         if (alien == null) return;
 
@@ -1295,8 +1295,10 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         mount.SetParent(alien, false);
         mount.localPosition = new Vector3(0.47f, 0.06f, 0.16f);
         mount.localRotation = Quaternion.identity;
-        ModelLibrary.AttachWeapon(mount, ModelKind.VoidRifle, false,
-            Vector3.zero, Quaternion.identity, 0.58f);
+        ModelKind weaponKind = archetype == 1 ? ModelKind.Pistol
+            : (archetype == 2 ? ModelKind.HeavyMachineGun : ModelKind.VoidRifle);
+        ModelLibrary.AttachWeapon(mount, weaponKind, false,
+            Vector3.zero, Quaternion.identity, archetype == 2 ? 0.52f : 0.58f);
     }
 
     private void UpdateUpperGuardPatrols()

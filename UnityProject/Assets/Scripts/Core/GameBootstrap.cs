@@ -1853,7 +1853,8 @@ namespace PersiaWar.Unity2D5D
                 Vector3 house;
                 float footprint;
                 float depth;
-                float houseHeight = i % 7 == 0 ? 4.4f : 3.35f;
+                // Taller Stage 2 village skyline, while retaining the existing plot and path geometry.
+                float houseHeight = i % 7 == 0 ? 6.0f : 5.15f;
 
                 if (style == 1)
                 {
@@ -2000,7 +2001,7 @@ namespace PersiaWar.Unity2D5D
                 Vector3 treePosition = trees[i];
                 if (stageTwoLayoutVariant == 1) treePosition.x = -treePosition.x;
                 else if (stageTwoLayoutVariant == 2) { float ox = treePosition.x; treePosition.x = treePosition.z; treePosition.z = -ox; }
-                CreateAndroidTree(treePosition, 1.8f + (i % 3) * 0.35f);
+                CreateAndroidTree(treePosition, 2.05f + (i % 3) * 0.40f);
                 if (i % 2 == 0)
                     QueueAndroidBox("VillageFieldGreenPatch",
                         new Vector3(treePosition.x + 2.8f, 0.07f, treePosition.z + 1.9f),
@@ -2269,6 +2270,7 @@ namespace PersiaWar.Unity2D5D
 
         private Material androidTreeTrunkMaterial;
         private Material androidTreeCrownMaterial;
+        private Material androidTreeCrownHighlightMaterial;
         private Material androidLampMaterial;
         private Material androidLampGlowMaterial;
         private Material androidWindowMaterial;
@@ -2306,22 +2308,61 @@ namespace PersiaWar.Unity2D5D
                 androidTreeTrunkMaterial,
                 true);
 
-            CreateAndroidBox(
-                "TreeCrownLower",
-                position + Vector3.up * (scale * 1.75f),
-                new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
-                androidTreeCrownMaterial,
-                true);
+            if (stageTwoRequested)
+            {
+                if (androidTreeCrownHighlightMaterial == null)
+                    androidTreeCrownHighlightMaterial = MakeStageTwoLitMaterial(
+                        "AndroidTreeCrownHighlight", new Color(0.23f, 0.47f, 0.16f));
 
-            CreateAndroidBox(
-                "TreeCrownUpper",
-                position + Vector3.up * (scale * 2.30f),
-                new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
-                androidTreeCrownMaterial,
-                true);
+                CreateAndroidTreeCanopy("TreeCrownLower",
+                    position + Vector3.up * (scale * 1.72f),
+                    new Vector3(scale * 2.05f, scale * 1.15f, scale * 1.92f),
+                    androidTreeCrownMaterial);
+                CreateAndroidTreeCanopy("TreeCrownUpper",
+                    position + Vector3.up * (scale * 2.30f),
+                    new Vector3(scale * 1.48f, scale * 1.12f, scale * 1.48f),
+                    androidTreeCrownHighlightMaterial);
+                CreateAndroidTreeCanopy("TreeCrownLeft",
+                    position + new Vector3(-scale * 0.48f, scale * 1.72f, scale * 0.08f),
+                    new Vector3(scale * 1.18f, scale * 1.05f, scale * 1.30f),
+                    androidTreeCrownHighlightMaterial);
+                CreateAndroidTreeCanopy("TreeCrownRight",
+                    position + new Vector3(scale * 0.48f, scale * 1.70f, -scale * 0.06f),
+                    new Vector3(scale * 1.15f, scale * 1.00f, scale * 1.25f),
+                    androidTreeCrownMaterial);
+            }
+            else
+            {
+                // Keep Stage 1's existing foliage and gameplay presentation untouched.
+                CreateAndroidBox("TreeCrownLower",
+                    position + Vector3.up * (scale * 1.75f),
+                    new Vector3(scale * 1.55f, scale * 0.92f, scale * 1.55f),
+                    androidTreeCrownMaterial, true);
+                CreateAndroidBox("TreeCrownUpper",
+                    position + Vector3.up * (scale * 2.30f),
+                    new Vector3(scale * 1.02f, scale * 0.78f, scale * 1.02f),
+                    androidTreeCrownMaterial, true);
+            }
 
             if (stageTwoRequested)
                 androidCurrentBuildingRoot = previousBuildingRoot;
+        }
+
+        private void CreateAndroidTreeCanopy(string objectName, Vector3 position, Vector3 size, Material material)
+        {
+            GameObject canopy = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            canopy.name = objectName;
+            Transform parent = androidCurrentBuildingRoot != null ? androidCurrentBuildingRoot : worldRoot;
+            canopy.transform.SetParent(parent, true);
+            canopy.transform.position = position;
+            canopy.transform.localScale = size;
+            Renderer renderer = canopy.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = stageTwoRequested;
+            }
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
