@@ -1510,6 +1510,8 @@ namespace PersiaWar.Unity2D5D
                     stageThreeWorldBuilder.OnBuildFailed -= HandleStageThreeBuildFailed;
                 }
                 GraphicsQualityProfile.ReleaseStageEffects();
+                BloodFX.ClearAll();
+                ModelPreview.ReleaseAll();
                 StartupCheckpoint.Set("StageTransitionSceneReloadBegin_Stage" + targetStage);
                 AsyncOperation sceneReload = SceneManager.LoadSceneAsync(gameObject.scene.name, LoadSceneMode.Single);
                 if (sceneReload == null)
@@ -1820,6 +1822,8 @@ namespace PersiaWar.Unity2D5D
         {
             Time.timeScale = 1f;
             GraphicsQualityProfile.ReleaseStageEffects();
+            BloodFX.ClearAll();
+            ModelPreview.ReleaseAll();
             StageTwoArenaManager.Instance?.ResetForStageChange();
 
             if (stageTwoVictorySequence != null)
@@ -2019,7 +2023,12 @@ namespace PersiaWar.Unity2D5D
                     : i == 1 ? new Color(0.89f, 0.73f, 0.25f)
                     : i == 2 ? new Color(0.14f, 0.52f, 0.79f)
                     : i == 3 ? new Color(0.08f, 0.72f, 0.98f) : new Color(0.20f, 0.95f, 0.58f);
-                Fill(emblem, emblemColor);
+                if (i == 3)
+                    ModelPreview.Draw(emblem, ModelKind.VoidRifle);
+                else if (i == 4)
+                    ModelPreview.Draw(emblem, ModelKind.AlienSword);
+                else
+                    Fill(emblem, emblemColor);
                 GUI.Label(new Rect(card.x + 6f, card.y + 76f, card.width - 12f, 34f), StoreCosmeticNames[i], menuSmallStyle);
                 GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f),
                     owned ? (equipped ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
@@ -2028,7 +2037,11 @@ namespace PersiaWar.Unity2D5D
                 if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : (i >= 3 ? "EQUIP WEAPON" : "EQUIP")) : "UNLOCK"))
                     PurchaseOrEquipCosmetic(i);
             }
-            if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
+            if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU"))
+            {
+                ModelPreview.ReleaseAll();
+                mode = ScreenMode.MainMenu;
+            }
         }
 
         private Rect GetSettingsSoundRect()
@@ -2739,6 +2752,8 @@ namespace PersiaWar.Unity2D5D
 
         private void ReleaseCompletedWorldBeforeStageFour()
         {
+            BloodFX.ClearAll();
+            ModelPreview.ReleaseAll();
             // Detach callbacks first so cleanup cannot re-enter the progression flow.
             if (stageThreeWorldBuilder != null)
             {
