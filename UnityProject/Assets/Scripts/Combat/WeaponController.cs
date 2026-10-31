@@ -46,6 +46,12 @@ namespace PersiaWar.Unity2D5D
         private Transform swordRoot;
         private Renderer[] gunRenderers;
         private Material[] baseGunMaterials;
+        private GameObject libraryGunVisual;
+        private ModelKind libraryGunVisualKind = ModelKind.None;
+        private GameObject libraryAxeVisual;
+        private ModelKind libraryAxeVisualKind = ModelKind.None;
+        private GameObject librarySwordVisual;
+        private ModelKind librarySwordVisualKind = ModelKind.None;
         private Material voidRifleMaterial;
         private Vector3 swordRestLocalPosition;
         private Quaternion swordRestLocalRotation;
@@ -435,6 +441,50 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < gunRenderers.Length && i < baseGunMaterials.Length; i++)
                     if (gunRenderers[i] != null) gunRenderers[i].sharedMaterial = baseGunMaterials[i];
             }
+
+            RefreshLibraryWeaponVisuals();
+        }
+
+        private void RefreshLibraryWeaponVisuals()
+        {
+            bool showGun = weaponKind != WeaponKind.Axe && weaponKind != WeaponKind.AlienSword;
+            if (showGun)
+                EnsureLibraryWeaponVisual(gunRoot, ModelLibrary.KindFromName(weaponKind.ToString()),
+                    ref libraryGunVisual, ref libraryGunVisualKind, 1f);
+            else if (libraryGunVisual != null)
+                libraryGunVisual.SetActive(false);
+
+            bool showAxe = axeEquippedAsMelee || weaponKind == WeaponKind.Axe;
+            if (showAxe)
+                EnsureLibraryWeaponVisual(axeRoot, ModelKind.Axe,
+                    ref libraryAxeVisual, ref libraryAxeVisualKind, 0.9f);
+            else if (libraryAxeVisual != null)
+                libraryAxeVisual.SetActive(false);
+
+            bool showSword = weaponKind == WeaponKind.AlienSword;
+            if (showSword)
+                EnsureLibraryWeaponVisual(swordRoot, ModelKind.AlienSword,
+                    ref librarySwordVisual, ref librarySwordVisualKind, 0.9f);
+            else if (librarySwordVisual != null)
+                librarySwordVisual.SetActive(false);
+        }
+
+        private static void EnsureLibraryWeaponVisual(
+            Transform root, ModelKind kind, ref GameObject currentVisual, ref ModelKind currentKind, float scale)
+        {
+            if (root == null || kind == ModelKind.None) return;
+            if (currentVisual != null && currentKind == kind)
+            {
+                currentVisual.SetActive(true);
+                return;
+            }
+
+            if (currentVisual != null)
+                Object.Destroy(currentVisual);
+
+            currentVisual = ModelLibrary.AttachWeapon(root, kind, true,
+                Vector3.zero, Quaternion.identity, scale);
+            currentKind = currentVisual != null ? kind : ModelKind.None;
         }
 
         private void SetWeaponPart(string partName, bool visible, Vector3 localPosition, Vector3 localScale)
