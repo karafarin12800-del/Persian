@@ -126,8 +126,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     private void ApplyAndroidResolutionBudget()
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
-        int longestSide = CurrentTier == QualityTier.High ? 1920
-            : (CurrentTier == QualityTier.Medium ? 1760 : 1600);
+        int longestSide = CurrentTier == QualityTier.High ? 1920 : 1600;
         int currentLongest = Mathf.Max(Screen.width, Screen.height);
         if (currentLongest > longestSide && currentLongest > 0)
         {
