@@ -92,7 +92,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add UnityProject/Assets docs/graphics-library/INTEGRATION.md
           git diff --cached --check
-          git diff --cached --quiet && { echo "No graphics asset changes to commit."; exit 1; }
+          if git diff --cached --quiet; then
+            echo "No graphics asset changes to commit."
+            exit 1
+          fi
           git commit -m "Import PersiaWar graphics library assets"
           git push origin HEAD:refs/heads/Persian-war4
 
