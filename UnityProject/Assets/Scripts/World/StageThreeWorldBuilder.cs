@@ -1367,7 +1367,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             float distance = direction.magnitude;
             // Keep alien fire within a readable combat distance. The old 62-82m
             // ranges let multiple squads focus-fire the player from across the map.
-            float maxRange = alien.UpperPatrol ? 24f : 18f;
+            float maxRange = alien.UpperPatrol ? 30f : 24f;
             if (distance > maxRange)
             {
                 alien.NextShotTime = Time.time + 0.7f;
@@ -1377,13 +1377,13 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (alien.UpperPatrol)
             {
                 // Elite guards still hit harder, but slower and only at close-mid range.
-                CreateHostileProjectile(origin, direction.normalized, alien.Root, 6, 27f, greenGlowMaterial);
+                CreateHostileProjectile(origin, direction.normalized, alien.Root, 6, 33f, greenGlowMaterial);
                 alien.NextShotTime = Time.time + 3.0f + (alien.Archetype - 1) * 0.35f;
             }
             else
             {
                 // Standard sentries are a low-pressure threat rather than a long-range sniper.
-                CreateHostileProjectile(origin, direction.normalized, alien.Root, 4, 20f, warningMaterial);
+                CreateHostileProjectile(origin, direction.normalized, alien.Root, 4, 27f, warningMaterial);
                 alien.NextShotTime = Time.time + 3.4f + (alien.Archetype - 1) * 0.45f;
             }
         }
@@ -1666,6 +1666,17 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             if (localPlayer.Weapon != null) localPlayer.Weapon.enabled = true;
             if (localPlayer.Aim != null) localPlayer.Aim.enabled = true;
         }
+        // Regular rovers use EnemyChase for pursuit and ranged fire. They were
+        // configured disabled before the landing cinematic but had no post-intro
+        // activation path, leaving a large part of the Stage 3 roster passive.
+        for (int i = 0; i < groundAliens.Count; i++)
+        {
+            GroundAlien alien = groundAliens[i];
+            if (alien.Chase != null && !alien.Guard && alien.Health != null &&
+                alien.Health.CurrentHealth > 0)
+                alien.Chase.enabled = true;
+        }
+        StartupCheckpoint.Set("StageThreeRegularAlienCombatEnabled_AfterLanding");
         StartupCheckpoint.Set("StageThreeTransportDisembarkComplete_CombatReady");
     }
 
