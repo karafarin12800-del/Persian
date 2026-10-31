@@ -1059,6 +1059,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                     new Vector3(0.16f, 0.15f, 0.90f), darkMetalMaterial);
                 CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.48f, 0.12f, 0.94f),
                     new Vector3(0.10f, 0.10f, 0.46f), greenGlowMaterial);
+                AttachStageThreeAlienWeapon(guard.Root);
                 upperPatrols++;
             }
         }
@@ -1097,6 +1098,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(0.16f, 0.15f, 0.90f), darkMetalMaterial);
             CreateBoxChild(guard.Root, "S3_EliteHeavyRifleBarrel", new Vector3(0.48f, 0.12f, 0.94f),
                 new Vector3(0.10f, 0.10f, 0.46f), greenGlowMaterial);
+            AttachStageThreeAlienWeapon(guard.Root);
             upperPatrols++;
         }
 
@@ -1196,6 +1198,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         if (eliteGuard)
             alien.transform.localScale = new Vector3(1.12f, 1.62f, 1.12f);
         BuildAlienCreatureDetails(alien.transform, archetype, guard, eliteGuard);
+        if (guard && !eliteGuard)
+            AttachStageThreeAlienWeapon(alien.transform);
 
         TargetHealth health = alien.AddComponent<TargetHealth>();
         health.SetMaxHealth(archetype == 3 ? 150 : (archetype == 2 ? 115 : 90));
@@ -1263,6 +1267,36 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(0.47f, 0.06f, 0.45f), new Vector3(0.12f, 0.12f, 0.52f),
                 eliteGuard ? greenGlowMaterial : darkMetalMaterial);
         }
+    }
+
+    private static void AttachStageThreeAlienWeapon(Transform alien)
+    {
+        if (alien == null) return;
+
+        // Hide only the old placeholder weapon parts, preserving the alien body and armour.
+        for (int i = 0; i < alien.childCount; i++)
+        {
+            Transform child = alien.GetChild(i);
+            if (child == null) continue;
+            if (child.name != "S3_AlienEnergyRifle" &&
+                child.name != "S3_EliteHeavyRifle" &&
+                child.name != "S3_EliteHeavyRifleBarrel")
+                continue;
+
+            Renderer legacyRenderer = child.GetComponent<Renderer>();
+            if (legacyRenderer != null) legacyRenderer.enabled = false;
+        }
+
+        // The guard-spawn fallback can revisit an existing guard in lite mode.
+        // Reuse its weapon mount instead of allocating a second model.
+        if (alien.Find("S3_AlienWeaponModelMount") != null) return;
+
+        Transform mount = new GameObject("S3_AlienWeaponModelMount").transform;
+        mount.SetParent(alien, false);
+        mount.localPosition = new Vector3(0.47f, 0.06f, 0.16f);
+        mount.localRotation = Quaternion.identity;
+        ModelLibrary.AttachWeapon(mount, ModelKind.VoidRifle, false,
+            Vector3.zero, Quaternion.identity, 0.58f);
     }
 
     private void UpdateUpperGuardPatrols()
