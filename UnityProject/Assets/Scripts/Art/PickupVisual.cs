@@ -85,9 +85,6 @@ namespace PersiaWar.Unity2D5D
             GameObject model = ModelLibrary.Spawn(kind, pickupRoot, Vector3.zero, Quaternion.identity,
                 ModelLibrary.PickupScale(kind));
             if (model == null) return null;
-            ModelSpinner spinner = model.AddComponent<ModelSpinner>();
-            spinner.spinDegreesPerSecond = ModelLibrary.IsWeapon(kind) ? 55f : 80f;
-
             // Ground ring: a separate tiny mesh coloured by pickup type.
             GameObject ring = new GameObject("PW_PickupRing");
             ring.transform.SetParent(pickupRoot, false);

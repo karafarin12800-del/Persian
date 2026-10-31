@@ -22,6 +22,7 @@ namespace PersiaWar.Unity2D5D
 
         private float startY;
         private bool weaponPickupScaleApplied;
+        private bool visualAttached;
 
         public void Configure(PickupType pickupType, int value)
         {
@@ -47,6 +48,34 @@ namespace PersiaWar.Unity2D5D
             trigger.radius = 0.7f;
         }
 
+        private void Start()
+        {
+            TryAttachSafePickupVisual();
+        }
+
+        private void TryAttachSafePickupVisual()
+        {
+            if (visualAttached) return;
+
+            ModelKind visualKind;
+            switch (type)
+            {
+                case PickupType.Medkit:
+                    visualKind = ModelKind.Medkit;
+                    break;
+                case PickupType.Shield:
+                    visualKind = ModelKind.ShieldPickup;
+                    break;
+                case PickupType.QuickDash:
+                    visualKind = ModelKind.QuickDash;
+                    break;
+                default:
+                    return;
+            }
+
+            visualAttached = PickupVisual.Attach(transform, visualKind, true) != null;
+        }
+
         private void ApplyWeaponPickupScale()
         {
             if (weaponPickupScaleApplied) return;
@@ -68,6 +97,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (!visualAttached)
+                TryAttachSafePickupVisual();
+
             transform.Rotate(0f, rotateSpeed * Time.deltaTime, 0f, Space.World);
             Vector3 p = transform.position;
             p.y = startY + Mathf.Sin(Time.time * 3f) * bobHeight;
