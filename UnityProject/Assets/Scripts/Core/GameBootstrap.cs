@@ -2306,6 +2306,14 @@ namespace PersiaWar.Unity2D5D
                 androidTreeCrownHighlightMaterial = MakeStageTwoLitMaterial(
                     "AndroidTreeCrownHighlight", new Color(0.23f, 0.47f, 0.16f));
 
+            Transform treeRoot = androidCurrentBuildingRoot;
+            Transform canopyRoot = new GameObject("TreeCanopyWindRoot").transform;
+            canopyRoot.SetParent(treeRoot, false);
+            canopyRoot.position = position;
+            canopyRoot.localRotation = Quaternion.identity;
+            canopyRoot.gameObject.AddComponent<FoliageSway>();
+            androidCurrentBuildingRoot = canopyRoot;
+
             if (stageTwoRequested)
             {
                 // Keep the accepted Stage 2 four-cluster broadleaf shape unchanged.

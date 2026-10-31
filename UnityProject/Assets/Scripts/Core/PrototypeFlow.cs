@@ -2400,11 +2400,17 @@ namespace PersiaWar.Unity2D5D
         private void DrawHeroSelect()
         {
             GUI.Label(new Rect(0f, 121f, Screen.width, 58f), stageNumber >= 2 ? "STAGE " + stageNumber + "  •  CHOOSE YOUR HERO" : "CHOOSE YOUR HERO", menuHeaderStyle);
-            string heroHint = stageNumber >= 2
-                ? (IsAnahitaUnlocked()
-                    ? "ARDESHIR OR RESCUED ANAHITA ARE AVAILABLE  •  OTHERS LOCKED"
-                    : "RESCUE ANAHITA IN STAGE 1 TO UNLOCK HER  •  OTHERS LOCKED")
-                : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
+            string heroHint = stageNumber >= 4
+                ? "ADVANCED HEROES UNLOCKED  •  RESCUE ANAHITA TO ADD HER TO YOUR ROSTER"
+                : stageNumber == 3
+                    ? (IsAnahitaUnlocked()
+                        ? "PARS GUARD AND ROYAL SCOUT UNLOCKED  •  ANAHITA IS ALSO AVAILABLE"
+                        : "PARS GUARD AND ROYAL SCOUT UNLOCKED  •  RESCUE ANAHITA IN STAGE 1")
+                    : stageNumber >= 2
+                        ? (IsAnahitaUnlocked()
+                            ? "ARDESHIR AND ANAHITA AVAILABLE  •  REACH STAGE 3 FOR MORE HEROES"
+                            : "RESCUE ANAHITA IN STAGE 1  •  REACH STAGE 3 FOR MORE HEROES")
+                        : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
             GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), heroHint, menuSmallStyle);
 
             float gap = 14f;
@@ -2490,8 +2496,12 @@ namespace PersiaWar.Unity2D5D
             if (index == 0)
                 return true;
 
-            // Anahita is deliberately the second card from the left.
-            return index == 1 && stageNumber >= 2 && IsAnahitaUnlocked();
+            // Anahita remains tied to the Stage 1 rescue. The other four heroes
+            // unlock through campaign progress only; no purchase/payment is involved.
+            if (index == 1) return stageNumber >= 2 && IsAnahitaUnlocked();
+            if (index == 2 || index == 3) return stageNumber >= 3;
+            if (index == 4 || index == 5) return stageNumber >= 4;
+            return false;
         }
 
         private void CheckStageOneGirlRescue()

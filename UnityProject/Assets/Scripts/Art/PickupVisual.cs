@@ -82,11 +82,14 @@ namespace PersiaWar.Unity2D5D
                     if (old[i] != null) old[i].enabled = false;
             }
 
-            GameObject model = ModelLibrary.Spawn(kind, pickupRoot, Vector3.zero, Quaternion.identity,
+            bool isWeapon = ModelLibrary.IsWeapon(kind);
+            Vector3 modelOffset = isWeapon ? pickupRoot.InverseTransformVector(Vector3.up * 0.62f) : Vector3.zero;
+            GameObject model = ModelLibrary.Spawn(kind, pickupRoot, modelOffset, Quaternion.identity,
                 ModelLibrary.PickupScale(kind));
             if (model == null) return null;
             ModelSpinner spinner = model.AddComponent<ModelSpinner>();
-            spinner.spinDegreesPerSecond = ModelLibrary.IsWeapon(kind) ? 55f : 80f;
+            spinner.spinDegreesPerSecond = isWeapon ? 55f : 80f;
+            spinner.bobHeight = isWeapon ? 0.045f : 0.08f;
 
             // Ground ring: a separate tiny mesh coloured by pickup type.
             GameObject ring = new GameObject("PW_PickupRing");
@@ -98,6 +101,8 @@ namespace PersiaWar.Unity2D5D
             MeshRenderer renderer = ring.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = ModelLibrary.GetMaterial();
             ModelLibrary.ConfigureRenderer(renderer);
+            PickupGroundRingFollower follower = ring.AddComponent<PickupGroundRingFollower>();
+            follower.Configure(pickupRoot, GroundY(world));
             return model;
         }
 
@@ -121,6 +126,30 @@ namespace PersiaWar.Unity2D5D
                 }
             }
             return found ? y : 0f;
+        }
+    }
+}
+
+
+namespace PersiaWar.Unity2D5D
+{
+    /// <summary>Keeps the pickup locator on the ground while the weapon model floats above it.</summary>
+    public sealed class PickupGroundRingFollower : MonoBehaviour
+    {
+        private Transform pickupRoot;
+        private float groundY;
+
+        public void Configure(Transform owner, float terrainHeight)
+        {
+            pickupRoot = owner;
+            groundY = terrainHeight + 0.03f;
+            LateUpdate();
+        }
+
+        private void LateUpdate()
+        {
+            if (pickupRoot == null) return;
+            transform.position = new Vector3(pickupRoot.position.x, groundY, pickupRoot.position.z);
         }
     }
 }

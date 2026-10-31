@@ -19,6 +19,7 @@ namespace PersiaWar.Unity2D5D
         private SpriteRenderer sprite;
         private SpriteRenderer shadowSprite;
         private ParticleSystem muzzleFlash;
+        private Light muzzleLight;
 
         private bool moving;
         private bool playerCharacter;
@@ -34,6 +35,8 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobileHair;
         private Renderer mobileShirt;
         private Renderer mobilePants;
+        private Renderer mobileLeftLeg;
+        private Renderer mobileRightLeg;
         private Renderer mobileShoes;
         private Renderer mobileArmor;
         private Renderer mobileLeftArm;
@@ -174,8 +177,20 @@ namespace PersiaWar.Unity2D5D
                 1f);
 
             if (mobileModelRoot != null)
+            {
                 mobileModelRoot.localPosition = new Vector3(0f, bob, 0f);
-
+                float stride = moving ? Mathf.Sin(t * 10.5f) * 27f : Mathf.Sin(t * 2.1f) * 1.8f;
+                float recoil = Time.time < fireUntil ? -12f : 0f;
+                if (mobileLeftArm != null) mobileLeftArm.transform.localRotation = Quaternion.Euler(stride + recoil, 0f, 0f);
+                if (mobileRightArm != null) mobileRightArm.transform.localRotation = Quaternion.Euler(-stride + recoil, 0f, 0f);
+                if (mobileLeftLeg != null) mobileLeftLeg.transform.localRotation = Quaternion.Euler(-stride * 0.78f, 0f, 0f);
+                if (mobileRightLeg != null) mobileRightLeg.transform.localRotation = Quaternion.Euler(stride * 0.78f, 0f, 0f);
+            }
+            if (muzzleLight != null)
+            {
+                muzzleLight.enabled = playerCharacter && Time.time < fireUntil;
+                if (muzzleLight.enabled) muzzleLight.intensity = 1.15f + Mathf.Sin(t * 70f) * 0.28f;
+            }
             if (muzzle != null && Time.time < fireUntil)
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.62f);
             else if (muzzle != null)
@@ -206,9 +221,14 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, 0.78f, 0f), new Vector3(0.78f, 0.42f, 0.56f));
                 mobilePants = CreateMobilePrimitive(PrimitiveType.Cube, "Pants", mobileModelRoot,
                     new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.28f, 0.48f));
+                mobileLeftLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftLeg", mobileModelRoot,
+                    new Vector3(-0.18f, 0.33f, 0f), new Vector3(0.15f, 0.29f, 0.15f));
+                mobileRightLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "RightLeg", mobileModelRoot,
+                    new Vector3(0.18f, 0.33f, 0f), new Vector3(0.15f, 0.29f, 0.15f));
                 mobileShoes = null;
                 mobileHair = null;
-                mobileArmor = null;
+                mobileArmor = CreateMobilePrimitive(PrimitiveType.Cube, "EnemyChestArmor", mobileModelRoot,
+                    new Vector3(0f, 0.91f, 0.19f), new Vector3(0.78f, 0.32f, 0.20f));
                 mobileLeftArm = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftArm", mobileModelRoot,
                     new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
                 mobileRightArm = CreateMobilePrimitive(PrimitiveType.Capsule, "RightArm", mobileModelRoot,
@@ -228,6 +248,10 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, 0.78f, 0f), new Vector3(0.78f, 0.42f, 0.56f));
                 mobilePants = CreateMobilePrimitive(PrimitiveType.Cube, "Pants", mobileModelRoot,
                     new Vector3(0f, 0.28f, 0f), new Vector3(0.62f, 0.28f, 0.48f));
+                mobileLeftLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftLeg", mobileModelRoot,
+                    new Vector3(-0.18f, 0.33f, 0f), new Vector3(0.15f, 0.29f, 0.15f));
+                mobileRightLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "RightLeg", mobileModelRoot,
+                    new Vector3(0.18f, 0.33f, 0f), new Vector3(0.15f, 0.29f, 0.15f));
                 mobileShoes = CreateMobilePrimitive(PrimitiveType.Cube, "Shoes", mobileModelRoot,
                     new Vector3(0f, 0.05f, 0f), new Vector3(0.78f, 0.14f, 0.56f));
                 mobileHair = CreateMobilePrimitive(PrimitiveType.Cylinder, "Hair", mobileModelRoot,
@@ -257,7 +281,7 @@ namespace PersiaWar.Unity2D5D
 
             Renderer[] parts =
             {
-                mobileHead, mobileBody, mobileShirt, mobilePants, mobileShoes, mobileHair,
+                mobileHead, mobileBody, mobileShirt, mobilePants, mobileLeftLeg, mobileRightLeg, mobileShoes, mobileHair,
                 mobileArmor, mobileLeftArm, mobileRightArm, mobilePack, mobileHelmet, mobileVisor,
                 mobileFemaleHairLeft, mobileFemaleHairRight, mobileFemaleHairCap
             };
@@ -314,116 +338,126 @@ namespace PersiaWar.Unity2D5D
         private void ApplyMobilePlayerColors(int heroIndex)
         {
             bool isAnahita = heroIndex == 1;
-            Color shirtColor = isAnahita ? new Color(0.82f, 0.22f, 0.50f)
-                : heroIndex == 0 ? new Color(0.08f, 0.26f, 0.52f)
-                : heroIndex == 2 ? new Color(0.10f, 0.42f, 0.52f)
-                : heroIndex == 3 ? new Color(0.16f, 0.46f, 0.24f)
-                : heroIndex == 4 ? new Color(0.42f, 0.16f, 0.46f)
-                : new Color(0.48f, 0.32f, 0.08f);
+            bool isRoyalGuard = heroIndex == 2;
+            bool isScout = heroIndex == 3;
+            bool isSilkWarrior = heroIndex == 4;
+            bool isDesertKnight = heroIndex == 5;
+            bool longHair = isAnahita || isSilkWarrior;
+            Color shirtColor = heroIndex == 0 ? new Color(0.08f, 0.26f, 0.52f)
+                : isAnahita ? new Color(0.82f, 0.22f, 0.50f)
+                : isRoyalGuard ? new Color(0.10f, 0.42f, 0.52f)
+                : isScout ? new Color(0.16f, 0.46f, 0.24f)
+                : isSilkWarrior ? new Color(0.42f, 0.16f, 0.46f) : new Color(0.48f, 0.32f, 0.08f);
+            Color hairColor = heroIndex == 0 ? new Color(0.56f, 0.20f, 0.08f)
+                : isScout ? new Color(0.28f, 0.12f, 0.055f)
+                : isSilkWarrior ? new Color(0.07f, 0.035f, 0.08f) : new Color(0.10f, 0.055f, 0.035f);
 
-            Color hairColor = heroIndex == 0
-                ? new Color(0.56f, 0.20f, 0.08f)
-                : new Color(0.10f, 0.055f, 0.035f);
-
-            // Restore the common base measurements first; selecting another hero
-            // after Anahita must not leave the smaller silhouette or dress behind.
+            // Reset every transform before applying a hero so switching never keeps
+            // the previous character's proportions, clothing or animation pose.
+            if (mobileModelRoot != null)
+                mobileModelRoot.localScale = isAnahita ? Vector3.one * 0.82f
+                    : isRoyalGuard ? Vector3.one * 1.045f : isScout ? Vector3.one * 0.93f
+                    : isSilkWarrior ? Vector3.one * 0.96f : isDesertKnight ? Vector3.one * 1.08f : Vector3.one;
             if (mobileHead != null)
-                mobileHead.transform.localScale = new Vector3(0.62f, 0.62f, 0.62f);
+                mobileHead.transform.localScale = isAnahita ? new Vector3(0.56f, 0.58f, 0.55f) : new Vector3(0.62f, 0.62f, 0.62f);
             if (mobileBody != null)
-                mobileBody.transform.localScale = new Vector3(0.72f, 0.82f, 0.52f);
+                mobileBody.transform.localScale = isAnahita ? new Vector3(0.62f, 0.75f, 0.46f)
+                    : isRoyalGuard ? new Vector3(0.80f, 0.86f, 0.58f) : isScout ? new Vector3(0.66f, 0.86f, 0.47f)
+                    : isDesertKnight ? new Vector3(0.82f, 0.90f, 0.60f) : new Vector3(0.72f, 0.82f, 0.52f);
             if (mobileShirt != null)
-                mobileShirt.transform.localScale = new Vector3(0.78f, 0.42f, 0.56f);
+            {
+                mobileShirt.transform.localPosition = new Vector3(0f, 0.78f, 0f);
+                mobileShirt.transform.localScale = isAnahita ? new Vector3(0.65f, 0.40f, 0.48f)
+                    : isRoyalGuard ? new Vector3(0.86f, 0.46f, 0.62f) : isScout ? new Vector3(0.70f, 0.38f, 0.49f)
+                    : isDesertKnight ? new Vector3(0.88f, 0.47f, 0.64f) : new Vector3(0.78f, 0.42f, 0.56f);
+            }
             if (mobileLeftArm != null)
             {
                 mobileLeftArm.transform.localPosition = new Vector3(-0.47f, 0.76f, 0.03f);
-                mobileLeftArm.transform.localScale = new Vector3(0.20f, 0.50f, 0.20f);
+                mobileLeftArm.transform.localScale = isAnahita ? new Vector3(0.16f, 0.43f, 0.17f)
+                    : isRoyalGuard || isDesertKnight ? new Vector3(0.23f, 0.53f, 0.23f) : new Vector3(0.20f, 0.50f, 0.20f);
             }
             if (mobileRightArm != null)
             {
                 mobileRightArm.transform.localPosition = new Vector3(0.47f, 0.76f, 0.03f);
-                mobileRightArm.transform.localScale = new Vector3(0.20f, 0.50f, 0.20f);
+                mobileRightArm.transform.localScale = isAnahita ? new Vector3(0.16f, 0.43f, 0.17f)
+                    : isRoyalGuard || isDesertKnight ? new Vector3(0.23f, 0.53f, 0.23f) : new Vector3(0.20f, 0.50f, 0.20f);
             }
-            if (mobileHair != null)
-                mobileHair.transform.localScale = new Vector3(0.48f, 0.16f, 0.48f);
-            if (mobileModelRoot != null)
-                mobileModelRoot.localScale = isAnahita ? Vector3.one * 0.82f : Vector3.one;
+            if (mobileHair != null) mobileHair.transform.localScale = isScout ? new Vector3(0.43f, 0.12f, 0.43f) : new Vector3(0.48f, 0.16f, 0.48f);
+            if (mobileHelmet != null)
+                mobileHelmet.transform.localScale = isRoyalGuard ? new Vector3(0.78f, 0.43f, 0.72f)
+                    : isDesertKnight ? new Vector3(0.82f, 0.48f, 0.76f) : new Vector3(0.70f, 0.38f, 0.66f);
+            if (mobileArmor != null)
+                mobileArmor.transform.localScale = isDesertKnight ? new Vector3(0.80f, 0.56f, 0.25f)
+                    : isRoyalGuard ? new Vector3(0.74f, 0.52f, 0.23f) : new Vector3(0.66f, 0.48f, 0.20f);
+            if (mobilePack != null)
+                mobilePack.transform.localScale = isScout ? new Vector3(0.38f, 0.46f, 0.18f)
+                    : isDesertKnight ? new Vector3(0.52f, 0.58f, 0.22f) : new Vector3(0.46f, 0.55f, 0.20f);
 
             SetRendererColor(mobileHead, new Color(0.78f, 0.53f, 0.34f));
             SetRendererColor(mobileBody, shirtColor * 0.85f);
             SetRendererColor(mobileShirt, shirtColor);
-            SetRendererColor(mobilePants, isAnahita ? new Color(0.70f, 0.17f, 0.43f) : new Color(0.08f, 0.12f, 0.20f));
+            SetRendererColor(mobilePants, isAnahita ? new Color(0.70f, 0.17f, 0.43f)
+                : isScout ? new Color(0.08f, 0.18f, 0.13f) : isSilkWarrior ? new Color(0.20f, 0.07f, 0.24f) : new Color(0.08f, 0.12f, 0.20f));
+            SetRendererColor(mobileLeftLeg, isAnahita ? new Color(0.63f, 0.14f, 0.36f) : new Color(0.08f, 0.11f, 0.16f));
+            SetRendererColor(mobileRightLeg, isAnahita ? new Color(0.63f, 0.14f, 0.36f) : new Color(0.08f, 0.11f, 0.16f));
             SetRendererColor(mobileShoes, new Color(0.10f, 0.11f, 0.13f));
             SetRendererColor(mobileHair, hairColor);
-            SetRendererColor(mobileArmor, Color.Lerp(shirtColor, Color.white, 0.16f));
+            SetRendererColor(mobileArmor, isDesertKnight ? new Color(0.72f, 0.48f, 0.16f)
+                : isRoyalGuard ? new Color(0.20f, 0.56f, 0.62f) : Color.Lerp(shirtColor, Color.white, 0.16f));
             SetRendererColor(mobileLeftArm, shirtColor);
             SetRendererColor(mobileRightArm, shirtColor);
             SetRendererColor(mobilePack, new Color(0.07f, 0.09f, 0.12f));
-            SetRendererColor(mobileHelmet, new Color(0.13f, 0.16f, 0.19f));
+            SetRendererColor(mobileHelmet, isDesertKnight ? new Color(0.54f, 0.35f, 0.12f) : new Color(0.13f, 0.16f, 0.19f));
             SetRendererColor(mobileVisor, new Color(0.18f, 0.48f, 0.58f));
-
-            if (isAnahita)
-            {
-                // Smaller shoulders, a narrower torso, a slightly smaller head and a
-                // skirt-shaped lower garment give her a more feminine silhouette.
-                if (mobileHead != null)
-                    mobileHead.transform.localScale = new Vector3(0.56f, 0.58f, 0.55f);
-                if (mobileBody != null)
-                    mobileBody.transform.localScale = new Vector3(0.62f, 0.75f, 0.46f);
-                if (mobileShirt != null)
-                {
-                    mobileShirt.transform.localPosition = new Vector3(0f, 0.79f, 0f);
-                    mobileShirt.transform.localScale = new Vector3(0.65f, 0.40f, 0.48f);
-                }
-                if (mobileLeftArm != null)
-                    mobileLeftArm.transform.localScale = new Vector3(0.16f, 0.43f, 0.17f);
-                if (mobileRightArm != null)
-                    mobileRightArm.transform.localScale = new Vector3(0.16f, 0.43f, 0.17f);
-                if (mobileHair != null)
-                    mobileHair.transform.localScale = new Vector3(0.52f, 0.18f, 0.52f);
-            }
 
             if (mobilePants != null)
             {
-                mobilePants.transform.localPosition = isAnahita
-                    ? new Vector3(0f, 0.37f, 0f)
-                    : new Vector3(0f, 0.28f, 0f);
-                mobilePants.transform.localScale = isAnahita
-                    ? new Vector3(0.66f, 0.38f, 0.52f)
-                    : new Vector3(0.62f, 0.28f, 0.48f);
+                mobilePants.transform.localPosition = isAnahita ? new Vector3(0f, 0.37f, 0f) : new Vector3(0f, 0.28f, 0f);
+                mobilePants.transform.localScale = isAnahita ? new Vector3(0.66f, 0.38f, 0.52f) : new Vector3(0.62f, 0.28f, 0.48f);
             }
-            if (mobileHelmet != null) mobileHelmet.enabled = !isAnahita;
-            if (mobileVisor != null) mobileVisor.enabled = !isAnahita;
-            if (mobileArmor != null) mobileArmor.enabled = !isAnahita;
-            if (mobilePack != null) mobilePack.enabled = !isAnahita;
-            if (mobileFemaleHairLeft != null)
-            {
-                mobileFemaleHairLeft.enabled = isAnahita;
-                SetRendererColor(mobileFemaleHairLeft, hairColor);
-            }
-            if (mobileFemaleHairRight != null)
-            {
-                mobileFemaleHairRight.enabled = isAnahita;
-                SetRendererColor(mobileFemaleHairRight, hairColor);
-            }
-            if (mobileFemaleHairCap != null)
-            {
-                mobileFemaleHairCap.enabled = isAnahita;
-                SetRendererColor(mobileFemaleHairCap, hairColor);
-            }
+            if (mobileHelmet != null) mobileHelmet.enabled = !isAnahita && !isScout && !isSilkWarrior;
+            if (mobileVisor != null) mobileVisor.enabled = heroIndex == 0 || isRoyalGuard || isDesertKnight;
+            if (mobileArmor != null) mobileArmor.enabled = !isAnahita && !isScout && !isSilkWarrior;
+            if (mobilePack != null) mobilePack.enabled = !isAnahita && !isSilkWarrior;
+            if (mobileHair != null) mobileHair.enabled = isScout || isSilkWarrior;
+            if (mobileFemaleHairLeft != null) { mobileFemaleHairLeft.enabled = longHair; SetRendererColor(mobileFemaleHairLeft, hairColor); }
+            if (mobileFemaleHairRight != null) { mobileFemaleHairRight.enabled = longHair; SetRendererColor(mobileFemaleHairRight, hairColor); }
+            if (mobileFemaleHairCap != null) { mobileFemaleHairCap.enabled = longHair; SetRendererColor(mobileFemaleHairCap, hairColor); }
         }
 
         private void ApplyMobileEnemyColors(int archetypeIndex)
         {
             Color body = archetypeIndex == 1 ? new Color(0.48f, 0.15f, 0.12f)
-                : archetypeIndex == 2 ? new Color(0.18f, 0.34f, 0.18f)
-                : new Color(0.32f, 0.20f, 0.42f);
-
+                : archetypeIndex == 2 ? new Color(0.18f, 0.34f, 0.18f) : new Color(0.32f, 0.20f, 0.42f);
+            if (mobileModelRoot != null)
+                mobileModelRoot.localScale = archetypeIndex == 1 ? Vector3.one * 0.94f
+                    : archetypeIndex == 2 ? Vector3.one * 1.10f : Vector3.one * 1.16f;
+            if (mobileHead != null)
+                mobileHead.transform.localScale = archetypeIndex == 1 ? new Vector3(0.56f, 0.56f, 0.56f)
+                    : archetypeIndex == 2 ? new Vector3(0.68f, 0.66f, 0.68f) : new Vector3(0.66f, 0.72f, 0.66f);
+            if (mobileBody != null)
+                mobileBody.transform.localScale = archetypeIndex == 1 ? new Vector3(0.63f, 0.78f, 0.47f)
+                    : archetypeIndex == 2 ? new Vector3(0.86f, 0.92f, 0.66f) : new Vector3(0.70f, 0.96f, 0.54f);
+            if (mobileArmor != null)
+            {
+                mobileArmor.enabled = archetypeIndex != 1;
+                mobileArmor.transform.localScale = archetypeIndex == 2 ? new Vector3(0.92f, 0.45f, 0.24f) : new Vector3(0.72f, 0.40f, 0.22f);
+            }
+            if (mobileHelmet != null)
+                mobileHelmet.transform.localScale = archetypeIndex == 1 ? new Vector3(0.60f, 0.32f, 0.60f)
+                    : archetypeIndex == 2 ? new Vector3(0.78f, 0.42f, 0.74f) : new Vector3(0.76f, 0.44f, 0.70f);
             SetRendererColor(mobileHead, new Color(0.66f, 0.43f, 0.28f));
             SetRendererColor(mobileBody, body * 0.85f);
             SetRendererColor(mobileShirt, body);
             SetRendererColor(mobilePants, new Color(0.09f, 0.09f, 0.12f));
+            SetRendererColor(mobileLeftLeg, new Color(0.08f, 0.09f, 0.12f));
+            SetRendererColor(mobileRightLeg, new Color(0.08f, 0.09f, 0.12f));
             SetRendererColor(mobileShoes, new Color(0.07f, 0.07f, 0.08f));
-            SetRendererColor(mobileHair, new Color(0.08f, 0.06f, 0.05f));
+            SetRendererColor(mobileArmor, archetypeIndex == 2 ? new Color(0.18f, 0.45f, 0.22f) : new Color(0.42f, 0.18f, 0.50f));
+            SetRendererColor(mobileHelmet, archetypeIndex == 1 ? new Color(0.28f, 0.13f, 0.14f)
+                : archetypeIndex == 2 ? new Color(0.10f, 0.18f, 0.13f) : new Color(0.42f, 0.16f, 0.52f));
+            if (mobileVisor != null) mobileVisor.enabled = archetypeIndex == 3;
         }
 
         private static void SetRendererColor(Renderer renderer, Color color)
@@ -522,7 +556,16 @@ namespace PersiaWar.Unity2D5D
             GameObject go = new GameObject("MuzzleFlash");
             go.transform.SetParent(transform, false);
             go.transform.localPosition = new Vector3(0.42f, 1.05f, 0.66f);
-
+            if (playerCharacter)
+            {
+                muzzleLight = go.AddComponent<Light>();
+                muzzleLight.type = LightType.Point;
+                muzzleLight.color = new Color(1f, 0.54f, 0.20f);
+                muzzleLight.intensity = 1.15f;
+                muzzleLight.range = 3.4f;
+                muzzleLight.shadows = LightShadows.None;
+                muzzleLight.enabled = false;
+            }
             ParticleSystem ps = go.AddComponent<ParticleSystem>();
             var main = ps.main;
             main.loop = false;
