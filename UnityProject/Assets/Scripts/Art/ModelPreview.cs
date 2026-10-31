@@ -29,9 +29,20 @@ namespace PersiaWar.Unity2D5D
             public float angle;
         }
 
+        private sealed class CharacterEntry
+        {
+            public int heroIndex;
+            public RenderTexture texture;
+            public GameObject pivot;
+            public float lastRequest;
+            public float lastRender;
+            public float angle;
+        }
+
         private static ModelPreview instance;
 
         private readonly List<Entry> entries = new List<Entry>(8);
+        private readonly List<CharacterEntry> characterEntries = new List<CharacterEntry>(6);
         private Camera previewCamera;
         private Transform rig;
 
@@ -52,6 +63,19 @@ namespace PersiaWar.Unity2D5D
             if (Event.current == null || Event.current.type != EventType.Repaint) return;
             Texture texture = Get(kind, 192);
             if (texture != null) GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, true);
+        }
+
+        /// <summary>Draws the real mobile 3D hero rig inside a character selection card.</summary>
+        public static void DrawHero(Rect rect, int heroIndex)
+        {
+            if (Event.current == null || Event.current.type != EventType.Repaint) return;
+            ModelPreview preview = Ensure();
+            if (preview == null) return;
+            CharacterEntry entry = preview.FindOrCreateHero(Mathf.Clamp(heroIndex, 0, 5));
+            if (entry == null) return;
+            entry.lastRequest = Time.unscaledTime;
+            if (entry.texture != null)
+                GUI.DrawTexture(rect, entry.texture, ScaleMode.ScaleToFit, true);
         }
 
         public static void ReleaseAll()
@@ -91,6 +115,26 @@ namespace PersiaWar.Unity2D5D
             previewCamera.allowMSAA = false;
             previewCamera.allowHDR = false;
             previewCamera.depth = -100f;
+
+            GameObject keyLightObject = new GameObject("PW_PreviewKeyLight");
+            keyLightObject.transform.SetParent(rig, false);
+            keyLightObject.transform.rotation = Quaternion.Euler(38f, -28f, 0f);
+            Light keyLight = keyLightObject.AddComponent<Light>();
+            keyLight.type = LightType.Directional;
+            keyLight.intensity = 1.18f;
+            keyLight.color = new Color(1f, 0.94f, 0.82f);
+            keyLight.shadows = LightShadows.None;
+            keyLight.cullingMask = 1 << PreviewLayer;
+
+            GameObject fillLightObject = new GameObject("PW_PreviewFillLight");
+            fillLightObject.transform.SetParent(rig, false);
+            fillLightObject.transform.rotation = Quaternion.Euler(18f, 145f, 0f);
+            Light fillLight = fillLightObject.AddComponent<Light>();
+            fillLight.type = LightType.Directional;
+            fillLight.intensity = 0.42f;
+            fillLight.color = new Color(0.48f, 0.68f, 1f);
+            fillLight.shadows = LightShadows.None;
+            fillLight.cullingMask = 1 << PreviewLayer;
         }
 
         private Entry FindOrCreate(ModelKind kind, int size)
@@ -126,6 +170,39 @@ namespace PersiaWar.Unity2D5D
             return entry;
         }
 
+        private CharacterEntry FindOrCreateHero(int heroIndex)
+        {
+            for (int i = 0; i < characterEntries.Count; i++)
+            {
+                CharacterEntry existing = characterEntries[i];
+                if (existing.heroIndex == heroIndex && existing.texture != null && existing.pivot != null)
+                    return existing;
+            }
+            if (rig == null || previewCamera == null) return null;
+
+            CharacterEntry entry = new CharacterEntry();
+            entry.heroIndex = heroIndex;
+            entry.texture = new RenderTexture(160, 220, 16, RenderTextureFormat.ARGB32);
+            entry.texture.antiAliasing = 1;
+            entry.texture.Create();
+
+            entry.pivot = new GameObject("PW_PreviewHeroPivot_" + heroIndex);
+            entry.pivot.transform.SetParent(rig, false);
+            int slot = entries.Count + characterEntries.Count;
+            entry.pivot.transform.localPosition = new Vector3(slot * 6f, 0f, 22f);
+
+            GameObject owner = new GameObject("PW_PreviewHeroOwner_" + heroIndex);
+            owner.transform.SetParent(entry.pivot.transform, false);
+            StylizedCharacterVisual visual = StylizedCharacterVisual.Attach(owner.transform, true, 1);
+            visual.ConfigurePlayerHeroPreview(heroIndex, previewCamera);
+
+            SetLayerRecursive(entry.pivot, PreviewLayer);
+            entry.lastRequest = Time.unscaledTime;
+            entry.lastRender = 0f;
+            characterEntries.Add(entry);
+            return entry;
+        }
+
         private static void SetLayerRecursive(GameObject root, int layer)
         {
             root.layer = layer;
@@ -154,6 +231,37 @@ namespace PersiaWar.Unity2D5D
                 entry.lastRender = now;
                 RenderEntry(entry);
             }
+
+            for (int i = characterEntries.Count - 1; i >= 0; i--)
+            {
+                CharacterEntry entry = characterEntries[i];
+                if (entry.texture == null || entry.pivot == null || now - entry.lastRequest > ReleaseAfter)
+                {
+                    Release(entry);
+                    characterEntries.RemoveAt(i);
+                    continue;
+                }
+                if (now - entry.lastRequest > VisibleWindow || now - entry.lastRender < RenderInterval)
+                    continue;
+
+                float dt = entry.lastRender <= 0f ? 0f : Mathf.Min(now - entry.lastRender, 0.2f);
+                entry.angle += dt * 24f;
+                entry.lastRender = now;
+                RenderHeroEntry(entry);
+            }
+        }
+
+        private void RenderHeroEntry(CharacterEntry entry)
+        {
+            Transform pivot = entry.pivot.transform;
+            pivot.localRotation = Quaternion.Euler(0f, entry.angle, 0f);
+            Transform cameraTransform = previewCamera.transform;
+            cameraTransform.position = pivot.position + new Vector3(0.75f, 1.68f, -5.4f);
+            cameraTransform.LookAt(pivot.position + Vector3.up * 0.91f);
+            previewCamera.orthographicSize = 1.48f;
+            previewCamera.targetTexture = entry.texture;
+            previewCamera.Render();
+            previewCamera.targetTexture = null;
         }
 
         private void RenderEntry(Entry entry)
@@ -169,6 +277,19 @@ namespace PersiaWar.Unity2D5D
             previewCamera.targetTexture = entry.texture;
             previewCamera.Render();
             previewCamera.targetTexture = null;
+        }
+
+        private static void Release(CharacterEntry entry)
+        {
+            if (entry == null) return;
+            if (entry.texture != null)
+            {
+                entry.texture.Release();
+                Destroy(entry.texture);
+                entry.texture = null;
+            }
+            if (entry.pivot != null) Destroy(entry.pivot);
+            entry.pivot = null;
         }
 
         private static void Release(Entry entry)
@@ -188,6 +309,8 @@ namespace PersiaWar.Unity2D5D
         {
             for (int i = 0; i < entries.Count; i++) Release(entries[i]);
             entries.Clear();
+            for (int i = 0; i < characterEntries.Count; i++) Release(characterEntries[i]);
+            characterEntries.Clear();
         }
 
         private void OnDestroy()

@@ -155,9 +155,10 @@ namespace PersiaWar.Unity2D5D
 
         private static void SpawnBloodEffect(Vector3 position)
         {
-            // A wider, irregular blood pool spreads across the ground and remains for four seconds.
+            // Fallback blood also belongs on the terrain plane beneath the fallen body.
+            float groundY = PickupVisual.GroundY(position);
             GameObject stain = new GameObject("EnemyBloodStain");
-            stain.transform.position = new Vector3(position.x, 0.055f, position.z);
+            stain.transform.position = new Vector3(position.x, groundY + 0.025f, position.z);
             Material stainMaterial = RuntimeMaterialFactory.Create(
                 "EnemyBloodStainMaterial", new Color(0.30f, 0.008f, 0.018f));
 
@@ -177,13 +178,13 @@ namespace PersiaWar.Unity2D5D
 
             // Short impact spray supplements the persistent ground stain.
             GameObject blood = new GameObject("EnemyDefeatBloodParticles");
-            blood.transform.position = position + Vector3.up * 0.35f;
+            blood.transform.position = new Vector3(position.x, groundY + 0.045f, position.z);
             ParticleSystem particles = blood.AddComponent<ParticleSystem>();
             var main = particles.main;
             main.duration = 0.45f;
             main.loop = false;
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.20f, 0.55f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(0.7f, 1.6f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.12f, 0.38f);
             main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.13f);
             main.startColor = new Color(0.62f, 0.025f, 0.035f, 0.9f);
             main.maxParticles = 22;
@@ -192,7 +193,7 @@ namespace PersiaWar.Unity2D5D
             emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 18) });
             var shape = particles.shape;
             shape.shapeType = ParticleSystemShapeType.Cone;
-            shape.angle = 42f;
+            shape.angle = 14f;
             shape.radius = 0.12f;
             var particleRenderer = particles.GetComponent<ParticleSystemRenderer>();
             particleRenderer.material = RuntimeMaterialFactory.Create(

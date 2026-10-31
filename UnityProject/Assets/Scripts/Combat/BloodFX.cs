@@ -259,7 +259,8 @@ namespace PersiaWar.Unity2D5D
             Vector3 side = new Vector3(-dir.z, 0f, dir.x);
 
             int dropCount = tier <= 0 ? 10 : (tier == 1 ? 18 : 26);
-            EmitDrops(position, dir, dropCount, style, 1.3f + force * 0.08f, groundY, tier > 0);
+            // Start death droplets at ground level, not from the fallen character's torso.
+            EmitDrops(ground + Vector3.up * 0.035f, dir, dropCount, style, 0.55f, groundY, tier > 0);
 
             // main pool grows under the body for ~1.6 s
             Splat(ground + dir * 0.25f, 0f, Random.Range(0f, 6.28f), Random.Range(0, 4),

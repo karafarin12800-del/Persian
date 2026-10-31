@@ -43,7 +43,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             camera.allowMSAA = false;
             return;
         }
-        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 : 2;
+        QualitySettings.antiAliasing = 4;
         camera.allowMSAA = true;
     }
 
@@ -102,15 +102,32 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         instance = this;
         ChooseTierOnce();
         DontDestroyOnLoad(gameObject);
+        ApplyGlobalVisualQuality();
         ApplyAndroidResolutionBudget();
         StartCoroutine(ApplyAntiAliasingAfterPresentationLayer());
         StartCoroutine(DiscoverCharacterShadows());
     }
 
+    private void ApplyGlobalVisualQuality()
+    {
+        // Sharper edges and texture filtering improve clarity while avoiding
+        // expensive real-time shadow casting on every enemy in the mobile arena.
+        QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
+        QualitySettings.masterTextureLimit = 0;
+        QualitySettings.softParticles = CurrentTier >= QualityTier.Medium;
+        QualitySettings.antiAliasing = CurrentTier >= QualityTier.Medium ? 4 : 0;
+        QualitySettings.shadowResolution = CurrentTier == QualityTier.High
+            ? ShadowResolution.High : ShadowResolution.Medium;
+        QualitySettings.shadowDistance = CurrentTier == QualityTier.High ? 36f : 24f;
+        QualitySettings.shadowCascades = 1;
+        StartupCheckpoint.Set("MobileVisualQualityApplied_" + CurrentTier);
+    }
+
     private void ApplyAndroidResolutionBudget()
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
-        int longestSide = CurrentTier == QualityTier.High ? 1920 : 1600;
+        int longestSide = CurrentTier == QualityTier.High ? 1920
+            : (CurrentTier == QualityTier.Medium ? 1760 : 1600);
         int currentLongest = Mathf.Max(Screen.width, Screen.height);
         if (currentLongest > longestSide && currentLongest > 0)
         {
@@ -161,7 +178,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             yield break;
         }
 
-        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 : 2;
+        QualitySettings.antiAliasing = 4;
         for (int i = 0; i < cameras.Length; i++)
             if (cameras[i] != null) cameras[i].allowMSAA = true;
     }

@@ -35,9 +35,13 @@ namespace PersiaWar.Unity2D5D
             "GOLD NAMEPLATE",
             "AZURE BANNER",
             "VOID RIFLE",
-            "ALIEN SWORD"
+            "ALIEN SWORD",
+            "LIGHT PISTOL",
+            "ASSAULT RIFLE",
+            "HEAVY MACHINE GUN",
+            "AXE"
         };
-        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350, 450, 400 };
+        private static readonly int[] StoreCosmeticPrices = { 0, 250, 350, 450, 400, 0, 0, 0, 0 };
         private PlayerController player;
         private EnemySpawner enemySpawner;
         private MobileInputHub mobileInput;
@@ -115,6 +119,11 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle menuBodyStyle;
         private GUIStyle menuSmallStyle;
         private GUIStyle menuButtonStyle;
+        private GUIStyle heroCardTextStyle;
+        private GUIStyle storeTextStyle;
+        private GUIStyle storePriceStyle;
+        private GUIStyle storeActionStyle;
+        private GUIStyle profileNameFieldStyle;
         private GUIStyle objectiveStyle;
         private GUIStyle stageTwoFinalLeaderboardStyle;
         private int stageTwoFinalLeaderboardStyleScreenHeight = -1;
@@ -1920,8 +1929,8 @@ namespace PersiaWar.Unity2D5D
             GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f),
                 registrationPending ? "CREATE PLAYER PROFILE" : "PLAYER PROFILE", menuHeaderStyle);
             GUI.Label(new Rect(panel.x + 32f, panel.y + 88f, panel.width - 64f, 36f), "DISPLAY NAME (MAX 20 CHARACTERS)", menuSmallStyle);
-            profileNameInput = GUI.TextField(new Rect(panel.x + 40f, panel.y + 132f, panel.width - 80f, 58f),
-                profileNameInput, 20);
+            profileNameInput = GUI.TextField(new Rect(panel.x + 40f, panel.y + 126f, panel.width - 80f, 76f),
+                profileNameInput, 20, profileNameFieldStyle);
             GUI.Label(new Rect(panel.x + 32f, panel.y + 208f, panel.width - 64f, 34f), "PLAYER ID  " + playerId, menuSmallStyle);
             GUI.Label(new Rect(panel.x + 32f, panel.y + 250f, panel.width - 64f, 34f),
                 "PROFILE COSMETIC  " + StoreCosmeticNames[Mathf.Clamp(selectedProfileCosmetic, 0, StoreCosmeticNames.Length - 1)],
@@ -1934,55 +1943,78 @@ namespace PersiaWar.Unity2D5D
         private Rect GetStoreItemRect(int index)
         {
             const int columns = 3;
-            float gap = 12f;
-            float totalWidth = Mathf.Min(Screen.width - 44f, 1050f);
+            float scale = GetUiScale();
+            float gap = 8f * scale;
+            float totalWidth = Mathf.Min(Screen.width - 30f * scale, 1050f * scale);
             float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
-            float cardHeight = Mathf.Min(220f, Screen.height * 0.27f);
+            float cardHeight = Mathf.Clamp(Screen.height * 0.15f, 128f * scale, 174f * scale);
             float left = (Screen.width - totalWidth) * 0.5f;
             int column = index % columns;
             int row = index / columns;
-            float top = Screen.height * 0.25f;
+            float top = Screen.height * 0.19f;
             return new Rect(left + column * (cardWidth + gap), top + row * (cardHeight + gap), cardWidth, cardHeight);
         }
 
         private Rect GetStoreActionRect(int index)
         {
             Rect card = GetStoreItemRect(index);
-            return new Rect(card.x + 10f, card.yMax - 44f, card.width - 20f, 34f);
+            float scale = GetUiScale();
+            return new Rect(card.x + 8f * scale, card.yMax - 33f * scale,
+                card.width - 16f * scale, 27f * scale);
+        }
+
+        private static bool TryGetStoreWeaponKind(int index, out WeaponController.WeaponKind kind)
+        {
+            switch (index)
+            {
+                case 3: kind = WeaponController.WeaponKind.VoidRifle; return true;
+                case 4: kind = WeaponController.WeaponKind.AlienSword; return true;
+                case 5: kind = WeaponController.WeaponKind.LightPistol; return true;
+                case 6: kind = WeaponController.WeaponKind.AssaultRifle; return true;
+                case 7: kind = WeaponController.WeaponKind.HeavyMachineGun; return true;
+                case 8: kind = WeaponController.WeaponKind.Axe; return true;
+                default: kind = WeaponController.WeaponKind.AssaultRifle; return false;
+            }
+        }
+
+        private static string StoreWeaponRewardKey(WeaponController.WeaponKind kind)
+        {
+            if (kind == WeaponController.WeaponKind.VoidRifle) return "PW.Reward.VoidRifle";
+            if (kind == WeaponController.WeaponKind.AlienSword) return "PW.Reward.AlienSword";
+            return "PW.StoreWeaponOwned." + kind;
         }
 
         private bool IsStoreItemOwned(int index)
         {
             if (index < 3)
                 return PlayerPrefs.GetInt("PW.CosmeticOwned." + index, index == 0 ? 1 : 0) != 0;
-            string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
-            return PlayerPrefs.GetInt(rewardKey, 0) != 0;
+            WeaponController.WeaponKind kind;
+            return TryGetStoreWeaponKind(index, out kind) && IsCampaignWeaponAvailable(kind);
         }
 
         private bool IsStoreItemEquipped(int index)
         {
             if (index < 3) return selectedProfileCosmetic == index;
-            int kind = index == 3 ? (int)WeaponController.WeaponKind.VoidRifle : (int)WeaponController.WeaponKind.AlienSword;
-            return selectedStoreWeaponKind == kind;
+            WeaponController.WeaponKind kind;
+            return TryGetStoreWeaponKind(index, out kind) && selectedStoreWeaponKind == (int)kind;
         }
 
         private void PurchaseOrEquipCosmetic(int index)
         {
             if (index >= 3)
             {
-                string rewardKey = index == 3 ? "PW.Reward.VoidRifle" : "PW.Reward.AlienSword";
-                bool ownedWeapon = PlayerPrefs.GetInt(rewardKey, 0) != 0;
+                WeaponController.WeaponKind kind;
+                if (!TryGetStoreWeaponKind(index, out kind)) return;
+                bool ownedWeapon = IsCampaignWeaponAvailable(kind);
                 if (!ownedWeapon)
                 {
                     int price = StoreCosmeticPrices[index];
                     if (storeCoins < price) return;
                     storeCoins -= price;
                     PlayerPrefs.SetInt("PW.StoreCoins", storeCoins);
-                    PlayerPrefs.SetInt(rewardKey, 1);
+                    PlayerPrefs.SetInt(StoreWeaponRewardKey(kind), 1);
                 }
-                selectedStoreWeaponKind = index == 3
-                    ? (int)WeaponController.WeaponKind.VoidRifle
-                    : (int)WeaponController.WeaponKind.AlienSword;
+                selectedStoreWeaponKind = (int)kind;
                 PlayerPrefs.SetInt("PW.SelectedWeaponKind", selectedStoreWeaponKind);
                 PlayerPrefs.Save();
                 return;
@@ -2018,23 +2050,33 @@ namespace PersiaWar.Unity2D5D
                 Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.78f));
                 Fill(new Rect(card.x, card.y, card.width, 4f), equipped
                     ? new Color(0.24f, 0.92f, 0.98f, 0.95f) : new Color(0.38f, 0.50f, 0.60f, 0.72f));
-                Rect emblem = new Rect(card.center.x - 29f, card.y + 14f, 58f, 58f);
+                Rect emblem = new Rect(card.center.x - 27f, card.y + 6f, 54f, 48f);
                 Color emblemColor = i == 0 ? new Color(0.83f, 0.57f, 0.16f)
                     : i == 1 ? new Color(0.89f, 0.73f, 0.25f)
                     : i == 2 ? new Color(0.14f, 0.52f, 0.79f)
                     : i == 3 ? new Color(0.08f, 0.72f, 0.98f) : new Color(0.20f, 0.95f, 0.58f);
-                if (i == 3)
-                    ModelPreview.Draw(emblem, ModelKind.VoidRifle);
-                else if (i == 4)
-                    ModelPreview.Draw(emblem, ModelKind.AlienSword);
+                if (i >= 3)
+                {
+                    WeaponController.WeaponKind weaponKind;
+                    if (TryGetStoreWeaponKind(i, out weaponKind))
+                        ModelPreview.Draw(emblem, GetCampaignWeaponPreviewKind(weaponKind));
+                }
                 else
+                {
                     Fill(emblem, emblemColor);
-                GUI.Label(new Rect(card.x + 6f, card.y + 76f, card.width - 12f, 34f), StoreCosmeticNames[i], menuSmallStyle);
-                GUI.Label(new Rect(card.x + 6f, card.y + 110f, card.width - 12f, 26f),
+                }
+                GUI.Label(new Rect(card.x + 6f, card.y + 54f, card.width - 12f, 22f),
+                    StoreCosmeticNames[i], storeTextStyle);
+                GUI.Label(new Rect(card.x + 6f, card.y + 77f, card.width - 12f, 18f),
                     owned ? (equipped ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
-                    menuBodyStyle);
+                    storePriceStyle);
                 Rect action = GetStoreActionRect(i);
-                if (DrawFantasyButton(action, owned ? (equipped ? "EQUIPPED" : (i >= 3 ? "EQUIP WEAPON" : "EQUIP")) : "UNLOCK"))
+                string actionLabel = owned ? (equipped ? "EQUIPPED" : "EQUIP") : "UNLOCK";
+                Fill(action, new Color(0.16f, 0.40f, 0.48f, 0.92f));
+                Fill(new Rect(action.x + 2f, action.y + 2f, action.width - 4f, action.height - 4f),
+                    new Color(0.025f, 0.075f, 0.12f, 0.94f));
+                GUI.Label(action, actionLabel, storeActionStyle);
+                if (GUI.Button(action, GUIContent.none, GUIStyle.none))
                     PurchaseOrEquipCosmetic(i);
             }
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU"))
@@ -2284,11 +2326,11 @@ namespace PersiaWar.Unity2D5D
                     selected ? new Color(0.25f, 0.94f, 0.49f, 1f)
                     : new Color(0.36f, 0.46f, 0.52f, 0.8f));
                 GUI.Label(new Rect(card.x + 8f * scale, card.y + 8f * scale,
-                    card.width - 16f * scale, 36f * scale), CampaignWeaponLabels[i], menuBodyStyle);
-                string status = !available ? "LOCKED / NOT AN ENTRY WEAPON"
+                    card.width - 16f * scale, 28f * scale), CampaignWeaponLabels[i], storeTextStyle);
+                string status = !available ? "LOCKED / NOT ENTRY WEAPON"
                     : selected ? "SELECTED" : "TAP TO SELECT";
-                GUI.Label(new Rect(card.x + 8f * scale, card.y + 46f * scale,
-                    card.width - 16f * scale, 28f * scale), status, menuSmallStyle);
+                GUI.Label(new Rect(card.x + 8f * scale, card.y + 36f * scale,
+                    card.width - 16f * scale, 20f * scale), status, storePriceStyle);
 
                 // Render the actual 3D weapon mesh in each selection card.
                 Rect imageRect = new Rect(card.x + 10f * scale, card.y + 76f * scale,
@@ -2541,21 +2583,19 @@ namespace PersiaWar.Unity2D5D
             Fill(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, rect.height - 6f), panel);
             Fill(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, 5f), selected ? new Color(0.98f, 0.70f, 0.16f) : new Color(0.20f, 0.28f, 0.36f));
 
-            Rect figure = new Rect(rect.x + rect.width * 0.18f, rect.y + 34f, rect.width * 0.64f, rect.height * 0.52f);
-            DrawChibiFigure(figure, index);
+            Rect figure = new Rect(rect.x + rect.width * 0.16f, rect.y + 22f, rect.width * 0.68f, rect.height * 0.58f);
+            ModelPreview.DrawHero(figure, index);
 
-            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 82f, rect.width - 16f, 34f), HeroNames[index], menuSmallStyle);
+            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 82f, rect.width - 16f, 34f), HeroNames[index], heroCardTextStyle);
             string state = selected && unlocked ? "✦ SELECTED ✦" : (unlocked ? "TAP TO SELECT" : "LOCKED");
-            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), state, menuSmallStyle);
+            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), state, heroCardTextStyle);
 
             if (!unlocked)
             {
                 Fill(rect, new Color(0.015f, 0.025f, 0.04f, 0.58f));
-                GUI.Label(new Rect(rect.x + 6f, rect.center.y - 12f, rect.width - 12f, 34f),
-                    "LOCKED", menuButtonStyle);
-                string hint = index == 5 ? "RESCUE IN STAGE 1" : "COMING SOON";
-                GUI.Label(new Rect(rect.x + 6f, rect.center.y + 21f, rect.width - 12f, 34f),
-                    hint, menuSmallStyle);
+                GUI.Label(new Rect(rect.x + 6f, rect.center.y - 12f, rect.width - 12f, 28f), "LOCKED", heroCardTextStyle);
+                string hint = index == 1 ? "RESCUE IN STAGE 1" : "UNLOCK BY CAMPAIGN";
+                GUI.Label(new Rect(rect.x + 6f, rect.center.y + 16f, rect.width - 12f, 28f), hint, heroCardTextStyle);
             }
         }
 
@@ -4303,6 +4343,16 @@ namespace PersiaWar.Unity2D5D
                 wordWrap = true
             };
             menuSmallStyle.normal.textColor = new Color(0.91f, 0.94f, 0.98f, 1f);
+
+            heroCardTextStyle = new GUIStyle(menuSmallStyle) { fontSize = Mathf.Max(12, menuSmallStyle.fontSize / 2), alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            storeTextStyle = new GUIStyle(menuSmallStyle) { fontSize = Mathf.Max(12, menuSmallStyle.fontSize / 2), alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            storePriceStyle = new GUIStyle(menuBodyStyle) { fontSize = Mathf.Max(12, menuBodyStyle.fontSize / 2), alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            storeActionStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.Max(12, Mathf.RoundToInt(14f * scale)), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            storeActionStyle.normal.textColor = new Color(1f, 0.94f, 0.78f, 1f);
+            profileNameFieldStyle = new GUIStyle(GUI.skin.textField) { fontSize = Mathf.Clamp(Mathf.RoundToInt(32f * scale), 24, 36), alignment = TextAnchor.MiddleLeft, padding = new RectOffset(16, 16, 8, 8) };
+            profileNameFieldStyle.normal.textColor = Color.white;
+            profileNameFieldStyle.focused.textColor = Color.white;
+            profileNameFieldStyle.hover.textColor = Color.white;
 
             menuButtonStyle = new GUIStyle(GUI.skin.label)
             {

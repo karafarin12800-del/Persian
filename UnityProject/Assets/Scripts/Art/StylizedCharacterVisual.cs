@@ -20,6 +20,7 @@ namespace PersiaWar.Unity2D5D
         private SpriteRenderer shadowSprite;
         private ParticleSystem muzzleFlash;
         private Light muzzleLight;
+        private Camera previewCameraOverride;
 
         private bool moving;
         private bool playerCharacter;
@@ -111,6 +112,17 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        public void ConfigurePlayerHeroPreview(int heroIndex, Camera previewCamera)
+        {
+            previewCameraOverride = previewCamera;
+            ConfigurePlayerHero(heroIndex);
+            EnsureMobile3DCharacter();
+            ApplyMobilePlayerColors(Mathf.Clamp(heroIndex, 0, 5));
+            moving = false;
+            if (sprite != null) sprite.enabled = false;
+            if (shadowSprite != null) shadowSprite.enabled = false;
+        }
+
         public void SetFacing(Vector3 worldDirection)
         {
             worldDirection.y = 0f;
@@ -151,10 +163,10 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            if (sprite == null)
+            if (sprite == null && mobileModelRoot == null)
                 return;
 
-            Camera cam = Camera.main;
+            Camera cam = previewCameraOverride != null ? previewCameraOverride : Camera.main;
             if (cam != null && artRoot != null)
             {
                 Vector3 toCamera = cam.transform.position - artRoot.position;
@@ -165,16 +177,17 @@ namespace PersiaWar.Unity2D5D
 
             float t = Time.time + phase;
             float bob = moving ? Mathf.Abs(Mathf.Sin(t * 11f)) * 0.045f : Mathf.Sin(t * 2.2f) * 0.015f;
-            sprite.transform.localPosition = new Vector3(0f, bob, 0f);
-
-            float squash = moving
-                ? 1f + Mathf.Sin(t * 11f) * 0.018f
-                : 1f + Mathf.Sin(t * 2.2f) * 0.008f;
-
-            sprite.transform.localScale = new Vector3(
-                transform.localScale.x * squash,
-                transform.localScale.y * (2f - squash),
-                1f);
+            if (sprite != null)
+            {
+                sprite.transform.localPosition = new Vector3(0f, bob, 0f);
+                float squash = moving
+                    ? 1f + Mathf.Sin(t * 11f) * 0.018f
+                    : 1f + Mathf.Sin(t * 2.2f) * 0.008f;
+                sprite.transform.localScale = new Vector3(
+                    transform.localScale.x * squash,
+                    transform.localScale.y * (2f - squash),
+                    1f);
+            }
 
             if (mobileModelRoot != null)
             {
