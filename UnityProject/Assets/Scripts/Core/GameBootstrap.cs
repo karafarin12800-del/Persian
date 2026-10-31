@@ -130,6 +130,8 @@ namespace PersiaWar.Unity2D5D
         public void ReleaseWorldForStageTransition()
         {
             ExtractionBeacon.ClearForStageTransition();
+            BloodFX.ClearAll();
+            ModelPreview.ReleaseAll();
 
             // The Stage 2 arena's combatants and projectiles are not children of
             // worldRoot. Destroy them explicitly or the large Stage 3 world is built
@@ -696,6 +698,35 @@ namespace PersiaWar.Unity2D5D
             Debug.Log("PERSIA_GUIDE: Random extraction beacon activated at " + beaconX + "," + beaconZ);
         }
 
+        private static void AttachStageOneLootVisual(GameObject item, ModelKind kind)
+        {
+            if (item == null || kind == ModelKind.None) return;
+
+            // Stage 1 pickup roots keep their original collider geometry and scale.
+            // A neutral child cancels the primitive's non-uniform visual scale/rotation
+            // so the shared 3D model and its ground ring render at their intended size.
+            Transform visualRoot = new GameObject("PW_PickupVisualRoot").transform;
+            visualRoot.SetParent(item.transform, false);
+            visualRoot.localPosition = Vector3.zero;
+            Vector3 rootScale = item.transform.localScale;
+            visualRoot.localScale = new Vector3(
+                1f / Mathf.Max(0.001f, Mathf.Abs(rootScale.x)),
+                1f / Mathf.Max(0.001f, Mathf.Abs(rootScale.y)),
+                1f / Mathf.Max(0.001f, Mathf.Abs(rootScale.z)));
+            visualRoot.localRotation = Quaternion.Inverse(item.transform.localRotation);
+
+            GameObject model = PickupVisual.Attach(visualRoot, kind, true);
+            if (model != null)
+            {
+                Renderer legacyRenderer = item.GetComponent<Renderer>();
+                if (legacyRenderer != null) legacyRenderer.enabled = false;
+            }
+            else
+            {
+                Destroy(visualRoot.gameObject);
+            }
+        }
+
         private void SpawnRandomHouseLoot()
         {
             if (androidBuildingCenters.Count == 0) return;
@@ -734,10 +765,21 @@ namespace PersiaWar.Unity2D5D
                     body.isKinematic = true;
                     body.useGravity = false;
                     PickupItem pickup = item.AddComponent<PickupItem>();
+                    ModelKind visualKind;
                     if (type == PickupItem.PickupType.Weapon)
-                        pickup.ConfigureWeapon((WeaponController.WeaponKind)Random.Range(0, 3), 30);
+                    {
+                        WeaponController.WeaponKind weaponKind =
+                            (WeaponController.WeaponKind)Random.Range(0, 3);
+                        pickup.ConfigureWeapon(weaponKind, 30);
+                        visualKind = ModelLibrary.KindFromName(weaponKind.ToString());
+                    }
                     else
+                    {
                         pickup.Configure(type, type == PickupItem.PickupType.Shield ? 35 : 2);
+                        visualKind = type == PickupItem.PickupType.Shield ? ModelKind.ShieldPickup
+                            : (type == PickupItem.PickupType.Grenade ? ModelKind.Grenade : ModelKind.QuickDash);
+                    }
+                    AttachStageOneLootVisual(item, visualKind);
                 }
                 Debug.Log("PERSIA_LOOT: spawned 8 weapons, 8 shields, 8 grenades and 8 magenta triangular quick-dash pickups inside houses");
                 return;
@@ -785,6 +827,7 @@ namespace PersiaWar.Unity2D5D
                     weaponBody.useGravity = false;
                     PickupItem weaponPickup = item.AddComponent<PickupItem>();
                     weaponPickup.ConfigureWeapon(kind, 30);
+                    PickupVisual.Attach(item.transform, ModelLibrary.KindFromName(kind.ToString()), true);
                     continue;
                 }
 
@@ -834,6 +877,11 @@ namespace PersiaWar.Unity2D5D
                     : type == PickupItem.PickupType.Medkit ? 30
                     : type == PickupItem.PickupType.Ammo ? 45 : 2;
                 pickup.Configure(type, amount);
+                ModelKind visualKind = type == PickupItem.PickupType.Shield ? ModelKind.ShieldPickup
+                    : (type == PickupItem.PickupType.Grenade ? ModelKind.Grenade
+                    : (type == PickupItem.PickupType.Ammo ? ModelKind.AmmoCrate
+                    : (type == PickupItem.PickupType.Medkit ? ModelKind.Medkit : ModelKind.QuickDash)));
+                PickupVisual.Attach(item.transform, visualKind, true);
             }
 
             SpawnVillageAxePickups(6);
@@ -935,6 +983,7 @@ namespace PersiaWar.Unity2D5D
                 body.useGravity = false;
                 PickupItem pickup = pickupRoot.AddComponent<PickupItem>();
                 pickup.ConfigureWeapon(WeaponController.WeaponKind.Axe, 0);
+                PickupVisual.Attach(pickupRoot.transform, ModelKind.Axe, true);
             }
         }
 
