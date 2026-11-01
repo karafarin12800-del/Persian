@@ -3709,7 +3709,11 @@ namespace PersiaWar.Unity2D5D
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.15f, 0.16f, 0.17f, 1f);
+            // Stage 2 is a sunlit outdoor village; use a clear daytime sky instead
+            // of the dark neutral fallback used by the other campaign environments.
+            camera.backgroundColor = stageNumber == 2
+                ? new Color(0.58f, 0.78f, 0.92f, 1f)
+                : new Color(0.15f, 0.16f, 0.17f, 1f);
             camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
