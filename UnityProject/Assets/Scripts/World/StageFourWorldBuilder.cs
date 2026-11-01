@@ -34,6 +34,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private Transform legacyCity;
     private Color savedAmbient;
     private bool ambientCaptured;
+    private bool savedFogEnabled;
+    private FogMode savedFogMode;
+    private Color savedFogColor;
+    private float savedFogStartDistance;
+    private float savedFogEndDistance;
+    private bool fogCaptured;
 
     public bool IsCinematic => introRunning;
     public string IntroMessage { get; private set; } = "GREEN UPLINK DETECTED";
@@ -137,6 +143,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             ClearWorld();
             savedAmbient = RenderSettings.ambientLight;
             ambientCaptured = true;
+            savedFogEnabled = RenderSettings.fog;
+            savedFogMode = RenderSettings.fogMode;
+            savedFogColor = RenderSettings.fogColor;
+            savedFogStartDistance = RenderSettings.fogStartDistance;
+            savedFogEndDistance = RenderSettings.fogEndDistance;
+            fogCaptured = true;
             GameObject oldRoot = GameObject.Find(RootName);
             if (oldRoot != null) Destroy(oldRoot);
             GameObject city = GameObject.Find("BattleRoyaleCity");
@@ -931,7 +943,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         light.color = new Color(0.58f, 0.76f, 1f);
         light.intensity = 1.1f;
         light.shadows = LightShadows.None;
-        RenderSettings.ambientLight = new Color(0.22f, 0.27f, 0.35f);
+        RenderSettings.ambientLight = new Color(0.30f, 0.36f, 0.46f);
+        RenderSettings.fog = false;
         if (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High)
             light.shadows = LightShadows.Soft;
         GraphicsQualityProfile.ApplyStageFourLook(root, controller != null ? controller.transform : null);
@@ -1252,6 +1265,15 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         }
         if (legacyCity != null && legacyCity.gameObject != null) legacyCity.gameObject.SetActive(true);
         if (ambientCaptured) { RenderSettings.ambientLight = savedAmbient; ambientCaptured = false; }
+        if (fogCaptured)
+        {
+            RenderSettings.fog = savedFogEnabled;
+            RenderSettings.fogMode = savedFogMode;
+            RenderSettings.fogColor = savedFogColor;
+            RenderSettings.fogStartDistance = savedFogStartDistance;
+            RenderSettings.fogEndDistance = savedFogEndDistance;
+            fogCaptured = false;
+        }
         if (gameplayCamera != null)
         {
             gameplayCamera.farClipPlane = savedFarClip > 0f ? savedFarClip : gameplayCamera.farClipPlane;

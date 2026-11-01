@@ -55,6 +55,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private float savedCameraFieldOfView;
     private Color savedAmbientLight;
     private bool ambientCaptured;
+    private bool savedFogEnabled;
+    private FogMode savedFogMode;
+    private Color savedFogColor;
+    private float savedFogStartDistance;
+    private float savedFogEndDistance;
+    private bool fogCaptured;
     private Renderer[] savedPlayerRenderers;
     private bool[] savedPlayerRendererStates;
 
@@ -217,6 +223,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             ClearWorldAndRestorePrevious();
             savedAmbientLight = RenderSettings.ambientLight;
             ambientCaptured = true;
+            savedFogEnabled = RenderSettings.fog;
+            savedFogMode = RenderSettings.fogMode;
+            savedFogColor = RenderSettings.fogColor;
+            savedFogStartDistance = RenderSettings.fogStartDistance;
+            savedFogEndDistance = RenderSettings.fogEndDistance;
+            fogCaptured = true;
             GameObject oldWorld = FindSceneObject(WorldRootName);
             if (oldWorld != null) Destroy(oldWorld);
             GameObject city = FindSceneObject("BattleRoyaleCity");
@@ -431,7 +443,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         key.color = new Color(0.83f, 0.88f, 1f);
         key.intensity = 1.25f;
         key.shadows = LightShadows.None;
-        RenderSettings.ambientLight = new Color(0.34f, 0.33f, 0.31f);
+        RenderSettings.ambientLight = new Color(0.31f, 0.36f, 0.44f);
+        RenderSettings.fog = GraphicsQualityProfile.CurrentTier >= GraphicsQualityProfile.QualityTier.Medium;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = new Color(0.10f, 0.17f, 0.25f, 1f);
+        RenderSettings.fogStartDistance = 44f;
+        RenderSettings.fogEndDistance = 224f;
     }
 
     private IEnumerator BuildGroundAndBoundaryRoutine()
@@ -1919,6 +1936,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         {
             RenderSettings.ambientLight = savedAmbientLight;
             ambientCaptured = false;
+        }
+        if (fogCaptured)
+        {
+            RenderSettings.fog = savedFogEnabled;
+            RenderSettings.fogMode = savedFogMode;
+            RenderSettings.fogColor = savedFogColor;
+            RenderSettings.fogStartDistance = savedFogStartDistance;
+            RenderSettings.fogEndDistance = savedFogEndDistance;
+            fogCaptured = false;
         }
 
         hovercrafts.Clear();

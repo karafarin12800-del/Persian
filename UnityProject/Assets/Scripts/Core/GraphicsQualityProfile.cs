@@ -112,14 +112,24 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     {
         // Sharper edges and texture filtering improve clarity while avoiding
         // expensive real-time shadow casting on every enemy in the mobile arena.
-        QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
+        QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
         QualitySettings.masterTextureLimit = 0;
+        QualitySettings.maximumLODLevel = 0;
+        QualitySettings.lodBias = CurrentTier == QualityTier.High ? 2.0f :
+                                  (CurrentTier == QualityTier.Medium ? 1.4f : 1.0f);
+        QualitySettings.pixelLightCount = CurrentTier == QualityTier.High ? 4 :
+                                          (CurrentTier == QualityTier.Medium ? 2 : 1);
         QualitySettings.softParticles = CurrentTier >= QualityTier.Medium;
         QualitySettings.antiAliasing = CurrentTier >= QualityTier.Medium ? 4 : 0;
-        QualitySettings.shadowResolution = CurrentTier == QualityTier.High
-            ? ShadowResolution.High : ShadowResolution.Medium;
-        QualitySettings.shadowDistance = CurrentTier == QualityTier.High ? 36f : 24f;
-        QualitySettings.shadowCascades = 1;
+        QualitySettings.shadows = CurrentTier == QualityTier.High ? ShadowQuality.All :
+                                  (CurrentTier == QualityTier.Medium ? ShadowQuality.HardOnly : ShadowQuality.Disable);
+        QualitySettings.shadowResolution = CurrentTier == QualityTier.High ? ShadowResolution.VeryHigh :
+                                           (CurrentTier == QualityTier.Medium ? ShadowResolution.High : ShadowResolution.Low);
+        QualitySettings.shadowDistance = CurrentTier == QualityTier.High ? 52f :
+                                         (CurrentTier == QualityTier.Medium ? 30f : 18f);
+        QualitySettings.shadowCascades = CurrentTier == QualityTier.High ? 2 : 1;
+        QualitySettings.realtimeReflectionProbes = CurrentTier == QualityTier.High;
+        QualitySettings.reflectionProbeBlending = CurrentTier == QualityTier.High;
         StartupCheckpoint.Set("MobileVisualQualityApplied_" + CurrentTier);
     }
 
@@ -426,9 +436,9 @@ public sealed class StageFourGraphicsSettingsLease : MonoBehaviour
             previousResolution = QualitySettings.shadowResolution;
             captured = true;
         }
-        QualitySettings.shadowDistance = 40f;
-        QualitySettings.shadowCascades = 1;
-        QualitySettings.shadowResolution = ShadowResolution.High;
+        QualitySettings.shadowDistance = 52f;
+        QualitySettings.shadowCascades = 2;
+        QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
     }
 
     private void OnDestroy()

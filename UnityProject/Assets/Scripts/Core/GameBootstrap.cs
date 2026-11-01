@@ -334,7 +334,15 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.ambientLight = stageTwoRequested
                 ? new Color(0.62f, 0.63f, 0.56f)
                 : new Color(0.24f, 0.27f, 0.30f);
-            RenderSettings.fog = false;
+            bool atmosphericRendering = GraphicsQualityProfile.CurrentTier >=
+                GraphicsQualityProfile.QualityTier.Medium;
+            RenderSettings.fog = atmosphericRendering;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogColor = stageTwoRequested
+                ? new Color(0.70f, 0.59f, 0.46f, 1f)
+                : new Color(0.53f, 0.63f, 0.70f, 1f);
+            RenderSettings.fogStartDistance = stageTwoRequested ? 62f : 74f;
+            RenderSettings.fogEndDistance = stageTwoRequested ? 238f : 270f;
 #if UNITY_ANDROID
             QualitySettings.antiAliasing = 0;
 #endif
