@@ -432,6 +432,13 @@ namespace PersiaWar.Unity2D5D
             else
                 BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
+            if (!stageTwoRequested)
+            {
+                // Stage 1 receives its own batched Persian architectural layer.
+                // It is presentation-only: no colliders, combat, loot or rescue rules change.
+                StageOneWorldArt.Build(worldRoot);
+                StartupCheckpoint.Set("StageOneWorldArtReady");
+            }
             SpawnRandomHouseLoot();
             RemoveAnyExtractionBeacon();
             return;
