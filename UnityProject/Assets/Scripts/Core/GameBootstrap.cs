@@ -332,7 +332,7 @@ namespace PersiaWar.Unity2D5D
             // Stage 2 is an outdoor Iranian village: lift the ambient daylight so
             // adobe walls, soil, trees and courtyards remain readable in Android shadows.
             RenderSettings.ambientLight = stageTwoRequested
-                ? new Color(0.48f, 0.49f, 0.44f)
+                ? new Color(0.62f, 0.63f, 0.56f)
                 : new Color(0.24f, 0.27f, 0.30f);
             RenderSettings.fog = false;
 #if UNITY_ANDROID
@@ -347,19 +347,20 @@ namespace PersiaWar.Unity2D5D
             }
             sun.type = LightType.Directional;
             sun.enabled = true;
-            sun.intensity = stageTwoRequested ? 1.32f : 1.15f;
+            sun.intensity = stageTwoRequested ? 1.40f : 1.15f;
             sun.color = stageTwoRequested
-                ? new Color(1f, 0.97f, 0.90f)
+                ? new Color(1f, 0.99f, 0.94f)
                 : new Color(1f, 0.93f, 0.82f);
 #if UNITY_ANDROID
-            sun.shadows = stageTwoRequested ? LightShadows.Hard : LightShadows.None;
-            // Softer shadow contrast keeps courtyards and the ground from collapsing
-            // into black while retaining contact shadows beneath houses and trees.
-            sun.shadowStrength = stageTwoRequested ? 0.30f : 0f;
-            QualitySettings.shadowDistance = stageTwoRequested ? 60f : 0f;
+            // Android village materials are rendered with the project-owned unlit
+            // shader below. Disable real-time shadows here as a safety net for any
+            // remaining lit props; they were the main source of near-black ground.
+            sun.shadows = LightShadows.None;
+            sun.shadowStrength = 0f;
+            QualitySettings.shadowDistance = 0f;
 #else
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = stageTwoRequested ? 0.34f : 0.78f;
+            sun.shadowStrength = stageTwoRequested ? 0.24f : 0.78f;
 #endif
             sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
         }
@@ -2562,11 +2563,13 @@ namespace PersiaWar.Unity2D5D
 
             // Reuse the same lit materials in both stages for consistent leaf colour and shading.
             if (androidTreeTrunkMaterial == null)
-                androidTreeTrunkMaterial = MakeStageTwoLitMaterial(
-                    "AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
+                androidTreeTrunkMaterial = stageTwoRequested
+                    ? MakeStageTwoLitMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f))
+                    : MakeMaterial("AndroidTreeTrunk", new Color(0.25f, 0.16f, 0.09f));
             if (androidTreeCrownMaterial == null)
-                androidTreeCrownMaterial = MakeStageTwoLitMaterial(
-                    "AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
+                androidTreeCrownMaterial = stageTwoRequested
+                    ? MakeStageTwoLitMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f))
+                    : MakeMaterial("AndroidTreeCrown", new Color(0.17f, 0.40f, 0.14f));
 
             CreateAndroidBox(
                 "TreeTrunk",
@@ -2576,8 +2579,9 @@ namespace PersiaWar.Unity2D5D
                 true);
 
             if (androidTreeCrownHighlightMaterial == null)
-                androidTreeCrownHighlightMaterial = MakeStageTwoLitMaterial(
-                    "AndroidTreeCrownHighlight", new Color(0.23f, 0.47f, 0.16f));
+                androidTreeCrownHighlightMaterial = stageTwoRequested
+                    ? MakeStageTwoLitMaterial("AndroidTreeCrownHighlight", new Color(0.23f, 0.47f, 0.16f))
+                    : MakeMaterial("AndroidTreeCrownHighlight", new Color(0.23f, 0.47f, 0.16f));
 
             Transform treeRoot = androidCurrentBuildingRoot;
             Transform canopyRoot = new GameObject("TreeCanopyWindRoot").transform;
@@ -3102,6 +3106,16 @@ namespace PersiaWar.Unity2D5D
             Shader shader = stageTwoLitShader;
             if (shader == null || !shader.isSupported)
             {
+#if UNITY_ANDROID
+                // The previous Standard/PersiaWarLit surface shader depended on
+                // directional lighting and produced almost-black village ground,
+                // walls and foliage on some Android devices. Stage 2 is deliberately
+                // authored as a bright daytime scene, so use the bundled, guaranteed
+                // color-preserving Android shader for its environment materials.
+                shader = Resources.Load<Shader>("PersiaWarAndroidFlat");
+                if (shader == null || !shader.isSupported)
+                    shader = RuntimeMaterialFactory.GetShader();
+#else
                 shader = Resources.Load<Shader>("PersiaWarLit");
                 if (shader == null || !shader.isSupported)
                     shader = Shader.Find("PersiaWar/Lit");
@@ -3113,6 +3127,7 @@ namespace PersiaWar.Unity2D5D
                     shader = Resources.Load<Shader>("PersiaWarAndroidFlat");
                 if (shader == null || !shader.isSupported)
                     shader = RuntimeMaterialFactory.GetShader();
+#endif
                 stageTwoLitShader = shader;
             }
             if (shader == null || !shader.isSupported)
