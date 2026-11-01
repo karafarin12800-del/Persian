@@ -50,9 +50,15 @@ Shader "PersiaWar/AndroidFlat"
                 return o;
             }
 
+            fixed4 SampleAndroidAlbedo(v2f i)
+            {
+                // Preserve the tested flat-texture tint expression; fog is layered afterwards.
+                return tex2D(_MainTex, i.uv) * _Color;
+            }
+
             fixed4 frag(v2f i) : SV_Target
             {
-                fixed4 color = tex2D(_MainTex, i.uv) * _Color;
+                fixed4 color = SampleAndroidAlbedo(i);
                 UNITY_APPLY_FOG(i.fogCoord, color);
                 return color;
             }
