@@ -69,18 +69,18 @@ namespace PersiaWar.Unity2D5D
             float y = GroundHeight(x, z);
             Vector3 center = new Vector3(x, y, z);
 
-            kit.AddCylinder(center + Vector3.up * 0.48f, 1.55f, 1.55f, 0.96f, 10, Limestone, MeshKit.AlongY);
-            kit.AddCylinder(center + Vector3.up * 1.14f, 1.26f, 1.05f, 0.38f, 10, Ivory, MeshKit.AlongY);
-            kit.AddCylinder(center + Vector3.up * 4.25f, 0.96f, 0.70f, 5.95f, 10, Limestone, MeshKit.AlongY);
-            kit.AddCylinder(center + Vector3.up * 7.25f, 0.78f, 0.96f, 0.26f, 10, Turquoise, MeshKit.AlongY);
+            kit.AddCylinder(center + Vector3.up * 0.48f, 1.55f, 1.55f, 0.96f, 10, Limestone, MeshKit.AlongY, true, true);
+            kit.AddCylinder(center + Vector3.up * 1.14f, 1.26f, 1.05f, 0.38f, 10, Ivory, MeshKit.AlongY, true, true);
+            kit.AddCylinder(center + Vector3.up * 4.25f, 0.96f, 0.70f, 5.95f, 10, Limestone, MeshKit.AlongY, true, true);
+            kit.AddCylinder(center + Vector3.up * 7.25f, 0.78f, 0.96f, 0.26f, 10, Turquoise, MeshKit.AlongY, true, true);
             kit.AddRing(center + Vector3.up * 7.42f, 0.80f, 1.12f, 12, Brass);
-            kit.AddCylinder(center + Vector3.up * 7.72f, 0.80f, 0.68f, 0.42f, 10, Ivory, MeshKit.AlongY);
+            kit.AddCylinder(center + Vector3.up * 7.72f, 0.80f, 0.68f, 0.42f, 10, Ivory, MeshKit.AlongY, true, true);
             kit.AddCylinder(center + Vector3.up * 8.55f, 0.78f, 0.04f, 1.52f, 12,
-                variation % 2 == 0 ? TurquoiseLight : DeepBlue, MeshKit.AlongY);
+                variation % 2 == 0 ? TurquoiseLight : DeepBlue, MeshKit.AlongY, true, true);
             kit.AddRing(center + Vector3.up * 8.05f, 0.58f, 0.78f, 12, Brass);
             kit.AddSphere(center + Vector3.up * 9.38f, 0.78f, 10, 7,
                 variation % 2 == 0 ? Turquoise : DeepBlue);
-            kit.AddCylinder(center + Vector3.up * 10.25f, 0.10f, 0.015f, 1.35f, 8, Brass, MeshKit.AlongY);
+            kit.AddCylinder(center + Vector3.up * 10.25f, 0.10f, 0.015f, 1.35f, 8, Brass, MeshKit.AlongY, true, true);
             kit.AddSphere(center + Vector3.up * 10.95f, 0.17f, 8, 5, WarmGlow);
 
             // Paired cypress silhouettes give the skyline a distinctly Persian garden rhythm.
@@ -92,7 +92,7 @@ namespace PersiaWar.Unity2D5D
         private static void AddCypress(MeshKit kit, float x, float z, float y, float scale)
         {
             kit.AddCylinder(new Vector3(x, y + scale * 0.48f, z),
-                scale * 0.075f, scale * 0.055f, scale * 0.96f, 6, Terracotta, MeshKit.AlongY);
+                scale * 0.075f, scale * 0.055f, scale * 0.96f, 6, Terracotta, MeshKit.AlongY, true, true);
             for (int tier = 0; tier < 4; tier++)
             {
                 float radius = scale * (0.47f - tier * 0.085f);
@@ -100,7 +100,7 @@ namespace PersiaWar.Unity2D5D
                 float baseY = y + scale * (0.54f + tier * 0.58f);
                 kit.AddCylinder(new Vector3(x, baseY + height * 0.5f, z),
                     radius, radius * 0.08f, height, 8,
-                    tier % 2 == 0 ? CypressDark : CypressLight, MeshKit.AlongY);
+                    tier % 2 == 0 ? CypressDark : CypressLight, MeshKit.AlongY, true, true);
             }
         }
 
