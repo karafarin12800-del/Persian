@@ -3130,12 +3130,15 @@ namespace PersiaWar.Unity2D5D
             // This project has no online-session backend yet. Be explicit: the first
             // slot is the local player and remaining slots are local AI competitors.
             // A real human online count requires a server/networking service.
-            yield return new WaitForSecondsRealtime(7f);
+            // Keep the requested seven-second arrival beat. The nine offline
+            // AI slots are prepared rapidly after the wait instead of adding nine
+            // extra seconds before the village invasion can begin.
+            yield return new WaitForSecondsRealtime(6f);
             while (stageTwoLobbyPlayers < 10)
             {
                 stageTwoLobbyPlayers++;
                 StartupCheckpoint.Set("StageTwoLobbyRoster_" + stageTwoLobbyPlayers);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return new WaitForSecondsRealtime(0.10f);
             }
 
             stageTwoLobbyReady = true;
@@ -3171,9 +3174,9 @@ namespace PersiaWar.Unity2D5D
                 new Color(0.20f, 0.92f, 0.42f, 0.95f));
 
             float elapsed = Time.unscaledTime - stageTwoLobbyStartedAt;
-            string status = elapsed < 7f
-                ? "WAITING FOR PLAYERS  •  " + Mathf.CeilToInt(7f - elapsed) + "s"
-                : "FILLING REMAINING SLOTS WITH LOCAL AI  •  +1 / SECOND";
+            string status = elapsed < 6f
+                ? "WAITING FOR PLAYERS  •  " + Mathf.CeilToInt(6f - elapsed) + "s"
+                : "PREPARING THE 9 LOCAL AI COMPETITORS...";
             GUI.Label(new Rect(panel.x + pad, panel.y + 124f * scale, panel.width - pad * 2f, 34f * scale),
                 status, menuSmallStyle);
 
@@ -3199,7 +3202,7 @@ namespace PersiaWar.Unity2D5D
 
             float footerY = panel.y + panel.height - 76f * scale;
             GUI.Label(new Rect(panel.x + pad, footerY, panel.width - pad * 2f, 30f * scale),
-                "100 ALIENS  •  5 WAVES  •  NEXT WAVE AT 6 REMAINING", menuSmallStyle);
+                "100 ALIENS  •  5 WAVES  •  20 ALIENS PER WAVE", menuSmallStyle);
             GUI.Label(new Rect(panel.x + pad, footerY + 30f * scale, panel.width - pad * 2f, 28f * scale),
                 "OFFLINE TEST: AI FILLS THE LOBBY; ONLINE SERVER NOT CONNECTED", menuSmallStyle);
         }

@@ -196,11 +196,14 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                // Wave spawning still respects all remaining bodies for spacing;
-                // only the final victory check ignores already-defeated corpses.
-                if (wave < 5 && enemies.Length <= 6 && !spawning)
+                // Stage 2 is five distinct waves of twenty aliens (100 total).
+                // Do not overlap the next wave with surviving aliens: the old
+                // "six remaining" threshold made the story beats and wave counter
+                // drift out of sync while enemies from two waves fought together.
+                if (wave < 5 && livingEnemies == 0 && !spawning)
                 {
                     spawning = true;
+                    Debug.Log("PERSIA_STAGE2: wave " + wave + " cleared; preparing wave " + (wave + 1) + ".");
                     Invoke(nameof(SpawnNextWave), 1f);
                 }
                 return;
