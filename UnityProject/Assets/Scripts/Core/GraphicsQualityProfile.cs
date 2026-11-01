@@ -129,7 +129,6 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
                                          (CurrentTier == QualityTier.Medium ? 30f : 18f);
         QualitySettings.shadowCascades = CurrentTier == QualityTier.High ? 2 : 1;
         QualitySettings.realtimeReflectionProbes = CurrentTier == QualityTier.High;
-        QualitySettings.reflectionProbeBlending = CurrentTier == QualityTier.High;
         StartupCheckpoint.Set("MobileVisualQualityApplied_" + CurrentTier);
     }
 
