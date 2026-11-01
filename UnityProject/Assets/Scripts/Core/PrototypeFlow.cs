@@ -125,6 +125,7 @@ namespace PersiaWar.Unity2D5D
         private GUIStyle storeActionStyle;
         private GUIStyle profileNameFieldStyle;
         private GUIStyle objectiveStyle;
+        private GUIStyle debugStageButtonStyle;
         private GUIStyle stageTwoFinalLeaderboardStyle;
         private int stageTwoFinalLeaderboardStyleScreenHeight = -1;
         private int menuStyleScreenHeight = -1;
@@ -3214,8 +3215,10 @@ namespace PersiaWar.Unity2D5D
         private Rect GetDebugStageButtonRect()
         {
             float scale = GetUiScale();
-            float width = Mathf.Min(Screen.width - 40f * scale, 300f * scale);
-            return new Rect((Screen.width - width) * 0.5f, Screen.height - 82f * scale, width, 42f * scale);
+            float width = Mathf.Min(Screen.width - 40f * scale, 460f * scale);
+            float height = 64f * scale;
+            return new Rect((Screen.width - width) * 0.5f,
+                Screen.height - 100f * scale, width, height);
         }
 
         private bool HandleDebugStageButtonTouches()
@@ -3238,7 +3241,7 @@ namespace PersiaWar.Unity2D5D
         private void DrawDebugStageButton()
         {
             Rect button = GetDebugStageButtonRect();
-            if (GUI.Button(button, "DEBUG: COMPLETE THIS STAGE", buttonStyle))
+            if (GUI.Button(button, "DEBUG: COMPLETE THIS STAGE", debugStageButtonStyle))
                 DebugCompleteCurrentStage();
         }
 
@@ -3706,7 +3709,11 @@ namespace PersiaWar.Unity2D5D
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.tag = "MainCamera";
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.15f, 0.16f, 0.17f, 1f);
+            // Stage 2 is a sunlit outdoor village; use a clear daytime sky instead
+            // of the dark neutral fallback used by the other campaign environments.
+            camera.backgroundColor = stageNumber == 2
+                ? new Color(0.58f, 0.78f, 0.92f, 1f)
+                : new Color(0.15f, 0.16f, 0.17f, 1f);
             camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 240f;
@@ -4302,6 +4309,14 @@ namespace PersiaWar.Unity2D5D
             smallStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(19f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             objectiveStyle = new GUIStyle(smallStyle) { fontSize = Mathf.RoundToInt(16f * scale), wordWrap = true, alignment = TextAnchor.MiddleLeft };
             buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = Mathf.RoundToInt(20f * scale), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            debugStageButtonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = Mathf.RoundToInt(27f * scale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = false,
+                padding = new RectOffset(12, 12, 6, 6)
+            };
         }
         private void BuildMenuStyles()
         {
