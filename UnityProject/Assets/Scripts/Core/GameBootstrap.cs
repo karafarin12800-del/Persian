@@ -329,7 +329,11 @@ namespace PersiaWar.Unity2D5D
         private void ConfigureLighting()
         {
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.24f, 0.27f, 0.30f);
+            // Stage 2 is an outdoor Iranian village: lift the ambient daylight so
+            // adobe walls, soil, trees and courtyards remain readable in Android shadows.
+            RenderSettings.ambientLight = stageTwoRequested
+                ? new Color(0.48f, 0.49f, 0.44f)
+                : new Color(0.24f, 0.27f, 0.30f);
             RenderSettings.fog = false;
 #if UNITY_ANDROID
             QualitySettings.antiAliasing = 0;
@@ -342,15 +346,20 @@ namespace PersiaWar.Unity2D5D
                 sun.type = LightType.Directional;
             }
             sun.type = LightType.Directional;
-            sun.intensity = 1.15f;
-            sun.color = new Color(1f, 0.93f, 0.82f);
+            sun.enabled = true;
+            sun.intensity = stageTwoRequested ? 1.32f : 1.15f;
+            sun.color = stageTwoRequested
+                ? new Color(1f, 0.97f, 0.90f)
+                : new Color(1f, 0.93f, 0.82f);
 #if UNITY_ANDROID
             sun.shadows = stageTwoRequested ? LightShadows.Hard : LightShadows.None;
-            sun.shadowStrength = stageTwoRequested ? 0.72f : 0f;
-            QualitySettings.shadowDistance = stageTwoRequested ? 72f : 0f;
+            // Softer shadow contrast keeps courtyards and the ground from collapsing
+            // into black while retaining contact shadows beneath houses and trees.
+            sun.shadowStrength = stageTwoRequested ? 0.30f : 0f;
+            QualitySettings.shadowDistance = stageTwoRequested ? 60f : 0f;
 #else
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.78f;
+            sun.shadowStrength = stageTwoRequested ? 0.34f : 0.78f;
 #endif
             sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
         }
@@ -1824,6 +1833,8 @@ namespace PersiaWar.Unity2D5D
             Material bareSoilMaterial = MakeStageTwoLitMaterial("VillageGardenSoil", new Color(0.30f, 0.23f, 0.15f));
 
             int windcatchers = 0;
+            List<Vector3> villagePlotCenters = new List<Vector3>(plots.Length);
+            List<Vector3> villageShrubCenters = new List<Vector3>(plots.Length * 2);
             for (int i = 0; i < plots.Length; i++)
             {
                 Vector2 p = plots[i];
@@ -1831,6 +1842,7 @@ namespace PersiaWar.Unity2D5D
                 else if (stageTwoLayoutVariant == 2) { float ox = p.x; p.x = p.y; p.y = -ox; }
                 Vector3 plot = new Vector3(p.x + Mathf.Sin((i + 1) * 4.17f) * 0.8f, 0f,
                     p.y + Mathf.Cos((i + 1) * 2.93f) * 0.75f);
+                villagePlotCenters.Add(plot);
 
                 // North of the screen (positive Z): the player meets the house first
                 // and the private courtyard/garden is behind it. Southern plots open
@@ -1980,6 +1992,13 @@ namespace PersiaWar.Unity2D5D
                         new Vector3(0.72f, 0.76f, 3.8f), hedgeMaterial);
                 }
 
+                // Add compact rounded boxwood shrubs at courtyard garden corners.
+                // Their positions stay clear of the centered gate opening and paths.
+                if (i % 3 == 0)
+                    villageShrubCenters.Add(plot + new Vector3(-4.85f, 0f, gardenZ));
+                if (i % 4 == 0)
+                    villageShrubCenters.Add(plot + new Vector3(4.85f, 0f, gardenZ));
+
                 // Complete this house's mesh batch under its own root so the existing
                 // occlusion/fade logic can fade the actual obstructing house.
                 FlushAndroidBoxBatches();
@@ -2008,8 +2027,262 @@ namespace PersiaWar.Unity2D5D
                         new Vector3(5.0f, 0.12f, 3.6f), gardenMaterial);
             }
             FlushAndroidBoxBatches();
+            BuildAndroidVillageGroundCover(villagePlotCenters, villageShrubCenters);
             Debug.Log("PERSIA_STAGE2: varied Iranian courtyard village built; houses=" + plots.Length +
-                ", windcatchers=" + windcatchers + ", courtyard plans=4, boxwood dividers enabled");
+                ", windcatchers=" + windcatchers + ", courtyard plans=4, boxwood dividers and grass groundcover enabled");
+        }
+
+        private void BuildAndroidVillageGroundCover(
+            List<Vector3> villagePlotCenters,
+            List<Vector3> villageShrubCenters)
+        {
+            BuildAndroidVillageShrubBatch(villageShrubCenters);
+
+            // Keep the worn dirt lanes, house footprints and the player spawn clear.
+            // Grass grows in irregular field-edge clusters rather than covering the
+            // village in a uniform green carpet.
+            Vector3[] mainLane =
+            {
+                new Vector3(-78f, 0f, -58f), new Vector3(-56f, 0f, -46f),
+                new Vector3(-34f, 0f, -28f), new Vector3(-10f, 0f, -8f),
+                new Vector3(14f, 0f, 12f), new Vector3(36f, 0f, 34f),
+                new Vector3(58f, 0f, 52f), new Vector3(78f, 0f, 68f)
+            };
+            Vector3[] crossLane =
+            {
+                new Vector3(-58f, 0f, 8f), new Vector3(-30f, 0f, 18f),
+                new Vector3(0f, 0f, 30f), new Vector3(28f, 0f, 38f),
+                new Vector3(54f, 0f, 42f)
+            };
+
+            List<Vector3>[] grassBuckets =
+            {
+                new List<Vector3>(), new List<Vector3>(), new List<Vector3>()
+            };
+            System.Random random = new System.Random(32025 + stageTwoLayoutVariant * 7919);
+            int placed = 0;
+            const int targetTufts = 220;
+            for (int attempt = 0; attempt < 4200 && placed < targetTufts; attempt++)
+            {
+                float x = (float)(random.NextDouble() * 202.0 - 101.0);
+                float z = (float)(random.NextDouble() * 202.0 - 101.0);
+                Vector2 point = new Vector2(x, z);
+
+                if (point.sqrMagnitude < 14f * 14f)
+                    continue;
+
+                bool nearLane = false;
+                for (int i = 0; i < mainLane.Length - 1; i++)
+                {
+                    if (DistanceToVillagePathSegment(point, mainLane[i], mainLane[i + 1]) < 4.15f)
+                    {
+                        nearLane = true;
+                        break;
+                    }
+                }
+                if (nearLane)
+                    continue;
+                for (int i = 0; i < crossLane.Length - 1; i++)
+                {
+                    if (DistanceToVillagePathSegment(point, crossLane[i], crossLane[i + 1]) < 3.65f)
+                    {
+                        nearLane = true;
+                        break;
+                    }
+                }
+                if (nearLane)
+                    continue;
+
+                bool insideCourtyard = false;
+                for (int i = 0; i < villagePlotCenters.Count; i++)
+                {
+                    Vector3 plot = villagePlotCenters[i];
+                    if (Mathf.Abs(point.x - plot.x) <= 6.45f &&
+                        Mathf.Abs(point.y - plot.z) <= 6.45f)
+                    {
+                        insideCourtyard = true;
+                        break;
+                    }
+                }
+                if (insideCourtyard)
+                    continue;
+
+                bool nearBuilding = false;
+                for (int i = 0; i < androidBuildingCenters.Count; i++)
+                {
+                    Vector3 center = androidBuildingCenters[i];
+                    Vector2 halfExtents = androidBuildingHalfExtents[i];
+                    if (Mathf.Abs(point.x - center.x) <= halfExtents.x + 1.1f &&
+                        Mathf.Abs(point.y - center.z) <= halfExtents.y + 1.1f)
+                    {
+                        nearBuilding = true;
+                        break;
+                    }
+                }
+                if (nearBuilding)
+                    continue;
+
+                if (random.NextDouble() < 0.18)
+                    continue;
+
+                Vector3 tuft = new Vector3(x,
+                    CalculateAndroidTerrainHeight(x, z) + 0.025f, z);
+                grassBuckets[placed % grassBuckets.Length].Add(tuft);
+                placed++;
+            }
+
+            Material[] grassMaterials =
+            {
+                MakeStageTwoLitMaterial("VillageGrassDeep", new Color(0.19f, 0.37f, 0.12f)),
+                MakeStageTwoLitMaterial("VillageGrassFresh", new Color(0.27f, 0.48f, 0.16f)),
+                MakeStageTwoLitMaterial("VillageGrassSunlit", new Color(0.33f, 0.50f, 0.18f))
+            };
+            for (int i = 0; i < grassBuckets.Length; i++)
+                CreateAndroidVillageGrassBatch("VillageGrassTufts_" + i, grassBuckets[i],
+                    grassMaterials[i], 6101 + i * 313);
+
+            Debug.Log("PERSIA_STAGE2: grass tufts=" + placed +
+                ", boxwood shrub groups=" + (villageShrubCenters != null ? villageShrubCenters.Count : 0));
+        }
+
+        private static float DistanceToVillagePathSegment(Vector2 point, Vector3 a, Vector3 b)
+        {
+            Vector2 start = new Vector2(a.x, a.z);
+            Vector2 end = new Vector2(b.x, b.z);
+            Vector2 delta = end - start;
+            float t = Mathf.Clamp01(Vector2.Dot(point - start, delta) /
+                Mathf.Max(0.0001f, delta.sqrMagnitude));
+            return Vector2.Distance(point, start + delta * t);
+        }
+
+        private void BuildAndroidVillageShrubBatch(List<Vector3> shrubCenters)
+        {
+            if (shrubCenters == null || shrubCenters.Count == 0)
+                return;
+
+            GameObject template = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Mesh sphereMesh = template != null
+                ? template.GetComponent<MeshFilter>()?.sharedMesh
+                : null;
+            if (template != null)
+            {
+                Collider templateCollider = template.GetComponent<Collider>();
+                if (templateCollider != null) Destroy(templateCollider);
+                MeshRenderer templateRenderer = template.GetComponent<MeshRenderer>();
+                if (templateRenderer != null) templateRenderer.enabled = false;
+                Destroy(template);
+            }
+            if (sphereMesh == null)
+                return;
+
+            List<CombineInstance> combine = new List<CombineInstance>(shrubCenters.Count * 3);
+            for (int i = 0; i < shrubCenters.Count; i++)
+            {
+                Vector3 center = shrubCenters[i];
+                center.y = CalculateAndroidTerrainHeight(center.x, center.z) + 0.42f;
+                float size = 0.84f + (i % 3) * 0.08f;
+                Vector3[] offsets =
+                {
+                    new Vector3(-0.28f, 0f, 0f),
+                    new Vector3(0.28f, 0.02f, 0.02f),
+                    new Vector3(0f, 0.06f, 0.27f)
+                };
+                for (int lobe = 0; lobe < offsets.Length; lobe++)
+                {
+                    Vector3 position = center + offsets[lobe] * size;
+                    Vector3 scale = new Vector3(size * 0.76f, size * 0.58f, size * 0.72f);
+                    CombineInstance item = new CombineInstance
+                    {
+                        mesh = sphereMesh,
+                        transform = worldRoot.worldToLocalMatrix *
+                            Matrix4x4.TRS(position,
+                                Quaternion.Euler(0f, (i * 37f + lobe * 71f) % 360f, 0f),
+                                scale)
+                    };
+                    combine.Add(item);
+                }
+            }
+
+            Mesh shrubMesh = new Mesh
+            {
+                name = "StageTwoVillageBoxwoodShrubMesh",
+                indexFormat = UnityEngine.Rendering.IndexFormat.UInt32
+            };
+            shrubMesh.CombineMeshes(combine.ToArray(), true, true);
+            shrubMesh.RecalculateBounds();
+
+            GameObject shrubs = new GameObject("StageTwoVillageBoxwoodShrubs");
+            shrubs.transform.SetParent(worldRoot, false);
+            MeshFilter filter = shrubs.AddComponent<MeshFilter>();
+            filter.sharedMesh = shrubMesh;
+            MeshRenderer renderer = shrubs.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = MakeStageTwoLitMaterial(
+                "VillageRoundedBoxwood",
+                new Color(0.20f, 0.39f, 0.13f));
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = true;
+        }
+
+        private void CreateAndroidVillageGrassBatch(
+            string objectName,
+            List<Vector3> tuftCenters,
+            Material material,
+            int seed)
+        {
+            if (tuftCenters == null || tuftCenters.Count == 0 || material == null)
+                return;
+
+            List<Vector3> vertices = new List<Vector3>(tuftCenters.Count * 30);
+            List<int> triangles = new List<int>(tuftCenters.Count * 30);
+            System.Random random = new System.Random(seed);
+            for (int i = 0; i < tuftCenters.Count; i++)
+            {
+                Vector3 center = tuftCenters[i];
+                int bladeCount = 4 + i % 2;
+                for (int blade = 0; blade < bladeCount; blade++)
+                {
+                    float angle = (float)(random.NextDouble() * Mathf.PI * 2f);
+                    float width = 0.15f + (float)random.NextDouble() * 0.12f;
+                    float height = 0.38f + (float)random.NextDouble() * 0.48f;
+                    Vector3 axis = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                    Vector3 side = new Vector3(-axis.z, 0f, axis.x) * (width * 0.5f);
+                    Vector3 lean = axis * (width * 0.38f);
+                    Vector3 left = center - side;
+                    Vector3 right = center + side;
+                    Vector3 tip = center + Vector3.up * height + lean;
+
+                    int first = vertices.Count;
+                    // Duplicate the reverse face so grass remains visible from either side.
+                    vertices.Add(left);
+                    vertices.Add(tip);
+                    vertices.Add(right);
+                    triangles.Add(first);
+                    triangles.Add(first + 1);
+                    triangles.Add(first + 2);
+
+                    vertices.Add(right);
+                    vertices.Add(tip);
+                    vertices.Add(left);
+                    triangles.Add(first + 3);
+                    triangles.Add(first + 4);
+                    triangles.Add(first + 5);
+                }
+            }
+
+            Mesh mesh = new Mesh { name = objectName + "Mesh" };
+            mesh.vertices = vertices.ToArray();
+            mesh.triangles = triangles.ToArray();
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            GameObject grass = new GameObject(objectName);
+            grass.transform.SetParent(worldRoot, false);
+            MeshFilter filter = grass.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+            MeshRenderer renderer = grass.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
         }
 
         private void CreateAndroidVillageWindcatcher(Vector3 house, float footprint, float bodyHeight, float depth, int index)
