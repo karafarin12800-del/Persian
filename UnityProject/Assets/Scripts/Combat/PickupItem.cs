@@ -69,6 +69,15 @@ namespace PersiaWar.Unity2D5D
                 case PickupType.QuickDash:
                     visualKind = ModelKind.QuickDash;
                     break;
+                case PickupType.Grenade:
+                    visualKind = ModelKind.Grenade;
+                    break;
+                case PickupType.Ammo:
+                    visualKind = ModelKind.AmmoCrate;
+                    break;
+                case PickupType.Weapon:
+                    visualKind = ModelLibrary.KindFromName(weaponKind.ToString());
+                    break;
                 default:
                     return;
             }
