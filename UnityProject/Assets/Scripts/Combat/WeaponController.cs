@@ -354,7 +354,7 @@ namespace PersiaWar.Unity2D5D
             // Keep the pistol compact by changing its actual silhouette rather than
             // merely shrinking a rifle. The heavy profile uses a thicker receiver,
             // larger magazine, long barrel, stock and foregrip.
-            gunRoot.gameObject.SetActive(weaponKind != WeaponKind.Axe && !sword);
+            gunRoot.gameObject.SetActive(!axe && !sword);
             if (axeRoot != null)
             {
                 axeRoot.gameObject.SetActive(axe);
@@ -441,11 +441,12 @@ namespace PersiaWar.Unity2D5D
 
         private void RefreshLibraryWeaponVisual()
         {
-            Transform root = weaponKind == WeaponKind.Axe ? axeRoot
+            bool axe = axeEquippedAsMelee || weaponKind == WeaponKind.Axe;
+            Transform root = axe ? axeRoot
                 : weaponKind == WeaponKind.AlienSword ? swordRoot : gunRoot;
             if (root == null) return;
 
-            ModelKind kind = ModelLibrary.KindFromName(weaponKind.ToString());
+            ModelKind kind = axe ? ModelKind.Axe : ModelLibrary.KindFromName(weaponKind.ToString());
             if (!ModelLibrary.IsWeapon(kind)) return;
 
             string modelName = "PW_" + kind;
