@@ -357,7 +357,7 @@ jobs:
           assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy, 'Enemy firing does not pass its effective range to the projectile.'
           assert 'Configure(Vector3 launchDirection, int damageAmount, Transform ownerTransform, float maxRange)' in projectile, 'Enemy projectile has no explicit distance cap.'
           assert 'lifetime = Mathf.Max(0.05f, Mathf.Max(1f, maxRange) / Mathf.Max(1f, speed));' in projectile, 'Enemy projectile lifetime is not tied to weapon range.'
-          assert 'SpawnDroppedWeapon(enemy);' in health and 'pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);' in health, 'Enemy death does not drop the matching weapon.'
+          assert 'SpawnDroppedWeapon(enemy);' in health and 'pickup.ConfigureWeapon(dropKind, 24);' in health and 'dropKind = alienKind;' in health, 'Enemy death does not drop the matching weapon, including the alien weapon override.'
           extraction = (root / 'Core/ExtractionBeacon.cs').read_text(encoding='utf-8')
           assert 'ExtractionBeacon.NotifyEnemyDefeated(enemy);' not in health, 'Enemy death must not create a permanent premature extraction controller.'
           assert 'ExtractionBeacon.ActivateForVictory(activePlayer)' in spawner, 'Final-wave clear must activate extraction instead of ending the match.'
