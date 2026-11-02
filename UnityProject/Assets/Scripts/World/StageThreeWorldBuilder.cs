@@ -479,6 +479,23 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 new Vector3(0.13f, 0.07f, 1.65f), cyanGlowMaterial, false);
             if (i % 4 == 3) yield return null;
         }
+
+        SpawnStageThreePylon(new Vector3(-88f, 0f, -82f), 0);
+        SpawnStageThreePylon(new Vector3(88f, 0f, -82f), 1);
+        SpawnStageThreePylon(new Vector3(-88f, 0f, 82f), 2);
+        SpawnStageThreePylon(new Vector3(88f, 0f, 82f), 3);
+    }
+
+    private void SpawnStageThreePylon(Vector3 position, int index)
+    {
+        GameObject propRoot = new GameObject("S3_AlienPylonCollider_" + index);
+        propRoot.transform.SetParent(worldRoot, false);
+        propRoot.transform.position = position;
+        BoxCollider collider = propRoot.AddComponent<BoxCollider>();
+        collider.center = new Vector3(0f, 0.72f, 0f);
+        collider.size = new Vector3(1.3f, 1.5f, 1.3f);
+        ModelLibrary.Spawn(ModelKind.AlienPylon, propRoot.transform, Vector3.zero,
+            Quaternion.identity, 0.65f);
     }
 
     private IEnumerator BuildAlienCityRoutine()

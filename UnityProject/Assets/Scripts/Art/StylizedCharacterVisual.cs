@@ -29,6 +29,10 @@ namespace PersiaWar.Unity2D5D
         private Vector3 baseLocalPosition;
 
         private Transform mobileModelRoot;
+        private Transform mobileLeftArmPivot;
+        private Transform mobileRightArmPivot;
+        private Transform mobileLeftLegPivot;
+        private Transform mobileRightLegPivot;
         private Renderer mobileBody;
         private Renderer mobileHead;
         private Renderer mobileHair;
@@ -194,14 +198,14 @@ namespace PersiaWar.Unity2D5D
                 // Lightweight procedural gait: opposing arm/leg swings with a
                 // restrained idle sway. No Animator or per-character allocations.
                 float gait = moving ? Mathf.Sin(t * 11f) * 0.42f : Mathf.Sin(t * 1.8f) * 0.025f;
-                if (mobileLeftArm != null)
-                    mobileLeftArm.transform.localRotation = Quaternion.Euler(gait * Mathf.Rad2Deg, 0f, 0f);
-                if (mobileRightArm != null)
-                    mobileRightArm.transform.localRotation = Quaternion.Euler(-gait * Mathf.Rad2Deg, 0f, 0f);
-                if (mobileLeftLeg != null)
-                    mobileLeftLeg.transform.localRotation = Quaternion.Euler(-gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
-                if (mobileRightLeg != null)
-                    mobileRightLeg.transform.localRotation = Quaternion.Euler(gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
+                if (mobileLeftArmPivot != null)
+                    mobileLeftArmPivot.localRotation = Quaternion.Euler(gait * Mathf.Rad2Deg, 0f, 0f);
+                if (mobileRightArmPivot != null)
+                    mobileRightArmPivot.localRotation = Quaternion.Euler(-gait * Mathf.Rad2Deg, 0f, 0f);
+                if (mobileLeftLegPivot != null)
+                    mobileLeftLegPivot.localRotation = Quaternion.Euler(-gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
+                if (mobileRightLegPivot != null)
+                    mobileRightLegPivot.localRotation = Quaternion.Euler(gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
             }
 
             if (muzzle != null && Time.time < fireUntil)
@@ -237,14 +241,14 @@ namespace PersiaWar.Unity2D5D
                 mobileShoes = null;
                 mobileHair = null;
                 mobileArmor = null;
-                mobileLeftArm = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftArm", mobileModelRoot,
-                    new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
-                mobileRightArm = CreateMobilePrimitive(PrimitiveType.Capsule, "RightArm", mobileModelRoot,
-                    new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
-                mobileLeftLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftLeg", mobileModelRoot,
-                    new Vector3(-0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f));
-                mobileRightLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "RightLeg", mobileModelRoot,
-                    new Vector3(0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f));
+                mobileLeftArm = CreateMobileLimb("LeftArm", mobileModelRoot,
+                    new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f), out mobileLeftArmPivot);
+                mobileRightArm = CreateMobileLimb("RightArm", mobileModelRoot,
+                    new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f), out mobileRightArmPivot);
+                mobileLeftLeg = CreateMobileLimb("LeftLeg", mobileModelRoot,
+                    new Vector3(-0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f), out mobileLeftLegPivot);
+                mobileRightLeg = CreateMobileLimb("RightLeg", mobileModelRoot,
+                    new Vector3(0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f), out mobileRightLegPivot);
                 mobilePack = null;
                 mobileHelmet = CreateMobilePrimitive(PrimitiveType.Sphere, "Helmet", mobileModelRoot,
                     new Vector3(0f, 1.57f, 0.01f), new Vector3(0.70f, 0.38f, 0.66f));
@@ -266,14 +270,14 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, 1.67f, 0f), new Vector3(0.48f, 0.16f, 0.48f));
                 mobileArmor = CreateMobilePrimitive(PrimitiveType.Cube, "Armor", mobileModelRoot,
                     new Vector3(0f, 0.92f, 0.10f), new Vector3(0.66f, 0.48f, 0.20f));
-                mobileLeftArm = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftArm", mobileModelRoot,
-                    new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
-                mobileRightArm = CreateMobilePrimitive(PrimitiveType.Capsule, "RightArm", mobileModelRoot,
-                    new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f));
-                mobileLeftLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "LeftLeg", mobileModelRoot,
-                    new Vector3(-0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f));
-                mobileRightLeg = CreateMobilePrimitive(PrimitiveType.Capsule, "RightLeg", mobileModelRoot,
-                    new Vector3(0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f));
+                mobileLeftArm = CreateMobileLimb("LeftArm", mobileModelRoot,
+                    new Vector3(-0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f), out mobileLeftArmPivot);
+                mobileRightArm = CreateMobileLimb("RightArm", mobileModelRoot,
+                    new Vector3(0.47f, 0.76f, 0.03f), new Vector3(0.20f, 0.50f, 0.20f), out mobileRightArmPivot);
+                mobileLeftLeg = CreateMobileLimb("LeftLeg", mobileModelRoot,
+                    new Vector3(-0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f), out mobileLeftLegPivot);
+                mobileRightLeg = CreateMobileLimb("RightLeg", mobileModelRoot,
+                    new Vector3(0.18f, 0.27f, 0f), new Vector3(0.22f, 0.48f, 0.23f), out mobileRightLegPivot);
                 mobilePack = CreateMobilePrimitive(PrimitiveType.Cube, "Backpack", mobileModelRoot,
                     new Vector3(0f, 0.88f, -0.30f), new Vector3(0.46f, 0.55f, 0.20f));
                 mobileHelmet = CreateMobilePrimitive(PrimitiveType.Sphere, "Helmet", mobileModelRoot,
@@ -357,6 +361,18 @@ namespace PersiaWar.Unity2D5D
 
             transform.localScale = Vector3.one;
             StartupCheckpoint.Set("Mobile3DCharacterReady");
+        }
+
+        private Renderer CreateMobileLimb(string partName, Transform parent,
+            Vector3 capsuleCenter, Vector3 capsuleScale, out Transform pivot)
+        {
+            GameObject pivotObject = new GameObject(partName + "Pivot");
+            pivot = pivotObject.transform;
+            pivot.SetParent(parent, false);
+            float halfHeight = capsuleScale.y * 0.5f;
+            pivot.localPosition = capsuleCenter + Vector3.up * halfHeight;
+            return CreateMobilePrimitive(PrimitiveType.Capsule, partName, pivot,
+                new Vector3(0f, -halfHeight, 0f), capsuleScale);
         }
 
         private Renderer CreateMobilePrimitive(

@@ -1038,6 +1038,7 @@ namespace PersiaWar.Unity2D5D
             if (stageTwoRequested)
             {
                 BuildAndroidVillagePresentation();
+                BuildAndroidLibraryProps();
                 return;
             }
 
@@ -1179,6 +1180,49 @@ namespace PersiaWar.Unity2D5D
                 CreateAndroidCaptiveVillageGirl();
 
             StartupCheckpoint.Set("CITY_PRESENTATION_DONE");
+            BuildAndroidLibraryProps();
+        }
+
+        private void BuildAndroidLibraryProps()
+        {
+            if (worldRoot == null) return;
+
+            ModelKind[] kinds =
+            {
+                ModelKind.Barrel, ModelKind.Crate, ModelKind.Sandbags,
+                ModelKind.StreetLamp, ModelKind.Rock, ModelKind.Bush
+            };
+            Vector3[] positions =
+            {
+                new Vector3(-96f, 0f, -72f), new Vector3(96f, 0f, -72f),
+                new Vector3(-96f, 0f, -24f), new Vector3(96f, 0f, 24f),
+                new Vector3(-96f, 0f, 72f), new Vector3(96f, 0f, 72f)
+            };
+            Vector3[] colliderSizes =
+            {
+                new Vector3(0.72f, 0.95f, 0.72f), new Vector3(0.9f, 0.85f, 0.9f),
+                new Vector3(2.0f, 0.8f, 0.65f), new Vector3(0.65f, 3.5f, 0.65f),
+                new Vector3(1.1f, 0.65f, 0.9f), new Vector3(1.0f, 0.9f, 0.9f)
+            };
+            float[] scales = { 1f, 1f, 1f, 1f, 1f, 1f };
+
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                Vector3 point = positions[i];
+                GameObject propRoot = new GameObject("PW_PropCollider_" + kinds[i]);
+                propRoot.transform.SetParent(worldRoot, false);
+                propRoot.transform.position = new Vector3(point.x,
+                    CalculateAndroidTerrainHeight(point.x, point.z), point.z);
+                propRoot.transform.rotation = Quaternion.Euler(0f, (i * 47f) % 360f, 0f);
+
+                BoxCollider collider = propRoot.AddComponent<BoxCollider>();
+                collider.size = colliderSizes[i];
+                collider.center = new Vector3(0f, colliderSizes[i].y * 0.5f, 0f);
+
+                ModelLibrary.Spawn(kinds[i], propRoot.transform, Vector3.zero,
+                    Quaternion.identity, scales[i]);
+            }
+            StartupCheckpoint.Set("AndroidSharedModelLibraryPropsReady");
         }
 
         public bool TryRescueVillageGirl(Vector3 playerPosition)

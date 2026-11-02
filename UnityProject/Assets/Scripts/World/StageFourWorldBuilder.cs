@@ -935,6 +935,20 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         if (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High)
             light.shadows = LightShadows.Soft;
         GraphicsQualityProfile.ApplyStageFourLook(root, controller != null ? controller.transform : null);
+        SpawnMothershipPylon(new Vector3(-44f, 0f, -38f), 0);
+        SpawnMothershipPylon(new Vector3(44f, 0f, -38f), 1);
+    }
+
+    private void SpawnMothershipPylon(Vector3 position, int index)
+    {
+        GameObject propRoot = new GameObject("S4_AlienPylonCollider_" + index);
+        propRoot.transform.SetParent(root, false);
+        propRoot.transform.localPosition = position;
+        BoxCollider collider = propRoot.AddComponent<BoxCollider>();
+        collider.center = new Vector3(0f, 0.72f, 0f);
+        collider.size = new Vector3(1.3f, 1.5f, 1.3f);
+        ModelLibrary.Spawn(ModelKind.AlienPylon, propRoot.transform, Vector3.zero,
+            Quaternion.identity, 0.65f);
     }
 
     private GameObject BuildShip(string name, Vector3 position, Quaternion rotation, float scale)
