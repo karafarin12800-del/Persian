@@ -1949,7 +1949,7 @@ namespace PersiaWar.Unity2D5D
             float totalWidth = Mathf.Min(Screen.width - 30f * scale, 1050f * scale);
             float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
             int rows = Mathf.CeilToInt(StoreCosmeticNames.Length / (float)columns);
-            float top = Screen.height * 0.19f;
+            float top = Screen.height <= 800f ? 92f * scale : Screen.height * 0.19f;
             // Reserve a clear footer lane for BACK TO MENU and let each row grow
             // enough to show a large 3D weapon render plus two compact text lines.
             float bottomReserve = 96f * scale;
@@ -2044,9 +2044,15 @@ namespace PersiaWar.Unity2D5D
         private void DrawStoreScreen()
         {
             storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
-            GUI.Label(new Rect(0f, 118f, Screen.width, 54f), "PERSIA STORE", menuHeaderStyle);
-            GUI.Label(new Rect(0f, 166f, Screen.width, 36f), "OFFLINE DEMO STORE  •  NO REAL-MONEY PAYMENTS", menuSmallStyle);
-            GUI.Label(new Rect(Screen.width - 300f, 24f, 270f, 42f), "COINS  " + storeCoins, menuBodyStyle);
+            bool compactLandscape = Screen.height <= 800f;
+            float titleY = compactLandscape ? 16f * GetUiScale() : 118f;
+            float subtitleY = compactLandscape ? 57f * GetUiScale() : 166f;
+            GUI.Label(new Rect(0f, titleY, Screen.width, compactLandscape ? 40f * GetUiScale() : 54f),
+                "PERSIA STORE", menuHeaderStyle);
+            GUI.Label(new Rect(0f, subtitleY, Screen.width, compactLandscape ? 26f * GetUiScale() : 36f),
+                "OFFLINE DEMO STORE  •  NO REAL-MONEY PAYMENTS", menuSmallStyle);
+            GUI.Label(new Rect(Screen.width - 300f, compactLandscape ? 14f * GetUiScale() : 24f,
+                270f, 42f), "COINS  " + storeCoins, menuBodyStyle);
 
             for (int i = 0; i < StoreCosmeticNames.Length; i++)
             {
