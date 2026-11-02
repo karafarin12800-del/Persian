@@ -1,33 +1,25 @@
 Shader "PersiaWar/Decal"
 {
     // Unlit alpha-blended decal / particle shader. Colour comes from the vertex
-    // or particle colour, while the texture alpha defines the visible shape.
+    // (or particle) colour, shape from the texture alpha. One draw call for all
+    // ground decals because they live in a single dynamic mesh.
     Properties
     {
         _MainTex ("Splat Atlas", 2D) = "white" {}
     }
-
     SubShader
     {
-        Tags
-        {
-            "Queue"="Transparent"
-            "RenderType"="Transparent"
-            "IgnoreProjector"="True"
-        }
-
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" "IgnoreProjector"="True" }
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
         Cull Off
         Offset -1, -1
-
         Pass
         {
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 2.0
-
             #include "UnityCG.cginc"
 
             sampler2D _MainTex;
@@ -42,7 +34,7 @@ Shader "PersiaWar/Decal"
 
             struct v2f
             {
-                float4 position : SV_POSITION;
+                float4 pos : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 fixed4 color : COLOR;
             };
@@ -50,7 +42,7 @@ Shader "PersiaWar/Decal"
             v2f vert(appdata v)
             {
                 v2f o;
-                o.position = UnityObjectToClipPos(v.vertex);
+                o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 o.color = v.color;
                 return o;
@@ -58,15 +50,15 @@ Shader "PersiaWar/Decal"
 
             fixed4 frag(v2f i) : SV_Target
             {
-                fixed4 textureColor = tex2D(_MainTex, i.uv);
-                return fixed4(
-                    i.color.rgb * textureColor.rgb,
-                    i.color.a * textureColor.a
-                );
+                fixed4 t = tex2D(_MainTex, i.uv);
+                half3 tint = i.color.rgb;
+                #if !defined(UNITY_COLORSPACE_GAMMA)
+                tint = GammaToLinearSpace(tint);
+                #endif
+                return fixed4(tint * t.rgb, i.color.a * t.a);
             }
             ENDCG
         }
     }
-
     Fallback Off
 }
