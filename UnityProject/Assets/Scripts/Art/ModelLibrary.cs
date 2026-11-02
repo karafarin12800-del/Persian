@@ -16,7 +16,18 @@ namespace PersiaWar.Unity2D5D
         Grenade = 8,
         AmmoCrate = 9,
         Medkit = 10,
-        QuickDash = 11
+        QuickDash = 11,
+        Barrel = 12,
+        Crate = 13,
+        Sandbags = 14,
+        StreetLamp = 15,
+        Rock = 16,
+        Bush = 17,
+        AlienPylon = 18,
+        Bullet = 19,
+        PlasmaBolt = 20,
+        MuzzleFlash = 21,
+        MuzzleFlashAlien = 22
     }
 
     /// <summary>
@@ -29,6 +40,12 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public static class ModelLibrary
     {
+        /// <summary>
+        /// Height above the collider ground for rings, decals and ground effects. Road, sidewalk
+        /// and crosswalk quads sit 8-9 cm above the ground, so anything lower is hidden on roads.
+        /// </summary>
+        public const float GroundLift = 0.12f;
+
         private static readonly Dictionary<ModelKind, Mesh> meshes = new Dictionary<ModelKind, Mesh>();
         private static readonly Dictionary<uint, Mesh> ringMeshes = new Dictionary<uint, Mesh>();
         private static Material sharedMaterial;
@@ -66,10 +83,20 @@ namespace PersiaWar.Unity2D5D
             if (n.Contains("sword") || n.Contains("blade")) return ModelKind.AlienSword;
             if (n.Contains("axe")) return ModelKind.Axe;
             if (n.Contains("heavy") || n.Contains("machine") || n.Contains("hmg")) return ModelKind.HeavyMachineGun;
+            if (n.Contains("muzzle")) return n.Contains("alien") ? ModelKind.MuzzleFlashAlien : ModelKind.MuzzleFlash;
+            if (n.Contains("plasma")) return ModelKind.PlasmaBolt;
+            if (n.Contains("bullet") || n.Contains("tracer")) return ModelKind.Bullet;
+            if (n.Contains("pylon")) return ModelKind.AlienPylon;
+            if (n.Contains("lamp")) return ModelKind.StreetLamp;
+            if (n.Contains("sandbag")) return ModelKind.Sandbags;
+            if (n.Contains("barrel")) return ModelKind.Barrel;
+            if (n.Contains("bush")) return ModelKind.Bush;
+            if (n.Contains("rock")) return ModelKind.Rock;
             if (n.Contains("pistol") || n.Contains("light")) return ModelKind.Pistol;
             if (n.Contains("shield")) return ModelKind.ShieldPickup;
             if (n.Contains("grenade")) return ModelKind.Grenade;
             if (n.Contains("ammo")) return ModelKind.AmmoCrate;
+            if (n.Contains("crate")) return ModelKind.Crate;
             if (n.Contains("med")) return ModelKind.Medkit;
             if (n.Contains("dash")) return ModelKind.QuickDash;
             if (n.Contains("assault") || n.Contains("rifle") || n.Contains("ak")) return ModelKind.AssaultRifle;
@@ -79,6 +106,16 @@ namespace PersiaWar.Unity2D5D
         public static bool IsWeapon(ModelKind kind)
         {
             return kind >= ModelKind.Pistol && kind <= ModelKind.AlienSword;
+        }
+
+        public static bool IsProp(ModelKind kind)
+        {
+            return kind >= ModelKind.Barrel && kind <= ModelKind.AlienPylon;
+        }
+
+        public static bool IsProjectile(ModelKind kind)
+        {
+            return kind == ModelKind.Bullet || kind == ModelKind.PlasmaBolt;
         }
 
         public static bool IsAlienWeapon(ModelKind kind)
@@ -235,6 +272,17 @@ namespace PersiaWar.Unity2D5D
                 case ModelKind.AmmoCrate: BuildAmmoCrate(k); break;
                 case ModelKind.Medkit: BuildMedkit(k); break;
                 case ModelKind.QuickDash: BuildQuickDash(k); break;
+                case ModelKind.Barrel: BuildBarrel(k); break;
+                case ModelKind.Crate: BuildCrate(k); break;
+                case ModelKind.Sandbags: BuildSandbags(k); break;
+                case ModelKind.StreetLamp: BuildStreetLamp(k); break;
+                case ModelKind.Rock: BuildRock(k); break;
+                case ModelKind.Bush: BuildBush(k); break;
+                case ModelKind.AlienPylon: BuildAlienPylon(k); break;
+                case ModelKind.Bullet: BuildBullet(k); break;
+                case ModelKind.PlasmaBolt: BuildPlasmaBolt(k); break;
+                case ModelKind.MuzzleFlash: BuildMuzzleFlash(k, false); break;
+                case ModelKind.MuzzleFlashAlien: BuildMuzzleFlash(k, true); break;
                 default: return null;
             }
             return k.Build("PW_Model_" + kind);
@@ -474,6 +522,115 @@ namespace PersiaWar.Unity2D5D
                 k.AddBeam(tip, new Vector3(-0.095f, 0.045f, z - 0.030f), 0.030f, 0.030f, Magenta);
                 k.AddBeam(tip, new Vector3(0.095f, 0.045f, z - 0.030f), 0.030f, 0.030f, Magenta);
             }
+        }
+
+        // ------------------------------------------------------------------ props
+
+        private static void BuildBarrel(MeshKit k)
+        {
+            Color32 rust = MeshKit.C(0.50f, 0.16f, 0.10f, MeshKit.Plastic);
+            k.AddCylinder(new Vector3(0f, 0.45f, 0f), 0.30f, 0.90f, 10, rust, MeshKit.AlongY);
+            for (int i = 0; i < 3; i++)
+                k.AddCylinder(new Vector3(0f, 0.15f + i * 0.30f, 0f), 0.312f, 0.04f, 10, DarkSteel, MeshKit.AlongY);
+            k.AddCylinder(new Vector3(0f, 0.91f, 0f), 0.27f, 0.02f, 10, Steel, MeshKit.AlongY);
+            k.AddCylinder(new Vector3(0.12f, 0.93f, 0.05f), 0.045f, 0.02f, 8, DarkSteel, MeshKit.AlongY);
+        }
+
+        private static void BuildCrate(MeshKit k)
+        {
+            k.AddBox(new Vector3(0f, 0.40f, 0f), new Vector3(0.80f, 0.80f, 0.80f), Wood);
+            for (int sx = -1; sx <= 1; sx += 2)
+                for (int sz = -1; sz <= 1; sz += 2)
+                    k.AddBox(new Vector3(sx * 0.38f, 0.40f, sz * 0.38f), new Vector3(0.10f, 0.84f, 0.10f), WoodDark);
+            float h = 0.41f;
+            k.AddBeam(new Vector3(-0.30f, 0.10f, h), new Vector3(0.30f, 0.70f, h), 0.03f, 0.07f, WoodDark);
+            k.AddBeam(new Vector3(-0.30f, 0.10f, -h), new Vector3(0.30f, 0.70f, -h), 0.03f, 0.07f, WoodDark);
+            k.AddBeam(new Vector3(h, 0.10f, -0.30f), new Vector3(h, 0.70f, 0.30f), 0.03f, 0.07f, WoodDark);
+            k.AddBeam(new Vector3(-h, 0.10f, -0.30f), new Vector3(-h, 0.70f, 0.30f), 0.03f, 0.07f, WoodDark);
+        }
+
+        private static void BuildSandbags(MeshKit k)
+        {
+            Color32 sandA = MeshKit.C(0.72f, 0.62f, 0.42f, MeshKit.Matte);
+            Color32 sandB = MeshKit.C(0.66f, 0.56f, 0.38f, MeshKit.Matte);
+            Vector3 radii = new Vector3(0.27f, 0.13f, 0.18f);
+            for (int i = 0; i < 4; i++)
+                k.AddEllipsoid(new Vector3(-0.75f + i * 0.5f, 0.13f, 0f), radii, 8, 5, i % 2 == 0 ? sandA : sandB,
+                    Quaternion.Euler(0f, i % 2 == 0 ? 4f : -5f, 0f));
+            for (int i = 0; i < 3; i++)
+                k.AddEllipsoid(new Vector3(-0.50f + i * 0.5f, 0.36f, 0.02f), radii, 8, 5, i % 2 == 0 ? sandB : sandA,
+                    Quaternion.Euler(0f, i % 2 == 0 ? -4f : 6f, 0f));
+            for (int i = 0; i < 2; i++)
+                k.AddEllipsoid(new Vector3(-0.25f + i * 0.5f, 0.59f, 0f), radii, 8, 5, i % 2 == 0 ? sandA : sandB,
+                    Quaternion.Euler(0f, 3f, 0f));
+        }
+
+        private static void BuildStreetLamp(MeshKit k)
+        {
+            k.AddCylinder(new Vector3(0f, 0.12f, 0f), 0.14f, 0.24f, 10, DarkSteel, MeshKit.AlongY);
+            k.AddCylinder(new Vector3(0f, 1.80f, 0f), 0.05f, 3.40f, 8, DarkSteel, MeshKit.AlongY);
+            k.AddBox(new Vector3(0f, 3.45f, 0.28f), new Vector3(0.08f, 0.08f, 0.70f), DarkSteel);
+            k.AddBox(new Vector3(0f, 3.40f, 0.60f), new Vector3(0.30f, 0.10f, 0.45f), GunMetal);
+            k.AddBox(new Vector3(0f, 3.34f, 0.60f), new Vector3(0.24f, 0.04f, 0.36f),
+                MeshKit.C(1.00f, 0.88f, 0.55f, MeshKit.Glow));
+        }
+
+        private static void BuildRock(MeshKit k)
+        {
+            Color32 a = MeshKit.C(0.42f, 0.41f, 0.38f, MeshKit.Matte);
+            Color32 b = MeshKit.C(0.34f, 0.34f, 0.32f, MeshKit.Matte);
+            k.AddEllipsoid(new Vector3(0f, 0.28f, 0f), new Vector3(0.55f, 0.32f, 0.45f), 7, 4, a, Quaternion.Euler(0f, 20f, 0f));
+            k.AddEllipsoid(new Vector3(0.38f, 0.18f, 0.12f), new Vector3(0.32f, 0.20f, 0.28f), 6, 4, b, Quaternion.Euler(0f, -30f, 10f));
+            k.AddEllipsoid(new Vector3(-0.34f, 0.15f, -0.20f), new Vector3(0.28f, 0.17f, 0.24f), 6, 4, b, Quaternion.Euler(5f, 40f, 0f));
+        }
+
+        private static void BuildBush(MeshKit k)
+        {
+            Color32 a = MeshKit.C(0.16f, 0.38f, 0.13f, MeshKit.Matte);
+            Color32 b = MeshKit.C(0.22f, 0.47f, 0.16f, MeshKit.Matte);
+            k.AddEllipsoid(new Vector3(0f, 0.34f, 0f), new Vector3(0.50f, 0.34f, 0.46f), 8, 4, a, Quaternion.identity);
+            k.AddEllipsoid(new Vector3(0.38f, 0.28f, 0.12f), new Vector3(0.34f, 0.26f, 0.32f), 7, 4, b, Quaternion.identity);
+            k.AddEllipsoid(new Vector3(-0.34f, 0.26f, -0.10f), new Vector3(0.32f, 0.24f, 0.30f), 7, 4, b, Quaternion.identity);
+            k.AddEllipsoid(new Vector3(0.04f, 0.52f, -0.02f), new Vector3(0.30f, 0.22f, 0.28f), 7, 4, a, Quaternion.identity);
+        }
+
+        private static void BuildAlienPylon(MeshKit k)
+        {
+            k.AddCylinder(new Vector3(0f, 0.10f, 0f), 0.55f, 0.20f, 6, VioletDark, MeshKit.AlongY);
+            k.AddCylinder(new Vector3(0f, 1.10f, 0f), 0.40f, 0.26f, 1.70f, 6, Violet, MeshKit.AlongY, true, true);
+            for (int i = 0; i < 3; i++)
+                k.AddCylinder(new Vector3(0f, 0.55f + i * 0.50f, 0f), 0.37f - i * 0.04f, 0.06f, 6, Teal, MeshKit.AlongY);
+            k.AddCylinder(new Vector3(0f, 2.20f, 0f), 0.18f, 0.0f, 0.70f, 6, Teal, MeshKit.AlongY, true, false);
+            k.AddRing(new Vector3(0f, 0.02f, 0f), 0.55f, 0.85f, 20, SoftTeal);
+        }
+
+        // ------------------------------------------------------------------ projectiles and flashes
+
+        private static void BuildBullet(MeshKit k)
+        {
+            Color32 amber = MeshKit.C(1.00f, 0.82f, 0.30f, MeshKit.Glow);
+            Color32 white = MeshKit.C(1.00f, 0.97f, 0.85f, MeshKit.Glow);
+            k.AddTaper(new Vector3(0f, 0f, -0.20f), new Vector2(0.004f, 0.004f), new Vector2(0.028f, 0.028f),
+                0.60f, amber, MeshKit.AlongZ);
+            k.AddSphere(new Vector3(0f, 0f, 0.12f), 0.03f, 6, 4, white);
+        }
+
+        private static void BuildPlasmaBolt(MeshKit k)
+        {
+            Color32 hot = MeshKit.C(0.90f, 1.00f, 1.00f, MeshKit.Glow);
+            k.AddEllipsoid(Vector3.zero, new Vector3(0.07f, 0.07f, 0.30f), 8, 5, Teal, Quaternion.identity);
+            k.AddEllipsoid(Vector3.zero, new Vector3(0.035f, 0.035f, 0.22f), 6, 4, hot, Quaternion.identity);
+            k.AddEllipsoid(new Vector3(0f, 0f, -0.38f), new Vector3(0.04f, 0.04f, 0.12f), 6, 4, SoftTeal, Quaternion.identity);
+            k.AddEllipsoid(new Vector3(0f, 0f, -0.60f), new Vector3(0.025f, 0.025f, 0.09f), 6, 4, SoftTeal, Quaternion.identity);
+        }
+
+        private static void BuildMuzzleFlash(MeshKit k, bool alien)
+        {
+            Color32 outer = alien ? MeshKit.C(0.20f, 0.95f, 0.85f, MeshKit.Glow) : MeshKit.C(1.00f, 0.86f, 0.45f, MeshKit.Glow);
+            Color32 core = alien ? MeshKit.C(0.85f, 1.00f, 1.00f, MeshKit.Glow) : MeshKit.C(1.00f, 1.00f, 0.90f, MeshKit.Glow);
+            k.AddCylinder(new Vector3(0f, 0f, 0.18f), 0.05f, 0.0f, 0.36f, 6, outer, MeshKit.AlongZ, false, false);
+            k.AddTaper(new Vector3(0f, 0f, 0.12f), new Vector2(0.02f, 0.24f), new Vector2(0.004f, 0.02f), 0.26f, core, MeshKit.AlongZ);
+            k.AddTaper(new Vector3(0f, 0f, 0.12f), new Vector2(0.24f, 0.02f), new Vector2(0.02f, 0.004f), 0.26f, core, MeshKit.AlongZ);
         }
     }
 }
