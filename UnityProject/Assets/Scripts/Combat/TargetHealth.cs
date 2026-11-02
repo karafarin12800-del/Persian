@@ -7,9 +7,10 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int maxHealth = 100;
         public int CurrentHealth { get; private set; }
         public int MaxHealth => maxHealth;
-        // Reused, visual-only hit feedback. It never changes enemy movement or combat state.
+        // Reused, visual-only hit feedback used when the violence level is 0 (energy mode).
         private ParticleSystem hitEnergyParticles;
         private float nextEnergyHitEffectTime;
+        private float nextPlayerHitEffectTime;
 
 
         private void Awake()
@@ -30,10 +31,22 @@ namespace PersiaWar.Unity2D5D
             if (amount == 0) return;
 
             CurrentHealth = Mathf.Max(0, CurrentHealth - amount);
+            Vector3 attackerPosition = attacker != null ? attacker.position : Vector3.zero;
             if (CurrentHealth > 0)
             {
                 if (GetComponent<EnemyChase>() != null)
-                    PlayEnergyHitEffect();
+                {
+                    // Blood (when enabled) + a short stagger/knockback. Level 0 keeps the energy sparks.
+                    HitReactor.NotifyDamaged(gameObject, attackerPosition, amount, null);
+                    if (BloodFX.Level <= 0)
+                        PlayEnergyHitEffect();
+                }
+                else if (BloodFX.Level > 0 && GetComponent<PlayerController>() != null &&
+                         Time.time >= nextPlayerHitEffectTime)
+                {
+                    nextPlayerHitEffectTime = Time.time + 0.12f;
+                    HitReactor.NotifyDamaged(gameObject, attackerPosition, amount, null);
+                }
                 return;
             }
 
@@ -60,21 +73,21 @@ namespace PersiaWar.Unity2D5D
                     "S3_HostileHovercraft_", System.StringComparison.Ordinal);
                 if (!isStageThreeCraft)
                     SpawnDroppedWeapon(enemy);
-                BeginEnemyDeathSequence(enemy);
+                BeginEnemyDeathSequence(enemy, attackerPosition, amount);
                 return;
             }
 
             Destroy(gameObject);
         }
 
-        private void BeginEnemyDeathSequence(EnemyChase enemy)
+        private void BeginEnemyDeathSequence(EnemyChase enemy, Vector3 attackerPosition, int damage)
         {
             Vector3 deathPosition = enemy != null ? enemy.transform.position : transform.position;
             bool deferCraftRemoval = enemy != null &&
                 enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal);
             if (enemy != null)
             {
-                // Keep the existing combat shutdown and grounded removal behaviour unchanged.
+                // Keep the existing combat shutdown behaviour unchanged.
                 enemy.enabled = false;
                 Collider[] colliders = enemy.GetComponentsInChildren<Collider>();
                 for (int i = 0; i < colliders.Length; i++)
@@ -82,10 +95,22 @@ namespace PersiaWar.Unity2D5D
 
                 MonoBehaviour[] behaviours = enemy.GetComponentsInChildren<MonoBehaviour>();
                 for (int i = 0; i < behaviours.Length; i++)
-                    if (behaviours[i] != null && behaviours[i] != this) behaviours[i].enabled = false;
+                {
+                    if (behaviours[i] == null || behaviours[i] == this) continue;
+                    if (behaviours[i] is HitReactor) continue;   // it drives the launched fall below
+                    behaviours[i].enabled = false;
+                }
 
                 if (!deferCraftRemoval)
-                    StartCoroutine(FallAndRemoveEnemy(enemy.transform));
+                {
+                    // Blood / goo + a launched, tumbling fall. Falls back to the old tip-over if
+                    // the reactor cannot run (returns 0).
+                    float settle = HitReactor.NotifyKilled(enemy.gameObject, attackerPosition, damage, null, false);
+                    if (settle > 0f)
+                        StartCoroutine(RemoveBodyAfter(enemy.transform, Mathf.Max(1.5f, settle + 0.5f)));
+                    else
+                        StartCoroutine(FallAndRemoveEnemy(enemy.transform));
+                }
             }
 
             bool isStageThreeAlien = enemy != null &&
@@ -96,16 +121,25 @@ namespace PersiaWar.Unity2D5D
             bool isStageFourAlien = enemy != null &&
                 enemy.gameObject.name.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
 
-            // Keep human-style and alien energy palettes separate. Stage 3 craft already
-            // own a dedicated vehicle-destruction effect, so do not stack a second burst.
+            // Humans bleed (violence level > 0) and aliens keep their cyan energy discharge on top of
+            // the goo. At level 0 everybody uses the energy discharge. Stage 3 craft already own a
+            // dedicated vehicle-destruction effect, so do not stack a second burst.
             bool isHumanStyleTarget = !isStageThreeAlien && !isStageThreeCraft && !isStageFourAlien;
-            if (!isStageThreeCraft)
+            bool showEnergy = BloodFX.Level <= 0 || !isHumanStyleTarget;
+            if (!isStageThreeCraft && showEnergy)
             {
                 Color energyColor = isHumanStyleTarget
                     ? new Color(1f, 0.72f, 0.28f, 0.95f)
                     : new Color(0.22f, 0.88f, 1f, 0.95f);
                 SpawnEnergyDefeatEffect(deathPosition, energyColor);
             }
+        }
+
+        private System.Collections.IEnumerator RemoveBodyAfter(Transform body, float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            if (body != null)
+                Destroy(body.gameObject);
         }
 
         private System.Collections.IEnumerator FallAndRemoveEnemy(Transform body)
@@ -139,7 +173,7 @@ namespace PersiaWar.Unity2D5D
         }
 
         /// <summary>
-        /// Replaces the legacy ground decal and spray with a short-lived sci-fi energy discharge.
+        /// Short-lived sci-fi energy discharge (aliens always, everybody at violence level 0).
         /// All particles are bounded and share the project's existing additive material.
         /// </summary>
         private void SpawnEnergyDefeatEffect(Vector3 position, Color color)
@@ -195,10 +229,10 @@ namespace PersiaWar.Unity2D5D
             particleRenderer.receiveShadows = false;
             sparks.Play();
 
-            // A separate ground pulse makes the defeat readable without leaving stains.
+            // A separate ground pulse makes the defeat readable. It sits above road decor (GroundLift).
             GameObject ringObject = new GameObject("PW_EnergyGroundPulse");
             float groundY = PickupVisual.GroundY(position);
-            ringObject.transform.position = new Vector3(position.x, groundY + 0.045f, position.z);
+            ringObject.transform.position = new Vector3(position.x, groundY + ModelLibrary.GroundLift, position.z);
             LineRenderer ring = ringObject.AddComponent<LineRenderer>();
             ring.useWorldSpace = false;
             ring.loop = true;
@@ -244,8 +278,7 @@ namespace PersiaWar.Unity2D5D
         }
 
         /// <summary>
-        /// The visual-only HitReactor feedback: a small reusable energy spark burst.
-        /// No knockback, stagger, target movement, or damage rules are changed.
+        /// Visual-only hit feedback for violence level 0: a small reusable energy spark burst.
         /// </summary>
         private void PlayEnergyHitEffect()
         {
@@ -327,6 +360,7 @@ namespace PersiaWar.Unity2D5D
                 "DroppedWeaponMetal",
                 enemy.Archetype == 2 ? new Color(0.55f, 0.47f, 0.22f) : new Color(0.38f, 0.40f, 0.40f));
 
+            // Primitive fallback model (hidden automatically when the shared model attaches below).
             if (enemy.Archetype == 1)
             {
                 CreateDroppedWeaponPart(dropped.transform, "PistolGrip",
@@ -349,15 +383,29 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, -0.015f, 0.02f), new Vector3(0.085f, 0.12f, 0.10f), metal);
             }
 
-            // Add an extra 2x size boost specifically to enemy drops; PickupItem
-            // applies its own 2x readable-pickup scale after this, for a clear 4x
-            // visible weapon compared with the original tiny dropped model.
+            // Enlarge the fallback primitives (PickupItem applies its own readable-pickup scale).
             for (int childIndex = 0; childIndex < dropped.transform.childCount; childIndex++)
                 dropped.transform.GetChild(childIndex).localScale *= 2f;
 
+            // Aliens leave an alien weapon (the pickup kind equals the model shown); humans leave
+            // the human weapon of their archetype.
+            var dropKind = enemy.DroppedWeaponKind;
+            ModelKind visualKind = ModelLibrary.KindFromName(dropKind.ToString());
+            if (BloodFX.StyleFor(enemy.gameObject.name) == BloodStyle.AlienGoo)
+            {
+                var alienKind = dropKind;
+                if (System.Enum.TryParse("VoidRifle", out alienKind))
+                {
+                    dropKind = alienKind;
+                    visualKind = ModelKind.VoidRifle;
+                }
+            }
+
             PickupItem pickup = dropped.AddComponent<PickupItem>();
-            pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);
-            Debug.Log("PERSIA_COMBAT: dropped enemy weapon " + enemy.DroppedWeaponKind);
+            pickup.ConfigureWeapon(dropKind, 24);
+            // PickupItem already scales weapon pickups x2, so keep the model at 0.8 of its default size.
+            PickupVisual.Attach(dropped.transform, visualKind, true, 0.8f);
+            Debug.Log("PERSIA_COMBAT: dropped enemy weapon " + dropKind);
         }
 
         private static void CreateDroppedWeaponPart(
