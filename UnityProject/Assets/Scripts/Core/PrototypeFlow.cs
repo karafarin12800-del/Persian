@@ -1948,11 +1948,16 @@ namespace PersiaWar.Unity2D5D
             float gap = 8f * scale;
             float totalWidth = Mathf.Min(Screen.width - 30f * scale, 1050f * scale);
             float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
-            float cardHeight = Mathf.Clamp(Screen.height * 0.15f, 128f * scale, 174f * scale);
+            int rows = Mathf.CeilToInt(StoreCosmeticNames.Length / (float)columns);
+            float top = Screen.height * 0.19f;
+            // Reserve a clear footer lane for BACK TO MENU and let each row grow
+            // enough to show a large 3D weapon render plus two compact text lines.
+            float bottomReserve = 96f * scale;
+            float availableHeight = (Screen.height - top - bottomReserve - gap * (rows - 1)) / rows;
+            float cardHeight = Mathf.Clamp(availableHeight, 172f * scale, 196f * scale);
             float left = (Screen.width - totalWidth) * 0.5f;
             int column = index % columns;
             int row = index / columns;
-            float top = Screen.height * 0.19f;
             return new Rect(left + column * (cardWidth + gap), top + row * (cardHeight + gap), cardWidth, cardHeight);
         }
 
@@ -2051,7 +2056,10 @@ namespace PersiaWar.Unity2D5D
                 Fill(card, new Color(0.025f, 0.055f, 0.085f, 0.78f));
                 Fill(new Rect(card.x, card.y, card.width, 4f), equipped
                     ? new Color(0.24f, 0.92f, 0.98f, 0.95f) : new Color(0.38f, 0.50f, 0.60f, 0.72f));
-                Rect emblem = new Rect(card.center.x - 27f, card.y + 6f, 54f, 48f);
+                float imageHeight = Mathf.Min(96f * scale, card.height - 72f * scale);
+                float imageWidth = Mathf.Min(108f * scale, card.width - 16f * scale);
+                Rect emblem = new Rect(card.center.x - imageWidth * 0.5f,
+                    card.y + 5f * scale, imageWidth, imageHeight);
                 Color emblemColor = i == 0 ? new Color(0.83f, 0.57f, 0.16f)
                     : i == 1 ? new Color(0.89f, 0.73f, 0.25f)
                     : i == 2 ? new Color(0.14f, 0.52f, 0.79f)
@@ -2066,9 +2074,14 @@ namespace PersiaWar.Unity2D5D
                 {
                     Fill(emblem, emblemColor);
                 }
-                GUI.Label(new Rect(card.x + 6f, card.y + 54f, card.width - 12f, 22f),
+
+                // Weapon models now occupy a true 2x preview area; the name and price
+                // stay on compact single lines beneath the image instead of wrapping.
+                float captionY = emblem.yMax + 3f * scale;
+                GUI.Label(new Rect(card.x + 6f * scale, captionY, card.width - 12f * scale, 16f * scale),
                     StoreCosmeticNames[i], storeTextStyle);
-                GUI.Label(new Rect(card.x + 6f, card.y + 77f, card.width - 12f, 18f),
+                GUI.Label(new Rect(card.x + 6f * scale, captionY + 17f * scale,
+                    card.width - 12f * scale, 15f * scale),
                     owned ? (equipped ? "EQUIPPED" : "OWNED") : (StoreCosmeticPrices[i] + " COINS"),
                     storePriceStyle);
                 Rect action = GetStoreActionRect(i);
@@ -4363,8 +4376,20 @@ namespace PersiaWar.Unity2D5D
             menuSmallStyle.normal.textColor = new Color(0.91f, 0.94f, 0.98f, 1f);
 
             heroCardTextStyle = new GUIStyle(menuSmallStyle) { fontSize = Mathf.Max(12, menuSmallStyle.fontSize / 2), alignment = TextAnchor.MiddleCenter, wordWrap = true };
-            storeTextStyle = new GUIStyle(menuSmallStyle) { fontSize = Mathf.Max(12, menuSmallStyle.fontSize / 2), alignment = TextAnchor.MiddleCenter, wordWrap = true };
-            storePriceStyle = new GUIStyle(menuBodyStyle) { fontSize = Mathf.Max(12, menuBodyStyle.fontSize / 2), alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            storeTextStyle = new GUIStyle(menuSmallStyle)
+            {
+                fontSize = Mathf.Clamp(Mathf.RoundToInt(12f * scale), 11, 15),
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = false,
+                clipping = TextClipping.Clip
+            };
+            storePriceStyle = new GUIStyle(menuBodyStyle)
+            {
+                fontSize = Mathf.Clamp(Mathf.RoundToInt(11f * scale), 11, 14),
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = false,
+                clipping = TextClipping.Clip
+            };
             storeActionStyle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.Max(12, Mathf.RoundToInt(14f * scale)), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = true };
             storeActionStyle.normal.textColor = new Color(1f, 0.94f, 0.78f, 1f);
             profileNameFieldStyle = new GUIStyle(GUI.skin.textField) { fontSize = Mathf.Clamp(Mathf.RoundToInt(32f * scale), 24, 36), alignment = TextAnchor.MiddleLeft, padding = new RectOffset(16, 16, 8, 8) };
