@@ -7,6 +7,11 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private int maxHealth = 100;
         public int CurrentHealth { get; private set; }
         public int MaxHealth => maxHealth;
+        // Reused, visual-only hit feedback used when the violence level is 0 (energy mode).
+        private ParticleSystem hitEnergyParticles;
+        private float nextEnergyHitEffectTime;
+        private float nextPlayerHitEffectTime;
+
 
         private void Awake()
         {
@@ -19,30 +24,29 @@ namespace PersiaWar.Unity2D5D
             CurrentHealth = maxHealth;
         }
 
-        private static string ResolveWeaponName(Transform attacker)
-        {
-            if (attacker == null) return "AssaultRifle";
-            WeaponController weapon = attacker.GetComponentInParent<WeaponController>();
-            return weapon != null ? weapon.CurrentWeapon.ToString() : attacker.name;
-        }
-
         public void ApplyDamage(int amount, Transform attacker = null)
         {
             if (CurrentHealth <= 0) return;
             amount = Mathf.Max(0, amount);
             if (amount == 0) return;
 
-            Vector3 attackerPosition = attacker != null ? attacker.position : Vector3.zero;
-            string weaponName = ResolveWeaponName(attacker);
-            bool explosive = weaponName.IndexOf("Grenade", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
-                (attacker != null && attacker.name.IndexOf("Grenade", System.StringComparison.OrdinalIgnoreCase) >= 0);
-            EnemyChase liveEnemy = GetComponent<EnemyChase>();
-
             CurrentHealth = Mathf.Max(0, CurrentHealth - amount);
+            Vector3 attackerPosition = attacker != null ? attacker.position : Vector3.zero;
             if (CurrentHealth > 0)
             {
-                if (liveEnemy != null)
-                    HitReactor.NotifyDamaged(gameObject, attackerPosition, amount, weaponName);
+                if (GetComponent<EnemyChase>() != null)
+                {
+                    // Blood (when enabled) + a short stagger/knockback. Level 0 keeps the energy sparks.
+                    HitReactor.NotifyDamaged(gameObject, attackerPosition, amount, null);
+                    if (BloodFX.Level <= 0)
+                        PlayEnergyHitEffect();
+                }
+                else if (BloodFX.Level > 0 && GetComponent<PlayerController>() != null &&
+                         Time.time >= nextPlayerHitEffectTime)
+                {
+                    nextPlayerHitEffectTime = Time.time + 0.12f;
+                    HitReactor.NotifyDamaged(gameObject, attackerPosition, amount, null);
+                }
                 return;
             }
 
@@ -53,7 +57,7 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
-            EnemyChase enemy = liveEnemy;
+            EnemyChase enemy = GetComponent<EnemyChase>();
             if (enemy != null)
             {
                 int scoreBonus = Mathf.Max(0, enemy.ScoreValue - 10);
@@ -69,24 +73,21 @@ namespace PersiaWar.Unity2D5D
                     "S3_HostileHovercraft_", System.StringComparison.Ordinal);
                 if (!isStageThreeCraft)
                     SpawnDroppedWeapon(enemy);
-                BeginEnemyDeathSequence(enemy, attackerPosition, amount, weaponName, explosive);
+                BeginEnemyDeathSequence(enemy, attackerPosition, amount);
                 return;
             }
 
             Destroy(gameObject);
         }
 
-        private void BeginEnemyDeathSequence(
-            EnemyChase enemy, Vector3 attackerPosition, int damage, string weaponName, bool explosive)
+        private void BeginEnemyDeathSequence(EnemyChase enemy, Vector3 attackerPosition, int damage)
         {
             Vector3 deathPosition = enemy != null ? enemy.transform.position : transform.position;
             bool deferCraftRemoval = enemy != null &&
                 enemy.gameObject.name.StartsWith("S3_HostileHovercraft_", System.StringComparison.Ordinal);
-            float settleDuration = 0f;
             if (enemy != null)
             {
-                // Disable combat and collision immediately, but let StageThreeWorldBuilder
-                // handle the craft's explosion and three-second grounded wreck lifetime.
+                // Keep the existing combat shutdown behaviour unchanged.
                 enemy.enabled = false;
                 Collider[] colliders = enemy.GetComponentsInChildren<Collider>();
                 for (int i = 0; i < colliders.Length; i++)
@@ -95,21 +96,23 @@ namespace PersiaWar.Unity2D5D
                 MonoBehaviour[] behaviours = enemy.GetComponentsInChildren<MonoBehaviour>();
                 for (int i = 0; i < behaviours.Length; i++)
                 {
-                    MonoBehaviour behaviour = behaviours[i];
-                    if (behaviour != null && behaviour != this && !(behaviour is HitReactor))
-                        behaviour.enabled = false;
+                    if (behaviours[i] == null || behaviours[i] == this) continue;
+                    if (behaviours[i] is HitReactor) continue;   // it drives the launched fall below
+                    behaviours[i].enabled = false;
                 }
 
                 if (!deferCraftRemoval)
                 {
-                    settleDuration = HitReactor.NotifyKilled(
-                        enemy.gameObject, attackerPosition, damage, weaponName, explosive);
-                    Destroy(enemy.gameObject, Mathf.Max(1.5f, settleDuration + 0.1f));
+                    // Blood / goo + a launched, tumbling fall. Falls back to the old tip-over if
+                    // the reactor cannot run (returns 0).
+                    float settle = HitReactor.NotifyKilled(enemy.gameObject, attackerPosition, damage, null, false);
+                    if (settle > 0f)
+                        StartCoroutine(RemoveBodyAfter(enemy.transform, Mathf.Max(1.5f, settle + 0.5f)));
+                    else
+                        StartCoroutine(FallAndRemoveEnemy(enemy.transform));
                 }
             }
 
-            // Keep the stage-specific exclusions: spacecraft wrecks have their own
-            // explosion sequence, while aliens receive the library's alien-goo effect.
             bool isStageThreeAlien = enemy != null &&
                 enemy.gameObject.name.StartsWith("S3_Alien", System.StringComparison.Ordinal);
             bool isStageThreeCraft = enemy != null &&
@@ -118,9 +121,25 @@ namespace PersiaWar.Unity2D5D
             bool isStageFourAlien = enemy != null &&
                 enemy.gameObject.name.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
 
-            // Fallback only if the new death reactor could not take ownership of the body.
-            if (!isStageThreeAlien && !isStageThreeCraft && !isStageFourAlien && settleDuration <= 0f)
-                SpawnBloodEffect(deathPosition);
+            // Humans bleed (violence level > 0) and aliens keep their cyan energy discharge on top of
+            // the goo. At level 0 everybody uses the energy discharge. Stage 3 craft already own a
+            // dedicated vehicle-destruction effect, so do not stack a second burst.
+            bool isHumanStyleTarget = !isStageThreeAlien && !isStageThreeCraft && !isStageFourAlien;
+            bool showEnergy = BloodFX.Level <= 0 || !isHumanStyleTarget;
+            if (!isStageThreeCraft && showEnergy)
+            {
+                Color energyColor = isHumanStyleTarget
+                    ? new Color(1f, 0.72f, 0.28f, 0.95f)
+                    : new Color(0.22f, 0.88f, 1f, 0.95f);
+                SpawnEnergyDefeatEffect(deathPosition, energyColor);
+            }
+        }
+
+        private System.Collections.IEnumerator RemoveBodyAfter(Transform body, float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            if (body != null)
+                Destroy(body.gameObject);
         }
 
         private System.Collections.IEnumerator FallAndRemoveEnemy(Transform body)
@@ -153,76 +172,166 @@ namespace PersiaWar.Unity2D5D
                 Destroy(body.gameObject);
         }
 
-        private static void SpawnBloodEffect(Vector3 position)
+        /// <summary>
+        /// Short-lived sci-fi energy discharge (aliens always, everybody at violence level 0).
+        /// All particles are bounded and share the project's existing additive material.
+        /// </summary>
+        private void SpawnEnergyDefeatEffect(Vector3 position, Color color)
         {
-            // Fallback blood also belongs on the terrain plane beneath the fallen body.
-            float groundY = PickupVisual.GroundY(position);
-            GameObject stain = new GameObject("EnemyBloodStain");
-            stain.transform.position = new Vector3(position.x, groundY + 0.025f, position.z);
-            Material stainMaterial = RuntimeMaterialFactory.Create(
-                "EnemyBloodStainMaterial", new Color(0.30f, 0.008f, 0.018f));
+            GameObject effectRoot = new GameObject("PW_EnemyEnergyDischarge");
+            effectRoot.transform.position = position + Vector3.up * 0.22f;
 
-            CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(0f, 0f, 0f), new Vector3(1.15f, 0.018f, 0.78f), 0f);
-            CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(0.38f, 0.002f, 0.18f), new Vector3(0.68f, 0.016f, 0.44f), 24f);
-            CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(-0.36f, 0.003f, -0.22f), new Vector3(0.62f, 0.015f, 0.40f), -31f);
-            CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(0.58f, 0.001f, -0.34f), new Vector3(0.44f, 0.014f, 0.27f), 48f);
-            CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(-0.62f, 0.001f, 0.30f), new Vector3(0.40f, 0.014f, 0.25f), -52f);
-            CreateBloodStainBlob(stain.transform, stainMaterial,
-                new Vector3(0.05f, 0.001f, 0.57f), new Vector3(0.38f, 0.014f, 0.24f), 12f);
-            Destroy(stain, 4f);
-
-            // Short impact spray supplements the persistent ground stain.
-            GameObject blood = new GameObject("EnemyDefeatBloodParticles");
-            blood.transform.position = new Vector3(position.x, groundY + 0.045f, position.z);
-            ParticleSystem particles = blood.AddComponent<ParticleSystem>();
-            var main = particles.main;
-            main.duration = 0.45f;
+            ParticleSystem sparks = effectRoot.AddComponent<ParticleSystem>();
+            var main = sparks.main;
+            main.duration = 0.42f;
             main.loop = false;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.20f, 0.55f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(0.12f, 0.38f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.13f);
-            main.startColor = new Color(0.62f, 0.025f, 0.035f, 0.9f);
-            main.maxParticles = 22;
-            var emission = particles.emission;
+            main.playOnAwake = false;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.22f, 0.58f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.1f, 3.1f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.055f, 0.14f);
+            main.startColor = color;
+            main.maxParticles = 28;
+
+            var emission = sparks.emission;
             emission.rateOverTime = 0f;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 18) });
-            var shape = particles.shape;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 22) });
+
+            var shape = sparks.shape;
             shape.shapeType = ParticleSystemShapeType.Cone;
-            shape.angle = 14f;
-            shape.radius = 0.12f;
-            var particleRenderer = particles.GetComponent<ParticleSystemRenderer>();
-            particleRenderer.material = RuntimeMaterialFactory.Create(
-                "EnemyBloodEffectMaterial", new Color(0.62f, 0.025f, 0.035f));
-            particles.Play();
-            Destroy(blood, 1.2f);
+            shape.angle = 58f;
+            shape.radius = 0.13f;
+
+            var fade = sparks.colorOverLifetime;
+            fade.enabled = true;
+            Gradient gradient = new Gradient();
+            gradient.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(color, 0.38f),
+                    new GradientColorKey(color, 1f)
+                },
+                new[]
+                {
+                    new GradientAlphaKey(0.95f, 0f),
+                    new GradientAlphaKey(0.8f, 0.55f),
+                    new GradientAlphaKey(0f, 1f)
+                });
+            fade.color = new ParticleSystem.MinMaxGradient(gradient);
+
+            ParticleSystemRenderer particleRenderer = sparks.GetComponent<ParticleSystemRenderer>();
+            Material energyMaterial = StageFourMothershipExplosionFX.GetSoftAdditiveMaterial();
+            if (energyMaterial != null)
+                particleRenderer.sharedMaterial = energyMaterial;
+            particleRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+            particleRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            particleRenderer.receiveShadows = false;
+            sparks.Play();
+
+            // A separate ground pulse makes the defeat readable. It sits above road decor (GroundLift).
+            GameObject ringObject = new GameObject("PW_EnergyGroundPulse");
+            float groundY = PickupVisual.GroundY(position);
+            ringObject.transform.position = new Vector3(position.x, groundY + ModelLibrary.GroundLift, position.z);
+            LineRenderer ring = ringObject.AddComponent<LineRenderer>();
+            ring.useWorldSpace = false;
+            ring.loop = true;
+            ring.positionCount = 32;
+            ring.alignment = LineAlignment.View;
+            ring.widthMultiplier = 0.045f;
+            ring.startColor = new Color(color.r, color.g, color.b, 0.9f);
+            ring.endColor = new Color(color.r, color.g, color.b, 0f);
+            ring.sharedMaterial = energyMaterial;
+            ring.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            ring.receiveShadows = false;
+            for (int i = 0; i < ring.positionCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / ring.positionCount;
+                ring.SetPosition(i, new Vector3(Mathf.Cos(angle) * 0.5f, 0f, Mathf.Sin(angle) * 0.5f));
+            }
+            ringObject.transform.localScale = new Vector3(0.12f, 1f, 0.12f);
+            StartCoroutine(AnimateEnergyGroundPulse(ringObject.transform, ring, color));
+            Destroy(effectRoot, 0.95f);
         }
 
-        private static void CreateBloodStainBlob(
-            Transform parent, Material material, Vector3 localPosition, Vector3 localScale, float rotationY)
+        private System.Collections.IEnumerator AnimateEnergyGroundPulse(
+            Transform pulseTransform, LineRenderer pulseLine, Color energyColor)
         {
-            GameObject blob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            blob.name = "BloodStainBlob";
-            blob.transform.SetParent(parent, false);
-            blob.transform.localPosition = localPosition;
-            blob.transform.localScale = localScale;
-            blob.transform.localRotation = Quaternion.Euler(0f, rotationY, 0f);
+            const float duration = 0.42f;
+            float elapsed = 0f;
+            Color initial = new Color(energyColor.r, energyColor.g, energyColor.b, 0.9f);
+            Color transparent = new Color(energyColor.r, energyColor.g, energyColor.b, 0f);
 
-            Collider collider = blob.GetComponent<Collider>();
-            if (collider != null)
-                Destroy(collider);
-
-            Renderer blobRenderer = blob.GetComponent<Renderer>();
-            if (blobRenderer != null)
+            while (elapsed < duration && pulseTransform != null && pulseLine != null)
             {
-                blobRenderer.sharedMaterial = material;
-                blobRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                blobRenderer.receiveShadows = false;
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float scale = Mathf.Lerp(0.12f, 3.0f, t);
+                pulseTransform.localScale = new Vector3(scale, 1f, scale);
+                pulseLine.startColor = Color.Lerp(initial, transparent, t);
+                pulseLine.endColor = transparent;
+                yield return null;
             }
+
+            if (pulseTransform != null)
+                Destroy(pulseTransform.gameObject);
+        }
+
+        /// <summary>
+        /// Visual-only hit feedback for violence level 0: a small reusable energy spark burst.
+        /// </summary>
+        private void PlayEnergyHitEffect()
+        {
+            if (Time.time < nextEnergyHitEffectTime)
+                return;
+            nextEnergyHitEffectTime = Time.time + 0.10f;
+
+            if (hitEnergyParticles == null)
+            {
+                GameObject emitter = new GameObject("PW_EnemyEnergyHitEmitter");
+                emitter.transform.SetParent(transform, false);
+                emitter.transform.localPosition = Vector3.up * 0.55f;
+
+                hitEnergyParticles = emitter.AddComponent<ParticleSystem>();
+                var main = hitEnergyParticles.main;
+                main.duration = 1f;
+                main.loop = true;
+                main.playOnAwake = false;
+                main.simulationSpace = ParticleSystemSimulationSpace.World;
+                main.startLifetime = new ParticleSystem.MinMaxCurve(0.12f, 0.24f);
+                main.startSpeed = new ParticleSystem.MinMaxCurve(0.65f, 1.45f);
+                main.startSize = new ParticleSystem.MinMaxCurve(0.045f, 0.09f);
+                main.startColor = ResolveEnergyColor();
+                main.maxParticles = 12;
+
+                var emission = hitEnergyParticles.emission;
+                emission.rateOverTime = 0f;
+
+                var shape = hitEnergyParticles.shape;
+                shape.shapeType = ParticleSystemShapeType.Cone;
+                shape.angle = 66f;
+                shape.radius = 0.045f;
+
+                ParticleSystemRenderer particleRenderer = hitEnergyParticles.GetComponent<ParticleSystemRenderer>();
+                Material energyMaterial = StageFourMothershipExplosionFX.GetSoftAdditiveMaterial();
+                if (energyMaterial != null)
+                    particleRenderer.sharedMaterial = energyMaterial;
+                particleRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+                particleRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                particleRenderer.receiveShadows = false;
+                hitEnergyParticles.Play();
+            }
+
+            hitEnergyParticles.Emit(5);
+        }
+
+        private Color ResolveEnergyColor()
+        {
+            string enemyName = gameObject.name;
+            if (enemyName.StartsWith("S3_Alien", System.StringComparison.Ordinal) ||
+                enemyName.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal))
+                return new Color(0.22f, 0.88f, 1f, 0.95f);
+            return new Color(1f, 0.72f, 0.28f, 0.95f);
         }
 
         private void SpawnDroppedWeapon(EnemyChase enemy)
@@ -251,6 +360,7 @@ namespace PersiaWar.Unity2D5D
                 "DroppedWeaponMetal",
                 enemy.Archetype == 2 ? new Color(0.55f, 0.47f, 0.22f) : new Color(0.38f, 0.40f, 0.40f));
 
+            // Primitive fallback model (hidden automatically when the shared model attaches below).
             if (enemy.Archetype == 1)
             {
                 CreateDroppedWeaponPart(dropped.transform, "PistolGrip",
@@ -273,17 +383,29 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(0f, -0.015f, 0.02f), new Vector3(0.085f, 0.12f, 0.10f), metal);
             }
 
-            // Add an extra 2x size boost specifically to enemy drops; PickupItem
-            // applies its own 2x readable-pickup scale after this, for a clear 4x
-            // visible weapon compared with the original tiny dropped model.
+            // Enlarge the fallback primitives (PickupItem applies its own readable-pickup scale).
             for (int childIndex = 0; childIndex < dropped.transform.childCount; childIndex++)
                 dropped.transform.GetChild(childIndex).localScale *= 2f;
 
+            // Aliens leave an alien weapon (the pickup kind equals the model shown); humans leave
+            // the human weapon of their archetype.
+            var dropKind = enemy.DroppedWeaponKind;
+            ModelKind visualKind = ModelLibrary.KindFromName(dropKind.ToString());
+            if (BloodFX.StyleFor(enemy.gameObject.name) == BloodStyle.AlienGoo)
+            {
+                var alienKind = dropKind;
+                if (System.Enum.TryParse("VoidRifle", out alienKind))
+                {
+                    dropKind = alienKind;
+                    visualKind = ModelKind.VoidRifle;
+                }
+            }
+
             PickupItem pickup = dropped.AddComponent<PickupItem>();
-            pickup.ConfigureWeapon(enemy.DroppedWeaponKind, 24);
-            PickupVisual.Attach(dropped.transform,
-                ModelLibrary.KindFromName(enemy.DroppedWeaponKind.ToString()), true);
-            Debug.Log("PERSIA_COMBAT: dropped enemy weapon " + enemy.DroppedWeaponKind);
+            pickup.ConfigureWeapon(dropKind, 24);
+            // PickupItem already scales weapon pickups x2, so keep the model at 0.8 of its default size.
+            PickupVisual.Attach(dropped.transform, visualKind, true, 0.8f);
+            Debug.Log("PERSIA_COMBAT: dropped enemy weapon " + dropKind);
         }
 
         private static void CreateDroppedWeaponPart(
