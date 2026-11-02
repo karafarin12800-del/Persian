@@ -207,7 +207,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private bool PrepareWorldBuild()
     {
         BuildFailureCode = string.Empty;
-        liteWorldVariant = StartupCheckpoint.ShouldUseLiteWorld();
+        liteWorldVariant = false;
         BuildStatus = liteWorldVariant
             ? "Stage 3: LOW MEMORY — reduced towers and patrols..."
             : "Stage 3: preparing world...";

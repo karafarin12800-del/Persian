@@ -29,6 +29,9 @@ namespace PersiaWar.Unity2D5D
         private int selectedProfileCosmetic;
         private int selectedStoreWeaponKind = (int)WeaponController.WeaponKind.AssaultRifle;
         private bool soundEnabled = true;
+        private int gfxVersionTapCount;
+        private float gfxVersionTapWindowStart;
+        private float gfxStatusVisibleUntil;
         private static readonly string[] StoreCosmeticNames =
         {
             "ROYAL PROFILE FRAME",
@@ -325,6 +328,7 @@ namespace PersiaWar.Unity2D5D
 
                 CheckStageOneGirlRescue();
                 if (HandleDebugStageButtonTouches()) return;
+                HandleGfxVersionTouches();
                 HandleAndroidPauseTouches();
                 return;
             }
@@ -403,6 +407,7 @@ namespace PersiaWar.Unity2D5D
                 }
                 if (stageNumber == 4 && StageFourEscapeSequence.IsFinaleActive) return;
                 DrawAndroidPresentationHUD();
+                DrawGfxVersionLabel();
                 if (stageNumber >= 3) DrawStageFourObjective();
                 DrawAndroidPauseControl();
                 if (stageTestRun || stageChainTest) DrawDebugStageButton();
@@ -929,6 +934,12 @@ namespace PersiaWar.Unity2D5D
                         return;
                     }
                 }
+                else if (mode == ScreenMode.Settings && GetSettingsQualityRect().Contains(point))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    CycleGraphicsQuality();
+                    return;
+                }
                 else if (mode == ScreenMode.Settings && GetSettingsSoundRect().Contains(point))
                 {
                     suppressMenuButtonClicksFrame = Time.frameCount;
@@ -936,6 +947,17 @@ namespace PersiaWar.Unity2D5D
                     PlayerPrefs.SetInt("PW.SoundEnabled", soundEnabled ? 1 : 0);
                     AudioListener.volume = soundEnabled ? 1f : 0f;
                     PlayerPrefs.Save();
+                    return;
+                }
+                else if (mode == ScreenMode.Settings && GetSettingsViolenceRect().Contains(point))
+                {
+                    suppressMenuButtonClicksFrame = Time.frameCount;
+                    CycleViolenceLevel();
+                    return;
+                }
+                else if (mode == ScreenMode.Match && GetGfxVersionRect().Contains(point))
+                {
+                    RegisterGfxVersionTap();
                     return;
                 }
             }
@@ -991,8 +1013,10 @@ namespace PersiaWar.Unity2D5D
                 GUI.Label(notice, lobbyNotice, menuSmallStyle);
             }
 
-            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height - 42f, Screen.width * 0.54f, 24f),
+            GUI.Label(new Rect(Screen.width * 0.40f, Screen.height - 68f, Screen.width * 0.54f, 24f),
                 "PERSIA WAR  •  UNITY EDITION", menuSmallStyle);
+            GUI.Label(new Rect(12f, Screen.height - 34f, Screen.width - 24f, 24f),
+                GraphicsQualityProfile.BuildGfxStatusLine(), menuSmallStyle);
             DrawPreviousRunDiagnostic();
         }
 
@@ -2046,10 +2070,16 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
+        private Rect GetSettingsQualityRect()
+        {
+            float width = Mathf.Min(Screen.width - 64f, 640f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.315f, width, 62f);
+        }
+
         private Rect GetSettingsSoundRect()
         {
             float width = Mathf.Min(Screen.width - 64f, 640f);
-            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.42f, width, 62f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.425f, width, 62f);
         }
 
         private Rect GetSettingsViolenceRect()
@@ -2061,10 +2091,16 @@ namespace PersiaWar.Unity2D5D
         private void DrawSettingsScreen()
         {
             float width = Mathf.Min(Screen.width - 64f, 700f);
-            Rect panel = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.23f, width, Screen.height * 0.48f);
+            Rect panel = new Rect((Screen.width - width) * 0.5f, Screen.height * 0.20f, width, Screen.height * 0.58f);
             Fill(panel, new Color(0.025f, 0.055f, 0.085f, 0.94f));
             Fill(new Rect(panel.x, panel.y, panel.width, 6f), new Color(0.95f, 0.69f, 0.20f, 1f));
-            GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 52f), "SETTINGS", menuHeaderStyle);
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 12f, panel.width - 40f, 52f), "SETTINGS", menuHeaderStyle);
+
+            GraphicsQualityProfile.QualityTier tier = GraphicsQualityProfile.CurrentTier;
+            string qualityLabel = "QUALITY  •  " + tier.ToString().ToUpperInvariant();
+            if (DrawFantasyButton(GetSettingsQualityRect(), qualityLabel, tier == GraphicsQualityProfile.QualityTier.High))
+                CycleGraphicsQuality();
+
             if (DrawFantasyButton(GetSettingsSoundRect(), soundEnabled ? "SOUND  •  ON" : "SOUND  •  OFF", soundEnabled))
             {
                 soundEnabled = !soundEnabled;
@@ -2077,14 +2113,76 @@ namespace PersiaWar.Unity2D5D
             string violenceLabel = violenceLevel == 0 ? "VIOLENCE  •  OFF"
                 : (violenceLevel == 1 ? "VIOLENCE  •  NORMAL" : "VIOLENCE  •  HIGH");
             if (DrawFantasyButton(GetSettingsViolenceRect(), violenceLabel, violenceLevel > 0))
-            {
-                BloodFX.Level = (violenceLevel + 1) % 3;
-                PlayerPrefs.SetInt("PW_BLOOD_LEVEL", BloodFX.Level);
-                PlayerPrefs.Save();
-            }
-            GUI.Label(new Rect(panel.x + 24f, panel.y + panel.height - 72f, panel.width - 48f, 42f),
-                "PROFILE AND STORE DATA ARE SAVED ON THIS DEVICE", menuSmallStyle);
+                CycleViolenceLevel();
+
+            GUI.Label(new Rect(panel.x + 24f, panel.y + panel.height - 52f, panel.width - 48f, 34f),
+                "QUALITY IS MANUAL • HIGH IS THE DEFAULT", menuSmallStyle);
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;
+        }
+
+        private void CycleGraphicsQuality()
+        {
+            int next = ((int)GraphicsQualityProfile.CurrentTier + 1) % 3;
+            GraphicsQualityProfile.SetTier((GraphicsQualityProfile.QualityTier)next);
+        }
+
+        private void CycleViolenceLevel()
+        {
+            BloodFX.Level = (BloodFX.Level + 1) % 3;
+            PlayerPrefs.SetInt("PW_BLOOD_LEVEL", BloodFX.Level);
+            PlayerPrefs.Save();
+        }
+
+        private Rect GetGfxVersionRect()
+        {
+            float scale = GetUiScale();
+            Rect safe = GetSafeGuiRect();
+            return new Rect(safe.x + 12f * scale, safe.yMax - 30f * scale,
+                150f * scale, 24f * scale);
+        }
+
+        private void HandleGfxVersionTouches()
+        {
+            if (!Application.isMobilePlatform || Input.touchCount <= 0) return;
+            Rect hitRect = GetGfxVersionRect();
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase != TouchPhase.Began) continue;
+                Vector2 point = new Vector2(touch.position.x, Screen.height - touch.position.y);
+                if (!hitRect.Contains(point)) continue;
+                RegisterGfxVersionTap();
+                return;
+            }
+        }
+
+        private void RegisterGfxVersionTap()
+        {
+            if (Time.unscaledTime - gfxVersionTapWindowStart > 2.5f)
+            {
+                gfxVersionTapWindowStart = Time.unscaledTime;
+                gfxVersionTapCount = 0;
+            }
+            gfxVersionTapCount++;
+            if (gfxVersionTapCount >= 5)
+            {
+                gfxVersionTapCount = 0;
+                gfxStatusVisibleUntil = Time.unscaledTime + 12f;
+                StartupCheckpoint.AppendDiagnosticLine(GraphicsQualityProfile.BuildGfxStatusLine());
+            }
+        }
+
+        private void DrawGfxVersionLabel()
+        {
+            Rect rect = GetGfxVersionRect();
+            bool pressed = GUI.Button(rect, "VERSION  •  2.0", smallStyle);
+            if (pressed && !Application.isMobilePlatform) RegisterGfxVersionTap();
+            if (Time.unscaledTime < gfxStatusVisibleUntil)
+            {
+                string status = GraphicsQualityProfile.BuildGfxStatusLine();
+                GUI.Label(new Rect(rect.x, rect.y - 48f * GetUiScale(),
+                    Mathf.Min(Screen.width - rect.x - 12f, 500f), 46f * GetUiScale()), status, smallStyle);
+            }
         }
 
         private void ContinueFromHeroSelection()

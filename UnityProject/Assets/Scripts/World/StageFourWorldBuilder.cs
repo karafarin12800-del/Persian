@@ -130,7 +130,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private bool PrepareWorldBuild()
     {
         BuildFailureCode = string.Empty;
-        liteWorldVariant = StartupCheckpoint.ShouldUseLiteWorld();
+        liteWorldVariant = false;
         if (liteWorldVariant) StartupCheckpoint.Set("Stage4LiteVariantSelected_BeforeWorldBuild");
         try
         {

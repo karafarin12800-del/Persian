@@ -1,11 +1,11 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using PersiaWar.Unity2D5D;
 
 /// <summary>
-/// Conservative runtime quality tiers. Low intentionally preserves the old flat
-/// Stage 4 material path; Medium is the default and High enables one short shadow
-/// cascade. PW_GFX_TIER overrides the automatic device-capability choice (0/1/2).
+/// Manually selected runtime quality tier. HIGH is the default; PW_GFX_TIER stores
+/// LOW/MEDIUM/HIGH as 0/1/2. Device capability is never used to downgrade quality.
 /// </summary>
 public sealed class GraphicsQualityProfile : MonoBehaviour
 {
@@ -14,7 +14,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     private const string OverrideKey = "PW_GFX_TIER";
     private static GraphicsQualityProfile instance;
     private static bool tierChosen;
-    private static QualityTier selectedTier = QualityTier.Medium;
+    private static QualityTier selectedTier = QualityTier.High;
 
     private Transform lookRoot;
     private readonly Transform[] billboards = new Transform[220];
@@ -38,13 +38,76 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     {
         if (camera == null) return;
         ChooseTierOnce();
-        if (CurrentTier == QualityTier.Low)
+        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 :
+            (CurrentTier == QualityTier.Medium ? 2 : 0);
+        camera.allowMSAA = CurrentTier != QualityTier.Low;
+    }
+
+    public static void SetTier(QualityTier tier)
+    {
+        selectedTier = (QualityTier)Mathf.Clamp((int)tier, 0, 2);
+        tierChosen = true;
+        PlayerPrefs.SetInt(OverrideKey, (int)selectedTier);
+        PlayerPrefs.Save();
+        QualitySettings.antiAliasing = selectedTier == QualityTier.High ? 4 :
+            (selectedTier == QualityTier.Medium ? 2 : 0);
+        Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
+        for (int i = 0; i < cameras.Length; i++)
+            if (cameras[i] != null) cameras[i].allowMSAA = selectedTier != QualityTier.Low;
+        StartupCheckpoint.Set("GraphicsQualityTier_" + selectedTier);
+    }
+
+    public static string BuildGfxStatusLine()
+    {
+        if (!string.IsNullOrEmpty(cachedGfxStatusLine) && Time.unscaledTime < nextGfxStatusRefresh)
+            return cachedGfxStatusLine;
+        nextGfxStatusRefresh = Time.unscaledTime + 1f;
+        HashSet<Material> litMaterials = new HashSet<Material>();
+        Renderer[] renderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        int activeDecals = 0;
+        for (int i = 0; i < renderers.Length; i++)
         {
-            camera.allowMSAA = false;
-            return;
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+            if (renderer.gameObject.name.IndexOf("Decal", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                activeDecals++;
+            Material[] materials = renderer.sharedMaterials;
+            for (int j = 0; j < materials.Length; j++)
+            {
+                Material material = materials[j];
+                if (material == null || material.shader == null) continue;
+                string shaderName = material.shader.name;
+                if (shaderName.IndexOf("Lit", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    shaderName.IndexOf("Standard", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    shaderName.IndexOf("Diffuse", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    litMaterials.Add(material);
+            }
         }
-        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 : 2;
-        camera.allowMSAA = true;
+
+        string postFx = PlayerPrefs.GetInt("PW_POST_FX", 0) != 0 ? "ON" : "OFF";
+        string line = "GFX STATUS | TIER " + CurrentTier.ToString().ToUpperInvariant() +
+            " | MSAA " + QualitySettings.antiAliasing +
+            " | SHADOWS " + (QualitySettings.shadowDistance > 0f ? "ON" : "OFF") +
+            "/" + Mathf.RoundToInt(QualitySettings.shadowDistance) + "m/" +
+            QualitySettings.shadowCascades + "C/" + QualitySettings.shadowResolution +
+            " | POST-FX " + postFx +
+            " | LIT " + litMaterials.Count +
+            " | BLOOD " + BloodFX.Level +
+            " | DECALS " + activeDecals +
+            " | FPS " + (Time.unscaledDeltaTime > 0.0001f ? Mathf.RoundToInt(1f / Time.unscaledDeltaTime) : 0);
+        cachedGfxStatusLine = line;
+        return line;
+    }
+
+    private float nextGfxDiagnosticWrite;
+    private static float nextGfxStatusRefresh;
+    private static string cachedGfxStatusLine = string.Empty;
+
+    private void Update()
+    {
+        if (Time.unscaledTime < nextGfxDiagnosticWrite) return;
+        nextGfxDiagnosticWrite = Time.unscaledTime + 10f;
+        StartupCheckpoint.AppendDiagnosticLine(BuildGfxStatusLine());
     }
 
     public static bool IsEnhanced
@@ -61,23 +124,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     private static void ChooseTierOnce()
     {
         if (tierChosen) return;
-        int over = PlayerPrefs.GetInt(OverrideKey, -1);
-        if (over >= 0 && over <= 2)
-        {
-            selectedTier = (QualityTier)over;
-            tierChosen = true;
-            return;
-        }
-
-        int gpuMemory = SystemInfo.graphicsMemorySize;
-        int cpuCount = SystemInfo.processorCount;
-        int systemMemory = SystemInfo.systemMemorySize;
-        bool clearlyLow = (gpuMemory > 0 && gpuMemory < 1024) ||
-                          (cpuCount > 0 && cpuCount <= 4) ||
-                          (systemMemory > 0 && systemMemory < 2800);
-        bool clearlyHigh = gpuMemory >= 4096 && cpuCount >= 8 && systemMemory >= 6000;
-        selectedTier = clearlyLow ? QualityTier.Low :
-                       (clearlyHigh ? QualityTier.High : QualityTier.Medium);
+        int over = PlayerPrefs.GetInt(OverrideKey, (int)QualityTier.High);
+        selectedTier = (QualityTier)Mathf.Clamp(over, 0, 2);
         tierChosen = true;
     }
 
@@ -102,25 +150,8 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         instance = this;
         ChooseTierOnce();
         DontDestroyOnLoad(gameObject);
-        ApplyAndroidResolutionBudget();
         StartCoroutine(ApplyAntiAliasingAfterPresentationLayer());
         StartCoroutine(DiscoverCharacterShadows());
-    }
-
-    private void ApplyAndroidResolutionBudget()
-    {
-#if UNITY_ANDROID && !UNITY_EDITOR
-        int longestSide = CurrentTier == QualityTier.High ? 1920 : 1600;
-        int currentLongest = Mathf.Max(Screen.width, Screen.height);
-        if (currentLongest > longestSide && currentLongest > 0)
-        {
-            float scale = longestSide / (float)currentLongest;
-            int width = Mathf.Max(720, Mathf.RoundToInt(Screen.width * scale));
-            int height = Mathf.Max(480, Mathf.RoundToInt(Screen.height * scale));
-            Screen.SetResolution(width, height, Screen.fullScreenMode);
-            StartupCheckpoint.Set("AndroidRenderResolutionCapped_" + width + "x" + height);
-        }
-#endif
     }
 
     public static void ReleaseStageEffects()
@@ -153,17 +184,10 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         // so this tier is the last writer without editing that read-only component.
         yield return null;
         Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
-        if (CurrentTier == QualityTier.Low)
-        {
-            QualitySettings.antiAliasing = 0;
-            for (int i = 0; i < cameras.Length; i++)
-                if (cameras[i] != null) cameras[i].allowMSAA = false;
-            yield break;
-        }
-
-        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 : 2;
+        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 :
+            (CurrentTier == QualityTier.Medium ? 2 : 0);
         for (int i = 0; i < cameras.Length; i++)
-            if (cameras[i] != null) cameras[i].allowMSAA = true;
+            if (cameras[i] != null) cameras[i].allowMSAA = CurrentTier != QualityTier.Low;
     }
 
     private IEnumerator DiscoverCharacterShadows()

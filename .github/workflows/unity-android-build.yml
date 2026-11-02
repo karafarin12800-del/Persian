@@ -411,11 +411,14 @@ jobs:
           assert 'StartupCheckpoint.BuildCopyReport()' in flow and 'GUIUtility.systemCopyBuffer' in flow, 'LAST RUN diagnostics must provide a copyable report.'
           monitor = Path('UnityProject/Assets/Scripts/Boot/StartupMemoryMonitor.cs').read_text(encoding='utf-8')
           assert 'WaitForSecondsRealtime(2f)' in monitor and 'TransitionLoading_2s' in monitor, 'Memory must be sampled every two seconds during transitions.'
-          assert 'ShouldUseLiteWorld()' in checkpoint and 'Stage3LiteVariantSelected_BeforeWorldBuild' in Path('UnityProject/Assets/Scripts/World/StageThreeWorldBuilder.cs').read_text(encoding='utf-8'), 'Stage 3 must select a reduced build before world construction when memory headroom is low.'
-          assert 'Stage4LiteVariantSelected_BeforeWorldBuild' in Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8'), 'Stage 4 must select a reduced hostile roster before world construction when memory headroom is low.'
+          stage3_world = Path('UnityProject/Assets/Scripts/World/StageThreeWorldBuilder.cs').read_text(encoding='utf-8')
+          stage4_world = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
+          assert 'return false;' in checkpoint[checkpoint.index('public static bool ShouldUseLiteWorld()'):checkpoint.index('public static string PreviousMemorySummary')], 'Device capability must not select reduced world content.'
+          assert 'liteWorldVariant = false;' in stage3_world and 'liteWorldVariant = false;' in stage4_world, 'Stage 3 and 4 must always build their full authored world variants.'
           graphics = Path('UnityProject/Assets/Scripts/Core/GraphicsQualityProfile.cs').read_text(encoding='utf-8')
-          assert 'Screen.SetResolution(width, height, Screen.fullScreenMode)' in graphics and 'longestSide = CurrentTier == QualityTier.High ? 1920 : 1600' in graphics, 'Android render resolution must be capped by quality tier.'
-          assert 'QualitySettings.antiAliasing = 0;' in graphics and 'ReleaseStageEffects()' in graphics, 'Low tier must disable MSAA and stage-end graphics effects must be released.'
+          assert 'Screen.SetResolution(' not in graphics and 'ApplyAndroidResolutionBudget' not in graphics, 'Rendering must use the native device resolution without a quality-tier cap.'
+          assert 'SystemInfo.graphicsMemorySize' not in graphics and 'SystemInfo.processorCount' not in graphics and 'SystemInfo.systemMemorySize' not in graphics, 'Graphics tier must not be auto-downgraded from device capability reports.'
+          assert 'CurrentTier != QualityTier.Low' in graphics and 'ReleaseStageEffects()' in graphics, 'Low tier must disable camera MSAA and stage-end graphics effects must be released.'
           assert 'PreviousMemorySummary' in checkpoint and 'memoryFromPreviousRun' in checkpoint, 'LAST RUN must preserve the previous process memory snapshot across startup.'
           assert 'PreviousTransitionPeakSummary' in checkpoint and 'PERSIA_TRANSITION_MEMORY_PEAK:' in Path('UnityProject/Assets/Scripts/Boot/StartupMemoryMonitor.cs').read_text(encoding='utf-8'), 'Transition peak allocated/reserved memory must be persisted and logged for each transition.'
           bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')

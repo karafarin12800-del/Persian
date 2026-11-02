@@ -229,7 +229,7 @@ namespace PersiaWar.Unity2D5D
             System.Exception startupException = null;
             try
             {
-                Application.targetFrameRate = 60;
+                Application.targetFrameRate = Mathf.Max(60, GetHighestRefreshRate());
                 QualitySettings.vSyncCount = 0;
                 Random.InitState(seed);
                 EnsureGameSession();
@@ -322,6 +322,28 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
             StartupCheckpoint.Set("CameraSafePathEntered");
+        }
+
+        private static int GetHighestRefreshRate()
+        {
+            int highest = 0;
+            Resolution current = Screen.currentResolution;
+            Resolution[] supported = Screen.resolutions;
+            if (supported != null)
+            {
+                for (int i = 0; i < supported.Length; i++)
+                {
+                    Resolution mode = supported[i];
+                    if (mode.width == current.width && mode.height == current.height)
+                        highest = Mathf.Max(highest, mode.refreshRate);
+                }
+                if (highest == 0)
+                {
+                    for (int i = 0; i < supported.Length; i++)
+                        highest = Mathf.Max(highest, supported[i].refreshRate);
+                }
+            }
+            return highest > 0 ? highest : current.refreshRate;
         }
 
         private void ConfigureLighting()
