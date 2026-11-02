@@ -113,20 +113,22 @@ namespace PersiaWar.Unity2D5D
 
         public static float PickupScale(ModelKind kind)
         {
+            // Ground pickups must read clearly at the mobile camera distance.
+            // These scales affect the shared visual only, never the pickup trigger.
             switch (kind)
             {
-                case ModelKind.Pistol: return 2.1f;
-                case ModelKind.AssaultRifle: return 1.0f;
-                case ModelKind.HeavyMachineGun: return 0.9f;
-                case ModelKind.Axe: return 1.0f;
-                case ModelKind.VoidRifle: return 1.0f;
-                case ModelKind.AlienSword: return 1.0f;
-                case ModelKind.ShieldPickup: return 1.3f;
-                case ModelKind.Grenade: return 2.2f;
-                case ModelKind.AmmoCrate: return 1.4f;
-                case ModelKind.Medkit: return 1.4f;
-                case ModelKind.QuickDash: return 1.4f;
-                default: return 1f;
+                case ModelKind.Pistol: return 2.5f;
+                case ModelKind.AssaultRifle: return 1.6f;
+                case ModelKind.HeavyMachineGun: return 1.5f;
+                case ModelKind.Axe: return 1.6f;
+                case ModelKind.VoidRifle: return 1.6f;
+                case ModelKind.AlienSword: return 1.6f;
+                case ModelKind.ShieldPickup: return 1.8f;
+                case ModelKind.Grenade: return 2.6f;
+                case ModelKind.AmmoCrate: return 1.9f;
+                case ModelKind.Medkit: return 1.9f;
+                case ModelKind.QuickDash: return 1.9f;
+                default: return 1.5f;
             }
         }
 
