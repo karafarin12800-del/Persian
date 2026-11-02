@@ -945,6 +945,10 @@ namespace PersiaWar.Unity2D5D
             EnemyProjectile shot = projectile.AddComponent<EnemyProjectile>();
             shot.Configure(shotDirection, rangedDamage, transform, rangedRange);
 
+            bool alienWeapon = transform.name.IndexOf("Alien", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || transform.name.StartsWith("S3_") || transform.name.StartsWith("S4_");
+            MuzzleFlashFX.Show(visual != null ? visual.Muzzle : null, alienWeapon);
+
             if (visual != null)
                 visual.PlayFire();
             RuntimeGameAudio.PlayEnemyShot();
