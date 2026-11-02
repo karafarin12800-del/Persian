@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace PersiaWar.Unity2D5D
 {
-    /// <summary>Cheap spin + bob for pickup models (no allocations per frame).</summary>
+    /// <summary>Cheap spin + bob for models that do not already rotate themselves.</summary>
     public sealed class ModelSpinner : MonoBehaviour
     {
         public float spinDegreesPerSecond = 70f;
@@ -30,10 +30,27 @@ namespace PersiaWar.Unity2D5D
         }
     }
 
+    /// <summary>Keeps a ground ring at a fixed world height while its pickup bobs and spins.</summary>
+    public sealed class PickupGroundRing : MonoBehaviour
+    {
+        public float worldY;
+
+        private void LateUpdate()
+        {
+            Vector3 p = transform.position;
+            if (Mathf.Abs(p.y - worldY) > 0.001f)
+            {
+                p.y = worldY;
+                transform.position = p;
+            }
+        }
+    }
+
     /// <summary>
     /// Gives an existing pickup object (Stage 1 loot, Stage 2 loot, enemy drops) the real
     /// shared model plus a coloured ground ring. The old primitive renderers are only
-    /// disabled, so colliders / PickupItem logic keep working unchanged.
+    /// disabled, so colliders / PickupItem logic keep working unchanged. The pickup object
+    /// itself (PickupItem) provides rotation and bobbing.
     /// </summary>
     public static class PickupVisual
     {
@@ -66,10 +83,18 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
-        /// <summary>
-        /// kind None -> resolved from the pickup object's name. Returns the model object.
-        /// </summary>
         public static GameObject Attach(Transform pickupRoot, ModelKind kind, bool hideOldVisuals)
+        {
+            return Attach(pickupRoot, kind, hideOldVisuals, 1f);
+        }
+
+        /// <summary>
+        /// kind None -> resolved from the pickup object's name. scaleMultiplier scales the
+        /// default pickup size (use it when the pickup object is already scaled up).
+        /// Returns the model object.
+        /// </summary>
+        public static GameObject Attach(Transform pickupRoot, ModelKind kind, bool hideOldVisuals,
+            float scaleMultiplier)
         {
             if (pickupRoot == null) return null;
             if (kind == ModelKind.None) kind = ModelLibrary.KindFromName(pickupRoot.name);
@@ -83,13 +108,17 @@ namespace PersiaWar.Unity2D5D
             }
 
             GameObject model = ModelLibrary.Spawn(kind, pickupRoot, Vector3.zero, Quaternion.identity,
-                ModelLibrary.PickupScale(kind));
+                ModelLibrary.PickupScale(kind) * Mathf.Max(0.05f, scaleMultiplier));
             if (model == null) return null;
-            // Ground ring: a separate tiny mesh coloured by pickup type.
+
+            // Ground ring: a separate tiny mesh coloured by pickup type, fixed at ground level.
             GameObject ring = new GameObject("PW_PickupRing");
             ring.transform.SetParent(pickupRoot, false);
             Vector3 world = pickupRoot.position;
-            ring.transform.position = new Vector3(world.x, GroundY(world) + 0.03f, world.z);
+            float y = GroundY(world) + ModelLibrary.GroundLift;
+            ring.transform.position = new Vector3(world.x, y, world.z);
+            PickupGroundRing fixedRing = ring.AddComponent<PickupGroundRing>();
+            fixedRing.worldY = y;
             MeshFilter filter = ring.AddComponent<MeshFilter>();
             filter.sharedMesh = ModelLibrary.GetRingMesh(RingColor(kind));
             MeshRenderer renderer = ring.AddComponent<MeshRenderer>();
