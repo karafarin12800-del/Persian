@@ -55,14 +55,14 @@ namespace PersiaWar.Unity2D5D
 
         /// <summary>
         /// Violence setting saved in PlayerPrefs: 0 = no blood (energy sparks / scorch marks only),
-        /// 1 = normal, 2 = intense (more droplets and longer-lasting pools).
+        /// 1 = normal (default), 2 = intense (more droplets and longer-lasting pools).
         /// Expose it as a three-state toggle in the settings screen.
         /// </summary>
         public static int Level
         {
             get
             {
-                if (level < 0) level = Mathf.Clamp(PlayerPrefs.GetInt(LevelKey, 0), 0, 2);
+                if (level < 0) level = Mathf.Clamp(PlayerPrefs.GetInt(LevelKey, 1), 0, 2);
                 return level;
             }
             set
