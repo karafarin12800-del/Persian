@@ -26,7 +26,11 @@ namespace PersiaWar.Unity2D5D
             if (amount == 0) return;
 
             CurrentHealth = Mathf.Max(0, CurrentHealth - amount);
-            if (CurrentHealth > 0) return;
+            if (CurrentHealth > 0)
+            {
+                HitReactor.NotifyDamaged(gameObject, amount);
+                return;
+            }
 
             PlayerController player = GetComponent<PlayerController>();
             if (player != null)
@@ -46,7 +50,11 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            Destroy(gameObject);
+            // Keep the defeated enemy briefly so its hit-reaction fall can finish.
+            // HitReactor owns the delayed destruction; fall back to immediate cleanup
+            // if this component cannot be created for any reason.
+            if (HitReactor.NotifyKilled(gameObject, amount) <= 0f)
+                Destroy(gameObject);
         }
 
         public void Restore(int amount)
