@@ -1467,6 +1467,9 @@ namespace PersiaWar.Unity2D5D
             }
             Time.timeScale = 1f;
             matchPaused = false;
+            BloodFX.ClearAll();
+            ModelPreview.ReleaseAll();
+            CharacterModelFactory.ReleaseAll();
             GateGameplay(false);
             if (GameSession.Instance != null) GameSession.Instance.ResetMatch();
             if (targetStage == 4)
@@ -1820,6 +1823,9 @@ namespace PersiaWar.Unity2D5D
         {
             Time.timeScale = 1f;
             GraphicsQualityProfile.ReleaseStageEffects();
+            BloodFX.ClearAll();
+            ModelPreview.ReleaseAll();
+            CharacterModelFactory.ReleaseAll();
             StageTwoArenaManager.Instance?.ResetForStageChange();
 
             if (stageTwoVictorySequence != null)
@@ -2046,6 +2052,12 @@ namespace PersiaWar.Unity2D5D
             return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.42f, width, 62f);
         }
 
+        private Rect GetSettingsViolenceRect()
+        {
+            float width = Mathf.Min(Screen.width - 64f, 640f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.535f, width, 62f);
+        }
+
         private void DrawSettingsScreen()
         {
             float width = Mathf.Min(Screen.width - 64f, 700f);
@@ -2058,6 +2070,16 @@ namespace PersiaWar.Unity2D5D
                 soundEnabled = !soundEnabled;
                 AudioListener.volume = soundEnabled ? 1f : 0f;
                 PlayerPrefs.SetInt("PW.SoundEnabled", soundEnabled ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+
+            int violenceLevel = BloodFX.Level;
+            string violenceLabel = violenceLevel == 0 ? "VIOLENCE  •  OFF"
+                : (violenceLevel == 1 ? "VIOLENCE  •  NORMAL" : "VIOLENCE  •  HIGH");
+            if (DrawFantasyButton(GetSettingsViolenceRect(), violenceLabel, violenceLevel > 0))
+            {
+                BloodFX.Level = (violenceLevel + 1) % 3;
+                PlayerPrefs.SetInt("PW_BLOOD_LEVEL", BloodFX.Level);
                 PlayerPrefs.Save();
             }
             GUI.Label(new Rect(panel.x + 24f, panel.y + panel.height - 72f, panel.width - 48f, 42f),
