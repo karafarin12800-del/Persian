@@ -432,6 +432,13 @@ namespace PersiaWar.Unity2D5D
             else
                 BuildAndroidRoadGrid();
             BuildAndroidCityPresentation();
+            if (!stageTwoRequested)
+            {
+                // Stage 1 receives its own batched Persian architectural layer.
+                // It is presentation-only: no colliders, combat, loot or rescue rules change.
+                StageOneWorldArt.Build(worldRoot);
+                StartupCheckpoint.Set("StageOneWorldArtReady");
+            }
             SpawnRandomHouseLoot();
             RemoveAnyExtractionBeacon();
             return;
@@ -2515,6 +2522,175 @@ namespace PersiaWar.Unity2D5D
                 position + new Vector3(footprint * 0.30f, 0.55f, -depth * 0.66f),
                 new Vector3(Mathf.Min(3.0f, footprint * 0.26f), 1.10f, 0.65f),
                 hedge);
+
+            // Only Stage 1 residential houses receive this architectural upgrade.
+            // Stage 2's accepted village houses, colliders and courtyard silhouettes
+            // remain untouched.
+            if (!stageTwoRequested && !isWarehouse)
+                QueueStageOneResidentialDetails(position, footprint, bodyHeight, depth,
+                    doorWidth, columns, windowRows, spacing, isPitchedRoof, buildingIndex, trim);
+        }
+
+        private void QueueStageOneResidentialDetails(
+            Vector3 position,
+            float footprint,
+            float bodyHeight,
+            float depth,
+            float doorWidth,
+            int columns,
+            int windowRows,
+            float spacing,
+            bool isPitchedRoof,
+            int buildingIndex,
+            Material trim)
+        {
+            Material turquoiseTile = MakeMaterial("StageOneTurquoiseGlaze",
+                new Color(0.07f, 0.39f, 0.43f));
+            Material deepBlueTile = MakeMaterial("StageOneDeepBlueGlaze",
+                new Color(0.055f, 0.17f, 0.29f));
+            Material warmStone = MakeMaterial("StageOneCarvedStone",
+                new Color(0.91f, 0.80f, 0.64f));
+
+            float facadeZ = -depth * 0.5f - 0.17f;
+            float frameZ = -depth * 0.5f - 0.27f;
+
+            // Continuous stone plinth, upper cornice and edge pilasters turn the
+            // plain wall shell into a layered Persian townhouse facade.
+            QueueAndroidBox("StageOneCarvedPlinth",
+                position + new Vector3(0f, 0.22f, facadeZ),
+                new Vector3(footprint + 0.34f, 0.34f, 0.20f), warmStone);
+            QueueAndroidBox("StageOneCarvedCornice",
+                position + new Vector3(0f, bodyHeight - 0.16f, facadeZ),
+                new Vector3(footprint + 0.50f, 0.28f, 0.22f), trim);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                QueueAndroidBox("StageOneFacadePilaster",
+                    position + new Vector3(side * footprint * 0.435f, bodyHeight * 0.51f, facadeZ),
+                    new Vector3(0.20f, bodyHeight * 0.94f, 0.19f), warmStone);
+                QueueAndroidBox("StageOnePilasterCapital",
+                    position + new Vector3(side * footprint * 0.435f, bodyHeight - 0.42f, frameZ),
+                    new Vector3(0.34f, 0.18f, 0.23f), turquoiseTile);
+            }
+
+            // A framed portal, shallow threshold and stepped tile crest make the
+            // entrance read as a designed doorway without changing its open collider gap.
+            float portalX = doorWidth * 0.5f + 0.16f;
+            QueueAndroidBox("StageOnePortalJamb",
+                position + new Vector3(-portalX, 1.26f, frameZ),
+                new Vector3(0.18f, 2.48f, 0.22f), warmStone);
+            QueueAndroidBox("StageOnePortalJamb",
+                position + new Vector3(portalX, 1.26f, frameZ),
+                new Vector3(0.18f, 2.48f, 0.22f), warmStone);
+            QueueAndroidBox("StageOnePortalLintel",
+                position + new Vector3(0f, 2.56f, frameZ),
+                new Vector3(doorWidth + 0.52f, 0.20f, 0.24f), trim);
+            QueueAndroidBox("StageOnePortalThreshold",
+                position + new Vector3(0f, 0.10f, -depth * 0.5f - 0.48f),
+                new Vector3(doorWidth + 0.48f, 0.18f, 0.64f), warmStone);
+            QueueAndroidBox("StageOnePortalTileCrest",
+                position + new Vector3(0f, 2.88f, frameZ - 0.025f),
+                new Vector3(0.48f, 0.36f, 0.12f), turquoiseTile);
+            QueueAndroidBox("StageOnePortalTileCrestInner",
+                position + new Vector3(0f, 3.10f, frameZ - 0.03f),
+                new Vector3(0.22f, 0.14f, 0.13f), deepBlueTile);
+
+            // Every window receives a raised stone surround, not just a dark flat pane.
+            float windowWidth = Mathf.Min(1.15f, spacing * 0.48f);
+            float windowZ = -depth * 0.5f - 0.25f;
+            for (int row = 0; row < windowRows; row++)
+            {
+                float y = windowRows == 1 ? 1.65f : 1.65f + row * 2.65f;
+                if (y >= bodyHeight - 0.15f) continue;
+                for (int col = 0; col < columns; col++)
+                {
+                    float x = -footprint * 0.5f + spacing * (col + 1);
+                    QueueAndroidBox("StageOneWindowJamb",
+                        position + new Vector3(x - windowWidth * 0.5f - 0.055f, y, windowZ),
+                        new Vector3(0.11f, 0.86f, 0.16f), warmStone);
+                    QueueAndroidBox("StageOneWindowJamb",
+                        position + new Vector3(x + windowWidth * 0.5f + 0.055f, y, windowZ),
+                        new Vector3(0.11f, 0.86f, 0.16f), warmStone);
+                    QueueAndroidBox("StageOneWindowLintel",
+                        position + new Vector3(x, y + 0.44f, windowZ),
+                        new Vector3(windowWidth + 0.20f, 0.12f, 0.17f), trim);
+                }
+            }
+
+            // Alternating turquoise and deep-blue glazed tiles form a narrow frieze
+            // between the windows and roofline; all pieces are merged into the house batches.
+            int tileCount = Mathf.Clamp(columns + 1, 3, 5);
+            float tileSpacing = footprint * 0.78f / tileCount;
+            for (int tile = 0; tile < tileCount; tile++)
+            {
+                float x = (tile - (tileCount - 1) * 0.5f) * tileSpacing;
+                QueueAndroidBox("StageOneFacadeGlazedTile",
+                    position + new Vector3(x, bodyHeight - 0.57f, frameZ - 0.025f),
+                    new Vector3(0.24f, 0.32f, 0.12f),
+                    tile % 2 == 0 ? turquoiseTile : deepBlueTile);
+            }
+
+            // Selected two-storey homes gain a real projecting balcony with a
+            // separate stone slab and metal balustrade; it is decoration-only.
+            if (windowRows > 1 && buildingIndex % 4 == 0)
+            {
+                float balconyWidth = Mathf.Min(2.05f, footprint * 0.46f);
+                float balconyY = 3.92f;
+                float balconyZ = -depth * 0.5f - 0.52f;
+                QueueAndroidBox("StageOneBalconySlab",
+                    position + new Vector3(0f, balconyY, balconyZ),
+                    new Vector3(balconyWidth, 0.15f, 0.78f), warmStone);
+                QueueAndroidBox("StageOneBalconyRail",
+                    position + new Vector3(0f, balconyY + 0.48f, balconyZ - 0.34f),
+                    new Vector3(balconyWidth, 0.10f, 0.10f), trim);
+                for (int post = -2; post <= 2; post++)
+                    QueueAndroidBox("StageOneBalconyBaluster",
+                        position + new Vector3(post * balconyWidth * 0.22f, balconyY + 0.28f,
+                            balconyZ - 0.34f),
+                        new Vector3(0.08f, 0.42f, 0.08f), turquoiseTile);
+            }
+
+            if (isPitchedRoof)
+            {
+                float rise = Mathf.Clamp(footprint * 0.095f, 0.82f, 1.18f);
+                QueueAndroidBox("StageOneRoofRidgeCap",
+                    position + new Vector3(0f, bodyHeight + rise - 0.04f, 0f),
+                    new Vector3(0.22f, 0.18f, depth + 0.72f), turquoiseTile);
+                QueueAndroidBox("StageOneGableTileBand",
+                    position + new Vector3(0f, bodyHeight + rise * 0.34f,
+                        -depth * 0.5f - 0.18f),
+                    new Vector3(Mathf.Min(footprint * 0.60f, 4.2f), 0.20f, 0.12f), deepBlueTile);
+                QueueAndroidBox("StageOneGableKeystone",
+                    position + new Vector3(0f, bodyHeight + rise * 0.58f,
+                        -depth * 0.5f - 0.23f),
+                    new Vector3(0.34f, 0.34f, 0.15f), turquoiseTile);
+            }
+            else
+            {
+                // Flat-roof homes receive a small stepped rooftop pavilion and
+                // a crenellated parapet, creating a second distinct roof silhouette.
+                QueueAndroidBox("StageOneRoofParapetFront",
+                    position + new Vector3(0f, bodyHeight + 0.58f, -depth * 0.43f),
+                    new Vector3(footprint + 0.42f, 0.30f, 0.20f), warmStone);
+                QueueAndroidBox("StageOneRoofParapetBack",
+                    position + new Vector3(0f, bodyHeight + 0.58f, depth * 0.43f),
+                    new Vector3(footprint + 0.42f, 0.30f, 0.20f), warmStone);
+
+                if (buildingIndex % 5 == 1)
+                {
+                    QueueAndroidBox("StageOneRoofPavilionBase",
+                        position + new Vector3(0f, bodyHeight + 0.67f, 0f),
+                        new Vector3(1.18f, 0.18f, 1.18f), turquoiseTile);
+                    QueueAndroidBox("StageOneRoofPavilionBody",
+                        position + new Vector3(0f, bodyHeight + 0.94f, 0f),
+                        new Vector3(0.88f, 0.42f, 0.88f), warmStone);
+                    QueueAndroidBox("StageOneRoofPavilionCrown",
+                        position + new Vector3(0f, bodyHeight + 1.20f, 0f),
+                        new Vector3(0.48f, 0.16f, 0.48f), turquoiseTile);
+                    QueueAndroidBox("StageOneRoofPavilionFinial",
+                        position + new Vector3(0f, bodyHeight + 1.38f, 0f),
+                        new Vector3(0.12f, 0.24f, 0.12f), deepBlueTile);
+                }
+            }
         }
 
         private void CreateAndroidPitchedRoof(
