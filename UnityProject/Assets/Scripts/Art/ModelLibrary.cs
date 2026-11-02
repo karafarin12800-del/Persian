@@ -29,6 +29,9 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public static class ModelLibrary
     {
+        // Small vertical offset shared by ground-level visual effects to avoid z-fighting.
+        public const float GroundLift = 0.08f;
+
         private static readonly Dictionary<ModelKind, Mesh> meshes = new Dictionary<ModelKind, Mesh>();
         private static readonly Dictionary<uint, Mesh> ringMeshes = new Dictionary<uint, Mesh>();
         private static Material sharedMaterial;

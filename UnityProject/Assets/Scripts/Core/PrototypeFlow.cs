@@ -2044,6 +2044,7 @@ namespace PersiaWar.Unity2D5D
         private void DrawStoreScreen()
         {
             storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
+            float scale = GetUiScale();
             bool compactLandscape = Screen.height <= 800f;
             float titleY = compactLandscape ? 16f * GetUiScale() : 118f;
             float subtitleY = compactLandscape ? 57f * GetUiScale() : 166f;
@@ -2112,6 +2113,12 @@ namespace PersiaWar.Unity2D5D
             return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.42f, width, 62f);
         }
 
+        private Rect GetSettingsBloodRect()
+        {
+            float width = Mathf.Min(Screen.width - 64f, 640f);
+            return new Rect((Screen.width - width) * 0.5f, Screen.height * 0.52f, width, 62f);
+        }
+
         private void DrawSettingsScreen()
         {
             float width = Mathf.Min(Screen.width - 64f, 700f);
@@ -2126,6 +2133,16 @@ namespace PersiaWar.Unity2D5D
                 PlayerPrefs.SetInt("PW.SoundEnabled", soundEnabled ? 1 : 0);
                 PlayerPrefs.Save();
             }
+
+            int bloodLevel = BloodFX.Level;
+            string bloodLabel = bloodLevel == 0 ? "BLOOD FX  •  OFF"
+                : (bloodLevel == 1 ? "BLOOD FX  •  NORMAL" : "BLOOD FX  •  INTENSE");
+            if (DrawFantasyButton(GetSettingsBloodRect(), bloodLabel, bloodLevel > 0))
+            {
+                BloodFX.Level = (bloodLevel + 1) % 3;
+                PlayerPrefs.Save();
+            }
+
             GUI.Label(new Rect(panel.x + 24f, panel.y + panel.height - 72f, panel.width - 48f, 42f),
                 "PROFILE AND STORE DATA ARE SAVED ON THIS DEVICE", menuSmallStyle);
             if (DrawFantasyButton(GetLobbyBackRect(), "BACK TO MENU")) mode = ScreenMode.MainMenu;

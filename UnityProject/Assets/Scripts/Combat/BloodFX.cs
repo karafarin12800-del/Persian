@@ -6,7 +6,8 @@ namespace PersiaWar.Unity2D5D
     {
         Red = 0,
         AlienGoo = 1,
-        Scorch = 2
+        Scorch = 2,
+        Energy = 3
     }
 
     /// <summary>
@@ -20,6 +21,8 @@ namespace PersiaWar.Unity2D5D
         private const int Capacity = 96;
         private const int AtlasCell = 64;
 
+        private const string LevelKey = "PW_BLOOD_LEVEL";
+        private static int level = -1;
         private static BloodFX instance;
         private static readonly RaycastHit[] groundHits = new RaycastHit[10];
 
@@ -49,6 +52,33 @@ namespace PersiaWar.Unity2D5D
         private bool dirty;
 
         // ------------------------------------------------------------------ public API
+
+        /// <summary>
+        /// Violence setting saved in PlayerPrefs: 0 = no blood (energy sparks / scorch marks only),
+        /// 1 = normal (default), 2 = intense (more droplets and longer-lasting pools).
+        /// Expose it as a three-state toggle in the settings screen.
+        /// </summary>
+        public static int Level
+        {
+            get
+            {
+                if (level < 0) level = Mathf.Clamp(PlayerPrefs.GetInt(LevelKey, 1), 0, 2);
+                return level;
+            }
+            set
+            {
+                level = Mathf.Clamp(value, 0, 2);
+                PlayerPrefs.SetInt(LevelKey, level);
+            }
+        }
+
+        private static BloodStyle ResolveStyle(BloodStyle style)
+        {
+            if (Level > 0) return style;
+            if (style == BloodStyle.AlienGoo) return BloodStyle.Energy;
+            if (style == BloodStyle.Red) return BloodStyle.Scorch;
+            return style;
+        }
 
         public static BloodStyle StyleFor(string objectName)
         {
@@ -214,6 +244,8 @@ namespace PersiaWar.Unity2D5D
                     return new Color32(Clamp8(70f * shade), Clamp8(235f * shade), Clamp8(90f * shade), 235);
                 case BloodStyle.Scorch:
                     return new Color32(Clamp8(18f * shade), Clamp8(16f * shade), Clamp8(15f * shade), 215);
+                case BloodStyle.Energy:
+                    return new Color32(Clamp8(56f * shade), Clamp8(224f * shade), Clamp8(255f * shade), 235);
                 default:
                     return new Color32(Clamp8(150f * shade), Clamp8(8f * shade), Clamp8(12f * shade), 235);
             }
@@ -232,14 +264,17 @@ namespace PersiaWar.Unity2D5D
 
         private void DoHit(Vector3 position, Vector3 direction, float damage, BloodStyle style)
         {
+            style = ResolveStyle(style);
+            float boost = Level >= 2 ? 1.4f : 1f;
             Vector3 dir = Flat(direction);
             int tier = Scale();
-            int count = Mathf.Clamp(Mathf.RoundToInt(4f + damage * 0.12f), 4, 12);
+            int count = Mathf.Clamp(Mathf.RoundToInt((4f + damage * 0.12f) * boost), 4, 16);
             if (tier <= 0) count = Mathf.Max(2, count / 2);
             float groundY = GroundY(position);
             EmitDrops(position, dir, count, style, 1f, groundY, tier > 0);
 
-            int splats = tier <= 0 ? 1 : 2;
+            bool bloodStyle = style == BloodStyle.Red || style == BloodStyle.AlienGoo;
+            int splats = !bloodStyle ? 0 : (tier <= 0 ? 1 : 2) + (Level >= 2 ? 1 : 0);
             for (int i = 0; i < splats; i++)
             {
                 Vector3 side = new Vector3(-dir.z, 0f, dir.x);
@@ -252,15 +287,17 @@ namespace PersiaWar.Unity2D5D
 
         private void DoDeath(Vector3 position, Vector3 direction, float force, BloodStyle style)
         {
+            style = ResolveStyle(style);
+            float boost = Level >= 2 ? 1.4f : 1f;
             Vector3 dir = Flat(direction);
             int tier = Scale();
             float groundY = GroundY(position);
             Vector3 ground = new Vector3(position.x, groundY, position.z);
             Vector3 side = new Vector3(-dir.z, 0f, dir.x);
 
-            int dropCount = tier <= 0 ? 10 : (tier == 1 ? 18 : 26);
-            // Start death droplets at ground level, not from the fallen character's torso.
-            EmitDrops(ground + Vector3.up * 0.035f, dir, dropCount, style, 0.55f, groundY, tier > 0);
+            int dropCount = Mathf.RoundToInt((tier <= 0 ? 10 : (tier == 1 ? 18 : 26)) * boost);
+            EmitDrops(position, dir, dropCount, style, 1.3f + force * 0.08f, groundY, tier > 0);
+            if (style != BloodStyle.Red && style != BloodStyle.AlienGoo) return;   // sparks / scorch only
 
             // main pool grows under the body for ~1.6 s
             Splat(ground + dir * 0.25f, 0f, Random.Range(0f, 6.28f), Random.Range(0, 4),
@@ -306,9 +343,13 @@ namespace PersiaWar.Unity2D5D
                 float landing = (velocity.y + Mathf.Sqrt(velocity.y * velocity.y + 2f * gravity * height)) / gravity;
                 landing = Mathf.Clamp(landing, 0.12f, 0.9f);
 
-                Color32 color = style == BloodStyle.Scorch
-                    ? new Color32(255, Clamp8(Random.Range(140f, 200f)), 60, 255)
-                    : ColorFor(style, Random.Range(0.8f, 1.1f));
+                Color32 color;
+                if (style == BloodStyle.Scorch)
+                    color = new Color32(255, Clamp8(Random.Range(140f, 200f)), 60, 255);
+                else if (style == BloodStyle.Energy)
+                    color = new Color32(70, Clamp8(Random.Range(200f, 245f)), 255, 255);
+                else
+                    color = ColorFor(style, Random.Range(0.8f, 1.1f));
                 emit.position = position;
                 emit.velocity = velocity;
                 emit.startLifetime = landing + 0.02f;
@@ -316,7 +357,7 @@ namespace PersiaWar.Unity2D5D
                 emit.startColor = color;
                 drops.Emit(emit, 1);
 
-                if (landingSplats && style != BloodStyle.Scorch && Random.value < 0.45f)
+                if (landingSplats && (style == BloodStyle.Red || style == BloodStyle.AlienGoo) && Random.value < 0.45f)
                 {
                     Vector3 landingPoint = new Vector3(position.x + velocity.x * landing, groundY,
                         position.z + velocity.z * landing);
@@ -350,7 +391,8 @@ namespace PersiaWar.Unity2D5D
 
             active[slot] = true;
             shown[slot] = false;
-            centers[slot] = new Vector3(center.x, center.y + 0.025f, center.z);
+            centers[slot] = new Vector3(center.x, center.y + ModelLibrary.GroundLift, center.z);
+            if (Level >= 2) life *= 1.5f;
             rotations[slot] = rotation;
             startTimes[slot] = Time.time + delay;
             lifeTimes[slot] = life;
