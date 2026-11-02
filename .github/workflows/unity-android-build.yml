@@ -1,4 +1,5 @@
 name: Unity Android Build # Direct-start validation: 2026-10-01
+# Revalidate graphics-library v2 wiring on the current branch head.
 
 on:
   workflow_dispatch:
