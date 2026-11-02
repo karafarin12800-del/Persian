@@ -164,7 +164,7 @@ namespace PersiaWar.Unity2D5D
                 delta.y = 0f;
                 float speed = delta.magnitude / Mathf.Max(0.0001f, Time.deltaTime);
                 libraryCharacterRig.moveSpeed01 = Mathf.Clamp01(speed / Mathf.Max(0.1f, moveSpeed));
-                libraryCharacterRig.aiming = target != null && !retreating;
+                libraryCharacterRig.aiming = target != null && Time.time >= retreatUntil;
                 libraryCharacterLastPosition = current;
             }
         }
