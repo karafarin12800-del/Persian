@@ -1,31 +1,28 @@
 Shader "PersiaWar/VertexLit"
 {
+    // One cheap pass for every procedural model (weapons, pickups, props).
+    // Vertex colour rgb = albedo. Vertex colour alpha encodes the surface:
+    //   0 matte, 64 plastic, 128 metal (specular), 255 emissive glow.
     Properties
     {
-        _Color ("Base Color", Color) = (1,1,1,1)
-        _EmissionBoost ("Emission Boost", Range(0,2)) = 0
-        _RimStrength ("Rim Strength", Range(0,2)) = 0.18
-        _SpecStrength ("Specular Strength", Range(0,1)) = 0.22
-        _Gloss ("Gloss", Range(0,1)) = 0.35
-        _AmbientFloor ("Ambient Floor", Range(0,1)) = 0.22
+        _Color ("Tint", Color) = (1,1,1,1)
+        _EmissionBoost ("Emission Boost", Range(0, 4)) = 1.6
+        _RimStrength ("Rim Strength", Range(0, 1)) = 0.30
+        _SpecStrength ("Spec Strength", Range(0, 1)) = 0.55
+        _Gloss ("Gloss", Range(4, 128)) = 36
+        _AmbientFloor ("Ambient Floor", Range(0, 0.6)) = 0.20
     }
-
     SubShader
     {
-        Tags { "Queue"="Geometry" "RenderType"="Opaque" }
-        LOD 150
-
+        Tags { "RenderType"="Opaque" "Queue"="Geometry" }
+        LOD 200
         Pass
         {
             Tags { "LightMode"="ForwardBase" }
-            Cull Back
-            ZWrite On
-
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 2.0
-
             #include "UnityCG.cginc"
             #include "Lighting.cginc"
 
@@ -45,53 +42,59 @@ Shader "PersiaWar/VertexLit"
 
             struct v2f
             {
-                float4 position : SV_POSITION;
-                float3 worldPosition : TEXCOORD0;
-                float3 worldNormal : TEXCOORD1;
-                fixed4 vertexColor : COLOR;
+                float4 pos : SV_POSITION;
+                half3 worldNormal : TEXCOORD0;
+                float3 worldPos : TEXCOORD1;
+                fixed4 color : COLOR;
             };
 
             v2f vert(appdata v)
             {
                 v2f o;
-                o.position = UnityObjectToClipPos(v.vertex);
-                o.worldPosition = mul(unity_ObjectToWorld, v.vertex).xyz;
+                o.pos = UnityObjectToClipPos(v.vertex);
                 o.worldNormal = UnityObjectToWorldNormal(v.normal);
-                o.vertexColor = v.color;
+                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+                o.color = v.color;
                 return o;
             }
 
             fixed4 frag(v2f i) : SV_Target
             {
-                half3 normal = normalize(i.worldNormal);
-                half3 lightDirection = normalize(UnityWorldSpaceLightDir(i.worldPosition));
-                half3 viewDirection = normalize(UnityWorldSpaceViewDir(i.worldPosition));
-                half3 halfDirection = normalize(lightDirection + viewDirection);
+                half3 n = normalize(i.worldNormal);
+                half3 l = normalize(_WorldSpaceLightPos0.xyz);
+                half3 v = normalize(_WorldSpaceCameraPos.xyz - i.worldPos);
 
-                half diffuseDot = dot(normal, lightDirection);
-                half wrappedDiffuse = saturate((diffuseDot + 0.35h) / 1.35h);
+                half3 albedo = i.color.rgb * _Color.rgb;
+                // Vertex colours are authored as display (sRGB) values.
+                #if !defined(UNITY_COLORSPACE_GAMMA)
+                albedo = GammaToLinearSpace(albedo);
+                #endif
+                half a = i.color.a;
+                half specMask = (a <= 0.5h) ? saturate(a * 2.0h) : 0.0h;
+                half emission = saturate((a - 0.5h) * 2.0h);
 
-                fixed4 baseColor = _Color * i.vertexColor;
-                half3 ambient = max(UNITY_LIGHTMODEL_AMBIENT.rgb, _AmbientFloor.xxx);
-                half3 diffuse = baseColor.rgb * (ambient + _LightColor0.rgb * wrappedDiffuse);
+                half ndl = dot(n, l);
+                half wrap = saturate(ndl * 0.5h + 0.5h);
+                wrap = wrap * wrap;
 
-                half specularPower = exp2(_Gloss * 10.0h + 1.0h);
-                half specular = pow(saturate(dot(normal, halfDirection)), specularPower);
-                specular *= _SpecStrength * saturate(diffuseDot);
+                half hemi = saturate(n.y * 0.5h + 0.5h);
+                half3 ambient = lerp(unity_AmbientGround.rgb, unity_AmbientSky.rgb, hemi);
+                ambient = ambient * 0.8h + _AmbientFloor;
 
-                half rim = pow(1.0h - saturate(dot(normal, viewDirection)), 3.0h);
-                rim *= _RimStrength;
+                half3 color = albedo * (ambient + _LightColor0.rgb * wrap);
 
-                half3 finalColor = diffuse
-                    + _LightColor0.rgb * specular
-                    + baseColor.rgb * rim
-                    + baseColor.rgb * _EmissionBoost;
+                half3 h = normalize(l + v);
+                half spec = pow(saturate(dot(n, h)), _Gloss) * saturate(ndl * 2.0h);
+                color += _LightColor0.rgb * spec * specMask * _SpecStrength;
 
-                return fixed4(finalColor, baseColor.a);
+                half rim = pow(1.0h - saturate(dot(n, v)), 3.0h) * _RimStrength;
+                color += albedo * rim;
+
+                color += albedo * emission * _EmissionBoost;
+                return fixed4(color, 1.0h);
             }
             ENDCG
         }
     }
-
     Fallback "Diffuse"
 }
