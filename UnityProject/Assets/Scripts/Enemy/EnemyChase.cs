@@ -240,6 +240,29 @@ namespace PersiaWar.Unity2D5D
                 CreateEnemyWeaponPart("RifleBarrel", new Vector3(0f, 0.015f, 0.43f),
                     new Vector3(0.065f, 0.065f, 0.30f), enemyRifleMetalMaterial);
             }
+
+            AttachLibraryEnemyWeapon();
+        }
+
+        private void AttachLibraryEnemyWeapon()
+        {
+            if (weaponVisualRoot == null) return;
+            bool alien = transform.name.IndexOf("Alien", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || transform.name.StartsWith("S3_") || transform.name.StartsWith("S4_");
+            ModelKind kind = alien ? ModelKind.VoidRifle
+                : archetype == 1 ? ModelKind.Pistol
+                : archetype == 2 ? ModelKind.HeavyMachineGun : ModelKind.AssaultRifle;
+
+            Transform model = weaponVisualRoot.Find("PW_" + kind);
+            if (model == null)
+                model = ModelLibrary.AttachWeapon(weaponVisualRoot, kind, true, Vector3.zero,
+                    Quaternion.identity, 0.75f)?.transform;
+            if (model == null) return;
+
+            Renderer[] renderers = weaponVisualRoot.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+                if (renderers[i] != null)
+                    renderers[i].enabled = renderers[i].transform == model || renderers[i].transform.IsChildOf(model);
         }
 
         private void CreateEnemyWeaponPart(
