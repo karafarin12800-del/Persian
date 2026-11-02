@@ -37,6 +37,10 @@ namespace PersiaWar.Unity2D5D
         [SerializeField] private float fallbackWorldLimit = 108.1f;
         private PlayerController targetPlayer;
         private StylizedCharacterVisual visual;
+        private CharacterRig libraryCharacterRig;
+        private Transform libraryMuzzle;
+        private Vector3 libraryCharacterLastPosition;
+        private bool libraryCharacterPositionInitialized;
         private Transform weaponVisualRoot;
         private static Material enemyRifleReceiverMaterial;
         private static Material enemyRifleMetalMaterial;
@@ -111,6 +115,7 @@ namespace PersiaWar.Unity2D5D
             if (visual != null)
                 visual.Configure(false, archetype);
 
+            EnsureLibraryCharacterVisual();
             EnsureEnemyWeaponVisual();
             EnsureEnemyRangeIndicator();
         }
@@ -147,6 +152,41 @@ namespace PersiaWar.Unity2D5D
         private void LateUpdate()
         {
             UpdateEnemyRangeIndicator();
+            if (libraryCharacterRig != null)
+            {
+                Vector3 current = transform.position;
+                if (!libraryCharacterPositionInitialized)
+                {
+                    libraryCharacterLastPosition = current;
+                    libraryCharacterPositionInitialized = true;
+                }
+                Vector3 delta = current - libraryCharacterLastPosition;
+                delta.y = 0f;
+                float speed = delta.magnitude / Mathf.Max(0.0001f, Time.deltaTime);
+                libraryCharacterRig.moveSpeed01 = Mathf.Clamp01(speed / Mathf.Max(0.1f, moveSpeed));
+                libraryCharacterRig.aiming = target != null && !retreating;
+                libraryCharacterLastPosition = current;
+            }
+        }
+
+        private void EnsureLibraryCharacterVisual()
+        {
+            string objectName = transform.name;
+            bool stageThreeAlien = objectName.StartsWith("S3_Alien", System.StringComparison.Ordinal);
+            bool stageFourAlien = objectName.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
+            if (!stageThreeAlien && !stageFourAlien) return;
+            if (libraryCharacterRig != null) return;
+
+            CharacterStyle style = stageFourAlien
+                ? CharacterStyle.AlienTrooper
+                : CharacterStyle.Alien;
+            CharacterRig created = CharacterModelFactory.Create(style, transform, Vector3.zero, 1f);
+            if (created == null) return;
+
+            libraryCharacterRig = created;
+            if (visual != null)
+                visual.gameObject.SetActive(false);
+            libraryCharacterPositionInitialized = false;
         }
 
         private void UpdateEnemyRangeIndicator()
@@ -173,7 +213,7 @@ namespace PersiaWar.Unity2D5D
 
         private void EnsureEnemyWeaponVisual()
         {
-            if (visual == null)
+            if (visual == null && libraryCharacterRig == null)
                 return;
 
             if (weaponVisualRoot != null)
@@ -182,7 +222,9 @@ namespace PersiaWar.Unity2D5D
             // Mount the rifle to the character's 3D hand/body layer on mobile,
             // not to the outer aiming transform. This keeps it visibly in the hands
             // while the enemy separately faces its target for projectile aiming.
-            Transform mount = visual.WeaponMount != null ? visual.WeaponMount : visual.transform;
+            Transform mount = libraryCharacterRig != null
+                ? libraryCharacterRig.weaponMount
+                : (visual.WeaponMount != null ? visual.WeaponMount : visual.transform);
             Transform existing = mount.Find("EnemyRifleVisual");
             if (existing != null)
             {
@@ -192,12 +234,21 @@ namespace PersiaWar.Unity2D5D
 
             weaponVisualRoot = new GameObject("EnemyRifleVisual").transform;
             weaponVisualRoot.SetParent(mount, false);
-            weaponVisualRoot.localPosition = mount == visual.transform
-                ? new Vector3(0.20f, 0.83f, 0.28f)
-                : new Vector3(0.16f, 0.72f, 0.42f);
+            weaponVisualRoot.localPosition = libraryCharacterRig != null
+                ? Vector3.zero
+                : (mount == visual.transform
+                    ? new Vector3(0.20f, 0.83f, 0.28f)
+                    : new Vector3(0.16f, 0.72f, 0.42f));
             // Make the silhouette readable at the game's isometric camera distance.
-            weaponVisualRoot.localRotation = Quaternion.Euler(0f, -8f, 0f);
+            weaponVisualRoot.localRotation = libraryCharacterRig != null
+                ? Quaternion.identity : Quaternion.Euler(0f, -8f, 0f);
             weaponVisualRoot.localScale = Vector3.one * 1.45f;
+
+            if (libraryCharacterRig != null)
+            {
+                AttachLibraryEnemyWeapon();
+                return;
+            }
 
             if (enemyRifleReceiverMaterial == null)
                 enemyRifleReceiverMaterial = RuntimeMaterialFactory.Create(
@@ -263,6 +314,14 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < renderers.Length; i++)
                 if (renderers[i] != null)
                     renderers[i].enabled = renderers[i].transform == model || renderers[i].transform.IsChildOf(model);
+
+            if (libraryCharacterRig != null && libraryMuzzle == null && model != null)
+            {
+                GameObject muzzleObject = new GameObject("LibraryWeaponMuzzle");
+                libraryMuzzle = muzzleObject.transform;
+                libraryMuzzle.SetParent(model, false);
+                libraryMuzzle.localPosition = new Vector3(0f, 0f, 0.92f);
+            }
         }
 
         private void CreateEnemyWeaponPart(
@@ -890,9 +949,10 @@ namespace PersiaWar.Unity2D5D
             if (target == null)
                 return;
 
-            Vector3 origin = visual != null && visual.Muzzle != null
-                ? visual.Muzzle.position
-                : transform.position + Vector3.up * 0.9f;
+            Vector3 origin = libraryMuzzle != null ? libraryMuzzle.position
+                : (visual != null && visual.Muzzle != null
+                    ? visual.Muzzle.position
+                    : transform.position + Vector3.up * 0.9f);
 
             Vector3 targetPoint = target.position + Vector3.up * 0.75f;
             Vector3 shotDirection = targetPoint - origin;
@@ -947,9 +1007,12 @@ namespace PersiaWar.Unity2D5D
 
             bool alienWeapon = transform.name.IndexOf("Alien", System.StringComparison.OrdinalIgnoreCase) >= 0
                 || transform.name.StartsWith("S3_") || transform.name.StartsWith("S4_");
-            MuzzleFlashFX.Show(visual != null ? visual.Muzzle : null, alienWeapon);
+            MuzzleFlashFX.Show(libraryMuzzle != null ? libraryMuzzle
+                : (visual != null ? visual.Muzzle : null), alienWeapon);
 
-            if (visual != null)
+            if (libraryCharacterRig != null)
+                libraryCharacterRig.Kick(1f);
+            else if (visual != null)
                 visual.PlayFire();
             RuntimeGameAudio.PlayEnemyShot();
         }
