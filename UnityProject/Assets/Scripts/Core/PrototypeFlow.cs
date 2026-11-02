@@ -2044,6 +2044,7 @@ namespace PersiaWar.Unity2D5D
         private void DrawStoreScreen()
         {
             storeCoins = PlayerPrefs.GetInt("PW.StoreCoins", 500);
+            float scale = GetUiScale();
             bool compactLandscape = Screen.height <= 800f;
             float titleY = compactLandscape ? 16f * GetUiScale() : 118f;
             float subtitleY = compactLandscape ? 57f * GetUiScale() : 166f;
