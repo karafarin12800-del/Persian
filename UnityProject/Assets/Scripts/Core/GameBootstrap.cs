@@ -1190,21 +1190,21 @@ namespace PersiaWar.Unity2D5D
             ModelKind[] kinds =
             {
                 ModelKind.Barrel, ModelKind.Crate, ModelKind.Sandbags,
-                ModelKind.StreetLamp, ModelKind.Rock, ModelKind.Bush
+                ModelKind.Rock, ModelKind.Bush
             };
             Vector3[] positions =
             {
                 new Vector3(-96f, 0f, -72f), new Vector3(96f, 0f, -72f),
                 new Vector3(-96f, 0f, -24f), new Vector3(96f, 0f, 24f),
-                new Vector3(-96f, 0f, 72f), new Vector3(96f, 0f, 72f)
+                new Vector3(-96f, 0f, 72f)
             };
             Vector3[] colliderSizes =
             {
                 new Vector3(0.72f, 0.95f, 0.72f), new Vector3(0.9f, 0.85f, 0.9f),
-                new Vector3(2.0f, 0.8f, 0.65f), new Vector3(0.65f, 3.5f, 0.65f),
-                new Vector3(1.1f, 0.65f, 0.9f), new Vector3(1.0f, 0.9f, 0.9f)
+                new Vector3(2.0f, 0.8f, 0.65f), new Vector3(1.1f, 0.65f, 0.9f),
+                new Vector3(1.0f, 0.9f, 0.9f)
             };
-            float[] scales = { 1f, 1f, 1f, 1f, 1f, 1f };
+            float[] scales = { 1f, 1f, 1f, 1f, 1f };
 
             for (int i = 0; i < kinds.Length; i++)
             {
@@ -1221,6 +1221,28 @@ namespace PersiaWar.Unity2D5D
 
                 ModelLibrary.Spawn(kinds[i], propRoot.transform, Vector3.zero,
                     Quaternion.identity, scales[i]);
+            }
+
+            // The village branch has no legacy street-lamp meshes to replace.
+            if (stageTwoRequested)
+            {
+                Vector3[] lampPositions =
+                {
+                    new Vector3(-88f, 0f, -88f), new Vector3(88f, 0f, 88f)
+                };
+                for (int i = 0; i < lampPositions.Length; i++)
+                {
+                    Vector3 point = lampPositions[i];
+                    GameObject lampRoot = new GameObject("PW_VillageStreetLampCollider_" + i);
+                    lampRoot.transform.SetParent(worldRoot, false);
+                    lampRoot.transform.position = new Vector3(point.x,
+                        CalculateAndroidTerrainHeight(point.x, point.z), point.z);
+                    BoxCollider lampCollider = lampRoot.AddComponent<BoxCollider>();
+                    lampCollider.center = new Vector3(0f, 1.75f, 0f);
+                    lampCollider.size = new Vector3(0.65f, 3.5f, 0.65f);
+                    ModelLibrary.Spawn(ModelKind.StreetLamp, lampRoot.transform,
+                        Vector3.zero, Quaternion.identity, 1f);
+                }
             }
             StartupCheckpoint.Set("AndroidSharedModelLibraryPropsReady");
         }
@@ -2548,18 +2570,34 @@ namespace PersiaWar.Unity2D5D
             if (androidLampGlowMaterial == null)
                 androidLampGlowMaterial = MakeMaterial("AndroidLampGlow", new Color(0.95f, 0.78f, 0.30f));
 
-            CreateAndroidBox(
+            GameObject oldPost = CreateAndroidBox(
                 "LampPost",
                 position + Vector3.up * 2.0f,
                 new Vector3(0.16f, 4.0f, 0.16f),
                 androidLampMaterial,
                 false);
 
-            CreateAndroidBox(
+            GameObject oldHead = CreateAndroidBox(
                 "LampHead",
                 position + Vector3.up * 4.0f,
                 new Vector3(0.65f, 0.18f, 0.38f),
-                androidLampGlowMaterial,                false);
+                androidLampGlowMaterial,
+                false);
+
+            // Preserve any legacy colliders; replace only the old visible mesh renderers.
+            Renderer oldPostRenderer = oldPost != null ? oldPost.GetComponent<Renderer>() : null;
+            Renderer oldHeadRenderer = oldHead != null ? oldHead.GetComponent<Renderer>() : null;
+            if (oldPostRenderer != null) oldPostRenderer.enabled = false;
+            if (oldHeadRenderer != null) oldHeadRenderer.enabled = false;
+
+            GameObject lampRoot = new GameObject("PW_StreetLampCollider");
+            lampRoot.transform.SetParent(worldRoot, true);
+            lampRoot.transform.position = position;
+            BoxCollider lampCollider = lampRoot.AddComponent<BoxCollider>();
+            lampCollider.center = new Vector3(0f, 1.75f, 0f);
+            lampCollider.size = new Vector3(0.65f, 3.5f, 0.65f);
+            ModelLibrary.Spawn(ModelKind.StreetLamp, lampRoot.transform, Vector3.zero,
+                Quaternion.identity, 1f);
         }
 
         private void QueueAndroidBox(string objectName, Vector3 position, Vector3 size, Material material)
