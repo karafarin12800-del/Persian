@@ -435,6 +435,38 @@ namespace PersiaWar.Unity2D5D
                 for (int i = 0; i < gunRenderers.Length && i < baseGunMaterials.Length; i++)
                     if (gunRenderers[i] != null) gunRenderers[i].sharedMaterial = baseGunMaterials[i];
             }
+
+            RefreshLibraryWeaponVisual();
+        }
+
+        private void RefreshLibraryWeaponVisual()
+        {
+            Transform root = weaponKind == WeaponKind.Axe ? axeRoot
+                : weaponKind == WeaponKind.AlienSword ? swordRoot : gunRoot;
+            if (root == null) return;
+
+            ModelKind kind = ModelLibrary.KindFromName(weaponKind.ToString());
+            if (!ModelLibrary.IsWeapon(kind)) return;
+
+            string modelName = "PW_" + kind;
+            Transform model = root.Find(modelName);
+            if (model == null)
+            {
+                for (int i = root.childCount - 1; i >= 0; i--)
+                {
+                    Transform child = root.GetChild(i);
+                    if (child != null && child.name.StartsWith("PW_"))
+                        Destroy(child.gameObject);
+                }
+                model = ModelLibrary.AttachWeapon(root, kind, true, Vector3.zero, Quaternion.identity, 1f)?.transform;
+            }
+
+            if (model == null) return;
+            model.gameObject.SetActive(true);
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+                if (renderers[i] != null)
+                    renderers[i].enabled = renderers[i].transform == model || renderers[i].transform.IsChildOf(model);
         }
 
         private void SetWeaponPart(string partName, bool visible, Vector3 localPosition, Vector3 localScale)
@@ -543,6 +575,7 @@ namespace PersiaWar.Unity2D5D
             projectile.SetOwner(transform);
             projectile.gameObject.SetActive(true);
             projectile.Launch(direction.normalized);
+            MuzzleFlashFX.Show(muzzle, false);
             recoilAmount = 0.12f;
             StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (characterVisual != null)
