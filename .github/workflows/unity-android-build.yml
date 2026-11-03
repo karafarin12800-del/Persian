@@ -130,8 +130,15 @@ jobs:
           factory = Path('UnityProject/Assets/Scripts/Core/RuntimeMaterialFactory.cs').read_text(encoding='utf-8')
           assert 'Shader "PersiaWar/AndroidFlat"' in flat_shader, 'Project-owned Android flat shader is missing.'
           assert 'return tex2D(_MainTex, i.uv) * _Color;' in flat_shader, 'Android flat shader must tint textures without lighting.'
-          assert 'Resources.Load<Shader>("PersiaWarAndroidFlat")' in factory, 'Android does not prefer the bundled flat shader.'
-          assert factory.index('Resources.Load<Shader>("PersiaWarAndroidFlat")') < factory.index('Shader.Find("Unlit/Texture")'), 'Built-in lookup runs before the bundled Android shader.'
+          assert 'Resources.Load<Shader>("PersiaWarLit")' in factory, 'Android HIGH tier does not load the bundled lit shader.'
+          assert factory.index('Resources.Load<Shader>("PersiaWarLit")') < factory.index('Resources.Load<Shader>("PersiaWarAndroidFlat")'), 'Android HIGH tier must prefer the bundled lit shader before flat fallback.'
+          assert factory.index('Resources.Load<Shader>("PersiaWarAndroidFlat")') < factory.index('Shader.Find("Unlit/Texture")'), 'Built-in lookup runs before the bundled Android fallback shader.'
+          enemy_chase = Path('UnityProject/Assets/Scripts/Enemy/EnemyChase.cs').read_text(encoding='utf-8')
+          assert 'RemoveLegacyEnemyRangeIndicator();' in enemy_chase and 'EnsureEnemyRangeIndicator' not in enemy_chase and 'UpdateEnemyRangeIndicator' not in enemy_chase, 'Enemy weapon-range rings must stay removed.'
+          assert 'sprite.enabled = false;' in visual, 'Mobile 3D character must not be hidden behind its overlaid sprite.'
+          quality = Path('UnityProject/Assets/Scripts/Core/GraphicsQualityProfile.cs').read_text(encoding='utf-8')
+          assert 'QualitySettings.shadowDistance = high ? 70f' in quality and 'QualitySettings.shadowResolution = high ? ShadowResolution.VeryHigh' in quality, 'HIGH tier must retain 70m VeryHigh real-time shadows.'
+          assert 'QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;' in quality, 'Texture anisotropic filtering must remain forced on.'
           assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
           stage4 = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'Shader shader = RuntimeMaterialFactory.GetShader();' in stage4, 'Stage 4 must prefer the Resources-backed shader to avoid Android shader stripping.'

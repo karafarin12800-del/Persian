@@ -34,12 +34,20 @@ namespace PersiaWar.Unity2D5D
                 ? new Color(1f, 0.84f, 0.68f)
                 : new Color(1f, 0.94f, 0.82f);
             sun.intensity = warmVillage ? 1.0f : 1.1f;
-            sun.shadows = !Application.isMobilePlatform &&
-                          QualitySettings.shadows != ShadowQuality.Disable
-                ? LightShadows.Hard
-                : LightShadows.None;
-            sun.shadowStrength = 0.65f;
+            sun.shadows = QualitySettings.shadows == ShadowQuality.All
+                ? LightShadows.Soft
+                : (QualitySettings.shadows == ShadowQuality.HardOnly ? LightShadows.Hard : LightShadows.None);
+            sun.shadowStrength = QualitySettings.shadows == ShadowQuality.All ? 0.82f : 0.68f;
             sun.renderMode = LightRenderMode.Auto;
+
+            // Keep one active directional light per stage to avoid duplicate suns.
+            Light[] sceneLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+            for (int i = 0; i < sceneLights.Length; i++)
+            {
+                Light other = sceneLights[i];
+                if (other != null && other != sun && other.type == LightType.Directional)
+                    other.enabled = false;
+            }
             RenderSettings.sun = sun;
 
             RenderSettings.ambientMode = AmbientMode.Trilight;

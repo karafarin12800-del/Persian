@@ -116,10 +116,12 @@ namespace PersiaWar.Unity2D5D
             }
 
 #if UNITY_ANDROID
-            // A project-owned shader in Resources is included in the Android build.
-            // Shader.Find fallbacks can be stripped; a lit fallback desaturates grass
-            // and can make road meshes without explicit normals look almost black.
-            cachedShader = Resources.Load<Shader>("PersiaWarAndroidFlat");
+            // HIGH uses the bundled Standard surface shader for directional lighting,
+            // specular response and real shadow reception. Flat remains the fallback.
+            if (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High)
+                cachedShader = Resources.Load<Shader>("PersiaWarLit");
+            if (cachedShader == null)
+                cachedShader = Resources.Load<Shader>("PersiaWarAndroidFlat");
             if (cachedShader == null)
                 cachedShader = Shader.Find("Unlit/Texture");
             if (cachedShader == null)

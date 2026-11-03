@@ -218,7 +218,10 @@ namespace PersiaWar.Unity2D5D
         private void EnsureMobile3DCharacter()
         {
             if (mobileModelRoot != null)
+            {
+                if (sprite != null) sprite.enabled = false;
                 return;
+            }
 
             mobileModelRoot = new GameObject("Mobile3DModel").transform;
             mobileModelRoot.SetParent(artRoot, false);
@@ -326,6 +329,12 @@ namespace PersiaWar.Unity2D5D
                 mobilePackPouchRight = CreateMobilePrimitive(PrimitiveType.Cube, "PackPouchRight",
                     mobilePack.transform, new Vector3(0.56f, 0.02f, 0.18f), new Vector3(0.42f, 0.55f, 0.82f));
             }
+
+            // Art's transparent sprite was rendered over the opaque 3D model.
+            // Hide only that sprite on mobile so head, torso, both arms, both legs,
+            // boots, armor, backpack and character-specific details are visible.
+            if (sprite != null)
+                sprite.enabled = false;
 
             Renderer[] parts =
             {

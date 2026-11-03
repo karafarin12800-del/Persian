@@ -37,10 +37,27 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     public static void ApplyToCamera(Camera camera)
     {
         if (camera == null) return;
-        ChooseTierOnce();
-        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 :
-            (CurrentTier == QualityTier.Medium ? 2 : 0);
+        ApplyQualitySettings();
         camera.allowMSAA = CurrentTier != QualityTier.Low;
+    }
+
+    public static void ApplyQualitySettings()
+    {
+        ChooseTierOnce();
+        bool high = CurrentTier == QualityTier.High;
+        bool medium = CurrentTier == QualityTier.Medium;
+
+        QualitySettings.antiAliasing = high ? 4 : (medium ? 2 : 0);
+        QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
+        QualitySettings.masterTextureLimit = 0;
+        QualitySettings.lodBias = high ? 2.0f : (medium ? 1.5f : 1.0f);
+        QualitySettings.pixelLightCount = high ? 4 : (medium ? 2 : 1);
+        QualitySettings.shadows = high ? ShadowQuality.All :
+            (medium ? ShadowQuality.HardOnly : ShadowQuality.Disable);
+        QualitySettings.shadowResolution = high ? ShadowResolution.VeryHigh :
+            (medium ? ShadowResolution.High : ShadowResolution.Low);
+        QualitySettings.shadowCascades = high ? 2 : 1;
+        QualitySettings.shadowDistance = high ? 70f : (medium ? 48f : 0f);
     }
 
     public static void SetTier(QualityTier tier)
@@ -49,8 +66,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         tierChosen = true;
         PlayerPrefs.SetInt(OverrideKey, (int)selectedTier);
         PlayerPrefs.Save();
-        QualitySettings.antiAliasing = selectedTier == QualityTier.High ? 4 :
-            (selectedTier == QualityTier.Medium ? 2 : 0);
+        ApplyQualitySettings();
         Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         for (int i = 0; i < cameras.Length; i++)
             if (cameras[i] != null) cameras[i].allowMSAA = selectedTier != QualityTier.Low;
@@ -184,8 +200,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         // so this tier is the last writer without editing that read-only component.
         yield return null;
         Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
-        QualitySettings.antiAliasing = CurrentTier == QualityTier.High ? 4 :
-            (CurrentTier == QualityTier.Medium ? 2 : 0);
+        ApplyQualitySettings();
         for (int i = 0; i < cameras.Length; i++)
             if (cameras[i] != null) cameras[i].allowMSAA = CurrentTier != QualityTier.Low;
     }

@@ -348,6 +348,7 @@ namespace PersiaWar.Unity2D5D
 
         private void ConfigureLighting()
         {
+            GraphicsQualityProfile.ApplyQualitySettings();
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.24f, 0.27f, 0.30f);
             RenderSettings.fog = false;
@@ -365,9 +366,11 @@ namespace PersiaWar.Unity2D5D
             sun.intensity = 1.15f;
             sun.color = new Color(1f, 0.93f, 0.82f);
 #if UNITY_ANDROID
-            sun.shadows = stageTwoRequested ? LightShadows.Hard : LightShadows.None;
-            sun.shadowStrength = stageTwoRequested ? 0.72f : 0f;
-            QualitySettings.shadowDistance = stageTwoRequested ? 72f : 0f;
+            sun.shadows = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High
+                ? LightShadows.Soft
+                : (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.Medium
+                    ? LightShadows.Hard : LightShadows.None);
+            sun.shadowStrength = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High ? 0.82f : 0.68f;
 #else
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.78f;

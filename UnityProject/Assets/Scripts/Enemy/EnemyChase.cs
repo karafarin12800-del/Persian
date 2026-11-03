@@ -44,9 +44,6 @@ namespace PersiaWar.Unity2D5D
         private Transform weaponVisualRoot;
         private static Material enemyRifleReceiverMaterial;
         private static Material enemyRifleMetalMaterial;
-        private static Material enemyRangeRingMaterial;
-        private LineRenderer rangeRing;
-        private const int RangeRingSegments = 48;
         private const int NavigationGridMaxSide = 40;
         private const int NavigationCellCapacity = NavigationGridMaxSide * NavigationGridMaxSide;
         private const int MaxNavigationWaypoints = 96;
@@ -117,56 +114,15 @@ namespace PersiaWar.Unity2D5D
 
             EnsureLibraryCharacterVisual();
             EnsureEnemyWeaponVisual();
-            EnsureEnemyRangeIndicator();
+            RemoveLegacyEnemyRangeIndicator();
         }
 
-        private void EnsureEnemyRangeIndicator()
+        private void RemoveLegacyEnemyRangeIndicator()
         {
-            if (rangeRing != null)
-                return;
-
-            GameObject indicator = new GameObject("EnemyWeaponRangeIndicator");
-            indicator.transform.SetParent(transform, false);
-            rangeRing = indicator.AddComponent<LineRenderer>();
-            rangeRing.useWorldSpace = true;
-            rangeRing.loop = true;
-            rangeRing.positionCount = RangeRingSegments;
-            rangeRing.widthMultiplier = 0.045f;
-            rangeRing.numCornerVertices = 1;
-            rangeRing.numCapVertices = 0;
-            rangeRing.alignment = LineAlignment.View;
-            rangeRing.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            rangeRing.receiveShadows = false;
-
-            if (enemyRangeRingMaterial == null)
-                enemyRangeRingMaterial = RuntimeMaterialFactory.Create(
-                    "EnemyWeaponRangeRingRed", new Color(1f, 0.18f, 0.12f, 0.82f));
-
-            rangeRing.sharedMaterial = enemyRangeRingMaterial;
-            rangeRing.startColor = new Color(1f, 0.18f, 0.12f, 0.82f);
-            rangeRing.endColor = new Color(1f, 0.18f, 0.12f, 0.82f);
-            rangeRing.enabled = true;
-            UpdateEnemyRangeIndicator();
-        }
-
-        private void LateUpdate()
-        {
-            UpdateEnemyRangeIndicator();
-            if (libraryCharacterRig != null)
-            {
-                Vector3 current = transform.position;
-                if (!libraryCharacterPositionInitialized)
-                {
-                    libraryCharacterLastPosition = current;
-                    libraryCharacterPositionInitialized = true;
-                }
-                Vector3 delta = current - libraryCharacterLastPosition;
-                delta.y = 0f;
-                float speed = delta.magnitude / Mathf.Max(0.0001f, Time.deltaTime);
-                libraryCharacterRig.moveSpeed01 = Mathf.Clamp01(speed / Mathf.Max(0.1f, moveSpeed));
-                libraryCharacterRig.aiming = target != null && Time.time >= retreatUntil;
-                libraryCharacterLastPosition = current;
-            }
+            // Remove the old 48-segment LineRenderer from any reused/legacy enemy object.
+            Transform legacyIndicator = transform.Find("EnemyWeaponRangeIndicator");
+            if (legacyIndicator != null)
+                Destroy(legacyIndicator.gameObject);
         }
 
         private void EnsureLibraryCharacterVisual()
@@ -187,28 +143,6 @@ namespace PersiaWar.Unity2D5D
             if (visual != null)
                 visual.gameObject.SetActive(false);
             libraryCharacterPositionInitialized = false;
-        }
-
-        private void UpdateEnemyRangeIndicator()
-        {
-            if (rangeRing == null)
-                return;
-
-            rangeRing.enabled = isActiveAndEnabled;
-            if (!rangeRing.enabled)
-                return;
-
-            Vector3 center = transform.position;
-            float radius = Mathf.Max(1f, rangedRange);
-            const float groundY = 0.10f;
-            for (int i = 0; i < RangeRingSegments; i++)
-            {
-                float angle = i / (float)RangeRingSegments * Mathf.PI * 2f;
-                rangeRing.SetPosition(i, new Vector3(
-                    center.x + Mathf.Cos(angle) * radius,
-                    groundY,
-                    center.z + Mathf.Sin(angle) * radius));
-            }
         }
 
         private void EnsureEnemyWeaponVisual()
