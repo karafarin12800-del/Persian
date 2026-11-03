@@ -45,6 +45,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private bool worldBuilt;
     private bool liteWorldVariant;
     private bool groundAliensSpawned;
+    private bool lowerGroundChasesActivated;
     private bool introStarted;
     private Vector3 savedCameraPosition;
     private Quaternion savedCameraRotation;
@@ -353,6 +354,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         if (IsIntroCinematic)
             return;
 
+        ActivateLowerGroundChases();
         UpdateUpperGuardPatrols();
         UpdateHovercraftShooting();
         UpdateStationaryGuardShooting();
@@ -1201,7 +1203,27 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             return;
 
         alien.Chase.SetTarget(localPlayer.transform);
-        alien.Chase.enabled = true;
+        alien.Chase.enabled = false;
+    }
+
+    private void ActivateLowerGroundChases()
+    {
+        if (lowerGroundChasesActivated || IsIntroCinematic || localPlayer == null)
+            return;
+
+        for (int i = 0; i < groundAliens.Count; i++)
+        {
+            GroundAlien alien = groundAliens[i];
+            if (alien == null || alien.UpperPatrol || alien.Chase == null ||
+                alien.Health == null || alien.Health.CurrentHealth <= 0)
+                continue;
+
+            alien.Chase.SetTarget(localPlayer.transform);
+            alien.Chase.enabled = true;
+        }
+
+        lowerGroundChasesActivated = true;
+        StartupCheckpoint.Set("StageThreeLowerGroundAliensActivatedAfterIntro");
     }
 
     private void SpawnGroundAlien(int index, Vector3 position, bool guard)
@@ -1884,6 +1906,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         IsIntroCinematic = false;
         liftSequenceStarted = false;
         groundAliensSpawned = false;
+        lowerGroundChasesActivated = false;
         introStarted = false;
         beamColumn = null;
         beamCoreColumn = null;

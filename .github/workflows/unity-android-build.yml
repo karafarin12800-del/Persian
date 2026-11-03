@@ -165,6 +165,7 @@ jobs:
           stage3_builder = Path('UnityProject/Assets/Scripts/World/StageThreeWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'BuildAlienCreatureDetails(' not in stage3_builder and 'chase.Configure(localPlayer != null ? localPlayer.transform : null, archetype);' in stage3_builder, 'Stage 3 alien spawns must use complete shared models without duplicate primitive bodies.'
           assert 'ActivateGroundAlienChase(groundAliens[groundAliens.Count - 1]);' in stage3_builder and 'alien.Chase.enabled = true;' in stage3_builder, 'All lower Stage 3 ground aliens must actively move and pursue the player.'
+          assert 'ActivateLowerGroundChases();' in stage3_builder and 'StageThreeLowerGroundAliensActivatedAfterIntro' in stage3_builder, 'Stage 3 must hold lower enemy AI until the arrival cinematic finishes.'
           assert 'if (!alien.UpperPatrol || alien.Root == null' in stage3_builder, 'Stage 3 lower sentries must not remain in the stationary scripted firing loop.'
           assert 'RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;' in stage3_builder and 'EnvironmentLightingProfile.AddFillLights(worldRoot, false);' in stage3_builder, 'Stage 3 must use brighter ambient and fill lighting.'
           assert 'renderer.receiveShadows = shadowsEnabled && !lightOnly;' in stage3_builder, 'Stage 3 architecture must receive shadows.'
