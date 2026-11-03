@@ -164,7 +164,9 @@ namespace PersiaWar.Unity2D5D
             GameObject root = new GameObject("PW_Character_" + style);
             if (parent != null) root.transform.SetParent(parent, false);
             root.transform.localPosition = localPosition;
-            float s = scale * (IsAlien(style) ? 1.08f : 1f);
+            // Slightly larger alien cranial and carapace silhouettes remain readable
+            // at the Android isometric camera distance without changing the hero scale.
+            float s = scale * (IsAlien(style) ? 1.14f : 1f);
             root.transform.localScale = new Vector3(s, s, s);
 
             Transform torso = MakePart(root.transform, "Torso", new Vector3(0f, HipHeight, 0f), GetMesh(style, Part.Torso), castCharacterShadows, receiveCharacterShadows);
@@ -367,31 +369,41 @@ namespace PersiaWar.Unity2D5D
                         MeshKit.AlongY, true, true);
                     break;
                 case CharacterStyle.AlienScout:
-                    k.AddEllipsoid(new Vector3(0f, 0.08f, 0f), new Vector3(0.13f, 0.13f, 0.10f), 8, 5, AlienTealDark, Quaternion.identity);
-                    k.AddEllipsoid(new Vector3(0f, 0.34f, -0.01f), new Vector3(0.19f, 0.29f, 0.14f), 10, 7, AlienTeal, Quaternion.identity);
-                    k.AddBox(new Vector3(0f, 0.35f, 0.13f), new Vector3(0.24f, 0.29f, 0.055f), AlienTealDark);
-                    k.AddTaper(new Vector3(-0.20f, 0.48f, -0.01f), new Vector2(0.07f, 0.08f), new Vector2(0.015f, 0.02f), 0.30f, AlienTealDark, Quaternion.Euler(0f, 0f, 20f));
-                    k.AddTaper(new Vector3(0.20f, 0.48f, -0.01f), new Vector2(0.07f, 0.08f), new Vector2(0.015f, 0.02f), 0.30f, AlienTealDark, Quaternion.Euler(0f, 0f, -20f));
-                    k.AddEllipsoid(new Vector3(0f, 0.12f, -0.15f), new Vector3(0.14f, 0.16f, 0.10f), 8, 5, AlienTealDark, Quaternion.identity);
+                    // Insectoid scout carapace: narrow abdomen, oval chest shell,
+                    // outward shoulder blades and a raised dorsal ridge.
+                    k.AddEllipsoid(new Vector3(0f, 0.08f, 0f), new Vector3(0.12f, 0.14f, 0.11f), 8, 5, AlienTealDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.34f, -0.015f), new Vector3(0.22f, 0.30f, 0.17f), 12, 8, AlienTeal, Quaternion.identity);
+                    k.AddTaper(new Vector3(0f, 0.36f, 0.14f), new Vector2(0.31f, 0.30f), new Vector2(0.18f, 0.20f), 0.07f, AlienTealDark, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.14f, 0.12f), new Vector3(0.28f, 0.07f, 0.06f), AlienTealDark);
+                    k.AddEllipsoid(new Vector3(-0.25f, 0.47f, 0f), new Vector3(0.13f, 0.20f, 0.15f), 8, 6, AlienTealDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0.25f, 0.47f, 0f), new Vector3(0.13f, 0.20f, 0.15f), 8, 6, AlienTealDark, Quaternion.identity);
+                    k.AddTaper(new Vector3(-0.24f, 0.58f, -0.01f), new Vector2(0.08f, 0.10f), new Vector2(0.01f, 0.01f), 0.29f, AlienTeal, Quaternion.Euler(0f, 0f, 34f));
+                    k.AddTaper(new Vector3(0.24f, 0.58f, -0.01f), new Vector2(0.08f, 0.10f), new Vector2(0.01f, 0.01f), 0.29f, AlienTeal, Quaternion.Euler(0f, 0f, -34f));
+                    k.AddTaper(new Vector3(0f, 0.50f, -0.15f), new Vector2(0.08f, 0.08f), new Vector2(0.01f, 0.01f), 0.25f, AlienTealDark, Quaternion.Euler(32f, 0f, 0f));
                     break;
                 case CharacterStyle.AlienBrute:
+                    // Wide armored thorax, side carapace plates and pronounced back spines.
                     k.AddEllipsoid(new Vector3(0f, 0.07f, 0f), new Vector3(0.18f, 0.14f, 0.13f), 9, 5, AlienVioletDark, Quaternion.identity);
-                    k.AddEllipsoid(new Vector3(0f, 0.34f, 0f), new Vector3(0.25f, 0.30f, 0.17f), 10, 7, AlienViolet, Quaternion.identity);
-                    k.AddBox(new Vector3(0f, 0.35f, 0.16f), new Vector3(0.38f, 0.32f, 0.07f), AlienVioletDark);
-                    k.AddBox(new Vector3(0f, 0.18f, 0.18f), new Vector3(0.26f, 0.10f, 0.07f), Steel);
-                    k.AddEllipsoid(new Vector3(-0.26f, 0.47f, 0f), new Vector3(0.15f, 0.20f, 0.16f), 8, 6, AlienVioletDark, Quaternion.identity);
-                    k.AddEllipsoid(new Vector3(0.26f, 0.47f, 0f), new Vector3(0.15f, 0.20f, 0.16f), 8, 6, AlienVioletDark, Quaternion.identity);
-                    k.AddTaper(new Vector3(-0.24f, 0.59f, -0.02f), new Vector2(0.10f, 0.12f), new Vector2(0.02f, 0.02f), 0.26f, AlienViolet, Quaternion.Euler(0f, 0f, 35f));
-                    k.AddTaper(new Vector3(0.24f, 0.59f, -0.02f), new Vector2(0.10f, 0.12f), new Vector2(0.02f, 0.02f), 0.26f, AlienViolet, Quaternion.Euler(0f, 0f, -35f));
+                    k.AddEllipsoid(new Vector3(0f, 0.34f, -0.01f), new Vector3(0.31f, 0.31f, 0.19f), 12, 8, AlienViolet, Quaternion.identity);
+                    k.AddTaper(new Vector3(0f, 0.35f, 0.16f), new Vector2(0.47f, 0.35f), new Vector2(0.28f, 0.22f), 0.09f, AlienVioletDark, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.16f, 0.20f), new Vector3(0.34f, 0.11f, 0.07f), Steel);
+                    k.AddEllipsoid(new Vector3(-0.31f, 0.48f, 0f), new Vector3(0.19f, 0.22f, 0.17f), 8, 6, AlienVioletDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0.31f, 0.48f, 0f), new Vector3(0.19f, 0.22f, 0.17f), 8, 6, AlienVioletDark, Quaternion.identity);
+                    k.AddTaper(new Vector3(-0.30f, 0.62f, -0.01f), new Vector2(0.13f, 0.14f), new Vector2(0.02f, 0.02f), 0.31f, AlienViolet, Quaternion.Euler(0f, 0f, 37f));
+                    k.AddTaper(new Vector3(0.30f, 0.62f, -0.01f), new Vector2(0.13f, 0.14f), new Vector2(0.02f, 0.02f), 0.31f, AlienViolet, Quaternion.Euler(0f, 0f, -37f));
+                    k.AddTaper(new Vector3(0f, 0.53f, -0.17f), new Vector2(0.13f, 0.12f), new Vector2(0.02f, 0.02f), 0.28f, AlienVioletDark, Quaternion.Euler(30f, 0f, 0f));
                     break;
                 case CharacterStyle.AlienHunter:
+                    // Lean hunter shell with a swept tail ridge and asymmetric side fins.
                     k.AddEllipsoid(new Vector3(0f, 0.06f, 0f), new Vector3(0.13f, 0.12f, 0.10f), 8, 5, AlienOliveDark, Quaternion.identity);
-                    k.AddEllipsoid(new Vector3(0f, 0.34f, -0.015f), new Vector3(0.17f, 0.27f, 0.13f), 9, 7, AlienOlive, Quaternion.identity);
-                    k.AddBox(new Vector3(0f, 0.34f, 0.13f), new Vector3(0.31f, 0.27f, 0.055f), AlienOliveDark);
-                    k.AddBox(new Vector3(0f, 0.16f, 0.15f), new Vector3(0.22f, 0.07f, 0.05f), Gold);
-                    k.AddEllipsoid(new Vector3(0f, 0.09f, -0.15f), new Vector3(0.14f, 0.16f, 0.10f), 8, 5, AlienOliveDark, Quaternion.identity);
-                    k.AddTaper(new Vector3(-0.15f, 0.52f, -0.02f), new Vector2(0.07f, 0.09f), new Vector2(0.01f, 0.01f), 0.25f, AlienOliveDark, Quaternion.Euler(0f, 0f, 18f));
-                    k.AddTaper(new Vector3(0.15f, 0.52f, -0.02f), new Vector2(0.07f, 0.09f), new Vector2(0.01f, 0.01f), 0.25f, AlienOliveDark, Quaternion.Euler(0f, 0f, -18f));
+                    k.AddEllipsoid(new Vector3(0f, 0.34f, -0.02f), new Vector3(0.22f, 0.29f, 0.15f), 10, 7, AlienOlive, Quaternion.identity);
+                    k.AddTaper(new Vector3(0f, 0.34f, 0.14f), new Vector2(0.32f, 0.29f), new Vector2(0.19f, 0.18f), 0.06f, AlienOliveDark, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.16f, 0.17f), new Vector3(0.25f, 0.08f, 0.06f), Gold);
+                    k.AddEllipsoid(new Vector3(-0.24f, 0.45f, -0.02f), new Vector3(0.12f, 0.16f, 0.14f), 8, 6, AlienOliveDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0.24f, 0.45f, -0.02f), new Vector3(0.12f, 0.16f, 0.14f), 8, 6, AlienOliveDark, Quaternion.identity);
+                    k.AddTaper(new Vector3(-0.20f, 0.56f, -0.03f), new Vector2(0.07f, 0.10f), new Vector2(0.01f, 0.01f), 0.32f, AlienOlive, Quaternion.Euler(0f, 0f, 28f));
+                    k.AddTaper(new Vector3(0.20f, 0.56f, -0.03f), new Vector2(0.07f, 0.10f), new Vector2(0.01f, 0.01f), 0.32f, AlienOlive, Quaternion.Euler(0f, 0f, -28f));
+                    k.AddTaper(new Vector3(0f, 0.45f, -0.18f), new Vector2(0.07f, 0.08f), new Vector2(0.01f, 0.01f), 0.32f, AlienOliveDark, Quaternion.Euler(30f, 0f, 0f));
                     break;
                 case CharacterStyle.StageTwoAlienScout:
                     k.AddEllipsoid(new Vector3(0f, 0.07f, 0f), new Vector3(0.13f, 0.13f, 0.10f), 8, 5, StageTwoGreenDark, Quaternion.identity);
@@ -517,32 +529,47 @@ namespace PersiaWar.Unity2D5D
                         new Vector2(0.04f, 0.025f), 0.17f, Gold, Quaternion.identity);
                     break;
                 case CharacterStyle.AlienScout:
+                    // A broad, leaf-shaped cranial shell with three sensory eyes and
+                    // paired antennae; deliberately avoids a human face/helmet silhouette.
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.035f, 0.10f, 8, AlienTealDark, MeshKit.AlongY);
-                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.17f, 0.22f, 0.16f), 10, 7, AlienTeal, Quaternion.identity);
-                    k.AddEllipsoid(new Vector3(-0.07f, 0.20f, 0.13f), new Vector3(0.043f, 0.075f, 0.035f), 8, 5, EyeDark, Quaternion.identity);
-                    k.AddEllipsoid(new Vector3(0.07f, 0.20f, 0.13f), new Vector3(0.043f, 0.075f, 0.035f), 8, 5, EyeDark, Quaternion.identity);
-                    k.AddSphere(new Vector3(-0.07f, 0.20f, 0.16f), 0.018f, 6, 4, AlienEyeCyan);
-                    k.AddSphere(new Vector3(0.07f, 0.20f, 0.16f), 0.018f, 6, 4, AlienEyeCyan);
-                    k.AddTaper(new Vector3(0f, 0.40f, -0.02f), new Vector2(0.07f, 0.06f), new Vector2(0.01f, 0.01f), 0.18f, AlienTealDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.01f), new Vector3(0.23f, 0.27f, 0.18f), 12, 8, AlienTeal, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.16f, 0.16f), new Vector3(0.27f, 0.12f, 0.055f), 10, 6, AlienTealDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(-0.12f, 0.23f, 0.18f), new Vector3(0.055f, 0.085f, 0.035f), 8, 5, EyeDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0.12f, 0.23f, 0.18f), new Vector3(0.055f, 0.085f, 0.035f), 8, 5, EyeDark, Quaternion.identity);
+                    k.AddSphere(new Vector3(-0.12f, 0.23f, 0.21f), 0.024f, 6, 4, AlienEyeCyan);
+                    k.AddSphere(new Vector3(0.12f, 0.23f, 0.21f), 0.024f, 6, 4, AlienEyeCyan);
+                    k.AddSphere(new Vector3(0f, 0.15f, 0.215f), 0.025f, 6, 4, AlienEyeCyan);
+                    k.AddTaper(new Vector3(-0.16f, 0.43f, -0.02f), new Vector2(0.07f, 0.07f), new Vector2(0.012f, 0.012f), 0.30f, AlienTealDark, Quaternion.Euler(0f, 0f, 18f));
+                    k.AddTaper(new Vector3(0.16f, 0.43f, -0.02f), new Vector2(0.07f, 0.07f), new Vector2(0.012f, 0.012f), 0.30f, AlienTealDark, Quaternion.Euler(0f, 0f, -18f));
+                    k.AddTaper(new Vector3(0f, 0.48f, -0.08f), new Vector2(0.08f, 0.06f), new Vector2(0.012f, 0.01f), 0.28f, AlienTeal, Quaternion.identity);
                     break;
                 case CharacterStyle.AlienBrute:
+                    // The brute has a flattened armored head, a heavy mandible and
+                    // a three-eye cluster rather than a human jaw and two-eye face.
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.05f, 0.11f, 8, AlienVioletDark, MeshKit.AlongY);
-                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.19f, 0.20f, 0.17f), 10, 7, AlienViolet, Quaternion.identity);
-                    k.AddBox(new Vector3(0f, 0.13f, 0.14f), new Vector3(0.28f, 0.10f, 0.08f), AlienVioletDark);
-                    k.AddEllipsoid(new Vector3(-0.08f, 0.20f, 0.15f), new Vector3(0.05f, 0.07f, 0.04f), 8, 5, EyeDark, Quaternion.identity);
-                    k.AddEllipsoid(new Vector3(0.08f, 0.20f, 0.15f), new Vector3(0.05f, 0.07f, 0.04f), 8, 5, EyeDark, Quaternion.identity);
-                    k.AddSphere(new Vector3(-0.08f, 0.20f, 0.18f), 0.02f, 6, 4, AlienEyeGreen);
-                    k.AddSphere(new Vector3(0.08f, 0.20f, 0.18f), 0.02f, 6, 4, AlienEyeGreen);
-                    k.AddTaper(new Vector3(-0.13f, 0.35f, -0.01f), new Vector2(0.08f, 0.08f), new Vector2(0.01f, 0.01f), 0.18f, AlienVioletDark, Quaternion.Euler(0f, 0f, 35f));
-                    k.AddTaper(new Vector3(0.13f, 0.35f, -0.01f), new Vector2(0.08f, 0.08f), new Vector2(0.01f, 0.01f), 0.18f, AlienVioletDark, Quaternion.Euler(0f, 0f, -35f));
+                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.01f), new Vector3(0.27f, 0.24f, 0.20f), 12, 8, AlienViolet, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.12f, 0.17f), new Vector3(0.34f, 0.13f, 0.09f), AlienVioletDark);
+                    k.AddEllipsoid(new Vector3(-0.12f, 0.24f, 0.18f), new Vector3(0.065f, 0.085f, 0.04f), 8, 5, EyeDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0.12f, 0.24f, 0.18f), new Vector3(0.065f, 0.085f, 0.04f), 8, 5, EyeDark, Quaternion.identity);
+                    k.AddSphere(new Vector3(-0.12f, 0.24f, 0.215f), 0.026f, 6, 4, AlienEyeGreen);
+                    k.AddSphere(new Vector3(0.12f, 0.24f, 0.215f), 0.026f, 6, 4, AlienEyeGreen);
+                    k.AddSphere(new Vector3(0f, 0.14f, 0.225f), 0.03f, 6, 4, AlienEyeGreen);
+                    k.AddTaper(new Vector3(-0.19f, 0.39f, -0.01f), new Vector2(0.11f, 0.12f), new Vector2(0.02f, 0.02f), 0.28f, AlienVioletDark, Quaternion.Euler(0f, 0f, 34f));
+                    k.AddTaper(new Vector3(0.19f, 0.39f, -0.01f), new Vector2(0.11f, 0.12f), new Vector2(0.02f, 0.02f), 0.28f, AlienVioletDark, Quaternion.Euler(0f, 0f, -34f));
+                    k.AddTaper(new Vector3(0f, 0.45f, -0.10f), new Vector2(0.11f, 0.10f), new Vector2(0.015f, 0.015f), 0.23f, AlienViolet, Quaternion.identity);
                     break;
                 case CharacterStyle.AlienHunter:
+                    // The hunter's narrow wedge skull has a vertical amber eye,
+                    // swept-back horns and a projecting sensory ridge.
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.03f, 0.09f, 8, AlienOliveDark, MeshKit.AlongY);
-                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.15f, 0.20f, 0.15f), 10, 7, AlienOlive, Quaternion.identity);
-                    k.AddBox(new Vector3(0f, 0.17f, 0.14f), new Vector3(0.23f, 0.08f, 0.07f), AlienOliveDark);
-                    k.AddSphere(new Vector3(0f, 0.20f, 0.18f), 0.026f, 6, 4, AlienEyeAmber);
-                    k.AddTaper(new Vector3(-0.12f, 0.32f, -0.02f), new Vector2(0.07f, 0.08f), new Vector2(0.01f, 0.01f), 0.20f, AlienOliveDark, Quaternion.Euler(0f, 0f, 26f));
-                    k.AddTaper(new Vector3(0.12f, 0.32f, -0.02f), new Vector2(0.07f, 0.08f), new Vector2(0.01f, 0.01f), 0.20f, AlienOliveDark, Quaternion.Euler(0f, 0f, -26f));
+                    k.AddEllipsoid(new Vector3(0f, 0.23f, 0.015f), new Vector3(0.19f, 0.26f, 0.17f), 10, 7, AlienOlive, Quaternion.identity);
+                    k.AddTaper(new Vector3(0f, 0.19f, 0.15f), new Vector2(0.18f, 0.18f), new Vector2(0.04f, 0.05f), 0.12f, AlienOliveDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.23f, 0.21f), new Vector3(0.07f, 0.10f, 0.04f), 8, 5, EyeDark, Quaternion.identity);
+                    k.AddSphere(new Vector3(0f, 0.23f, 0.245f), 0.038f, 7, 5, AlienEyeAmber);
+                    k.AddSphere(new Vector3(-0.105f, 0.27f, 0.18f), 0.022f, 6, 4, AlienEyeAmber);
+                    k.AddSphere(new Vector3(0.105f, 0.27f, 0.18f), 0.022f, 6, 4, AlienEyeAmber);
+                    k.AddTaper(new Vector3(-0.14f, 0.37f, -0.08f), new Vector2(0.09f, 0.09f), new Vector2(0.01f, 0.01f), 0.34f, AlienOliveDark, Quaternion.Euler(0f, 0f, 31f));
+                    k.AddTaper(new Vector3(0.14f, 0.37f, -0.08f), new Vector2(0.09f, 0.09f), new Vector2(0.01f, 0.01f), 0.34f, AlienOliveDark, Quaternion.Euler(0f, 0f, -31f));
                     break;
                 case CharacterStyle.StageTwoAlienScout:
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.035f, 0.10f, 8, StageTwoGreenDark, MeshKit.AlongY);
@@ -645,20 +672,30 @@ namespace PersiaWar.Unity2D5D
                     k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.06f, 7, 5, SkinDark);
                     break;
                 case CharacterStyle.AlienScout:
-                    k.AddBox(new Vector3(0f, -0.20f, 0f), new Vector3(0.075f, 0.40f, 0.075f), AlienTeal);
-                    k.AddBox(new Vector3(0f, -0.48f, 0.02f), new Vector3(0.07f, 0.25f, 0.07f), AlienTealDark);
-                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.05f, 6, 4, AlienEyeCyan);
+                    // Long segmented forearms end in two visible talons instead of hands.
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.075f, 0.44f, 0.075f), AlienTeal);
+                    k.AddBox(new Vector3(0f, -0.48f, 0.02f), new Vector3(0.065f, 0.26f, 0.065f), AlienTealDark);
+                    k.AddTaper(new Vector3(-0.045f, -0.63f, 0.08f), new Vector2(0.045f, 0.045f), new Vector2(0.008f, 0.008f), 0.18f, AlienTeal, Quaternion.Euler(0f, 0f, 18f));
+                    k.AddTaper(new Vector3(0.045f, -0.63f, 0.08f), new Vector2(0.045f, 0.045f), new Vector2(0.008f, 0.008f), 0.18f, AlienTeal, Quaternion.Euler(0f, 0f, -18f));
+                    k.AddSphere(new Vector3(0f, -0.58f, 0.02f), 0.025f, 6, 4, AlienEyeCyan);
                     break;
                 case CharacterStyle.AlienBrute:
-                    k.AddBox(new Vector3(0f, -0.20f, 0f), new Vector3(0.11f, 0.40f, 0.11f), AlienViolet);
-                    k.AddBox(new Vector3(0f, -0.43f, 0.02f), new Vector3(0.14f, 0.24f, 0.12f), AlienVioletDark);
-                    k.AddCylinder(new Vector3(0f, -0.45f, 0.02f), 0.085f, 0.09f, 0.10f, 8, Steel, MeshKit.AlongY, true, true);
-                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.065f, 7, 5, AlienViolet);
+                    // Heavy plated forearms and twin hooked claws give the brute a
+                    // different silhouette from the narrow scout.
+                    k.AddBox(new Vector3(0f, -0.20f, 0f), new Vector3(0.14f, 0.40f, 0.14f), AlienViolet);
+                    k.AddBox(new Vector3(0f, -0.43f, 0.02f), new Vector3(0.17f, 0.24f, 0.14f), AlienVioletDark);
+                    k.AddCylinder(new Vector3(0f, -0.45f, 0.02f), 0.095f, 0.10f, 0.12f, 8, Steel, MeshKit.AlongY, true, true);
+                    k.AddTaper(new Vector3(-0.065f, -0.61f, 0.04f), new Vector2(0.065f, 0.065f), new Vector2(0.012f, 0.012f), 0.17f, AlienViolet, Quaternion.Euler(0f, 0f, 15f));
+                    k.AddTaper(new Vector3(0.065f, -0.61f, 0.04f), new Vector2(0.065f, 0.065f), new Vector2(0.012f, 0.012f), 0.17f, AlienViolet, Quaternion.Euler(0f, 0f, -15f));
                     break;
                 case CharacterStyle.AlienHunter:
-                    k.AddBox(new Vector3(0f, -0.20f, 0f), new Vector3(0.075f, 0.40f, 0.075f), AlienOlive);
-                    k.AddBox(new Vector3(0f, -0.47f, 0.02f), new Vector3(0.065f, 0.26f, 0.065f), AlienOliveDark);
-                    k.AddTaper(new Vector3(0f, -0.60f, 0.02f), new Vector2(0.07f, 0.07f), new Vector2(0.025f, 0.02f), 0.10f, AlienEyeAmber, Quaternion.identity);
+                    // The hunter carries elongated scythe-like forearm fins and a
+                    // small amber sensory node; no glove-shaped human hand.
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.075f, 0.44f, 0.075f), AlienOlive);
+                    k.AddBox(new Vector3(0f, -0.47f, 0.02f), new Vector3(0.065f, 0.27f, 0.065f), AlienOliveDark);
+                    k.AddTaper(new Vector3(0f, -0.61f, 0.05f), new Vector2(0.06f, 0.08f), new Vector2(0.01f, 0.01f), 0.22f, AlienOlive, Quaternion.identity);
+                    k.AddTaper(new Vector3(-0.07f, -0.58f, 0.02f), new Vector2(0.035f, 0.05f), new Vector2(0.006f, 0.006f), 0.15f, AlienOliveDark, Quaternion.Euler(0f, 0f, 20f));
+                    k.AddSphere(new Vector3(0f, -0.56f, 0.13f), 0.022f, 6, 4, AlienEyeAmber);
                     break;
                 case CharacterStyle.StageTwoAlienScout:
                     k.AddBox(new Vector3(0f, -0.21f, 0f), new Vector3(0.075f, 0.42f, 0.075f), StageTwoGreenScout);
@@ -735,22 +772,27 @@ namespace PersiaWar.Unity2D5D
                     k.AddBox(new Vector3(0f, -0.83f, 0.07f), new Vector3(0.18f, 0.12f, 0.28f), BootBlack);
                     break;
                 case CharacterStyle.AlienScout:
-                    k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.105f, 0.50f, 0.11f), AlienTeal);
-                    k.AddBox(new Vector3(0f, -0.49f, 0.04f), new Vector3(0.13f, 0.12f, 0.04f), AlienTealDark);
-                    k.AddBox(new Vector3(0f, -0.65f, 0f), new Vector3(0.08f, 0.36f, 0.09f), AlienTealDark);
-                    k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.11f, 0.06f, 0.21f), AlienTeal);
+                    // Digitigrade lower legs and split toe claws read as an alien
+                    // stance even in the game's distant angled camera.
+                    k.AddBox(new Vector3(0f, -0.23f, 0f), new Vector3(0.11f, 0.46f, 0.11f), AlienTeal);
+                    k.AddTaper(new Vector3(0f, -0.50f, 0.03f), new Vector2(0.15f, 0.12f), new Vector2(0.08f, 0.08f), 0.14f, AlienTealDark, Quaternion.Euler(-18f, 0f, 0f));
+                    k.AddBox(new Vector3(0f, -0.68f, -0.01f), new Vector3(0.075f, 0.30f, 0.075f), AlienTealDark);
+                    k.AddTaper(new Vector3(-0.045f, -0.86f, 0.12f), new Vector2(0.06f, 0.06f), new Vector2(0.008f, 0.008f), 0.16f, AlienTeal, Quaternion.Euler(90f, 0f, 12f));
+                    k.AddTaper(new Vector3(0.045f, -0.86f, 0.12f), new Vector2(0.06f, 0.06f), new Vector2(0.008f, 0.008f), 0.16f, AlienTeal, Quaternion.Euler(90f, 0f, -12f));
                     break;
                 case CharacterStyle.AlienBrute:
-                    k.AddBox(new Vector3(0f, -0.24f, 0f), new Vector3(0.16f, 0.48f, 0.16f), AlienViolet);
-                    k.AddBox(new Vector3(0f, -0.48f, 0.05f), new Vector3(0.18f, 0.16f, 0.05f), Steel);
-                    k.AddBox(new Vector3(0f, -0.66f, 0f), new Vector3(0.14f, 0.38f, 0.14f), AlienVioletDark);
-                    k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.18f, 0.08f, 0.25f), AlienViolet);
+                    k.AddBox(new Vector3(0f, -0.23f, 0f), new Vector3(0.18f, 0.46f, 0.18f), AlienViolet);
+                    k.AddTaper(new Vector3(0f, -0.49f, 0.05f), new Vector2(0.21f, 0.18f), new Vector2(0.14f, 0.11f), 0.17f, Steel, Quaternion.Euler(-18f, 0f, 0f));
+                    k.AddBox(new Vector3(0f, -0.67f, -0.01f), new Vector3(0.16f, 0.36f, 0.16f), AlienVioletDark);
+                    k.AddBox(new Vector3(0f, -0.85f, 0.04f), new Vector3(0.16f, 0.08f, 0.20f), AlienViolet);
+                    k.AddTaper(new Vector3(-0.07f, -0.86f, 0.15f), new Vector2(0.08f, 0.07f), new Vector2(0.01f, 0.01f), 0.13f, AlienVioletDark, Quaternion.identity);
+                    k.AddTaper(new Vector3(0.07f, -0.86f, 0.15f), new Vector2(0.08f, 0.07f), new Vector2(0.01f, 0.01f), 0.13f, AlienVioletDark, Quaternion.identity);
                     break;
                 case CharacterStyle.AlienHunter:
-                    k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.10f, 0.50f, 0.10f), AlienOlive);
-                    k.AddBox(new Vector3(0f, -0.48f, 0.05f), new Vector3(0.12f, 0.15f, 0.05f), AlienOliveDark);
-                    k.AddBox(new Vector3(0f, -0.66f, 0f), new Vector3(0.075f, 0.38f, 0.08f), AlienOliveDark);
-                    k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.11f, 0.06f, 0.21f), AlienOlive);
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.10f, 0.44f, 0.10f), AlienOlive);
+                    k.AddTaper(new Vector3(0f, -0.48f, 0.05f), new Vector2(0.14f, 0.13f), new Vector2(0.07f, 0.07f), 0.18f, AlienOliveDark, Quaternion.Euler(-22f, 0f, 0f));
+                    k.AddBox(new Vector3(0f, -0.67f, -0.01f), new Vector3(0.065f, 0.37f, 0.07f), AlienOliveDark);
+                    k.AddTaper(new Vector3(0f, -0.86f, 0.12f), new Vector2(0.06f, 0.07f), new Vector2(0.008f, 0.008f), 0.20f, AlienOlive, Quaternion.Euler(90f, 0f, 0f));
                     break;
                 case CharacterStyle.StageTwoAlienScout:
                     k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.10f, 0.50f, 0.10f), StageTwoGreenScout);
