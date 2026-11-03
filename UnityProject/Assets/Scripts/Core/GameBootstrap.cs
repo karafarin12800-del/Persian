@@ -1892,11 +1892,11 @@ namespace PersiaWar.Unity2D5D
                             AddAndroidTerrainFollowingQuad(
                                 vertices, triangles,
                                 new Vector3(centerX, 0f, centerZ + side * offset),
-                                new Vector2(roadWidth * 0.76f, 0.48f), 0.125f);
+                                new Vector2(roadWidth * 0.76f, 0.48f), 0.075f);
                             AddAndroidTerrainFollowingQuad(
                                 vertices, triangles,
                                 new Vector3(centerX + side * offset, 0f, centerZ),
-                                new Vector2(0.48f, roadWidth * 0.76f), 0.126f);
+                                new Vector2(0.48f, roadWidth * 0.76f), 0.076f);
                         }
                     }
                 }
