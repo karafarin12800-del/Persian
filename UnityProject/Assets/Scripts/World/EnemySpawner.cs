@@ -467,8 +467,8 @@ namespace PersiaWar.Unity2D5D
 #endif
             if (stageTwoArena)
             {
-                CreateAlienEye(enemy.transform, new Vector3(-0.15f, 0.24f, 0.39f), "L_" + currentWave + "_" + index);
-                CreateAlienEye(enemy.transform, new Vector3(0.15f, 0.24f, 0.39f), "R_" + currentWave + "_" + index);
+                // The factory-built Stage 2 model already has a complete face and
+                // glowing eyes; do not attach the old floating capsule-eye overlays.
                 EnemiesSpawnedForArena++;
             }
             StartupCheckpoint.Set("AndroidEnemyObjectConstructionComplete");

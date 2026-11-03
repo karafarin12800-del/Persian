@@ -130,6 +130,7 @@ namespace PersiaWar.Unity2D5D
             string objectName = transform.name;
             bool stageThreeAlien = objectName.StartsWith("S3_Alien", System.StringComparison.Ordinal);
             bool stageFourAlien = objectName.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
+            bool stageTwoAlien = objectName.StartsWith("Alien_W", System.StringComparison.Ordinal);
             if (libraryCharacterRig != null) return;
 
             CharacterStyle style;
@@ -138,6 +139,9 @@ namespace PersiaWar.Unity2D5D
             else if (stageThreeAlien)
                 style = archetype == 1 ? CharacterStyle.AlienScout
                     : archetype == 2 ? CharacterStyle.AlienBrute : CharacterStyle.AlienHunter;
+            else if (stageTwoAlien)
+                style = archetype == 1 ? CharacterStyle.StageTwoAlienScout
+                    : archetype == 2 ? CharacterStyle.StageTwoAlienBrute : CharacterStyle.StageTwoAlienElite;
             else
                 style = archetype == 1 ? CharacterStyle.Soldier
                     : archetype == 2 ? CharacterStyle.RoyalScout : CharacterStyle.DesertKnight;
@@ -151,6 +155,14 @@ namespace PersiaWar.Unity2D5D
             libraryCharacterRig = created;
             if (visual != null)
                 visual.gameObject.SetActive(false);
+            if (stageTwoAlien)
+            {
+                // Stage 2's old capsule was only a placeholder body. Keep its
+                // collider/TargetHealth on the root, but hide the placeholder renderer.
+                Renderer placeholderRenderer = GetComponent<Renderer>();
+                if (placeholderRenderer != null)
+                    placeholderRenderer.enabled = false;
+            }
             libraryCharacterPositionInitialized = false;
         }
 

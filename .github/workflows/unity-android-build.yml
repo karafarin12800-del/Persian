@@ -156,6 +156,9 @@ jobs:
           assert 'CharacterStyle.AlienScout' in model_factory and 'CharacterStyle.AlienBrute' in model_factory and 'CharacterStyle.AlienHunter' in model_factory, 'Stage 3 alien archetypes must use distinct detailed models.'
           assert 'bool castCharacterShadows, bool receiveCharacterShadows' in model_factory and 'renderer.receiveShadows = receiveCharacterShadows;' in model_factory, 'Enemy meshes must receive world lighting without adding large-wave shadow casters.'
           assert 'CharacterStyle.Soldier' in enemy_chase and 'CharacterStyle.RoyalScout' in enemy_chase and 'CharacterStyle.DesertKnight' in enemy_chase, 'All human enemy archetypes must use the shared detailed character factory.'
+          assert 'CharacterStyle.StageTwoAlienScout' in enemy_chase and 'CharacterStyle.StageTwoAlienBrute' in enemy_chase and 'CharacterStyle.StageTwoAlienElite' in enemy_chase, 'Stage 2 green aliens must use three detailed factory-built silhouettes.'
+          stage2_spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
+          assert 'CreateAlienEye(enemy.transform' not in stage2_spawner and 'placeholderRenderer.enabled = false;' in enemy_chase, 'Stage 2 must not render old capsule bodies or duplicate floating eye primitives.'
           assert 'libraryCharacterRig.moveSpeed01' in enemy_chase and 'libraryCharacterRig.Kick(1f)' in enemy_chase, 'Factory enemy models must animate while moving and recoil when firing.'
           stage3_builder = Path('UnityProject/Assets/Scripts/World/StageThreeWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'BuildAlienCreatureDetails(' not in stage3_builder and 'chase.Configure(localPlayer != null ? localPlayer.transform : null, archetype);' in stage3_builder, 'Stage 3 alien spawns must use complete shared models without duplicate primitive bodies.'

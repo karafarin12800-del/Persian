@@ -15,7 +15,10 @@ namespace PersiaWar.Unity2D5D
         AlienTrooper = 7,
         AlienScout = 8,
         AlienBrute = 9,
-        AlienHunter = 10
+        AlienHunter = 10,
+        StageTwoAlienScout = 11,
+        StageTwoAlienBrute = 12,
+        StageTwoAlienElite = 13
     }
 
     /// <summary>
@@ -125,6 +128,12 @@ namespace PersiaWar.Unity2D5D
         private static readonly Color32 AlienEyeCyan = MeshKit.C(0.12f, 0.88f, 1f, MeshKit.Glow);
         private static readonly Color32 AlienEyeGreen = MeshKit.C(0.34f, 1f, 0.55f, MeshKit.Glow);
         private static readonly Color32 AlienEyeAmber = MeshKit.C(1f, 0.28f, 0.08f, MeshKit.Glow);
+        // Stage 2 keeps the established bright-green alien palette for all three archetypes.
+        private static readonly Color32 StageTwoGreenScout = MeshKit.C(0.28f, 0.92f, 0.34f, MeshKit.Metal);
+        private static readonly Color32 StageTwoGreenBrute = MeshKit.C(0.18f, 0.78f, 0.25f, MeshKit.Metal);
+        private static readonly Color32 StageTwoGreenElite = MeshKit.C(0.12f, 0.58f, 0.20f, MeshKit.Metal);
+        private static readonly Color32 StageTwoGreenDark = MeshKit.C(0.035f, 0.24f, 0.075f, MeshKit.Plastic);
+        private static readonly Color32 StageTwoEyeGlow = MeshKit.C(0.48f, 1f, 0.28f, MeshKit.Glow);
         private static readonly Color32 Violet = MeshKit.C(0.22f, 0.13f, 0.34f, MeshKit.Metal);
         private static readonly Color32 VioletDark = MeshKit.C(0.12f, 0.07f, 0.20f, MeshKit.Plastic);
         private static readonly Color32 Teal = MeshKit.C(0.20f, 0.95f, 0.85f, MeshKit.Glow);
@@ -134,7 +143,8 @@ namespace PersiaWar.Unity2D5D
         {
             return style == CharacterStyle.Alien || style == CharacterStyle.AlienTrooper ||
                    style == CharacterStyle.AlienScout || style == CharacterStyle.AlienBrute ||
-                   style == CharacterStyle.AlienHunter;
+                   style == CharacterStyle.AlienHunter || style == CharacterStyle.StageTwoAlienScout ||
+                   style == CharacterStyle.StageTwoAlienBrute || style == CharacterStyle.StageTwoAlienElite;
         }
 
         /// <summary>Builds a character under parent. Returns the rig (null if the shader is missing).</summary>
@@ -383,6 +393,29 @@ namespace PersiaWar.Unity2D5D
                     k.AddTaper(new Vector3(-0.15f, 0.52f, -0.02f), new Vector2(0.07f, 0.09f), new Vector2(0.01f, 0.01f), 0.25f, AlienOliveDark, Quaternion.Euler(0f, 0f, 18f));
                     k.AddTaper(new Vector3(0.15f, 0.52f, -0.02f), new Vector2(0.07f, 0.09f), new Vector2(0.01f, 0.01f), 0.25f, AlienOliveDark, Quaternion.Euler(0f, 0f, -18f));
                     break;
+                case CharacterStyle.StageTwoAlienScout:
+                    k.AddEllipsoid(new Vector3(0f, 0.07f, 0f), new Vector3(0.13f, 0.13f, 0.10f), 8, 5, StageTwoGreenDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.34f, 0f), new Vector3(0.18f, 0.28f, 0.13f), 10, 7, StageTwoGreenScout, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.35f, 0.13f), new Vector3(0.24f, 0.27f, 0.045f), StageTwoGreenDark);
+                    k.AddTaper(new Vector3(-0.18f, 0.49f, 0f), new Vector2(0.08f, 0.09f), new Vector2(0.015f, 0.02f), 0.24f, StageTwoGreenScout, Quaternion.Euler(0f, 0f, 22f));
+                    k.AddTaper(new Vector3(0.18f, 0.49f, 0f), new Vector2(0.08f, 0.09f), new Vector2(0.015f, 0.02f), 0.24f, StageTwoGreenScout, Quaternion.Euler(0f, 0f, -22f));
+                    break;
+                case CharacterStyle.StageTwoAlienBrute:
+                    k.AddEllipsoid(new Vector3(0f, 0.08f, 0f), new Vector3(0.18f, 0.14f, 0.13f), 9, 5, StageTwoGreenDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.34f, 0f), new Vector3(0.25f, 0.30f, 0.17f), 10, 7, StageTwoGreenBrute, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.35f, 0.16f), new Vector3(0.38f, 0.31f, 0.07f), StageTwoGreenDark);
+                    k.AddEllipsoid(new Vector3(-0.25f, 0.48f, 0f), new Vector3(0.14f, 0.18f, 0.15f), 8, 6, StageTwoGreenBrute, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0.25f, 0.48f, 0f), new Vector3(0.14f, 0.18f, 0.15f), 8, 6, StageTwoGreenBrute, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.17f, 0.17f), new Vector3(0.26f, 0.11f, 0.05f), StageTwoGreenDark);
+                    break;
+                case CharacterStyle.StageTwoAlienElite:
+                    k.AddEllipsoid(new Vector3(0f, 0.07f, 0f), new Vector3(0.16f, 0.13f, 0.12f), 8, 5, StageTwoGreenDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.34f, 0f), new Vector3(0.20f, 0.28f, 0.15f), 10, 7, StageTwoGreenElite, Quaternion.identity);
+                    k.AddTaper(new Vector3(0f, 0.36f, 0.16f), new Vector2(0.30f, 0.29f), new Vector2(0.20f, 0.22f), 0.055f, StageTwoGreenDark, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.17f, 0.18f), new Vector3(0.28f, 0.12f, 0.06f), StageTwoGreenElite);
+                    k.AddTaper(new Vector3(-0.20f, 0.55f, -0.01f), new Vector2(0.09f, 0.10f), new Vector2(0.01f, 0.015f), 0.25f, StageTwoGreenDark, Quaternion.Euler(0f, 0f, 28f));
+                    k.AddTaper(new Vector3(0.20f, 0.55f, -0.01f), new Vector2(0.09f, 0.10f), new Vector2(0.01f, 0.015f), 0.25f, StageTwoGreenDark, Quaternion.Euler(0f, 0f, -28f));
+                    break;
                 case CharacterStyle.Alien:
                     k.AddEllipsoid(new Vector3(0f, 0.08f, 0f), new Vector3(0.12f, 0.12f, 0.09f), 8, 5, AlienSkinDark,
                         Quaternion.identity);
@@ -511,6 +544,29 @@ namespace PersiaWar.Unity2D5D
                     k.AddTaper(new Vector3(-0.12f, 0.32f, -0.02f), new Vector2(0.07f, 0.08f), new Vector2(0.01f, 0.01f), 0.20f, AlienOliveDark, Quaternion.Euler(0f, 0f, 26f));
                     k.AddTaper(new Vector3(0.12f, 0.32f, -0.02f), new Vector2(0.07f, 0.08f), new Vector2(0.01f, 0.01f), 0.20f, AlienOliveDark, Quaternion.Euler(0f, 0f, -26f));
                     break;
+                case CharacterStyle.StageTwoAlienScout:
+                    k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.035f, 0.10f, 8, StageTwoGreenDark, MeshKit.AlongY);
+                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.15f, 0.20f, 0.14f), 10, 7, StageTwoGreenScout, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(-0.065f, 0.20f, 0.13f), new Vector3(0.04f, 0.07f, 0.03f), 7, 5, EyeDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0.065f, 0.20f, 0.13f), new Vector3(0.04f, 0.07f, 0.03f), 7, 5, EyeDark, Quaternion.identity);
+                    k.AddSphere(new Vector3(-0.065f, 0.20f, 0.16f), 0.018f, 6, 4, StageTwoEyeGlow);
+                    k.AddSphere(new Vector3(0.065f, 0.20f, 0.16f), 0.018f, 6, 4, StageTwoEyeGlow);
+                    k.AddTaper(new Vector3(0f, 0.38f, -0.02f), new Vector2(0.07f, 0.06f), new Vector2(0.01f, 0.01f), 0.16f, StageTwoGreenDark, Quaternion.identity);
+                    break;
+                case CharacterStyle.StageTwoAlienBrute:
+                    k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.05f, 0.11f, 8, StageTwoGreenDark, MeshKit.AlongY);
+                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.18f, 0.20f, 0.16f), 10, 7, StageTwoGreenBrute, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.13f, 0.14f), new Vector3(0.28f, 0.10f, 0.08f), StageTwoGreenDark);
+                    k.AddSphere(new Vector3(-0.08f, 0.20f, 0.17f), 0.019f, 6, 4, StageTwoEyeGlow);
+                    k.AddSphere(new Vector3(0.08f, 0.20f, 0.17f), 0.019f, 6, 4, StageTwoEyeGlow);
+                    break;
+                case CharacterStyle.StageTwoAlienElite:
+                    k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.04f, 0.10f, 8, StageTwoGreenDark, MeshKit.AlongY);
+                    k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.16f, 0.20f, 0.15f), 10, 7, StageTwoGreenElite, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.16f, 0.14f), new Vector3(0.26f, 0.09f, 0.06f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, 0.28f, 0.12f), new Vector3(0.23f, 0.06f, 0.045f), StageTwoEyeGlow);
+                    k.AddTaper(new Vector3(0f, 0.39f, -0.02f), new Vector2(0.09f, 0.07f), new Vector2(0.015f, 0.01f), 0.20f, StageTwoGreenDark, Quaternion.identity);
+                    break;
                 case CharacterStyle.Alien:
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.035f, 0.10f, 8, AlienSkinDark, MeshKit.AlongY);
                     k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.16f, 0.21f, 0.15f), 10, 7, AlienSkin,
@@ -604,6 +660,21 @@ namespace PersiaWar.Unity2D5D
                     k.AddBox(new Vector3(0f, -0.47f, 0.02f), new Vector3(0.065f, 0.26f, 0.065f), AlienOliveDark);
                     k.AddTaper(new Vector3(0f, -0.60f, 0.02f), new Vector2(0.07f, 0.07f), new Vector2(0.025f, 0.02f), 0.10f, AlienEyeAmber, Quaternion.identity);
                     break;
+                case CharacterStyle.StageTwoAlienScout:
+                    k.AddBox(new Vector3(0f, -0.21f, 0f), new Vector3(0.075f, 0.42f, 0.075f), StageTwoGreenScout);
+                    k.AddBox(new Vector3(0f, -0.48f, 0.02f), new Vector3(0.07f, 0.24f, 0.07f), StageTwoGreenDark);
+                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.05f, 6, 4, StageTwoGreenScout);
+                    break;
+                case CharacterStyle.StageTwoAlienBrute:
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.14f, 0.44f, 0.14f), StageTwoGreenBrute);
+                    k.AddBox(new Vector3(0f, -0.48f, 0.02f), new Vector3(0.13f, 0.22f, 0.12f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, -0.62f, 0.02f), new Vector3(0.15f, 0.12f, 0.18f), StageTwoGreenBrute);
+                    break;
+                case CharacterStyle.StageTwoAlienElite:
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.11f, 0.44f, 0.11f), StageTwoGreenElite);
+                    k.AddBox(new Vector3(0f, -0.48f, 0.02f), new Vector3(0.12f, 0.24f, 0.12f), StageTwoGreenDark);
+                    k.AddTaper(new Vector3(0f, -0.61f, 0.02f), new Vector2(0.08f, 0.08f), new Vector2(0.025f, 0.02f), 0.10f, StageTwoEyeGlow, Quaternion.identity);
+                    break;
                 case CharacterStyle.Alien:
                     k.AddBox(new Vector3(0f, -0.20f, 0f), new Vector3(0.07f, 0.40f, 0.07f), AlienSkin);
                     k.AddBox(new Vector3(0f, -0.55f, 0f), new Vector3(0.06f, 0.30f, 0.06f), AlienSkinDark);
@@ -680,6 +751,24 @@ namespace PersiaWar.Unity2D5D
                     k.AddBox(new Vector3(0f, -0.48f, 0.05f), new Vector3(0.12f, 0.15f, 0.05f), AlienOliveDark);
                     k.AddBox(new Vector3(0f, -0.66f, 0f), new Vector3(0.075f, 0.38f, 0.08f), AlienOliveDark);
                     k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.11f, 0.06f, 0.21f), AlienOlive);
+                    break;
+                case CharacterStyle.StageTwoAlienScout:
+                    k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.10f, 0.50f, 0.10f), StageTwoGreenScout);
+                    k.AddBox(new Vector3(0f, -0.49f, 0.04f), new Vector3(0.11f, 0.12f, 0.045f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, -0.66f, 0f), new Vector3(0.075f, 0.38f, 0.08f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.11f, 0.06f, 0.21f), StageTwoGreenScout);
+                    break;
+                case CharacterStyle.StageTwoAlienBrute:
+                    k.AddBox(new Vector3(0f, -0.24f, 0f), new Vector3(0.15f, 0.48f, 0.15f), StageTwoGreenBrute);
+                    k.AddBox(new Vector3(0f, -0.48f, 0.05f), new Vector3(0.17f, 0.16f, 0.05f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, -0.66f, 0f), new Vector3(0.13f, 0.38f, 0.13f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.18f, 0.08f, 0.25f), StageTwoGreenBrute);
+                    break;
+                case CharacterStyle.StageTwoAlienElite:
+                    k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.11f, 0.50f, 0.11f), StageTwoGreenElite);
+                    k.AddBox(new Vector3(0f, -0.48f, 0.05f), new Vector3(0.13f, 0.15f, 0.05f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, -0.66f, 0f), new Vector3(0.095f, 0.38f, 0.10f), StageTwoGreenDark);
+                    k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.14f, 0.07f, 0.22f), StageTwoGreenElite);
                     break;
                 case CharacterStyle.Alien:
                     k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.10f, 0.50f, 0.10f), AlienSkin);
