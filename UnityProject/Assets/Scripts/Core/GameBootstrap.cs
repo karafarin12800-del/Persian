@@ -1795,40 +1795,114 @@ namespace PersiaWar.Unity2D5D
             Material curb = MakeMaterial("AndroidCurb", new Color(0.78f, 0.74f, 0.65f));
             float half = worldSize * 0.5f;
 
-            List<Vector3> verticalVertices = new List<Vector3>(1024);
-            List<int> verticalTriangles = new List<int>(1536);
-            List<Vector3> horizontalVertices = new List<Vector3>(1024);
-            List<int> horizontalTriangles = new List<int>(1536);
+            // Keep mobile road markings above the pavement with enough screen-space
+            // coverage to avoid thin, rapidly flickering sub-pixel dashes during camera motion.
+            const float dashWidth = 0.42f;
+            const float dashLength = 3.4f;
+            const float dashSpacing = 12f;
+            const float laneMarkHeight = 0.090f;
+
+            List<Vector3> verticalVertices = new List<Vector3>(768);
+            List<int> verticalTriangles = new List<int>(1152);
+            List<Vector3> horizontalVertices = new List<Vector3>(768);
+            List<int> horizontalTriangles = new List<int>(1152);
             List<Vector3> curbVertices = new List<Vector3>(256);
             List<int> curbTriangles = new List<int>(384);
 
-            for (float x = -half + 5f; x < half; x += 10f)
+            for (float x = -half + dashSpacing * 0.5f; x < half; x += dashSpacing)
             {
                 for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
+                {
+                    if (IsInsideAndroidCrosswalkExclusion(x, z))
+                        continue;
                     AddAndroidTerrainFollowingQuad(verticalVertices, verticalTriangles,
-                        new Vector3(x, 0f, z), new Vector2(0.28f, 4.2f), 0.075f);
+                        new Vector3(x, 0f, z), new Vector2(dashWidth, dashLength), laneMarkHeight);
+                }
             }
 
-            for (float z = -half + 5f; z < half; z += 10f)
+            for (float z = -half + dashSpacing * 0.5f; z < half; z += dashSpacing)
             {
                 for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+                {
+                    if (IsInsideAndroidCrosswalkExclusion(x, z))
+                        continue;
                     AddAndroidTerrainFollowingQuad(horizontalVertices, horizontalTriangles,
-                        new Vector3(x, 0f, z), new Vector2(4.2f, 0.28f), 0.075f);
+                        new Vector3(x, 0f, z), new Vector2(dashLength, dashWidth), laneMarkHeight);
+                }
             }
 
+            // Curb edges are widened slightly so they remain stable at oblique mobile
+            // camera angles instead of collapsing into a one-pixel shimmer.
+            const float curbWidth = 0.14f;
             for (float roadCenter = -half + roadWidth * 0.5f; roadCenter <= half; roadCenter += 24f)
             {
                 AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
                     new Vector3(roadCenter - roadWidth * 0.5f, 0f, 0f),
-                    new Vector2(0.08f, worldSize), 0.055f);
+                    new Vector2(curbWidth, worldSize), 0.065f);
                 AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
                     new Vector3(roadCenter + roadWidth * 0.5f, 0f, 0f),
-                    new Vector2(0.08f, worldSize), 0.055f);
+                    new Vector2(curbWidth, worldSize), 0.065f);
             }
 
             CreateAndroidQuadBatch("AndroidLaneDashV", verticalVertices, verticalTriangles, lane);
             CreateAndroidQuadBatch("AndroidLaneDashH", horizontalVertices, horizontalTriangles, lane);
             CreateAndroidQuadBatch("AndroidCurbs", curbVertices, curbTriangles, curb);
+        }
+
+        private static bool IsInsideAndroidCrosswalkExclusion(float x, float z)
+        {
+            // Crosswalk bars own the full intersection approach. Suppress lane dashes
+            // inside those approach boxes so two high-contrast meshes never overlap.
+            for (int ix = 0; ix < 2; ix++)
+            {
+                float centerX = ix == 0 ? -9f : 15f;
+                for (int iz = 0; iz < 2; iz++)
+                {
+                    float centerZ = iz == 0 ? -9f : 15f;
+                    if (Mathf.Abs(x - centerX) <= 10.5f &&
+                        Mathf.Abs(z - centerZ) <= 10.5f)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private void BuildAndroidCrosswalks(float roadWidth)
+        {
+            Material crosswalkMaterial = MakeMaterial(
+                "AndroidCrosswalk",
+                new Color(0.80f, 0.79f, 0.74f));
+            List<Vector3> vertices = new List<Vector3>(384);
+            List<int> triangles = new List<int>(576);
+            float[] intersectionCenters = { -9f, 15f };
+
+            for (int ix = 0; ix < intersectionCenters.Length; ix++)
+            {
+                for (int iz = 0; iz < intersectionCenters.Length; iz++)
+                {
+                    float centerX = intersectionCenters[ix];
+                    float centerZ = intersectionCenters[iz];
+                    for (int side = -1; side <= 1; side += 2)
+                    {
+                        // Four broad, evenly spaced bars retain the zebra-crossing
+                        // read while avoiding the dense thin pattern that shimmers at distance.
+                        for (int stripe = 0; stripe < 4; stripe++)
+                        {
+                            float offset = roadWidth * 0.5f + 1.45f + stripe * 1.05f;
+                            AddAndroidTerrainFollowingQuad(
+                                vertices, triangles,
+                                new Vector3(centerX, 0f, centerZ + side * offset),
+                                new Vector2(roadWidth * 0.76f, 0.48f), 0.125f);
+                            AddAndroidTerrainFollowingQuad(
+                                vertices, triangles,
+                                new Vector3(centerX + side * offset, 0f, centerZ),
+                                new Vector2(0.48f, roadWidth * 0.76f), 0.126f);
+                        }
+                    }
+                }
+            }
+
+            CreateAndroidQuadBatch("AndroidCrosswalks", vertices, triangles, crosswalkMaterial);
         }
 
         private static void AddAndroidQuad(List<Vector3> vertices, List<int> triangles, Vector3 center, Vector2 size)
@@ -2629,16 +2703,12 @@ namespace PersiaWar.Unity2D5D
         {
             position.y = CalculateAndroidTerrainHeight(position.x, position.z);
 
-            // Stage 2 only: group the trunk and both canopy sections beneath one
-            // identifiable root. The camera fader can then fade the complete tree
-            // when a tree collider actually intersects the camera-to-player sightline.
-            // Stage 1 keeps its original hierarchy and rendering path unchanged.
+            // Keep the trunk colliders, hidden crown colliders and visible canopy mesh
+            // beneath one per-tree root in every stage. The camera fader needs this
+            // shared hierarchy to fade the foliage when any part of the tree blocks sight.
             Transform previousBuildingRoot = androidCurrentBuildingRoot;
-            if (stageTwoRequested)
-            {
-                androidCurrentBuildingRoot = new GameObject("Tree_OcclusionRoot").transform;
-                androidCurrentBuildingRoot.SetParent(worldRoot, true);
-            }
+            androidCurrentBuildingRoot = new GameObject("Tree_OcclusionRoot").transform;
+            androidCurrentBuildingRoot.SetParent(worldRoot, true);
 
             if (androidTreeTrunkMaterial == null)
                 androidTreeTrunkMaterial = stageTwoRequested
@@ -2698,8 +2768,7 @@ namespace PersiaWar.Unity2D5D
                 renderer.receiveShadows = !Application.isMobilePlatform;
             }
 
-            if (stageTwoRequested)
-                androidCurrentBuildingRoot = previousBuildingRoot;
+            androidCurrentBuildingRoot = previousBuildingRoot;
         }
 
         private void CreateAndroidStreetLamp(Vector3 position)
