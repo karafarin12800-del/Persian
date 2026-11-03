@@ -132,12 +132,13 @@ namespace PersiaWar.Unity2D5D
             float s = scale * (IsAlien(style) ? 1.08f : 1f);
             root.transform.localScale = new Vector3(s, s, s);
 
-            Transform torso = MakePart(root.transform, "Torso", new Vector3(0f, HipHeight, 0f), GetMesh(style, Part.Torso));
-            Transform head = MakePart(torso, "Head", new Vector3(0f, NeckHeight, 0f), GetMesh(style, Part.Head));
-            Transform leftArm = MakePart(torso, "ArmL", new Vector3(-ShoulderWidth, ShoulderHeight, 0f), GetMesh(style, Part.Arm));
-            Transform rightArm = MakePart(torso, "ArmR", new Vector3(ShoulderWidth, ShoulderHeight, 0f), GetMesh(style, Part.Arm));
-            Transform leftLeg = MakePart(root.transform, "LegL", new Vector3(-HipWidth, HipHeight, 0f), GetMesh(style, Part.Leg));
-            Transform rightLeg = MakePart(root.transform, "LegR", new Vector3(HipWidth, HipHeight, 0f), GetMesh(style, Part.Leg));
+            bool castCharacterShadows = !IsAlien(style);
+            Transform torso = MakePart(root.transform, "Torso", new Vector3(0f, HipHeight, 0f), GetMesh(style, Part.Torso), castCharacterShadows);
+            Transform head = MakePart(torso, "Head", new Vector3(0f, NeckHeight, 0f), GetMesh(style, Part.Head), castCharacterShadows);
+            Transform leftArm = MakePart(torso, "ArmL", new Vector3(-ShoulderWidth, ShoulderHeight, 0f), GetMesh(style, Part.Arm), castCharacterShadows);
+            Transform rightArm = MakePart(torso, "ArmR", new Vector3(ShoulderWidth, ShoulderHeight, 0f), GetMesh(style, Part.Arm), castCharacterShadows);
+            Transform leftLeg = MakePart(root.transform, "LegL", new Vector3(-HipWidth, HipHeight, 0f), GetMesh(style, Part.Leg), castCharacterShadows);
+            Transform rightLeg = MakePart(root.transform, "LegR", new Vector3(HipWidth, HipHeight, 0f), GetMesh(style, Part.Leg), castCharacterShadows);
 
             GameObject mount = new GameObject("WeaponMount");
             mount.transform.SetParent(rightArm, false);
@@ -195,7 +196,7 @@ namespace PersiaWar.Unity2D5D
             return characterMaterial;
         }
 
-        private static Transform MakePart(Transform parent, string name, Vector3 localPosition, Mesh mesh)
+        private static Transform MakePart(Transform parent, string name, Vector3 localPosition, Mesh mesh, bool castCharacterShadows)
         {
             GameObject go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -211,8 +212,7 @@ namespace PersiaWar.Unity2D5D
                 renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.BlendProbes;
                 renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.BlendProbes;
             }
-            if (parent != null && parent.root != null &&
-                !parent.root.name.Contains("Alien"))
+            if (castCharacterShadows)
             {
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 renderer.receiveShadows = true;

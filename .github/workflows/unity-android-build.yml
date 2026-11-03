@@ -149,7 +149,8 @@ jobs:
           assert 'CharacterStyle.RoyalScout' in character_factory and 'CharacterStyle.SilkWarrior' in character_factory and 'CharacterStyle.DesertKnight' in character_factory, 'All six selected heroes must have distinct procedural model styles.'
           lighting = Path('UnityProject/Assets/Scripts/Core/EnvironmentLightingProfile.cs').read_text(encoding='utf-8')
           assert 'PersiaWarEnvironmentFill' in lighting and 'PersiaWarEnvironmentRim' in lighting and 'LightRenderMode.ForcePixel' in lighting, 'World lighting must include the additional fill and rim lights.'
-          assert 'EnvironmentLightingProfile.AddFillLights(root, false);' in stage4, 'Stage 4 must include the secondary light sources.'
+          stage_four = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
+          assert 'EnvironmentLightingProfile.AddFillLights(root, false);' in stage_four, 'Stage 4 must include the secondary light sources.'
           assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
           stage4 = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'Shader shader = RuntimeMaterialFactory.GetShader();' in stage4, 'Stage 4 must prefer the Resources-backed shader to avoid Android shader stripping.'
@@ -292,7 +293,7 @@ jobs:
           assert 'EnemyRifleVisual' in enemy_ai and 'RifleBarrel' in enemy_ai, 'Enemy characters do not have visible rifle geometry.'
           assert 'visual.WeaponMount' in enemy_ai and 'weaponVisualRoot.SetParent(mount, false);' in enemy_ai, 'Enemy rifle is not attached to the visible character hand/body mount.'
           visual = Path('UnityProject/Assets/Scripts/Art/StylizedCharacterVisual.cs').read_text(encoding='utf-8')
-          assert 'public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;' in visual, 'Mobile weapon mount is missing.'
+          assert 'public Transform WeaponMount =>' in visual and 'mobileCharacterRig.weaponMount' in visual and 'mobileModelRoot != null ? mobileModelRoot : transform' in visual, 'Detailed player and legacy character weapon mounts are missing.'
           assert 'shot.Configure(shotDirection, rangedDamage, transform, rangedRange);' in enemy_ai, 'Enemy ranged attacks are not wired to the projectile system with an effective range.'
           assert 'retargetInterval = Application.isMobilePlatform ? 0.22f : 0.12f;' in enemy_ai, 'Enemy AI update cadence is not bounded for the full mobile lobby.'
           assert 'retreatUntil = Time.time + retreatDuration;' in enemy_ai and 'TrackMovementProgress();' in enemy_ai and 'ChooseRecoveryDirection()' in enemy_ai, 'Enemy AI must time-box retreat and recover from corner/wall stalls.'
