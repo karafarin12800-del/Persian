@@ -137,7 +137,8 @@ namespace PersiaWar.Unity2D5D
 
             CharacterStyle style;
             if (stageOneAlien)
-                style = archetype == 2 ? CharacterStyle.AlienBrute : CharacterStyle.AlienScout;
+                style = archetype == 1 ? CharacterStyle.AlienScout
+                    : archetype == 2 ? CharacterStyle.AlienBrute : CharacterStyle.AlienHunter;
             else if (stageFourAlien)
                 style = CharacterStyle.AlienTrooper;
             else if (stageThreeAlien)
@@ -184,11 +185,13 @@ namespace PersiaWar.Unity2D5D
             GameObject board = GameObject.CreatePrimitive(PrimitiveType.Cube);
             board.name = "StageOneAlienHoverboard";
             board.transform.SetParent(characterRoot, false);
-            board.transform.localPosition = new Vector3(0f, -0.065f, -0.015f);
+            board.transform.localPosition = new Vector3(0f, -0.14f, -0.015f);
             board.transform.localRotation = Quaternion.identity;
             board.transform.localScale = enemyArchetype == 2
-                ? new Vector3(1.02f, 0.095f, 0.48f)
-                : new Vector3(0.88f, 0.085f, 0.38f);
+                ? new Vector3(1.18f, 0.12f, 0.62f)
+                : (enemyArchetype == 3
+                    ? new Vector3(1.12f, 0.10f, 0.50f)
+                    : new Vector3(1.02f, 0.10f, 0.46f));
 
             Collider boardCollider = board.GetComponent<Collider>();
             if (boardCollider != null)
@@ -199,6 +202,28 @@ namespace PersiaWar.Unity2D5D
                 renderer.sharedMaterial = stageOneHoverboardMaterial;
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 renderer.receiveShadows = true;
+            }
+
+            // Two swept side rails make the levitating board readable from the
+            // isometric camera instead of looking like a thin dark floor slab.
+            for (int side = -1; side <= 1; side += 2)
+            {
+                GameObject rail = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                rail.name = side < 0 ? "StageOneAlienHoverboard_RailL" : "StageOneAlienHoverboard_RailR";
+                rail.transform.SetParent(board.transform, false);
+                rail.transform.localPosition = new Vector3(side * 0.48f, 0.22f, 0.02f);
+                rail.transform.localRotation = Quaternion.Euler(0f, side * -9f, side * 7f);
+                rail.transform.localScale = new Vector3(0.18f, 0.42f, 0.62f);
+                Collider railCollider = rail.GetComponent<Collider>();
+                if (railCollider != null)
+                    Destroy(railCollider);
+                Renderer railRenderer = rail.GetComponent<Renderer>();
+                if (railRenderer != null)
+                {
+                    railRenderer.sharedMaterial = stageOneHoverboardMaterial;
+                    railRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    railRenderer.receiveShadows = true;
+                }
             }
         }
 
