@@ -629,39 +629,142 @@ namespace PersiaWar.Unity2D5D
             const float sidewalkWidth = 1.0f;
             float half = worldSize * 0.5f;
 
+            List<float> roadCenters = new List<float>();
+            for (float center = -half + roadWidth * 0.5f; center <= half; center += 24f)
+                roadCenters.Add(center);
+
             List<Vector3> roadVertices = new List<Vector3>();
             List<int> roadTriangles = new List<int>();
             List<Vector3> sidewalkVertices = new List<Vector3>();
             List<int> sidewalkTriangles = new List<int>();
 
-            for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+            // Build north/south road runs without drawing through crossing roads.
+            // Every junction is represented once below, preventing coplanar asphalt
+            // overlap and the old fragmented/z-fighting road surface.
+            for (int xRoad = 0; xRoad < roadCenters.Count; xRoad++)
             {
-                AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
-                    new Vector3(x, 0f, 0f),
-                    new Vector2(roadWidth, worldSize), 0.035f);
-
-                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x - roadWidth * 0.5f - sidewalkWidth * 0.5f, 0f, 0f),
-                    new Vector2(sidewalkWidth, worldSize), 0.045f);
-
-                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(x + roadWidth * 0.5f + sidewalkWidth * 0.5f, 0f, 0f),
-                    new Vector2(sidewalkWidth, worldSize), 0.045f);
+                float x = roadCenters[xRoad];
+                float cursor = -half;
+                for (int zRoad = 0; zRoad < roadCenters.Count; zRoad++)
+                {
+                    float crossing = roadCenters[zRoad];
+                    float end = crossing - roadWidth * 0.5f;
+                    if (end > cursor + 0.01f)
+                    {
+                        float length = end - cursor;
+                        AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                            new Vector3(x, 0f, cursor + length * 0.5f),
+                            new Vector2(roadWidth, length), 0.035f);
+                    }
+                    cursor = crossing + roadWidth * 0.5f;
+                }
+                if (half > cursor + 0.01f)
+                {
+                    float length = half - cursor;
+                    AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                        new Vector3(x, 0f, cursor + length * 0.5f),
+                        new Vector2(roadWidth, length), 0.035f);
+                }
             }
 
-            for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
+            // East/west runs stop at the north/south road edges.
+            for (int zRoad = 0; zRoad < roadCenters.Count; zRoad++)
             {
-                AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
-                    new Vector3(0f, 0f, z),
-                    new Vector2(worldSize, roadWidth), 0.035f);
+                float z = roadCenters[zRoad];
+                float cursor = -half;
+                for (int xRoad = 0; xRoad < roadCenters.Count; xRoad++)
+                {
+                    float crossing = roadCenters[xRoad];
+                    float end = crossing - roadWidth * 0.5f;
+                    if (end > cursor + 0.01f)
+                    {
+                        float length = end - cursor;
+                        AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                            new Vector3(cursor + length * 0.5f, 0f, z),
+                            new Vector2(length, roadWidth), 0.035f);
+                    }
+                    cursor = crossing + roadWidth * 0.5f;
+                }
+                if (half > cursor + 0.01f)
+                {
+                    float length = half - cursor;
+                    AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                        new Vector3(cursor + length * 0.5f, 0f, z),
+                        new Vector2(length, roadWidth), 0.035f);
+                }
+            }
 
-                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0f, z - roadWidth * 0.5f - sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth), 0.045f);
+            // One asphalt square fills each intersection.
+            for (int xRoad = 0; xRoad < roadCenters.Count; xRoad++)
+            {
+                for (int zRoad = 0; zRoad < roadCenters.Count; zRoad++)
+                {
+                    AddAndroidTerrainFollowingQuad(roadVertices, roadTriangles,
+                        new Vector3(roadCenters[xRoad], 0f, roadCenters[zRoad]),
+                        new Vector2(roadWidth, roadWidth), 0.035f);
+                }
+            }
 
-                AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
-                    new Vector3(0f, 0f, z + roadWidth * 0.5f + sidewalkWidth * 0.5f),
-                    new Vector2(worldSize, sidewalkWidth), 0.045f);
+            // Sidewalk runs use the same crossing gaps. Their ends meet the crossing
+            // road edge without placing two pavement surfaces over one another.
+            for (int xRoad = 0; xRoad < roadCenters.Count; xRoad++)
+            {
+                float x = roadCenters[xRoad];
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    float sidewalkX = x + side * (roadWidth * 0.5f + sidewalkWidth * 0.5f);
+                    float cursor = -half;
+                    for (int zRoad = 0; zRoad < roadCenters.Count; zRoad++)
+                    {
+                        float crossing = roadCenters[zRoad];
+                        float end = crossing - roadWidth * 0.5f;
+                        if (end > cursor + 0.01f)
+                        {
+                            float length = end - cursor;
+                            AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                                new Vector3(sidewalkX, 0f, cursor + length * 0.5f),
+                                new Vector2(sidewalkWidth, length), 0.045f);
+                        }
+                        cursor = crossing + roadWidth * 0.5f;
+                    }
+                    if (half > cursor + 0.01f)
+                    {
+                        float length = half - cursor;
+                        AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                            new Vector3(sidewalkX, 0f, cursor + length * 0.5f),
+                            new Vector2(sidewalkWidth, length), 0.045f);
+                    }
+                }
+            }
+
+            for (int zRoad = 0; zRoad < roadCenters.Count; zRoad++)
+            {
+                float z = roadCenters[zRoad];
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    float sidewalkZ = z + side * (roadWidth * 0.5f + sidewalkWidth * 0.5f);
+                    float cursor = -half;
+                    for (int xRoad = 0; xRoad < roadCenters.Count; xRoad++)
+                    {
+                        float crossing = roadCenters[xRoad];
+                        float end = crossing - roadWidth * 0.5f;
+                        if (end > cursor + 0.01f)
+                        {
+                            float length = end - cursor;
+                            AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                                new Vector3(cursor + length * 0.5f, 0f, sidewalkZ),
+                                new Vector2(length, sidewalkWidth), 0.045f);
+                        }
+                        cursor = crossing + roadWidth * 0.5f;
+                    }
+                    if (half > cursor + 0.01f)
+                    {
+                        float length = half - cursor;
+                        AddAndroidTerrainFollowingQuad(sidewalkVertices, sidewalkTriangles,
+                            new Vector3(cursor + length * 0.5f, 0f, sidewalkZ),
+                            new Vector2(length, sidewalkWidth), 0.045f);
+                    }
+                }
             }
 
             CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
@@ -677,7 +780,7 @@ namespace PersiaWar.Unity2D5D
                 new Color(0.84f, 0.82f, 0.75f));
             List<Vector3> vertices = new List<Vector3>(512);
             List<int> triangles = new List<int>(768);
-            float[] intersectionCenters = { -7f, 17f };
+            float[] intersectionCenters = { -9f, 15f };
 
             for (int ix = 0; ix < intersectionCenters.Length; ix++)
             {
@@ -1101,8 +1204,8 @@ namespace PersiaWar.Unity2D5D
                 float depthRoll = Mathf.Abs(Mathf.Sin((i + 1) * 39.425f));
 
                 bool isWarehouse = i == 4 || i == 9 || i == 11 || i == 16;
-                // Two out of every three residential houses receive a gabled roof.
-                // Warehouses keep broad low rooflines for a readable silhouette.
+                // Residential blocks have distinct porch-villa, balcony-home and gabled-roof silhouettes.
+                bool isVilla = !isWarehouse && (i % 5 == 1 || i % 7 == 4);
                 bool isPitchedRoof = !isWarehouse && (i % 3 != 0 || i == 0);
 
                 // Keep the full footprint (including facade trim) within the
@@ -1128,6 +1231,14 @@ namespace PersiaWar.Unity2D5D
                     depth = Mathf.Lerp(6.8f, 9.2f, depthRoll);
                 }
 
+                if (isVilla)
+                {
+                    footprint = Mathf.Lerp(7.8f, 9.4f, widthRoll);
+                    depth = Mathf.Lerp(7.0f, 8.5f, depthRoll);
+                    height = 3.45f;
+                    isPitchedRoof = i % 2 == 0;
+                }
+
                 // A few wider corner homes become landmarks without becoming towers.
                 // Four dedicated low, deep industrial buildings are warehouses.
                 if (i == 0 || i == 7 || i == 13)
@@ -1147,7 +1258,7 @@ namespace PersiaWar.Unity2D5D
                 androidCurrentBuildingRoot = new GameObject("Building_House_" + (i + 1)).transform;
                 androidCurrentBuildingRoot.SetParent(worldRoot, true);
                 CreateAndroidBuilding(
-                    buildingPoints[i], footprint, height, depth, i, isWarehouse, isPitchedRoof);
+                    buildingPoints[i], footprint, height, depth, i, isWarehouse, isPitchedRoof, isVilla);
                 // Flush per house into material-group meshes parented beneath this house.
                 // This preserves most batching while making per-house transparency possible.
                 FlushAndroidBoxBatches();
@@ -1749,8 +1860,7 @@ namespace PersiaWar.Unity2D5D
             Mesh mesh = new Mesh { name = objectName + "Mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0, true);
-            if (stageTwoRequested)
-                mesh.RecalculateNormals();
+            mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             mesh.UploadMeshData(true);
 
@@ -2105,7 +2215,8 @@ namespace PersiaWar.Unity2D5D
             float depth,
             int buildingIndex,
             bool isWarehouse,
-            bool isPitchedRoof)
+            bool isPitchedRoof,
+            bool isVilla)
         {
             // Residential bodies are limited to one or two storeys. A pitched roof
             // adds roof height, not a third occupied floor.
@@ -2297,23 +2408,44 @@ namespace PersiaWar.Unity2D5D
                     position + new Vector3(0f, 0.06f, frontZ - 0.10f),
                     new Vector3(doorWidth + 0.18f, 0.12f, 0.30f), rooftop);
 
-                if (!isWarehouse && bodyHeight >= 5f && buildingIndex % 4 == 0)
+                if (!isWarehouse && !isVilla && bodyHeight >= 5f &&
+                    (buildingIndex % 3 == 0 || buildingIndex % 7 == 2))
                 {
-                    float balconyWidth = Mathf.Min(2.25f, footprint * 0.34f);
+                    float balconyWidth = Mathf.Min(2.55f, footprint * 0.38f);
                     float balconyX = -footprint * 0.19f;
                     float balconyZ = -depth * 0.62f;
                     QueueAndroidBox("CityBalconySlab",
                         position + new Vector3(balconyX, 3.05f, balconyZ),
-                        new Vector3(balconyWidth, 0.16f, 0.78f), rooftop);
+                        new Vector3(balconyWidth, 0.16f, 0.82f), rooftop);
                     QueueAndroidBox("CityBalconyRailTop",
-                        position + new Vector3(balconyX, 3.55f, balconyZ - 0.34f),
+                        position + new Vector3(balconyX, 3.55f, balconyZ - 0.37f),
                         new Vector3(balconyWidth, 0.09f, 0.09f), trim);
                     QueueAndroidBox("CityBalconyRailLeft",
-                        position + new Vector3(balconyX - balconyWidth * 0.5f, 3.32f, balconyZ - 0.34f),
+                        position + new Vector3(balconyX - balconyWidth * 0.5f, 3.32f, balconyZ - 0.37f),
                         new Vector3(0.09f, 0.48f, 0.09f), trim);
                     QueueAndroidBox("CityBalconyRailRight",
-                        position + new Vector3(balconyX + balconyWidth * 0.5f, 3.32f, balconyZ - 0.34f),
+                        position + new Vector3(balconyX + balconyWidth * 0.5f, 3.32f, balconyZ - 0.37f),
                         new Vector3(0.09f, 0.48f, 0.09f), trim);
+                }
+
+                if (isVilla)
+                {
+                    float porchWidth = Mathf.Min(3.8f, footprint * 0.56f);
+                    float porchDepth = 1.05f;
+                    float porchZ = -depth * 0.5f - porchDepth * 0.43f;
+                    float postX = porchWidth * 0.44f;
+                    QueueAndroidBox("VillaPorchDeck",
+                        position + new Vector3(0f, 0.15f, porchZ),
+                        new Vector3(porchWidth, 0.20f, porchDepth), rooftop);
+                    QueueAndroidBox("VillaPorchRoof",
+                        position + new Vector3(0f, 2.62f, porchZ),
+                        new Vector3(porchWidth + 0.24f, 0.16f, porchDepth + 0.16f), trim);
+                    QueueAndroidBox("VillaPorchPost_Left",
+                        position + new Vector3(-postX, 1.36f, porchZ - porchDepth * 0.38f),
+                        new Vector3(0.14f, 2.35f, 0.14f), trim);
+                    QueueAndroidBox("VillaPorchPost_Right",
+                        position + new Vector3(postX, 1.36f, porchZ - porchDepth * 0.38f),
+                        new Vector3(0.14f, 2.35f, 0.14f), trim);
                 }
             }
 
@@ -2346,7 +2478,7 @@ namespace PersiaWar.Unity2D5D
                     new Vector3(Mathf.Min(3.4f, footprint * 0.40f), 0.30f, 0.10f),
                     accentMaterial);
             }
-            else
+            else if (!isVilla)
             {
                 QueueAndroidBox(
                     "DoorCanopy",

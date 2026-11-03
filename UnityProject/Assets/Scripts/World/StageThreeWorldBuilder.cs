@@ -1011,6 +1011,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             position.y = 0f;
             occupied.Add(position);
             SpawnGroundAlien(i, position, true);
+            ActivateGroundAlienChase(groundAliens[groundAliens.Count - 1]);
             yield return null;
         }
 
@@ -1043,6 +1044,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
             occupied.Add(position);
             SpawnGroundAlien(spawned, position, false);
+            ActivateGroundAlienChase(groundAliens[groundAliens.Count - 1]);
             spawned++;
             if (spawned % 3 == 0) yield return null;
         }
@@ -1056,6 +1058,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             position.y = 0f;
             occupied.Add(position);
             SpawnGroundAlien(spawned, position, false);
+            ActivateGroundAlienChase(groundAliens[groundAliens.Count - 1]);
             spawned++;
             if (spawned % 3 == 0) yield return null;
         }
@@ -1192,6 +1195,15 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         return false;
     }
 
+    private void ActivateGroundAlienChase(GroundAlien alien)
+    {
+        if (alien == null || alien.Chase == null || localPlayer == null)
+            return;
+
+        alien.Chase.SetTarget(localPlayer.transform);
+        alien.Chase.enabled = true;
+    }
+
     private void SpawnGroundAlien(int index, Vector3 position, bool guard)
     {
         if (liteWorldVariant && index % 2 != 0)
@@ -1297,7 +1309,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         for (int i = 0; i < groundAliens.Count; i++)
         {
             GroundAlien alien = groundAliens[i];
-            if (!alien.Guard || alien.Root == null || alien.Health == null ||
+            if (!alien.UpperPatrol || alien.Root == null || alien.Health == null ||
                 alien.Health.CurrentHealth <= 0 || Time.time < alien.NextShotTime)
                 continue;
 

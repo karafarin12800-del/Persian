@@ -44,6 +44,7 @@ namespace PersiaWar.Unity2D5D
         private Transform weaponVisualRoot;
         private static Material enemyRifleReceiverMaterial;
         private static Material enemyRifleMetalMaterial;
+        private static Material stageOneHoverboardMaterial;
         private const int NavigationGridMaxSide = 40;
         private const int NavigationCellCapacity = NavigationGridMaxSide * NavigationGridMaxSide;
         private const int MaxNavigationWaypoints = 96;
@@ -128,13 +129,16 @@ namespace PersiaWar.Unity2D5D
         private void EnsureLibraryCharacterVisual()
         {
             string objectName = transform.name;
+            bool stageOneAlien = objectName.StartsWith("Enemy_W", System.StringComparison.Ordinal);
             bool stageThreeAlien = objectName.StartsWith("S3_Alien", System.StringComparison.Ordinal);
             bool stageFourAlien = objectName.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
             bool stageTwoAlien = objectName.StartsWith("Alien_W", System.StringComparison.Ordinal);
             if (libraryCharacterRig != null) return;
 
             CharacterStyle style;
-            if (stageFourAlien)
+            if (stageOneAlien)
+                style = archetype == 2 ? CharacterStyle.AlienBrute : CharacterStyle.AlienScout;
+            else if (stageFourAlien)
                 style = CharacterStyle.AlienTrooper;
             else if (stageThreeAlien)
                 style = archetype == 1 ? CharacterStyle.AlienScout
@@ -155,6 +159,8 @@ namespace PersiaWar.Unity2D5D
             libraryCharacterRig = created;
             if (visual != null)
                 visual.gameObject.SetActive(false);
+            if (stageOneAlien)
+                AttachStageOneHoverboard(created.transform, archetype);
             if (stageTwoAlien)
             {
                 // Stage 2's old capsule was only a placeholder body. Keep its
@@ -164,6 +170,36 @@ namespace PersiaWar.Unity2D5D
                     placeholderRenderer.enabled = false;
             }
             libraryCharacterPositionInitialized = false;
+        }
+
+        private static void AttachStageOneHoverboard(Transform characterRoot, int enemyArchetype)
+        {
+            if (characterRoot == null || characterRoot.Find("StageOneAlienHoverboard") != null)
+                return;
+
+            if (stageOneHoverboardMaterial == null)
+                stageOneHoverboardMaterial = RuntimeMaterialFactory.Create(
+                    "StageOneAlienHoverboard", new Color(0.045f, 0.16f, 0.20f));
+
+            GameObject board = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            board.name = "StageOneAlienHoverboard";
+            board.transform.SetParent(characterRoot, false);
+            board.transform.localPosition = new Vector3(0f, -0.065f, -0.015f);
+            board.transform.localRotation = Quaternion.identity;
+            board.transform.localScale = enemyArchetype == 2
+                ? new Vector3(1.02f, 0.095f, 0.48f)
+                : new Vector3(0.88f, 0.085f, 0.38f);
+
+            Collider boardCollider = board.GetComponent<Collider>();
+            if (boardCollider != null)
+                Destroy(boardCollider);
+            Renderer renderer = board.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = stageOneHoverboardMaterial;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = true;
+            }
         }
 
         private void EnsureEnemyWeaponVisual()

@@ -157,16 +157,25 @@ jobs:
           assert 'bool castCharacterShadows, bool receiveCharacterShadows' in model_factory and 'renderer.receiveShadows = receiveCharacterShadows;' in model_factory, 'Enemy meshes must receive world lighting without adding large-wave shadow casters.'
           assert 'CharacterStyle.Soldier' in enemy_chase and 'CharacterStyle.RoyalScout' in enemy_chase and 'CharacterStyle.DesertKnight' in enemy_chase, 'All human enemy archetypes must use the shared detailed character factory.'
           assert 'CharacterStyle.StageTwoAlienScout' in enemy_chase and 'CharacterStyle.StageTwoAlienBrute' in enemy_chase and 'CharacterStyle.StageTwoAlienElite' in enemy_chase, 'Stage 2 green aliens must use three detailed factory-built silhouettes.'
+          assert 'bool stageOneAlien = objectName.StartsWith("Enemy_W"' in enemy_chase and 'style = archetype == 2 ? CharacterStyle.AlienBrute : CharacterStyle.AlienScout;' in enemy_chase, 'Stage 1 enemies must use the two non-human Stage 3 alien archetypes.'
+          assert 'AttachStageOneHoverboard(created.transform, archetype);' in enemy_chase and 'StageOneAlienHoverboard' in enemy_chase, 'Stage 1 alien enemies must use the hoverboard/skater silhouette.'
           stage2_spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
           assert 'CreateAlienEye(enemy.transform' not in stage2_spawner and 'placeholderRenderer.enabled = false;' in enemy_chase, 'Stage 2 must not render old capsule bodies or duplicate floating eye primitives.'
           assert 'libraryCharacterRig.moveSpeed01' in enemy_chase and 'libraryCharacterRig.Kick(1f)' in enemy_chase, 'Factory enemy models must animate while moving and recoil when firing.'
           stage3_builder = Path('UnityProject/Assets/Scripts/World/StageThreeWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'BuildAlienCreatureDetails(' not in stage3_builder and 'chase.Configure(localPlayer != null ? localPlayer.transform : null, archetype);' in stage3_builder, 'Stage 3 alien spawns must use complete shared models without duplicate primitive bodies.'
+          assert 'ActivateGroundAlienChase(groundAliens[groundAliens.Count - 1]);' in stage3_builder and 'alien.Chase.enabled = true;' in stage3_builder, 'All lower Stage 3 ground aliens must actively move and pursue the player.'
+          assert 'if (!alien.UpperPatrol || alien.Root == null' in stage3_builder, 'Stage 3 lower sentries must not remain in the stationary scripted firing loop.'
           assert 'RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;' in stage3_builder and 'EnvironmentLightingProfile.AddFillLights(worldRoot, false);' in stage3_builder, 'Stage 3 must use brighter ambient and fill lighting.'
           assert 'renderer.receiveShadows = shadowsEnabled && !lightOnly;' in stage3_builder, 'Stage 3 architecture must receive shadows.'
           assert 'BuildAlienTrooperDetails(' not in stage_four and 'S4_AlienTrooper_' in enemy_chase and 'CharacterStyle.AlienTrooper' in enemy_chase, 'Stage 4 troopers must use the shared complete alien model.'
           stage1_bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')
           assert 'const int grid = 65;' in stage1_bootstrap and 'if (!stageTwoRequested)\n                return 0f;' in stage1_bootstrap, 'Stage 1 terrain must be dense and flat while Stage 2 retains its terrain.'
+          road_grid = stage1_bootstrap[stage1_bootstrap.index('private void BuildAndroidRoadGrid()'):stage1_bootstrap.index('private void BuildAndroidCrosswalks(')]
+          assert 'List<float> roadCenters' in road_grid and 'new Vector2(roadWidth, roadWidth)' in road_grid, 'Stage 1 asphalt must use non-overlapping road runs and one tile per junction.'
+          quad_batch = stage1_bootstrap[stage1_bootstrap.index('private GameObject CreateAndroidQuadBatch('):stage1_bootstrap.index('private void BuildAndroidRoadGrid()')]
+          assert 'mesh.RecalculateNormals();' in quad_batch, 'Android road and sidewalk meshes must have valid normals on every quality tier.'
+          assert 'bool isVilla = !isWarehouse' in stage1_bootstrap and 'VillaPorchDeck' in stage1_bootstrap and 'CityBalconySlab' in stage1_bootstrap and 'CreateAndroidPitchedRoof' in stage1_bootstrap, 'Stage 1 residential blocks must include porched villas, balconies and pitched roofs.'
           assert 'QualitySettings.antiAliasing = 0;' not in stage1_bootstrap, 'Android bootstrap must not override selected anti-aliasing quality.'
           assert 'CharacterStyle.HeroAnahita' in stage1_bootstrap and 'RescueGirlCageBars' in stage1_bootstrap, 'Rescued Anahita must share the detailed playable hero model and preserve the cage encounter.'
           assert 'RenderSettings.ambientIntensity = 1.22f;' in lighting and 'fill.intensity = 0.68f;' in lighting and 'rim.intensity = 0.42f;' in lighting, 'Stages 1 and 2 must use the brighter three-point lighting profile.'
@@ -217,7 +226,10 @@ jobs:
           assert 'CompleteStageFourEscapeToMainMenu' in prototype_flow and 'StageFourEscapeSequence.IsFinaleActive' in prototype_flow, 'Stage 4 must suppress overlapping combat HUD during the finale and return to main menu after the last detonation.'
           assert 'new Rect(14f * scale, 154f * scale, 340f * scale, 48f * scale)' in prototype_flow, 'Stage 4 objective HUD must remain below player health, shield and loadout indicators and wrap on phones.'
           patrol = Path('UnityProject/Assets/Scripts/World/StageFourAlienPatrol.cs').read_text(encoding='utf-8')
-          assert 'patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));' in stage4, 'Stage 4 aliens must receive explicit corridor patrol routes.'
+          assert 'patrol.Configure(controller, chase, GetInteriorPatrolRoute(i, positions[i]));' in stage4, 'Stage 4 aliens must receive individual room-local patrol routes.'
+          assert 'StageFourHostileCount = 54' in stage4 and 'positions.Length != StageFourHostileCount' in stage4, 'Stage 4 must build exactly three times the previous 18-enemy roster.'
+          assert 'HostileRosterReady => interiorSpawnCompleted' in stage4 and 'StageFourInteriorAlienRosterComplete_54' in stage4, 'Stage 4 must finish its complete hostile roster before unlocking extraction.'
+          assert 'AllStageFourHostilesDefeated()' in escape_finale and 'stageFourBuilder.RemainingHostiles == 0' in escape_finale, 'Stage 4 exit hatch must remain locked until every enemy is defeated.'
           assert 'StageFourAlienCorridorPatrolsConfigured_' in stage4, 'Stage 4 must report its patrol initialization checkpoint.'
           assert 'HasClearSightToPlayer' in patrol and 'PatrolCorridor' in patrol, 'Stage 4 sentries must patrol and use line-of-sight detection.'
           assert 'DisengageToPatrol' in patrol and 'EnemyChase' in patrol, 'Stage 4 sentries must return to patrol after losing contact.'

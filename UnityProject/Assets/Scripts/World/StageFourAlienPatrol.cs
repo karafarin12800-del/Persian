@@ -21,10 +21,16 @@ namespace PersiaWar.Unity2D5D
         private EnemyChase chase;
         private StageFourWorldBuilder builder;
         private StylizedCharacterVisual visual;
+        private CharacterRig characterRig;
+        private readonly RaycastHit[] patrolHits = new RaycastHit[16];
         private Vector3[] route = new Vector3[0];
         private int routeIndex;
         private float pauseUntil;
         private float lastSeenTime;
+        private float nextDetectionCheckTime;
+        private float nextWallCheckTime;
+        private bool cachedSeesPlayer;
+        private bool cachedWallBlocked;
         private bool engaged;
         private bool configured;
 
@@ -34,9 +40,14 @@ namespace PersiaWar.Unity2D5D
             chase = enemyChase;
             builder = GetComponentInParent<StageFourWorldBuilder>();
             visual = GetComponentInChildren<StylizedCharacterVisual>(true);
+            characterRig = GetComponentInChildren<CharacterRig>(true);
             route = patrolRoute != null ? patrolRoute : new Vector3[0];
             routeIndex = 0;
             lastSeenTime = -10000f;
+            nextDetectionCheckTime = Time.time + (Mathf.Abs(GetInstanceID()) % 8) * 0.025f;
+            nextWallCheckTime = Time.time + (Mathf.Abs(GetInstanceID()) % 8) * 0.0125f;
+            cachedSeesPlayer = false;
+            cachedWallBlocked = false;
             engaged = false;
             configured = player != null && chase != null && route.Length > 0;
 
@@ -61,7 +72,12 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             float distance = Vector3.Distance(transform.position, player.transform.position);
-            bool seesPlayer = distance <= detectionRange && HasClearSightToPlayer();
+            if (Time.time >= nextDetectionCheckTime)
+            {
+                nextDetectionCheckTime = Time.time + 0.22f;
+                cachedSeesPlayer = distance <= detectionRange && HasClearSightToPlayer();
+            }
+            bool seesPlayer = cachedSeesPlayer;
 
             if (!engaged && seesPlayer)
                 EngagePlayer();
@@ -198,7 +214,12 @@ namespace PersiaWar.Unity2D5D
             // Use three horizontal probes at body height before moving. The old direct
             // transform translation could cross a thin wall in a single patrol update.
             float step = Mathf.Min(patrolSpeed * Time.deltaTime, delta.magnitude);
-            if (IsBlockedByWall(direction, step + 0.18f))
+            if (Time.time >= nextWallCheckTime)
+            {
+                nextWallCheckTime = Time.time + 0.10f;
+                cachedWallBlocked = IsBlockedByWall(direction, step + 0.18f);
+            }
+            if (cachedWallBlocked)
             {
                 SetVisualMoving(false, direction);
                 pauseUntil = Time.time + 0.25f;
@@ -212,38 +233,44 @@ namespace PersiaWar.Unity2D5D
 
         private bool IsBlockedByWall(Vector3 direction, float distance)
         {
-            Vector3[] heights =
+            Vector3 origin = transform.position;
+            return IsBlockedAtHeight(origin + Vector3.up * 0.42f, direction, distance) ||
+                   IsBlockedAtHeight(origin + Vector3.up * 0.95f, direction, distance) ||
+                   IsBlockedAtHeight(origin + Vector3.up * 1.42f, direction, distance);
+        }
+
+        private bool IsBlockedAtHeight(Vector3 origin, Vector3 direction, float distance)
+        {
+            int hitCount = Physics.RaycastNonAlloc(
+                origin, direction, patrolHits, distance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hitCount; i++)
             {
-                transform.position + Vector3.up * 0.42f,
-                transform.position + Vector3.up * 0.95f,
-                transform.position + Vector3.up * 1.42f
-            };
+                Collider hitCollider = patrolHits[i].collider;
+                if (hitCollider == null ||
+                    hitCollider.transform == transform ||
+                    hitCollider.transform.IsChildOf(transform) ||
+                    hitCollider.GetComponentInParent<PlayerController>() != null)
+                    continue;
 
-            for (int i = 0; i < heights.Length; i++)
-            {
-                RaycastHit[] hits = Physics.RaycastAll(
-                    heights[i], direction, distance,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-                for (int j = 0; j < hits.Length; j++)
-                {
-                    Collider hitCollider = hits[j].collider;
-                    if (hitCollider == null ||
-                        hitCollider.transform == transform ||
-                        hitCollider.transform.IsChildOf(transform) ||
-                        hitCollider.GetComponentInParent<PlayerController>() != null)
-                        continue;
+                if (hitCollider.GetComponentInParent<EnemyChase>() != null)
+                    continue;
 
-                    if (hitCollider.GetComponentInParent<EnemyChase>() != null)
-                        continue;
-
-                    return true;
-                }
+                return true;
             }
             return false;
         }
 
         private void SetVisualMoving(bool moving, Vector3 facing)
         {
+            if (characterRig == null)
+                characterRig = GetComponentInChildren<CharacterRig>(true);
+            if (characterRig != null)
+            {
+                characterRig.moveSpeed01 = moving ? 0.34f : 0f;
+                characterRig.aiming = engaged;
+            }
+
             if (visual == null)
                 visual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (visual == null)

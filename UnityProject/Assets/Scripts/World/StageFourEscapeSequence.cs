@@ -15,6 +15,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     private Transform player;
     private Transform worldRoot;
     private Transform escapeShuttle;
+    private StageFourWorldBuilder stageFourBuilder;
     private readonly List<GameObject> plantedBombs = new List<GameObject>();
     private readonly List<GameObject> storedCharges = new List<GameObject>();
     private readonly List<Vector3> bombPositions = new List<Vector3>();
@@ -49,6 +50,7 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
     {
         active = this;
         worldRoot = GameObject.Find(WorldRootName)?.transform;
+        stageFourBuilder = GetComponent<StageFourWorldBuilder>();
         var p = FindFirstObjectByType<PlayerController>();
         player = p != null ? p.transform : null;
         sceneCamera = Camera.main;
@@ -106,23 +108,31 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
                 PlantTimedBomb(nearbySite);
         }
 
-        // The exit is physically inside the corridor and requires a deliberate tap.
+        // The hatch stays sealed until every one of the 54 hostiles has spawned
+        // and been defeated, in addition to the existing six-charge objective.
         float doorDistance = redDoorPanel != null
             ? Vector3.Distance(player.position, redDoorPanel.transform.position)
             : float.MaxValue;
         if (requestOpenDoor)
         {
             requestOpenDoor = false;
-            if (doorDistance <= 3.8f && plantedBombs.Count >= 6)
+            if (doorDistance <= 3.8f && !AllStageFourHostilesDefeated())
+                message = "EXIT LOCKED • ELIMINATE ALL ALIENS (" + GetRemainingHostileCount() + " LEFT)";
+            else if (doorDistance <= 3.8f && plantedBombs.Count >= 6)
                 OpenRedDoor();
             else if (doorDistance <= 3.8f)
                 message = "EXIT LOCKED • PLANT ALL 6 CHARGES FIRST";
         }
 
-        // After manually opening the door, crossing its threshold starts the shuttle cutscene.
+        // Crossing the threshold cannot bypass the all-hostiles-clear requirement.
         if (doorOpened && !boarded && player.position.z >= 80f &&
             Mathf.Abs(player.position.x) <= 10f)
         {
+            if (!AllStageFourHostilesDefeated())
+            {
+                message = "RETURN TO THE SHIP • ELIMINATE ALL ALIENS (" + GetRemainingHostileCount() + " LEFT)";
+                return;
+            }
             if (plantedBombs.Count < 6)
             {
                 message = "RETURN TO THE RED STATIONS • " + plantedBombs.Count + "/6";
@@ -131,6 +141,18 @@ public sealed class StageFourEscapeSequence : MonoBehaviour
             boarded = true;
             StartCoroutine(PlayEscapeFinale());
         }
+    }
+
+    private bool AllStageFourHostilesDefeated()
+    {
+        return stageFourBuilder != null &&
+            stageFourBuilder.HostileRosterReady &&
+            stageFourBuilder.RemainingHostiles == 0;
+    }
+
+    private int GetRemainingHostileCount()
+    {
+        return stageFourBuilder != null ? stageFourBuilder.RemainingHostiles : 54;
     }
 
     private Rect GetInteractionButtonRect()
