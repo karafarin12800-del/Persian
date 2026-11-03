@@ -773,41 +773,7 @@ namespace PersiaWar.Unity2D5D
             BuildAndroidCrosswalks(roadWidth);
         }
 
-        private void BuildAndroidCrosswalks(float roadWidth)
-        {
-            Material crosswalkMaterial = MakeMaterial(
-                "AndroidCrosswalk",
-                new Color(0.84f, 0.82f, 0.75f));
-            List<Vector3> vertices = new List<Vector3>(512);
-            List<int> triangles = new List<int>(768);
-            float[] intersectionCenters = { -9f, 15f };
 
-            for (int ix = 0; ix < intersectionCenters.Length; ix++)
-            {
-                for (int iz = 0; iz < intersectionCenters.Length; iz++)
-                {
-                    float centerX = intersectionCenters[ix];
-                    float centerZ = intersectionCenters[iz];
-                    for (int side = -1; side <= 1; side += 2)
-                    {
-                        for (int stripe = 0; stripe < 5; stripe++)
-                        {
-                            float offset = roadWidth * 0.5f + 1.25f + stripe * 0.78f;
-                            AddAndroidTerrainFollowingQuad(
-                                vertices, triangles,
-                                new Vector3(centerX, 0f, centerZ + side * offset),
-                                new Vector2(roadWidth * 0.72f, 0.34f), 0.088f);
-                            AddAndroidTerrainFollowingQuad(
-                                vertices, triangles,
-                                new Vector3(centerX + side * offset, 0f, centerZ),
-                                new Vector2(0.34f, roadWidth * 0.72f), 0.089f);
-                        }
-                    }
-                }
-            }
-
-            CreateAndroidQuadBatch("AndroidCrosswalks", vertices, triangles, crosswalkMaterial);
-        }
 
         private bool extractionBeaconShown;
 
