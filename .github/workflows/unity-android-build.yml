@@ -144,6 +144,7 @@ jobs:
           character_shader = Path('UnityProject/Assets/Resources/PersiaWarCharacterLit.shader').read_text(encoding='utf-8')
           character_factory = Path('UnityProject/Assets/Scripts/Art/CharacterModelFactory.cs').read_text(encoding='utf-8')
           assert 'Shader "PersiaWar/CharacterLit"' in character_shader and '#pragma surface surf Standard fullforwardshadows addshadow' in character_shader, 'Hero shader must use lit forward-add rendering and shadow reception.'
+          assert 'float3 worldPos;' in character_shader and 'UnityWorldSpaceViewDir(IN.worldPos)' in character_shader, 'Character rim lighting must use a valid world-space view vector.'
           assert 'Resources.Load<Shader>("PersiaWarCharacterLit")' in character_factory and 'renderer.receiveShadows = true;' in character_factory, 'Playable hero meshes must use the dedicated lit material and receive shadows.'
           assert 'CharacterModelFactory.Create(style, artRoot, Vector3.zero, 1f)' in visual, 'Android player does not instantiate the full procedural hero mesh.'
           assert 'CharacterStyle.RoyalScout' in character_factory and 'CharacterStyle.SilkWarrior' in character_factory and 'CharacterStyle.DesertKnight' in character_factory, 'All six selected heroes must have distinct procedural model styles.'

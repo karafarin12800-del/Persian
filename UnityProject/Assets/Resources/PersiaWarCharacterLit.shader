@@ -31,6 +31,7 @@ Shader "PersiaWar/CharacterLit"
         struct Input
         {
             fixed4 color : COLOR;
+            float3 worldPos;
             float3 viewDir;
             INTERNAL_DATA
         };
@@ -52,7 +53,7 @@ Shader "PersiaWar/CharacterLit"
 
             half emissionMask = saturate((surfaceCode - 0.72h) * 3.6h);
             half3 worldNormal = normalize(WorldNormalVector(IN, o.Normal));
-            half3 worldView = normalize(WorldViewDir(IN));
+            half3 worldView = normalize(UnityWorldSpaceViewDir(IN.worldPos));
             half rim = pow(1.0h - saturate(dot(worldNormal, worldView)), 3.0h);
 
             o.Emission = albedo * (emissionMask * _EmissionBoost + rim * _RimStrength);
