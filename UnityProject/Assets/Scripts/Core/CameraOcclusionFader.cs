@@ -155,6 +155,19 @@ namespace PersiaWar.Unity2D5D
         {
             if (col == null) return;
 
+            // Trees use separate crown colliders and a faceted canopy renderer.
+            // Resolve their common tree root first so a hit on the trunk or either
+            // hidden crown collider fades the complete visible tree, not one part.
+            Transform treeRoot = FindTreeRoot(col.transform);
+            if (treeRoot != null)
+            {
+                Renderer[] treeRenderers = treeRoot.GetComponentsInChildren<Renderer>(false);
+                for (int i = 0; i < treeRenderers.Length; i++)
+                    if (treeRenderers[i] != null && treeRenderers[i].enabled)
+                        blocked.Add(treeRenderers[i]);
+                return;
+            }
+
             // Stage two fades only what the camera-to-player sightline actually hits.
             // Courtyard walls and individual house wall/roof pieces have their own
             // renderer and collider, so entering a yard never fades the whole house.
@@ -207,6 +220,18 @@ namespace PersiaWar.Unity2D5D
             for (int i = 0; i < renderers.Length; i++)
                 if (renderers[i] != null && renderers[i].enabled)
                     blocked.Add(renderers[i]);
+        }
+
+        private static Transform FindTreeRoot(Transform t)
+        {
+            Transform match = null;
+            while (t != null)
+            {
+                if (t.name.IndexOf("tree", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    match = t;
+                t = t.parent;
+            }
+            return match;
         }
 
         private static Transform FindBuildingOrTreeRoot(Transform t)
