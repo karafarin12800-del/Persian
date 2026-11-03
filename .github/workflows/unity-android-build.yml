@@ -559,6 +559,16 @@ jobs:
             exit 1
           }
 
+      # Cache only Gradle's resolved dependency metadata and artifacts. Unity's
+      # generated Library/Bee project remains clean and is never restored.
+      - name: Restore Unity Android Gradle dependency cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/persiawar-gradle-home/caches
+          key: persiawar-gradle-${{ runner.os }}-unity-2022.3.62f1-${{ hashFiles('UnityProject/ProjectSettings/ProjectVersion.txt', 'UnityProject/Packages/manifest.json', 'UnityProject/Assets/Plugins/Android/**') }}
+          restore-keys: |
+            persiawar-gradle-${{ runner.os }}-unity-2022.3.62f1-
+
       # Unity Library cache intentionally disabled for deterministic CI builds.
       # Restoring a stale/large Library can block before the actual Unity build.
 
@@ -708,6 +718,8 @@ jobs:
           set -euo pipefail
 
           export DEBIAN_FRONTEND=noninteractive
+          # Keep Maven/Gradle dependency downloads across retries and CI runs.
+          export GRADLE_USER_HOME="/gradle"
           export UNITY_HUB_PATH="/usr/lib/unityhub/unityhub"
 
           echo "=== Installing Unity Hub ==="
@@ -783,28 +795,53 @@ jobs:
 
           echo "=== Building the existing Unity project ==="
           cd /workspace
-          set +e
-          unity-editor \
-            -batchmode \
-            -nographics \
-            -quit \
-            -accept-apiupdate \
-            -projectPath /workspace/UnityProject \
-            -buildTarget Android \
-            -executeMethod PersiaWarCiBuild.BuildAndroid \
-            -logFile -
-          unity_exit=$?
-          set -e
+          MAX_UNITY_BUILD_ATTEMPTS=3
+          UNITY_BUILD_SUCCEEDED=false
+          for attempt in 1 2 3; do
+            attempt_log="/workspace/.ci/unity-build-attempt-${attempt}.log"
+            rm -f /workspace/build/Android/UNITY_BUILD_SUCCESS.txt /workspace/build/Android/PersiaWar.apk
+            echo "=== Unity Android build attempt ${attempt}/${MAX_UNITY_BUILD_ATTEMPTS} ==="
 
-          echo "UNITY_EDITOR_EXIT_CODE:$unity_exit"
-          test -s /workspace/build/Android/UNITY_BUILD_SUCCESS.txt || {
-            echo "::error::Unity did not produce the verified build-success sentinel."
+            set +e
+            unity-editor \
+              -batchmode \
+              -nographics \
+              -quit \
+              -accept-apiupdate \
+              -projectPath /workspace/UnityProject \
+              -buildTarget Android \
+              -executeMethod PersiaWarCiBuild.BuildAndroid \
+              -logFile - 2>&1 | tee "$attempt_log"
+            pipeline_status=("${PIPESTATUS[@]}")
+            unity_exit="${pipeline_status[0]}"
+            set -e
+
+            echo "UNITY_EDITOR_EXIT_CODE_ATTEMPT_${attempt}:${unity_exit}"
+            if [[ -s /workspace/build/Android/UNITY_BUILD_SUCCESS.txt && -s /workspace/build/Android/PersiaWar.apk ]]; then
+              UNITY_BUILD_SUCCEEDED=true
+              echo "UNITY_APK_READY:/workspace/build/Android/PersiaWar.apk"
+              if [[ "$unity_exit" -ne 0 ]]; then
+                echo "::warning::Unity Editor returned exit code $unity_exit after a successful BuildPipeline result; nonfatal editor diagnostics were present."
+              fi
+              break
+            fi
+
+            # Retry only recognizable transport interruptions while Gradle resolves
+            # remote Maven artifacts. Compiler, IL2CPP, and project errors fail fast.
+            if [[ "$attempt" -lt "$MAX_UNITY_BUILD_ATTEMPTS" ]] &&
+              grep -Eqi 'Premature end of Content-Length|Connection reset by peer|Connection timed out|Read timed out|UnknownHostException|Temporary failure in name resolution|Remote host terminated the handshake|unexpected end of stream|502 Bad Gateway|503 Service Unavailable|504 Gateway Timeout' "$attempt_log"; then
+              echo "::warning::Transient Gradle/Maven download interruption detected. Retrying the same build with the existing dependency cache."
+              sleep "$((attempt * 15))"
+              continue
+            fi
+
+            echo "::error::Unity Android build failed. No verified success sentinel or APK was produced."
             exit "$unity_exit"
-          }
-          test -s /workspace/build/Android/PersiaWar.apk
-          echo "UNITY_APK_READY:/workspace/build/Android/PersiaWar.apk"
-          if [[ "$unity_exit" -ne 0 ]]; then
-            echo "::warning::Unity Editor returned exit code $unity_exit after a successful BuildPipeline result; nonfatal editor diagnostics were present."
+          done
+
+          if [[ "$UNITY_BUILD_SUCCEEDED" != true ]]; then
+            echo "::error::Unity Android build did not succeed after the allowed transient-network retries."
+            exit 1
           fi
 
           SH
@@ -820,6 +857,7 @@ jobs:
             -e UNITY_PASSWORD="$UNITY_PASSWORD" \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$GITHUB_WORKSPACE/.ci-unity-home:/root" \
+            -v "$RUNNER_TEMP/persiawar-gradle-home:/gradle" \
             -w /workspace \
             "$IMAGE" \
             bash /workspace/.ci/unity-build.sh
