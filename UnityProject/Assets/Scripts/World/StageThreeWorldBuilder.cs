@@ -37,7 +37,6 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Material greenGlowMaterial;
     private Material warningMaterial;
     private Material uplinkOrbMaterial;
-    private readonly Material[] alienBodyMaterials = new Material[3];
     private readonly List<HovercraftPatrol> hovercrafts = new List<HovercraftPatrol>();
     private readonly List<GroundAlien> groundAliens = new List<GroundAlien>();
     private readonly List<TargetHealth> hostileHealth = new List<TargetHealth>();
@@ -54,6 +53,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private float savedCameraFarClip;
     private float savedCameraFieldOfView;
     private Color savedAmbientLight;
+    private UnityEngine.Rendering.AmbientMode savedAmbientMode;
+    private Color savedAmbientSkyColor;
+    private Color savedAmbientEquatorColor;
+    private Color savedAmbientGroundColor;
+    private float savedAmbientIntensity;
+    private float savedReflectionIntensity;
     private bool ambientCaptured;
     private Renderer[] savedPlayerRenderers;
     private bool[] savedPlayerRendererStates;
@@ -216,6 +221,12 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         {
             ClearWorldAndRestorePrevious();
             savedAmbientLight = RenderSettings.ambientLight;
+            savedAmbientMode = RenderSettings.ambientMode;
+            savedAmbientSkyColor = RenderSettings.ambientSkyColor;
+            savedAmbientEquatorColor = RenderSettings.ambientEquatorColor;
+            savedAmbientGroundColor = RenderSettings.ambientGroundColor;
+            savedAmbientIntensity = RenderSettings.ambientIntensity;
+            savedReflectionIntensity = RenderSettings.reflectionIntensity;
             ambientCaptured = true;
             GameObject oldWorld = FindSceneObject(WorldRootName);
             if (oldWorld != null) Destroy(oldWorld);
@@ -238,9 +249,6 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             greenGlowMaterial = CreateMaterial("S3_UplinkEnergy", new Color(0.34f, 1f, 0.73f), new Color(0.18f, 1f, 0.67f));
             warningMaterial = CreateMaterial("S3_HazardWarning", new Color(1f, 0.24f, 0.10f), new Color(1f, 0.10f, 0.035f));
             uplinkOrbMaterial = CreateMaterial("S3_UplinkOrbDeepBlueSilver", new Color(0.13f, 0.20f, 0.28f));
-            alienBodyMaterials[0] = CreateMaterial("S3_AlienChitin_Teal", new Color(0.075f, 0.30f, 0.34f));
-            alienBodyMaterials[1] = CreateMaterial("S3_AlienChitin_Violet", new Color(0.25f, 0.15f, 0.36f));
-            alienBodyMaterials[2] = CreateMaterial("S3_AlienChitin_Olive", new Color(0.24f, 0.31f, 0.12f));
             StartupCheckpoint.Set("StageThreeWorldBuildStarted");
             return true;
         }
@@ -424,15 +432,28 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
 
     private void BuildLighting()
     {
+        GraphicsQualityProfile.ApplyQualitySettings();
         GameObject lightObject = new GameObject("S3_ColdAlienKeyLight");
         lightObject.transform.SetParent(worldRoot, false);
         lightObject.transform.rotation = Quaternion.Euler(48f, -28f, 0f);
         Light key = lightObject.AddComponent<Light>();
         key.type = LightType.Directional;
-        key.color = new Color(0.83f, 0.88f, 1f);
-        key.intensity = 1.25f;
-        key.shadows = LightShadows.None;
-        RenderSettings.ambientLight = new Color(0.34f, 0.33f, 0.31f);
+        key.color = new Color(0.88f, 0.93f, 1f);
+        key.intensity = 1.48f;
+        key.shadows = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High
+            ? LightShadows.Soft
+            : (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.Medium
+                ? LightShadows.Hard : LightShadows.None);
+        key.shadowStrength = 0.84f;
+        key.renderMode = LightRenderMode.ForcePixel;
+        RenderSettings.sun = key;
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(0.56f, 0.66f, 0.82f);
+        RenderSettings.ambientEquatorColor = new Color(0.47f, 0.53f, 0.60f);
+        RenderSettings.ambientGroundColor = new Color(0.25f, 0.29f, 0.33f);
+        RenderSettings.ambientIntensity = 1.22f;
+        RenderSettings.reflectionIntensity = 0.72f;
+        EnvironmentLightingProfile.AddFillLights(worldRoot, false);
     }
 
     private IEnumerator BuildGroundAndBoundaryRoutine()
@@ -1175,62 +1196,27 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             return;
 
         int archetype = index % 3 + 1;
-        GameObject alien;
-#if UNITY_ANDROID
-        alien = new GameObject((guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00"));
+        GameObject alien = new GameObject(
+            (guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00"));
+        alien.transform.SetParent(worldRoot, true);
         alien.transform.position = position;
         alien.transform.localScale = GetAlienModelScale(archetype);
+        bool eliteGuard = guard && index >= 40;
+        if (eliteGuard)
+            alien.transform.localScale = new Vector3(1.12f, 1.62f, 1.12f);
+
         CapsuleCollider capsule = alien.AddComponent<CapsuleCollider>();
         capsule.radius = 0.55f;
         capsule.height = 1.8f;
         capsule.center = new Vector3(0f, 0.9f, 0f);
 
-        GameObject meshSource = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        MeshFilter sourceFilter = meshSource.GetComponent<MeshFilter>();
-        MeshFilter alienFilter = alien.AddComponent<MeshFilter>();
-        alienFilter.sharedMesh = sourceFilter.sharedMesh;
-        MeshRenderer alienRenderer = alien.AddComponent<MeshRenderer>();
-        alienRenderer.sharedMaterial = alienBodyMaterials[archetype - 1];
-        alienRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        alienRenderer.receiveShadows = false;
-        Collider temporaryCollider = meshSource.GetComponent<Collider>();
-        if (temporaryCollider != null) Destroy(temporaryCollider);
-        Renderer temporaryRenderer = meshSource.GetComponent<Renderer>();
-        if (temporaryRenderer != null) temporaryRenderer.enabled = false;
-        Destroy(meshSource);
-#else
-        alien = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        alien.name = (guard ? "S3_AlienGuard_" : "S3_AlienRover_") + index.ToString("00");
-        alien.transform.position = position;
-        alien.transform.localScale = GetAlienModelScale(archetype);
-        Renderer alienRenderer = alien.GetComponent<Renderer>();
-        if (alienRenderer != null)
-        {
-            alienRenderer.sharedMaterial = alienBodyMaterials[archetype - 1];
-        }
-#endif
-        alien.transform.SetParent(worldRoot, true);
-        bool eliteGuard = guard && index >= 40;
-        if (eliteGuard)
-            alien.transform.localScale = new Vector3(1.12f, 1.62f, 1.12f);
-        BuildAlienCreatureDetails(alien.transform, archetype, guard, eliteGuard);
-
         TargetHealth health = alien.AddComponent<TargetHealth>();
         health.SetMaxHealth(archetype == 3 ? 150 : (archetype == 2 ? 115 : 90));
-        // Stage 3 already shows a live total-hostile counter. Avoid spawning 80
-        // independent IMGUI health bars/raycast loops on mobile; aim still reads TargetHealth.
+        // Roaming aliens and sentries share the same detailed cached alien meshes.
+        // Existing sentry patrol logic still owns guard movement after the intro.
         EnemyChase chase = alien.AddComponent<EnemyChase>();
-        if (guard)
-        {
-            chase.SetTarget(localPlayer.transform);
-            chase.enabled = false;
-        }
-        else
-        {
-            chase.Configure(localPlayer.transform, archetype);
-            // Enemy movement and aiming begin only after the wide intro completes.
-            chase.enabled = false;
-        }
+        chase.Configure(localPlayer != null ? localPlayer.transform : null, archetype);
+        chase.enabled = false;
 
         GroundAlien data = new GroundAlien
         {
@@ -1254,32 +1240,6 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             case 1: return new Vector3(0.78f, 1.10f, 0.80f);
             case 2: return new Vector3(1.12f, 0.88f, 1.08f);
             default: return new Vector3(0.94f, 1.02f, 0.78f);
-        }
-    }
-
-    private void BuildAlienCreatureDetails(Transform alien, int archetype, bool guard, bool eliteGuard)
-    {
-        Material chitin = alienBodyMaterials[Mathf.Clamp(archetype - 1, 0, alienBodyMaterials.Length - 1)];
-        Material eyes = archetype == 1 ? cyanGlowMaterial
-            : (archetype == 2 ? greenGlowMaterial : warningMaterial);
-        float tallScale = eliteGuard ? 1.22f : 1f;
-        CreateSphereChild(alien, "S3_AlienCranium", new Vector3(0f, 0.76f * tallScale, 0.16f),
-            new Vector3(0.78f, 0.62f, 0.62f), chitin);
-        CreateBoxChild(alien, "S3_AlienChestArmor", new Vector3(0f, 0.05f, 0.35f),
-            new Vector3(0.46f, 0.34f, 0.18f), darkMetalMaterial);
-        CreateSphereChild(alien, "S3_AlienSegmentedAbdomen", new Vector3(0f, -0.12f, -0.46f),
-            new Vector3(0.48f, 0.38f, 0.62f), chitin);
-        CreateSphereChild(alien, "S3_AlienEyeLeft", new Vector3(-0.19f, 0.69f, 0.47f),
-            new Vector3(0.13f, 0.13f, 0.08f), eyes);
-        CreateSphereChild(alien, "S3_AlienEyeRight", new Vector3(0.19f, 0.69f, 0.47f),
-            new Vector3(0.13f, 0.13f, 0.08f), eyes);
-        if (guard)
-        {
-            CreateBoxChild(alien, "S3_AlienSentryBackpack", new Vector3(0f, 0.43f, -0.34f),
-                new Vector3(0.38f, 0.50f, 0.20f), silverMaterial);
-            CreateBoxChild(alien, eliteGuard ? "S3_EliteHeavyRifle" : "S3_AlienEnergyRifle",
-                new Vector3(0.47f, 0.06f, 0.45f), new Vector3(0.12f, 0.12f, 0.52f),
-                eliteGuard ? greenGlowMaterial : darkMetalMaterial);
         }
     }
 
@@ -1888,7 +1848,13 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         }
         if (ambientCaptured)
         {
+            RenderSettings.ambientMode = savedAmbientMode;
             RenderSettings.ambientLight = savedAmbientLight;
+            RenderSettings.ambientSkyColor = savedAmbientSkyColor;
+            RenderSettings.ambientEquatorColor = savedAmbientEquatorColor;
+            RenderSettings.ambientGroundColor = savedAmbientGroundColor;
+            RenderSettings.ambientIntensity = savedAmbientIntensity;
+            RenderSettings.reflectionIntensity = savedReflectionIntensity;
             ambientCaptured = false;
         }
 
@@ -2022,8 +1988,17 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Renderer renderer = target != null ? target.GetComponent<Renderer>() : null;
         if (renderer == null) return;
         renderer.sharedMaterial = material;
-        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        renderer.receiveShadows = false;
+        bool shadowsEnabled = QualitySettings.shadows != ShadowQuality.Disable;
+        string objectName = target.name;
+        bool lightOnly = objectName.IndexOf("Glow", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         objectName.IndexOf("Beam", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         objectName.IndexOf("Orb", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         objectName.IndexOf("Eye", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        bool ground = objectName.IndexOf("Ground", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        renderer.shadowCastingMode = shadowsEnabled && !ground && !lightOnly
+            ? UnityEngine.Rendering.ShadowCastingMode.On
+            : UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = shadowsEnabled && !lightOnly;
     }
 
     private static void RemoveCollider(GameObject target)

@@ -108,6 +108,7 @@ namespace PersiaWar.Unity2D5D
         private GameBootstrap gameBootstrap;
         private Texture2D pixel;
         private Texture2D mapTexture;
+        private static Texture2D heroPortraitDisc;
         private GUIStyle titleStyle;
         private GUIStyle headerStyle;
         private GUIStyle bodyStyle;
@@ -2430,16 +2431,9 @@ namespace PersiaWar.Unity2D5D
                     return;
                 }
 
-                float gap = 14f;
-                float totalWidth = Mathf.Min(Screen.width - 44f, 1120f);
-                float cardWidth = (totalWidth - gap * (HeroNames.Length - 1)) / HeroNames.Length;
-                float startX = (Screen.width - totalWidth) * 0.5f;
-                float top = 230f;
-                float cardHeight = Mathf.Max(170f, Mathf.Min(310f * GetUiScale(), Screen.height - 360f));
-
                 for (int hero = 0; hero < HeroNames.Length; hero++)
                 {
-                    Rect card = new Rect(startX + hero * (cardWidth + gap), top, cardWidth, cardHeight);
+                    Rect card = GetHeroCardRect(hero);
                     if (!card.Contains(gui))
                         continue;
 
@@ -2503,16 +2497,9 @@ namespace PersiaWar.Unity2D5D
                 : "ONLY ARDESHIR IS AVAILABLE  •  RESCUE ANAHITA FOR STAGE 2";
             GUI.Label(new Rect(24f, 176f, Screen.width - 48f, 36f), heroHint, menuSmallStyle);
 
-            float gap = 14f;
-            float totalWidth = Mathf.Min(Screen.width - 44f, 1120f);
-            float cardWidth = (totalWidth - gap * (HeroNames.Length - 1)) / HeroNames.Length;
-            float startX = (Screen.width - totalWidth) * 0.5f;
-            float top = 230f;
-            float cardHeight = Mathf.Min(310f, Screen.height - 360f);
-
             for (int i = 0; i < HeroNames.Length; i++)
             {
-                Rect card = new Rect(startX + i * (cardWidth + gap), top, cardWidth, cardHeight);
+                Rect card = GetHeroCardRect(i);
                 bool unlocked = IsHeroUnlocked(i);
                 DrawHeroCard(card, i, i == selectedHero, unlocked);
                 if (GUI.Button(card, GUIContent.none, GUIStyle.none) && unlocked)
@@ -2627,12 +2614,18 @@ namespace PersiaWar.Unity2D5D
             Fill(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, rect.height - 6f), panel);
             Fill(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, 5f), selected ? new Color(0.98f, 0.70f, 0.16f) : new Color(0.20f, 0.28f, 0.36f));
 
-            Rect figure = new Rect(rect.x + rect.width * 0.18f, rect.y + 34f, rect.width * 0.64f, rect.height * 0.52f);
-            DrawChibiFigure(figure, index);
+            bool compact = rect.height < 150f;
+            float nameOffset = compact ? 40f : 82f;
+            float stateOffset = compact ? 20f : 48f;
+            Rect figure = new Rect(rect.x + rect.width * 0.08f, rect.y + 8f,
+                rect.width * 0.84f, Mathf.Max(44f, rect.height - nameOffset - 14f));
+            DrawHeroPortrait(figure, index);
 
-            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 82f, rect.width - 16f, 34f), HeroNames[index], menuSmallStyle);
+            GUI.Label(new Rect(rect.x + 5f, rect.yMax - nameOffset, rect.width - 10f,
+                compact ? 19f : 32f), HeroNames[index], menuSmallStyle);
             string state = selected && unlocked ? "✦ SELECTED ✦" : (unlocked ? "TAP TO SELECT" : "LOCKED");
-            GUI.Label(new Rect(rect.x + 8f, rect.yMax - 48f, rect.width - 16f, 30f), state, menuSmallStyle);
+            GUI.Label(new Rect(rect.x + 5f, rect.yMax - stateOffset, rect.width - 10f,
+                compact ? 18f : 28f), state, menuSmallStyle);
 
             if (!unlocked)
             {
@@ -2645,47 +2638,201 @@ namespace PersiaWar.Unity2D5D
             }
         }
 
-        private void DrawChibiFigure(Rect rect, int index)
+        private Rect GetHeroCardRect(int index)
         {
-            Color[] bodyColors =
+            // Three columns/two rows on narrow portrait phones give each face room
+            // to remain visible and keep large, reliable native touch targets.
+            if (Screen.width < 580f && Screen.height > Screen.width)
             {
-                new Color(0.45f, 0.17f, 0.10f), // Ardeshir
-                new Color(0.78f, 0.20f, 0.48f), // Anahita
-                new Color(0.08f, 0.37f, 0.48f), // Pars Guard
-                new Color(0.16f, 0.39f, 0.24f), // Royal Scout
-                new Color(0.35f, 0.15f, 0.42f), // Silk Warrior
-                new Color(0.39f, 0.28f, 0.08f)  // Desert Knight
+                const int columns = 3;
+                const float gap = 10f;
+                float totalWidth = Mathf.Min(Screen.width - 28f, 600f);
+                float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
+                float startX = (Screen.width - totalWidth) * 0.5f;
+                float cardHeight = Mathf.Clamp((Screen.height - 372f) * 0.5f, 108f, 182f);
+                const float top = 218f;
+                return new Rect(
+                    startX + (index % columns) * (cardWidth + gap),
+                    top + (index / columns) * (cardHeight + gap),
+                    cardWidth, cardHeight);
+            }
+
+            const float horizontalGap = 14f;
+            float total = Mathf.Min(Screen.width - 44f, 1120f);
+            float itemWidth = (total - horizontalGap * (HeroNames.Length - 1)) / HeroNames.Length;
+            float left = (Screen.width - total) * 0.5f;
+            float height = Mathf.Max(170f, Mathf.Min(310f, Screen.height - 360f));
+            return new Rect(left + index * (itemWidth + horizontalGap), 230f, itemWidth, height);
+        }
+
+        private void EnsureHeroPortraitDisc()
+        {
+            if (heroPortraitDisc != null)
+                return;
+
+            const int size = 64;
+            Color32[] pixels = new Color32[size * size];
+            Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
+            float radius = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float distance = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
+                    float alpha = Mathf.Clamp01((radius - distance) * 1.5f + 0.5f);
+                    pixels[y * size + x] = new Color32(255, 255, 255,
+                        (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            }
+
+            heroPortraitDisc = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            heroPortraitDisc.name = "PersiaWarHeroPortraitDisc";
+            heroPortraitDisc.hideFlags = HideFlags.HideAndDontSave;
+            heroPortraitDisc.wrapMode = TextureWrapMode.Clamp;
+            heroPortraitDisc.filterMode = FilterMode.Bilinear;
+            heroPortraitDisc.SetPixels32(pixels);
+            heroPortraitDisc.Apply(false, true);
+        }
+
+        private void DrawPortraitOval(Rect rect, Color color)
+        {
+            EnsureHeroPortraitDisc();
+            Color old = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, heroPortraitDisc, ScaleMode.StretchToFill, true);
+            GUI.color = old;
+        }
+
+        private void DrawHeroPortrait(Rect rect, int index)
+        {
+            Color[] outfit =
+            {
+                new Color(0.09f, 0.19f, 0.39f), // Ardeshir
+                new Color(0.68f, 0.14f, 0.40f), // Anahita
+                new Color(0.10f, 0.35f, 0.40f), // Pars Guard
+                new Color(0.22f, 0.36f, 0.22f), // Royal Scout
+                new Color(0.31f, 0.15f, 0.39f), // Silk Warrior
+                new Color(0.42f, 0.31f, 0.12f)  // Desert Knight
+            };
+            Color[] headwear =
+            {
+                new Color(0.34f, 0.39f, 0.46f),
+                new Color(0.10f, 0.055f, 0.035f),
+                new Color(0.13f, 0.18f, 0.17f),
+                new Color(0.16f, 0.24f, 0.15f),
+                new Color(0.18f, 0.08f, 0.22f),
+                new Color(0.48f, 0.39f, 0.22f)
             };
 
-            Vector2 center = new Vector2(rect.center.x, rect.y + rect.height * 0.55f);
-            float head = rect.width * 0.33f;
-            float body = rect.width * 0.44f;
-            DrawCircle(center + new Vector2(0f, -head * 0.95f), head * 0.78f, new Color(0.76f, 0.53f, 0.34f, 1f));
-            Fill(new Rect(center.x - body * 0.5f, center.y - body * 0.05f, body, body * 0.8f), bodyColors[index]);
-            Fill(new Rect(center.x - body * 0.46f, center.y + body * 0.67f, body * 0.34f, body * 0.55f), new Color(0.07f, 0.09f, 0.12f));
-            Fill(new Rect(center.x + body * 0.12f, center.y + body * 0.67f, body * 0.34f, body * 0.55f), new Color(0.07f, 0.09f, 0.12f));
+            float faceWidth = Mathf.Min(rect.width * 0.56f, rect.height * 0.74f);
+            float faceHeight = faceWidth * 1.16f;
+            Vector2 faceCenter = new Vector2(rect.center.x, rect.y + rect.height * 0.43f);
+            float shoulders = Mathf.Min(rect.width * 0.92f, faceWidth * 1.75f);
+            float shoulderHeight = Mathf.Max(12f, rect.height * 0.31f);
+
+            // Chest and neck silhouette, then hair/helmet, then the face itself.
+            DrawPortraitOval(new Rect(faceCenter.x - shoulders * 0.56f,
+                faceCenter.y + faceHeight * 0.38f, shoulders * 0.62f, shoulderHeight), outfit[index]);
+            DrawPortraitOval(new Rect(faceCenter.x - shoulders * 0.06f,
+                faceCenter.y + faceHeight * 0.38f, shoulders * 0.62f, shoulderHeight), outfit[index]);
+            Fill(new Rect(faceCenter.x - faceWidth * 0.15f, faceCenter.y + faceHeight * 0.24f,
+                faceWidth * 0.30f, faceHeight * 0.38f), new Color(0.66f, 0.43f, 0.31f));
+            Fill(new Rect(faceCenter.x - faceWidth * 0.48f, faceCenter.y + faceHeight * 0.50f,
+                faceWidth * 0.96f, Mathf.Max(3f, faceHeight * 0.055f)), new Color(0.82f, 0.63f, 0.24f));
+
+            DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.59f,
+                faceCenter.y - faceHeight * 0.56f, faceWidth * 1.18f, faceHeight * 1.18f),
+                headwear[index]);
+            Color skin = new Color(0.78f, 0.54f, 0.40f);
+            DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.43f,
+                faceCenter.y - faceHeight * 0.43f, faceWidth * 0.86f, faceHeight * 0.94f), skin);
+
+            // Ears.
+            DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.51f,
+                faceCenter.y - faceHeight * 0.02f, faceWidth * 0.17f, faceHeight * 0.24f), skin);
+            DrawPortraitOval(new Rect(faceCenter.x + faceWidth * 0.34f,
+                faceCenter.y - faceHeight * 0.02f, faceWidth * 0.17f, faceHeight * 0.24f), skin);
+
+            // Eyes, brows, nose and mouth.
+            float eyeY = faceCenter.y - faceHeight * 0.04f;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float eyeX = faceCenter.x + side * faceWidth * 0.17f;
+                DrawPortraitOval(new Rect(eyeX - faceWidth * 0.055f, eyeY,
+                    faceWidth * 0.11f, faceHeight * 0.085f), Color.white);
+                DrawPortraitOval(new Rect(eyeX - faceWidth * 0.025f, eyeY + faceHeight * 0.018f,
+                    faceWidth * 0.05f, faceHeight * 0.055f), new Color(0.07f, 0.09f, 0.10f));
+                Fill(new Rect(eyeX - faceWidth * 0.075f, eyeY - faceHeight * 0.055f,
+                    faceWidth * 0.15f, Mathf.Max(1.5f, faceHeight * 0.025f)), headwear[index] * 0.7f);
+            }
+            Fill(new Rect(faceCenter.x - faceWidth * 0.018f, faceCenter.y + faceHeight * 0.02f,
+                faceWidth * 0.036f, faceHeight * 0.13f), new Color(0.60f, 0.37f, 0.28f));
+            Fill(new Rect(faceCenter.x - faceWidth * 0.08f, faceCenter.y + faceHeight * 0.20f,
+                faceWidth * 0.16f, Mathf.Max(1.5f, faceHeight * 0.025f)), new Color(0.36f, 0.15f, 0.13f));
 
             if (index == 0)
             {
-                Fill(new Rect(center.x - head * 0.9f, center.y - head * 1.62f, head * 1.8f, head * 0.32f), new Color(0.92f, 0.66f, 0.14f));
-                Fill(new Rect(center.x - 4f, center.y - head * 1.86f, 8f, head * 0.40f), new Color(0.92f, 0.66f, 0.14f));
-                Fill(new Rect(center.x - head * 0.44f, center.y - head * 0.28f, head * 0.88f, head * 0.47f), new Color(0.08f, 0.055f, 0.04f));
-            }
-            else if (index == 4)
-            {
-                Fill(new Rect(center.x - head * 0.82f, center.y - head * 1.45f, head * 1.64f, head * 0.18f), new Color(0.90f, 0.22f, 0.12f));
+                // Ardeshir: beard, steel helmet, gold brow trim and crest.
+                DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.31f,
+                    faceCenter.y + faceHeight * 0.15f, faceWidth * 0.62f, faceHeight * 0.34f),
+                    new Color(0.12f, 0.075f, 0.055f));
+                DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.61f,
+                    faceCenter.y - faceHeight * 0.66f, faceWidth * 1.22f, faceHeight * 0.36f), headwear[index]);
+                Fill(new Rect(faceCenter.x - faceWidth * 0.57f, faceCenter.y - faceHeight * 0.43f,
+                    faceWidth * 1.14f, Mathf.Max(2f, faceHeight * 0.055f)), new Color(0.94f, 0.70f, 0.22f));
+                Fill(new Rect(faceCenter.x - faceWidth * 0.035f, faceCenter.y - faceHeight * 0.79f,
+                    faceWidth * 0.07f, faceHeight * 0.22f), new Color(0.73f, 0.12f, 0.15f));
             }
             else if (index == 1)
             {
-                // Feminine silhouette, long dark hair and pink dress for Anahita.
-                Fill(new Rect(center.x - head * 0.78f, center.y - head * 1.36f, head * 1.56f, head * 0.36f), new Color(0.10f, 0.055f, 0.035f));
-                Fill(new Rect(center.x - head * 0.82f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
-                Fill(new Rect(center.x + head * 0.52f, center.y - head * 0.90f, head * 0.30f, head * 1.18f), new Color(0.10f, 0.055f, 0.035f));
-                Fill(new Rect(center.x - body * 0.34f, center.y + body * 0.65f, body * 0.68f, body * 0.62f), new Color(0.80f, 0.22f, 0.50f));
-                Fill(new Rect(center.x - body * 0.48f, center.y + body * 0.59f, body * 0.96f, body * 0.12f), new Color(0.95f, 0.72f, 0.24f));
+                // Anahita: long dark hair, a forehead diadem and a magenta jewel.
+                DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.58f,
+                    faceCenter.y - faceHeight * 0.06f, faceWidth * 0.22f, faceHeight * 0.62f), headwear[index]);
+                DrawPortraitOval(new Rect(faceCenter.x + faceWidth * 0.36f,
+                    faceCenter.y - faceHeight * 0.06f, faceWidth * 0.22f, faceHeight * 0.62f), headwear[index]);
+                Fill(new Rect(faceCenter.x - faceWidth * 0.44f, faceCenter.y - faceHeight * 0.46f,
+                    faceWidth * 0.88f, Mathf.Max(2f, faceHeight * 0.045f)), new Color(0.91f, 0.69f, 0.25f));
+                DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.07f,
+                    faceCenter.y - faceHeight * 0.49f, faceWidth * 0.14f, faceHeight * 0.13f),
+                    new Color(0.83f, 0.18f, 0.48f));
+            }
+            else if (index == 2)
+            {
+                // Pars Guard: olive steel helmet and dark visor.
+                DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.58f,
+                    faceCenter.y - faceHeight * 0.64f, faceWidth * 1.16f, faceHeight * 0.40f), headwear[index]);
+                Fill(new Rect(faceCenter.x - faceWidth * 0.51f, eyeY + faceHeight * 0.08f,
+                    faceWidth * 1.02f, faceHeight * 0.09f), new Color(0.07f, 0.09f, 0.10f));
+            }
+            else if (index == 3)
+            {
+                // Royal Scout: hood-like wrap and scarf across the lower face.
+                Fill(new Rect(faceCenter.x - faceWidth * 0.48f, faceCenter.y + faceHeight * 0.18f,
+                    faceWidth * 0.96f, faceHeight * 0.18f), new Color(0.67f, 0.55f, 0.34f));
+                Fill(new Rect(faceCenter.x - faceWidth * 0.47f, faceCenter.y - faceHeight * 0.46f,
+                    faceWidth * 0.94f, Mathf.Max(2f, faceHeight * 0.045f)), new Color(0.73f, 0.60f, 0.36f));
+            }
+            else if (index == 4)
+            {
+                // Silk Warrior: violet head wrap, gold edge and a red side sash.
+                Fill(new Rect(faceCenter.x - faceWidth * 0.47f, faceCenter.y - faceHeight * 0.43f,
+                    faceWidth * 0.94f, Mathf.Max(2f, faceHeight * 0.06f)), new Color(0.88f, 0.67f, 0.24f));
+                Fill(new Rect(faceCenter.x + faceWidth * 0.25f, faceCenter.y - faceHeight * 0.26f,
+                    faceWidth * 0.24f, faceHeight * 0.46f), new Color(0.64f, 0.11f, 0.18f));
+            }
+            else
+            {
+                // Desert Knight: khaki helmet and olive face guard.
+                DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.58f,
+                    faceCenter.y - faceHeight * 0.65f, faceWidth * 1.16f, faceHeight * 0.40f), headwear[index]);
+                Fill(new Rect(faceCenter.x - faceWidth * 0.46f, faceCenter.y + faceHeight * 0.15f,
+                    faceWidth * 0.92f, faceHeight * 0.21f), new Color(0.20f, 0.25f, 0.15f));
+                Fill(new Rect(faceCenter.x - faceWidth * 0.49f, faceCenter.y - faceHeight * 0.45f,
+                    faceWidth * 0.98f, Mathf.Max(2f, faceHeight * 0.055f)), new Color(0.86f, 0.66f, 0.23f));
             }
         }
-        private void DrawDropMap()
+
+                private void DrawDropMap()
         {
             if (stageNumber >= 2)
             {

@@ -103,16 +103,16 @@ namespace PersiaWar.Unity2D5D
             stopDistance = Mathf.Max(1f, rangedRange * 0.70f);
             meleeCooldown = archetype == 3 ? 1.05f : (archetype == 2 ? 1.25f : 1.5f);
             rangedCooldown = archetype == 3 ? 0.90f : (archetype == 2 ? 1.10f : 1.35f);
-            if (visual == null)
-                visual = StylizedCharacterVisual.Attach(transform, false, archetype);
-            else
-                visual.Configure(false, archetype);
-
-
-            if (visual != null)
-                visual.Configure(false, archetype);
-
+            // Use the shared detailed character meshes for every enemy archetype.
+            // Fall back to the legacy visual only if a mesh/shader could not be created.
             EnsureLibraryCharacterVisual();
+            if (libraryCharacterRig == null)
+            {
+                if (visual == null)
+                    visual = StylizedCharacterVisual.Attach(transform, false, archetype);
+                else
+                    visual.Configure(false, archetype);
+            }
             EnsureEnemyWeaponVisual();
             RemoveLegacyEnemyRangeIndicator();
         }
@@ -130,13 +130,22 @@ namespace PersiaWar.Unity2D5D
             string objectName = transform.name;
             bool stageThreeAlien = objectName.StartsWith("S3_Alien", System.StringComparison.Ordinal);
             bool stageFourAlien = objectName.StartsWith("S4_AlienTrooper_", System.StringComparison.Ordinal);
-            if (!stageThreeAlien && !stageFourAlien) return;
             if (libraryCharacterRig != null) return;
 
-            CharacterStyle style = stageFourAlien
-                ? CharacterStyle.AlienTrooper
-                : CharacterStyle.Alien;
-            CharacterRig created = CharacterModelFactory.Create(style, transform, Vector3.zero, 1f);
+            CharacterStyle style;
+            if (stageFourAlien)
+                style = CharacterStyle.AlienTrooper;
+            else if (stageThreeAlien)
+                style = archetype == 1 ? CharacterStyle.AlienScout
+                    : archetype == 2 ? CharacterStyle.AlienBrute : CharacterStyle.AlienHunter;
+            else
+                style = archetype == 1 ? CharacterStyle.Soldier
+                    : archetype == 2 ? CharacterStyle.RoyalScout : CharacterStyle.DesertKnight;
+
+            // Enemy models receive world lighting and shadows but do not cast their
+            // own realtime shadows in large waves, avoiding a large GPU shadow cost.
+            CharacterRig created = CharacterModelFactory.Create(
+                style, transform, Vector3.zero, 1f, false, true);
             if (created == null) return;
 
             libraryCharacterRig = created;
@@ -361,15 +370,32 @@ namespace PersiaWar.Unity2D5D
             else
                 ClearNavigationPath();
 
-            if (visual != null)
+            if (visual != null || libraryCharacterRig != null)
             {
                 bool repositioning = retreating || recoveringFromStall ||
                     (shouldMove && !hasLineOfSight);
                 Vector3 facing = repositioning
                     ? GetCurrentMovementDirection(movementDirection)
                     : direction;
-                visual.SetFacing(facing);
-                visual.SetMoving(shouldMove);
+
+                if (libraryCharacterRig != null)
+                {
+                    libraryCharacterRig.moveSpeed01 = shouldMove ? Mathf.Clamp01(moveSpeed / 8.5f) : 0f;
+                    libraryCharacterRig.aiming = player != null && !retreating &&
+                        hasLineOfSight && distance <= rangedRange;
+                    if (facing.sqrMagnitude > 0.001f)
+                    {
+                        Quaternion rigFacing = Quaternion.LookRotation(facing.normalized, Vector3.up);
+                        libraryCharacterRig.transform.rotation = Quaternion.Slerp(
+                            libraryCharacterRig.transform.rotation, rigFacing,
+                            1f - Mathf.Exp(-16f * Time.deltaTime));
+                    }
+                }
+                else
+                {
+                    visual.SetFacing(facing);
+                    visual.SetMoving(shouldMove);
+                }
             }
 
             if (player == null || retreating)

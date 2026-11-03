@@ -145,13 +145,34 @@ jobs:
           character_factory = Path('UnityProject/Assets/Scripts/Art/CharacterModelFactory.cs').read_text(encoding='utf-8')
           assert 'Shader "PersiaWar/CharacterLit"' in character_shader and '#pragma surface surf Standard fullforwardshadows addshadow' in character_shader, 'Hero shader must use lit forward-add rendering and shadow reception.'
           assert 'float3 worldPos;' in character_shader and 'UnityWorldSpaceViewDir(IN.worldPos)' in character_shader, 'Character rim lighting must use a valid world-space view vector.'
-          assert 'Resources.Load<Shader>("PersiaWarCharacterLit")' in character_factory and 'renderer.receiveShadows = true;' in character_factory, 'Playable hero meshes must use the dedicated lit material and receive shadows.'
+          assert 'Resources.Load<Shader>("PersiaWarCharacterLit")' in character_factory and 'renderer.receiveShadows = receiveCharacterShadows;' in character_factory, 'Playable hero meshes must use the dedicated lit material and support explicit shadow receiving.'
           assert 'CharacterModelFactory.Create(style, artRoot, Vector3.zero, 1f)' in visual, 'Android player does not instantiate the full procedural hero mesh.'
           assert 'CharacterStyle.RoyalScout' in character_factory and 'CharacterStyle.SilkWarrior' in character_factory and 'CharacterStyle.DesertKnight' in character_factory, 'All six selected heroes must have distinct procedural model styles.'
           lighting = Path('UnityProject/Assets/Scripts/Core/EnvironmentLightingProfile.cs').read_text(encoding='utf-8')
           assert 'PersiaWarEnvironmentFill' in lighting and 'PersiaWarEnvironmentRim' in lighting and 'LightRenderMode.ForcePixel' in lighting, 'World lighting must include the additional fill and rim lights.'
           stage_four = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'EnvironmentLightingProfile.AddFillLights(root, false);' in stage_four, 'Stage 4 must include the secondary light sources.'
+          model_factory = Path('UnityProject/Assets/Scripts/Art/CharacterModelFactory.cs').read_text(encoding='utf-8')
+          assert 'CharacterStyle.AlienScout' in model_factory and 'CharacterStyle.AlienBrute' in model_factory and 'CharacterStyle.AlienHunter' in model_factory, 'Stage 3 alien archetypes must use distinct detailed models.'
+          assert 'bool castCharacterShadows, bool receiveCharacterShadows' in model_factory and 'renderer.receiveShadows = receiveCharacterShadows;' in model_factory, 'Enemy meshes must receive world lighting without adding large-wave shadow casters.'
+          assert 'CharacterStyle.Soldier' in enemy_chase and 'CharacterStyle.RoyalScout' in enemy_chase and 'CharacterStyle.DesertKnight' in enemy_chase, 'All human enemy archetypes must use the shared detailed character factory.'
+          assert 'libraryCharacterRig.moveSpeed01' in enemy_chase and 'libraryCharacterRig.Kick(1f)' in enemy_chase, 'Factory enemy models must animate while moving and recoil when firing.'
+          stage3_builder = Path('UnityProject/Assets/Scripts/World/StageThreeWorldBuilder.cs').read_text(encoding='utf-8')
+          assert 'BuildAlienCreatureDetails(' not in stage3_builder and 'chase.Configure(localPlayer != null ? localPlayer.transform : null, archetype);' in stage3_builder, 'Stage 3 alien spawns must use complete shared models without duplicate primitive bodies.'
+          assert 'RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;' in stage3_builder and 'EnvironmentLightingProfile.AddFillLights(worldRoot, false);' in stage3_builder, 'Stage 3 must use brighter ambient and fill lighting.'
+          assert 'renderer.receiveShadows = shadowsEnabled && !lightOnly;' in stage3_builder, 'Stage 3 architecture must receive shadows.'
+          assert 'BuildAlienTrooperDetails(' not in stage_four and 'S4_AlienTrooper_' in enemy_chase and 'CharacterStyle.AlienTrooper' in enemy_chase, 'Stage 4 troopers must use the shared complete alien model.'
+          stage1_bootstrap = Path('UnityProject/Assets/Scripts/Core/GameBootstrap.cs').read_text(encoding='utf-8')
+          assert 'const int grid = 65;' in stage1_bootstrap and 'if (!stageTwoRequested)\n                return 0f;' in stage1_bootstrap, 'Stage 1 terrain must be dense and flat while Stage 2 retains its terrain.'
+          assert 'QualitySettings.antiAliasing = 0;' not in stage1_bootstrap, 'Android bootstrap must not override selected anti-aliasing quality.'
+          assert 'CharacterStyle.HeroAnahita' in stage1_bootstrap and 'RescueGirlCageBars' in stage1_bootstrap, 'Rescued Anahita must share the detailed playable hero model and preserve the cage encounter.'
+          assert 'RenderSettings.ambientIntensity = 1.22f;' in lighting and 'fill.intensity = 0.68f;' in lighting and 'rim.intensity = 0.42f;' in lighting, 'Stages 1 and 2 must use the brighter three-point lighting profile.'
+          assert 'RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;' in stage_four and 'savedReflectionIntensity' in stage_four, 'Stage 4 ambient lighting must be explicitly set and restored.'
+          hero_flow = Path('UnityProject/Assets/Scripts/Core/PrototypeFlow.cs').read_text(encoding='utf-8')
+          assert 'private void DrawHeroPortrait(Rect rect, int index)' in hero_flow and 'private Rect GetHeroCardRect(int index)' in hero_flow, 'Hero selection must display updated face portraits with responsive shared card layout.'
+          assert 'GetHeroCardRect(hero)' in hero_flow and 'DrawHeroPortrait(figure, index);' in hero_flow, 'Hero portraits and touch hitboxes must use identical card geometry.'
+          assert 'index / columns' in hero_flow and 'index % columns' in hero_flow, 'Portrait-phone hero selection must use a three-column layout.'
+
           assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
           stage4 = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'Shader shader = RuntimeMaterialFactory.GetShader();' in stage4, 'Stage 4 must prefer the Resources-backed shader to avoid Android shader stripping.'

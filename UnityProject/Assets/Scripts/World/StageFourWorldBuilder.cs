@@ -33,6 +33,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private CameraClearFlags savedClearFlags;
     private Transform legacyCity;
     private Color savedAmbient;
+    private UnityEngine.Rendering.AmbientMode savedAmbientMode;
+    private Color savedAmbientSkyColor;
+    private Color savedAmbientEquatorColor;
+    private Color savedAmbientGroundColor;
+    private float savedAmbientIntensity;
+    private float savedReflectionIntensity;
     private bool ambientCaptured;
 
     public bool IsCinematic => introRunning;
@@ -136,6 +142,12 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         {
             ClearWorld();
             savedAmbient = RenderSettings.ambientLight;
+            savedAmbientMode = RenderSettings.ambientMode;
+            savedAmbientSkyColor = RenderSettings.ambientSkyColor;
+            savedAmbientEquatorColor = RenderSettings.ambientEquatorColor;
+            savedAmbientGroundColor = RenderSettings.ambientGroundColor;
+            savedAmbientIntensity = RenderSettings.ambientIntensity;
+            savedReflectionIntensity = RenderSettings.reflectionIntensity;
             ambientCaptured = true;
             GameObject oldRoot = GameObject.Find(RootName);
             if (oldRoot != null) Destroy(oldRoot);
@@ -928,14 +940,21 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         lightGo.transform.rotation = Quaternion.Euler(48f, -24f, 0f);
         var light = lightGo.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.color = new Color(0.64f, 0.80f, 1f);
-        light.intensity = 1.2f;
-        light.shadows = LightShadows.None;
+        light.color = new Color(0.70f, 0.84f, 1f);
+        light.intensity = 1.42f;
+        light.shadows = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High
+            ? LightShadows.Soft
+            : (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.Medium
+                ? LightShadows.Hard : LightShadows.None);
+        light.shadowStrength = 0.84f;
         light.renderMode = LightRenderMode.ForcePixel;
         RenderSettings.sun = light;
-        RenderSettings.ambientLight = new Color(0.22f, 0.27f, 0.35f);
-        if (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High)
-            light.shadows = LightShadows.Soft;
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(0.61f, 0.70f, 0.86f);
+        RenderSettings.ambientEquatorColor = new Color(0.46f, 0.54f, 0.64f);
+        RenderSettings.ambientGroundColor = new Color(0.24f, 0.30f, 0.38f);
+        RenderSettings.ambientIntensity = 1.24f;
+        RenderSettings.reflectionIntensity = 0.76f;
         EnvironmentLightingProfile.AddFillLights(root, false);
         GraphicsQualityProfile.ApplyStageFourLook(root, controller != null ? controller.transform : null);
         SpawnMothershipPylon(new Vector3(-44f, 0f, -38f), 0);
@@ -1102,7 +1121,6 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
 
             StageFourAlienPatrol patrol = alien.AddComponent<StageFourAlienPatrol>();
             patrol.Configure(controller, chase, GetInteriorPatrolRoute(i));
-            BuildAlienTrooperDetails(alien.transform, archetype);
         }
         StartupCheckpoint.Set("StageFourInteriorAliensSpawned_" + interiorHostiles.Count);
         StartupCheckpoint.Set("StageFourAlienCorridorPatrolsConfigured_" + interiorHostiles.Count);
@@ -1167,40 +1185,6 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             new Vector3(exitSide, 0f, 105f), new Vector3(exitSide, 0f, 115f),
             new Vector3(-exitSide, 0f, 123f), new Vector3(-exitSide, 0f, 106f)
         };
-    }
-
-    private void BuildAlienTrooperDetails(Transform alien, int archetype)
-    {
-        Material armor = archetype == 2 ? brightMetal : alienArmor;
-        CreateAlienDetail(alien, "S4_AlienHead", new Vector3(0f, 1.48f, 0.04f),
-            new Vector3(0.62f, 0.53f, 0.52f), alienDark);
-        CreateAlienDetail(alien, "S4_AlienChestPlate", new Vector3(0f, 1.02f, 0.33f),
-            new Vector3(0.68f, 0.56f, 0.18f), armor);
-        CreateAlienDetail(alien, "S4_AlienShoulderL", new Vector3(-0.43f, 1.13f, 0.08f),
-            new Vector3(0.32f, 0.38f, 0.42f), armor);
-        CreateAlienDetail(alien, "S4_AlienShoulderR", new Vector3(0.43f, 1.13f, 0.08f),
-            new Vector3(0.32f, 0.38f, 0.42f), armor);
-        CreateAlienDetail(alien, "S4_AlienEyeL", new Vector3(-0.16f, 1.53f, 0.47f),
-            new Vector3(0.12f, 0.09f, 0.07f), alienEye);
-        CreateAlienDetail(alien, "S4_AlienEyeR", new Vector3(0.16f, 1.53f, 0.47f),
-            new Vector3(0.12f, 0.09f, 0.07f), alienEye);
-        CreateAlienDetail(alien, "S4_AlienAntennaL", new Vector3(-0.24f, 1.91f, 0.08f),
-            new Vector3(0.07f, 0.28f, 0.07f), alienEye);
-        CreateAlienDetail(alien, "S4_AlienAntennaR", new Vector3(0.24f, 1.91f, 0.08f),
-            new Vector3(0.07f, 0.28f, 0.07f), alienEye);
-    }
-
-    private void CreateAlienDetail(Transform parent, string name, Vector3 position, Vector3 size, Material material)
-    {
-        GameObject part = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        part.name = name;
-        part.transform.SetParent(parent, false);
-        part.transform.localPosition = position;
-        part.transform.localScale = size;
-        Renderer renderer = part.GetComponent<Renderer>();
-        if (renderer != null) renderer.sharedMaterial = material;
-        Collider collider = part.GetComponent<Collider>();
-        if (collider != null) Destroy(collider);
     }
 
     private void Box(string name, Vector3 pos, Vector3 size, Material mat, Quaternion rotation = default(Quaternion))
@@ -1268,7 +1252,17 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             if (city != null) legacyCity = city.transform;
         }
         if (legacyCity != null && legacyCity.gameObject != null) legacyCity.gameObject.SetActive(true);
-        if (ambientCaptured) { RenderSettings.ambientLight = savedAmbient; ambientCaptured = false; }
+        if (ambientCaptured)
+        {
+            RenderSettings.ambientMode = savedAmbientMode;
+            RenderSettings.ambientLight = savedAmbient;
+            RenderSettings.ambientSkyColor = savedAmbientSkyColor;
+            RenderSettings.ambientEquatorColor = savedAmbientEquatorColor;
+            RenderSettings.ambientGroundColor = savedAmbientGroundColor;
+            RenderSettings.ambientIntensity = savedAmbientIntensity;
+            RenderSettings.reflectionIntensity = savedReflectionIntensity;
+            ambientCaptured = false;
+        }
         if (gameplayCamera != null)
         {
             gameplayCamera.farClipPlane = savedFarClip > 0f ? savedFarClip : gameplayCamera.farClipPlane;

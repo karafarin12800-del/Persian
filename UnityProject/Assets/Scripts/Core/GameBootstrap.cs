@@ -352,9 +352,6 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.24f, 0.27f, 0.30f);
             RenderSettings.fog = false;
-#if UNITY_ANDROID
-            QualitySettings.antiAliasing = 0;
-#endif
             Light sun = FindFirstObjectByType<Light>();
             if (sun == null)
             {
@@ -500,7 +497,7 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidTerrain3D(Material material)
         {
-            const int grid = 17;
+            const int grid = 65;
             float half = worldSize * 0.5f;
             float step = worldSize / (grid - 1);
 
@@ -561,6 +558,12 @@ namespace PersiaWar.Unity2D5D
 
         private float CalculateAndroidTerrainHeight(float worldX, float worldZ)
         {
+            // Stage 1 is a dense urban battlefield. Its old coarse radial height field
+            // caused the city floor to look warped and made long roads appear kinked.
+            // Keep the city slab planar while retaining Stage 2's existing village relief.
+            if (!stageTwoRequested)
+                return 0f;
+
             float half = worldSize * 0.5f;
             float radial = Vector2.Distance(new Vector2(worldX, worldZ), Vector2.zero) / half;
             float edge = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((radial - 0.52f) / 0.48f));
@@ -1437,38 +1440,18 @@ namespace PersiaWar.Unity2D5D
             captiveVillageGirlRoot.transform.SetParent(worldRoot, true);
             captiveVillageGirlRoot.transform.position = captiveVillageGirlPosition;
 
-            Material skin = MakeMaterial("RescueGirlSkin", new Color(0.78f, 0.54f, 0.39f));
-            Material hair = MakeMaterial("RescueGirlHair", new Color(0.10f, 0.055f, 0.035f));
-            Material dress = MakeMaterial("RescueGirlDress", new Color(0.72f, 0.20f, 0.48f));
-            Material sash = MakeMaterial("RescueGirlSash", new Color(0.95f, 0.70f, 0.22f));
-            Material shoes = MakeMaterial("RescueGirlShoes", new Color(0.16f, 0.12f, 0.10f));
             Material bars = MakeMaterial("RescueGirlCageBars", new Color(0.30f, 0.31f, 0.29f));
             Material sparkle = MakeMaterial("RescueGirlRescueMarker", new Color(1f, 0.78f, 0.18f));
 
-            // A readable low-poly girl silhouette: long dark hair, a dress, a sash
-            // and a face. All pieces are visual-only; the encounter is distance-triggered.
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "Dress", PrimitiveType.Cylinder,
-                new Vector3(0f, 0.64f, 0f), new Vector3(0.39f, 0.43f, 0.31f), dress, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "UpperBody", PrimitiveType.Capsule,
-                new Vector3(0f, 1.12f, 0f), new Vector3(0.27f, 0.29f, 0.23f), dress, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "WaistSash", PrimitiveType.Cube,
-                new Vector3(0f, 0.88f, 0.02f), new Vector3(0.43f, 0.075f, 0.32f), sash, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "Head", PrimitiveType.Sphere,
-                new Vector3(0f, 1.54f, 0.025f), new Vector3(0.35f, 0.37f, 0.32f), skin, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "HairCap", PrimitiveType.Sphere,
-                new Vector3(0f, 1.72f, -0.015f), new Vector3(0.39f, 0.24f, 0.35f), hair, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LongHairLeft", PrimitiveType.Capsule,
-                new Vector3(-0.25f, 1.38f, -0.06f), new Vector3(0.13f, 0.31f, 0.14f), hair, new Vector3(0f, 0f, -8f));
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LongHairRight", PrimitiveType.Capsule,
-                new Vector3(0.25f, 1.38f, -0.06f), new Vector3(0.13f, 0.31f, 0.14f), hair, new Vector3(0f, 0f, 8f));
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LegLeft", PrimitiveType.Capsule,
-                new Vector3(-0.12f, 0.20f, 0f), new Vector3(0.11f, 0.25f, 0.12f), shoes, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "LegRight", PrimitiveType.Capsule,
-                new Vector3(0.12f, 0.20f, 0f), new Vector3(0.11f, 0.25f, 0.12f), shoes, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "EyeLeft", PrimitiveType.Sphere,
-                new Vector3(-0.085f, 1.57f, 0.177f), new Vector3(0.035f, 0.045f, 0.025f), hair, Vector3.zero);
-            CreateRescueGirlPart(captiveVillageGirlRoot.transform, "EyeRight", PrimitiveType.Sphere,
-                new Vector3(0.085f, 1.57f, 0.177f), new Vector3(0.035f, 0.045f, 0.025f), hair, Vector3.zero);
+            // Use the same complete Anahita model and face as the playable hero.
+            // Only the existing cage and rescue marker remain separate encounter props.
+            CharacterRig anahitaRig = CharacterModelFactory.Create(
+                CharacterStyle.HeroAnahita, captiveVillageGirlRoot.transform, Vector3.zero, 1f, true, true);
+            if (anahitaRig != null)
+            {
+                anahitaRig.moveSpeed01 = 0f;
+                anahitaRig.aiming = false;
+            }
 
             // A small iron cage makes the captive state clear but does not block
             // movement or bullets; rescue is intentionally tied to entering the room.

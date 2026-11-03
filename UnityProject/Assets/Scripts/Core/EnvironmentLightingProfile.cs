@@ -35,11 +35,11 @@ namespace PersiaWar.Unity2D5D
             sun.color = warmVillage
                 ? new Color(1f, 0.84f, 0.68f)
                 : new Color(1f, 0.94f, 0.82f);
-            sun.intensity = warmVillage ? 1.0f : 1.1f;
+            sun.intensity = warmVillage ? 1.28f : 1.38f;
             sun.shadows = QualitySettings.shadows == ShadowQuality.All
                 ? LightShadows.Soft
                 : (QualitySettings.shadows == ShadowQuality.HardOnly ? LightShadows.Hard : LightShadows.None);
-            sun.shadowStrength = QualitySettings.shadows == ShadowQuality.All ? 0.82f : 0.68f;
+            sun.shadowStrength = QualitySettings.shadows == ShadowQuality.All ? 0.86f : 0.72f;
             sun.renderMode = LightRenderMode.ForcePixel;
 
             // Keep one shadow-casting key light; the two additional lights are
@@ -56,23 +56,23 @@ namespace PersiaWar.Unity2D5D
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = warmVillage
-                ? new Color(0.46f, 0.52f, 0.62f)
-                : new Color(0.52f, 0.62f, 0.76f);
+                ? new Color(0.60f, 0.67f, 0.78f)
+                : new Color(0.61f, 0.70f, 0.84f);
             RenderSettings.ambientEquatorColor = warmVillage
-                ? new Color(0.48f, 0.40f, 0.31f)
-                : new Color(0.48f, 0.50f, 0.48f);
+                ? new Color(0.57f, 0.49f, 0.40f)
+                : new Color(0.53f, 0.58f, 0.63f);
             RenderSettings.ambientGroundColor = warmVillage
-                ? new Color(0.22f, 0.19f, 0.16f)
-                : new Color(0.20f, 0.23f, 0.20f);
-            RenderSettings.ambientIntensity = 1f;
-            RenderSettings.reflectionIntensity = 0.55f;
+                ? new Color(0.30f, 0.26f, 0.22f)
+                : new Color(0.27f, 0.31f, 0.29f);
+            RenderSettings.ambientIntensity = 1.22f;
+            RenderSettings.reflectionIntensity = 0.72f;
         }
         public static void AddFillLights(Transform owner, bool warmVillage)
         {
             Light fill = EnsureDirectional(owner, FillObjectName);
             fill.transform.rotation = Quaternion.Euler(22f, 138f, 0f);
             fill.color = warmVillage ? new Color(0.55f, 0.72f, 1f) : new Color(0.50f, 0.70f, 1f);
-            fill.intensity = 0.46f;
+            fill.intensity = 0.68f;
             fill.shadows = LightShadows.None;
             fill.renderMode = LightRenderMode.ForcePixel;
             fill.enabled = true;
@@ -80,7 +80,7 @@ namespace PersiaWar.Unity2D5D
             Light rim = EnsureDirectional(owner, RimObjectName);
             rim.transform.rotation = Quaternion.Euler(16f, 32f, 0f);
             rim.color = warmVillage ? new Color(1f, 0.72f, 0.48f) : new Color(0.72f, 0.84f, 1f);
-            rim.intensity = 0.30f;
+            rim.intensity = 0.42f;
             rim.shadows = LightShadows.None;
             rim.renderMode = LightRenderMode.ForcePixel;
             rim.enabled = true;
