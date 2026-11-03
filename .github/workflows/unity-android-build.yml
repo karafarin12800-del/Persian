@@ -173,7 +173,9 @@ jobs:
           assert 'const int grid = 65;' in stage1_bootstrap and 'if (!stageTwoRequested)\n                return 0f;' in stage1_bootstrap, 'Stage 1 terrain must be dense and flat while Stage 2 retains its terrain.'
           road_grid = stage1_bootstrap[stage1_bootstrap.index('private void BuildAndroidRoadGrid()'):stage1_bootstrap.index('private void BuildAndroidCrosswalks(')]
           assert 'List<float> roadCenters' in road_grid and 'new Vector2(roadWidth, roadWidth)' in road_grid, 'Stage 1 asphalt must use non-overlapping road runs and one tile per junction.'
-          quad_batch = stage1_bootstrap[stage1_bootstrap.index('private GameObject CreateAndroidQuadBatch('):stage1_bootstrap.index('private void BuildAndroidRoadGrid()')]
+          quad_batch_start = stage1_bootstrap.index('private GameObject CreateAndroidQuadBatch(')
+          quad_batch_end = stage1_bootstrap.index('private void AddAndroidOrientedTerrainPath(', quad_batch_start)
+          quad_batch = stage1_bootstrap[quad_batch_start:quad_batch_end]
           assert 'mesh.RecalculateNormals();' in quad_batch, 'Android road and sidewalk meshes must have valid normals on every quality tier.'
           assert 'bool isVilla = !isWarehouse' in stage1_bootstrap and 'VillaPorchDeck' in stage1_bootstrap and 'CityBalconySlab' in stage1_bootstrap and 'CreateAndroidPitchedRoof' in stage1_bootstrap, 'Stage 1 residential blocks must include porched villas, balconies and pitched roofs.'
           assert 'QualitySettings.antiAliasing = 0;' not in stage1_bootstrap, 'Android bootstrap must not override selected anti-aliasing quality.'
