@@ -29,6 +29,8 @@ namespace PersiaWar.Unity2D5D
         private Vector3 baseLocalPosition;
 
         private Transform mobileModelRoot;
+        private CharacterRig mobileCharacterRig;
+        private int mobileHeroIndex = -1;
         private Transform mobileLeftArmPivot;
         private Transform mobileRightArmPivot;
         private Transform mobileLeftLegPivot;
@@ -64,7 +66,9 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobilePackPouchRight;
 
         public Transform Muzzle => muzzle;
-        public Transform WeaponMount => mobileModelRoot != null ? mobileModelRoot : transform;
+        public Transform WeaponMount => mobileCharacterRig != null && mobileCharacterRig.weaponMount != null
+            ? mobileCharacterRig.weaponMount
+            : (mobileModelRoot != null ? mobileModelRoot : transform);
 
         public static StylizedCharacterVisual Attach(Transform owner, bool isPlayer, int characterArchetype)
         {
@@ -94,7 +98,12 @@ namespace PersiaWar.Unity2D5D
             LoadCharacterSprite();
             ApplyScale();
             if (Application.isMobilePlatform)
-                EnsureMobile3DCharacter();
+            {
+                if (playerCharacter)
+                    EnsureDetailedMobilePlayerCharacter(PlayerPrefs.GetInt("PW.SelectedHero", 0));
+                else
+                    EnsureMobile3DCharacter();
+            }
         }
 
         public void ConfigurePlayerHero(int heroIndex)
@@ -120,10 +129,7 @@ namespace PersiaWar.Unity2D5D
                 sprite.color = variants[index];
 
             if (Application.isMobilePlatform)
-            {
-                EnsureMobile3DCharacter();
-                ApplyMobilePlayerColors(index);
-            }
+                EnsureDetailedMobilePlayerCharacter(index);
         }
 
         public void SetFacing(Vector3 worldDirection)
@@ -148,6 +154,8 @@ namespace PersiaWar.Unity2D5D
         public void PlayFire()
         {
             fireUntil = Time.time + 0.07f;
+            if (mobileCharacterRig != null)
+                mobileCharacterRig.Kick(1f);
             // The muzzle flash is a presentation effect, not a dependency for entering
             // the match. Allocate it only when the first shot is actually fired.
             if (muzzleFlash == null)
@@ -195,17 +203,24 @@ namespace PersiaWar.Unity2D5D
             {
                 mobileModelRoot.localPosition = new Vector3(0f, bob, 0f);
 
-                // Lightweight procedural gait: opposing arm/leg swings with a
-                // restrained idle sway. No Animator or per-character allocations.
-                float gait = moving ? Mathf.Sin(t * 11f) * 0.42f : Mathf.Sin(t * 1.8f) * 0.025f;
-                if (mobileLeftArmPivot != null)
-                    mobileLeftArmPivot.localRotation = Quaternion.Euler(gait * Mathf.Rad2Deg, 0f, 0f);
-                if (mobileRightArmPivot != null)
-                    mobileRightArmPivot.localRotation = Quaternion.Euler(-gait * Mathf.Rad2Deg, 0f, 0f);
-                if (mobileLeftLegPivot != null)
-                    mobileLeftLegPivot.localRotation = Quaternion.Euler(-gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
-                if (mobileRightLegPivot != null)
-                    mobileRightLegPivot.localRotation = Quaternion.Euler(gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
+                if (mobileCharacterRig != null)
+                {
+                    mobileCharacterRig.moveSpeed01 = moving ? 1f : 0f;
+                    mobileCharacterRig.aiming = Time.time < fireUntil;
+                }
+                else
+                {
+                    // Lightweight procedural gait for the reduced enemy silhouette.
+                    float gait = moving ? Mathf.Sin(t * 11f) * 0.42f : Mathf.Sin(t * 1.8f) * 0.025f;
+                    if (mobileLeftArmPivot != null)
+                        mobileLeftArmPivot.localRotation = Quaternion.Euler(gait * Mathf.Rad2Deg, 0f, 0f);
+                    if (mobileRightArmPivot != null)
+                        mobileRightArmPivot.localRotation = Quaternion.Euler(-gait * Mathf.Rad2Deg, 0f, 0f);
+                    if (mobileLeftLegPivot != null)
+                        mobileLeftLegPivot.localRotation = Quaternion.Euler(-gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
+                    if (mobileRightLegPivot != null)
+                        mobileRightLegPivot.localRotation = Quaternion.Euler(gait * 0.85f * Mathf.Rad2Deg, 0f, 0f);
+                }
             }
 
             if (muzzle != null && Time.time < fireUntil)
@@ -215,8 +230,59 @@ namespace PersiaWar.Unity2D5D
         }
 
 
+        private void EnsureDetailedMobilePlayerCharacter(int heroIndex)
+        {
+            heroIndex = Mathf.Clamp(heroIndex, 0, 5);
+            if (mobileCharacterRig != null && mobileHeroIndex == heroIndex)
+            {
+                if (sprite != null) sprite.enabled = false;
+                if (shadowSprite != null) shadowSprite.enabled = false;
+                return;
+            }
+
+            if (mobileModelRoot != null)
+            {
+                mobileModelRoot.gameObject.SetActive(false);
+                Destroy(mobileModelRoot.gameObject);
+            }
+            mobileModelRoot = null;
+            mobileCharacterRig = null;
+            mobileHeroIndex = -1;
+            mobileLeftArmPivot = mobileRightArmPivot = null;
+            mobileLeftLegPivot = mobileRightLegPivot = null;
+
+            CharacterStyle style = heroIndex == 0 ? CharacterStyle.HeroArdeshir
+                : heroIndex == 1 ? CharacterStyle.HeroAnahita
+                : heroIndex == 2 ? CharacterStyle.Soldier
+                : heroIndex == 3 ? CharacterStyle.RoyalScout
+                : heroIndex == 4 ? CharacterStyle.SilkWarrior
+                : CharacterStyle.DesertKnight;
+
+            mobileCharacterRig = CharacterModelFactory.Create(style, artRoot, Vector3.zero, 1f);
+            if (mobileCharacterRig == null)
+            {
+                Debug.LogError("PersiaWar: failed to create detailed hero model " + style);
+                if (sprite != null) sprite.enabled = true;
+                if (shadowSprite != null) shadowSprite.enabled = true;
+                return;
+            }
+
+            mobileModelRoot = mobileCharacterRig.transform;
+            mobileHeroIndex = heroIndex;
+            mobileCharacterRig.moveSpeed01 = 0f;
+            mobileCharacterRig.aiming = false;
+            if (sprite != null) sprite.enabled = false;
+            if (shadowSprite != null) shadowSprite.enabled = false;
+            StartupCheckpoint.Set("AndroidDetailedHeroReady_" + style);
+        }
+
         private void EnsureMobile3DCharacter()
         {
+            if (playerCharacter)
+            {
+                EnsureDetailedMobilePlayerCharacter(PlayerPrefs.GetInt("PW.SelectedHero", 0));
+                return;
+            }
             if (mobileModelRoot != null)
             {
                 if (sprite != null) sprite.enabled = false;

@@ -67,6 +67,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         PlayerPrefs.SetInt(OverrideKey, (int)selectedTier);
         PlayerPrefs.Save();
         ApplyQualitySettings();
+        CharacterModelFactory.ApplyQualityTier();
         Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         for (int i = 0; i < cameras.Length; i++)
             if (cameras[i] != null) cameras[i].allowMSAA = selectedTier != QualityTier.Low;

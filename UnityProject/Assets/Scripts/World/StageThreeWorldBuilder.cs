@@ -228,6 +228,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             GameObject rootObject = new GameObject(WorldRootName);
             rootObject.transform.SetParent(transform, false);
             worldRoot = rootObject.transform;
+            EnvironmentLightingProfile.AddFillLights(worldRoot, false);
             groundMaterial = CreateMaterial("S3_SandyAlienGround", new Color(0.57f, 0.43f, 0.27f));
             groundPlateMaterial = CreateMaterial("S3_SandPlate", new Color(0.44f, 0.32f, 0.20f));
             silverMaterial = CreateMaterial("S3_BlueSilverAlienMetal", new Color(0.48f, 0.66f, 0.82f));

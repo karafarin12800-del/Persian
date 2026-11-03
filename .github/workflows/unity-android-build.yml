@@ -56,6 +56,8 @@ jobs:
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity
           test -f UnityProject/Assets/Scenes/PersiaWarPrototype.unity.meta
           test -f UnityProject/Assets/Resources/PersiaWarLit.shader
+          test -f UnityProject/Assets/Resources/PersiaWarCharacterLit.shader
+          test -f UnityProject/Assets/Resources/PersiaWarCharacterLit.shader.meta
           test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader
           test -f UnityProject/Assets/Resources/PersiaWarAndroidFlat.shader.meta
           test -f UnityProject/Assets/Resources/PersiaWarAndroidFade.shader
@@ -139,6 +141,15 @@ jobs:
           quality = Path('UnityProject/Assets/Scripts/Core/GraphicsQualityProfile.cs').read_text(encoding='utf-8')
           assert 'QualitySettings.shadowDistance = high ? 70f' in quality and 'QualitySettings.shadowResolution = high ? ShadowResolution.VeryHigh' in quality, 'HIGH tier must retain 70m VeryHigh real-time shadows.'
           assert 'QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;' in quality, 'Texture anisotropic filtering must remain forced on.'
+          character_shader = Path('UnityProject/Assets/Resources/PersiaWarCharacterLit.shader').read_text(encoding='utf-8')
+          character_factory = Path('UnityProject/Assets/Scripts/Art/CharacterModelFactory.cs').read_text(encoding='utf-8')
+          assert 'Shader "PersiaWar/CharacterLit"' in character_shader and '#pragma surface surf Standard fullforwardshadows addshadow' in character_shader, 'Hero shader must use lit forward-add rendering and shadow reception.'
+          assert 'Resources.Load<Shader>("PersiaWarCharacterLit")' in character_factory and 'renderer.receiveShadows = true;' in character_factory, 'Playable hero meshes must use the dedicated lit material and receive shadows.'
+          assert 'CharacterModelFactory.Create(style, artRoot, Vector3.zero, 1f)' in visual, 'Android player does not instantiate the full procedural hero mesh.'
+          assert 'CharacterStyle.RoyalScout' in character_factory and 'CharacterStyle.SilkWarrior' in character_factory and 'CharacterStyle.DesertKnight' in character_factory, 'All six selected heroes must have distinct procedural model styles.'
+          lighting = Path('UnityProject/Assets/Scripts/Core/EnvironmentLightingProfile.cs').read_text(encoding='utf-8')
+          assert 'PersiaWarEnvironmentFill' in lighting and 'PersiaWarEnvironmentRim' in lighting and 'LightRenderMode.ForcePixel' in lighting, 'World lighting must include the additional fill and rim lights.'
+          assert 'EnvironmentLightingProfile.AddFillLights(root, false);' in stage4, 'Stage 4 must include the secondary light sources.'
           assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
           stage4 = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')
           assert 'Shader shader = RuntimeMaterialFactory.GetShader();' in stage4, 'Stage 4 must prefer the Resources-backed shader to avoid Android shader stripping.'

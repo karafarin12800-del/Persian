@@ -8,8 +8,11 @@ namespace PersiaWar.Unity2D5D
         HeroArdeshir = 0,
         HeroAnahita = 1,
         Soldier = 2,
-        Alien = 3,
-        AlienTrooper = 4
+        RoyalScout = 3,
+        SilkWarrior = 4,
+        DesertKnight = 5,
+        Alien = 6,
+        AlienTrooper = 7
     }
 
     /// <summary>
@@ -92,6 +95,7 @@ namespace PersiaWar.Unity2D5D
         private const float HipWidth = 0.10f;
 
         private static readonly Dictionary<int, Mesh> meshes = new Dictionary<int, Mesh>();
+        private static Material characterMaterial;
 
         // ------------------------------------------------------------------ palette
         private static readonly Color32 Skin = MeshKit.C(0.86f, 0.64f, 0.48f, MeshKit.Matte);
@@ -158,6 +162,39 @@ namespace PersiaWar.Unity2D5D
             meshes.Clear();
         }
 
+        public static void ApplyQualityTier()
+        {
+            if (characterMaterial == null) return;
+            bool high = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High;
+            bool medium = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.Medium;
+            if (characterMaterial.HasProperty("_RimStrength"))
+                characterMaterial.SetFloat("_RimStrength", high ? 0.58f : (medium ? 0.38f : 0.12f));
+            if (characterMaterial.HasProperty("_SpecStrength"))
+                characterMaterial.SetFloat("_SpecStrength", high ? 0.95f : (medium ? 0.68f : 0.28f));
+            if (characterMaterial.HasProperty("_Gloss"))
+                characterMaterial.SetFloat("_Gloss", high ? 72f : (medium ? 48f : 28f));
+            if (characterMaterial.HasProperty("_EmissionBoost"))
+                characterMaterial.SetFloat("_EmissionBoost", high ? 2.4f : (medium ? 1.8f : 1.2f));
+            if (characterMaterial.HasProperty("_AmbientFloor"))
+                characterMaterial.SetFloat("_AmbientFloor", high ? 0.25f : (medium ? 0.22f : 0.18f));
+        }
+
+        private static Material GetCharacterMaterial()
+        {
+            if (characterMaterial != null) return characterMaterial;
+            Shader shader = Resources.Load<Shader>("PersiaWarCharacterLit");
+            if (shader == null)
+                return ModelLibrary.GetMaterial();
+            characterMaterial = new Material(shader)
+            {
+                name = "PW_HeroCharacterLitMaterial",
+                enableInstancing = true,
+                hideFlags = HideFlags.DontUnloadUnusedAsset
+            };
+            ApplyQualityTier();
+            return characterMaterial;
+        }
+
         private static Transform MakePart(Transform parent, string name, Vector3 localPosition, Mesh mesh)
         {
             GameObject go = new GameObject(name);
@@ -167,8 +204,19 @@ namespace PersiaWar.Unity2D5D
             MeshFilter filter = go.AddComponent<MeshFilter>();
             filter.sharedMesh = mesh;
             MeshRenderer renderer = go.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = ModelLibrary.GetMaterial();
+            renderer.sharedMaterial = GetCharacterMaterial();
             ModelLibrary.ConfigureRenderer(renderer);
+            if (renderer.sharedMaterial == characterMaterial)
+            {
+                renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.BlendProbes;
+                renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.BlendProbes;
+            }
+            if (parent != null && parent.root != null &&
+                !parent.root.name.Contains("Alien"))
+            {
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                renderer.receiveShadows = true;
+            }
             return go.transform;
         }
 
@@ -193,6 +241,7 @@ namespace PersiaWar.Unity2D5D
 
         // ------------------------------------------------------------------ torso (origin = hip centre)
 
+
         private static void BuildTorso(MeshKit k, CharacterStyle style)
         {
             switch (style)
@@ -200,28 +249,88 @@ namespace PersiaWar.Unity2D5D
                 case CharacterStyle.HeroArdeshir:
                     k.AddBox(new Vector3(0f, 0.06f, 0f), new Vector3(0.34f, 0.14f, 0.20f), NavyDark);
                     k.AddBox(new Vector3(0f, 0.34f, 0f), new Vector3(0.44f, 0.44f, 0.25f), Navy);
-                    k.AddBox(new Vector3(0f, 0.34f, 0.13f), new Vector3(0.20f, 0.20f, 0.02f), Gold);
-                    k.AddBox(new Vector3(0f, 0.15f, 0f), new Vector3(0.37f, 0.06f, 0.22f), Gold);
-                    k.AddBox(new Vector3(0f, 0.08f, 0.10f), new Vector3(0.10f, 0.10f, 0.03f), Gold);
-                    k.AddBox(new Vector3(0f, 0.20f, -0.17f), new Vector3(0.40f, 0.70f, 0.03f), Crimson,
+                    k.AddTaper(new Vector3(0f, 0.37f, 0.145f), new Vector2(0.31f, 0.35f),
+                        new Vector2(0.22f, 0.29f), 0.045f, Steel, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.38f, 0.175f), new Vector3(0.16f, 0.18f, 0.025f), Gold);
+                    k.AddCylinder(new Vector3(0f, 0.38f, 0.196f), 0.055f, 0.055f, 0.025f, 10,
+                        Crimson, MeshKit.AlongY, true, true);
+                    k.AddBox(new Vector3(0f, 0.15f, 0f), new Vector3(0.39f, 0.07f, 0.26f), Gold);
+                    k.AddBox(new Vector3(0f, 0.08f, 0.145f), new Vector3(0.12f, 0.11f, 0.035f), Gold);
+                    k.AddBox(new Vector3(0f, 0.20f, -0.17f), new Vector3(0.42f, 0.72f, 0.035f), Crimson,
                         Quaternion.Euler(8f, 0f, 0f));
+                    k.AddCylinder(new Vector3(-0.23f, 0.51f, 0f), 0.12f, 0.10f, 0.12f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    k.AddCylinder(new Vector3(0.23f, 0.51f, 0f), 0.12f, 0.10f, 0.12f, 8, Gold,
+                        MeshKit.AlongY, true, true);
                     break;
                 case CharacterStyle.HeroAnahita:
                     k.AddBox(new Vector3(0f, 0.06f, 0f), new Vector3(0.30f, 0.14f, 0.18f), Magenta);
                     k.AddBox(new Vector3(0f, 0.34f, 0f), new Vector3(0.36f, 0.42f, 0.21f), Crimson);
-                    k.AddBox(new Vector3(0f, 0.38f, 0.115f), new Vector3(0.16f, 0.14f, 0.02f), Gold);
-                    k.AddBox(new Vector3(0f, 0.15f, 0f), new Vector3(0.32f, 0.05f, 0.20f), Gold);
-                    k.AddCylinder(new Vector3(0f, -0.04f, 0f), 0.27f, 0.17f, 0.30f, 10, Magenta,
+                    k.AddTaper(new Vector3(0f, 0.38f, 0.12f), new Vector2(0.27f, 0.28f),
+                        new Vector2(0.19f, 0.24f), 0.04f, Gold, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.38f, 0.15f), new Vector3(0.12f, 0.13f, 0.035f), Magenta);
+                    k.AddBox(new Vector3(0f, 0.15f, 0f), new Vector3(0.34f, 0.06f, 0.22f), Gold);
+                    k.AddCylinder(new Vector3(0f, -0.04f, 0f), 0.27f, 0.17f, 0.30f, 12, Magenta,
                         MeshKit.AlongY, true, true);
+                    k.AddBox(new Vector3(0f, 0.18f, -0.16f), new Vector3(0.34f, 0.62f, 0.035f), Crimson,
+                        Quaternion.Euler(6f, 0f, 0f));
                     break;
                 case CharacterStyle.Soldier:
                     k.AddBox(new Vector3(0f, 0.06f, 0f), new Vector3(0.34f, 0.14f, 0.20f), OliveDark);
                     k.AddBox(new Vector3(0f, 0.34f, 0f), new Vector3(0.44f, 0.44f, 0.25f), Olive);
-                    k.AddBox(new Vector3(0f, 0.34f, 0.12f), new Vector3(0.38f, 0.34f, 0.05f), Khaki);
-                    k.AddBox(new Vector3(0f, 0.15f, 0f), new Vector3(0.37f, 0.06f, 0.22f), Black);
-                    k.AddBox(new Vector3(0.12f, 0.20f, 0.12f), new Vector3(0.09f, 0.10f, 0.05f), OliveDark);
-                    k.AddBox(new Vector3(-0.12f, 0.20f, 0.12f), new Vector3(0.09f, 0.10f, 0.05f), OliveDark);
-                    k.AddBox(new Vector3(0f, 0.34f, -0.19f), new Vector3(0.32f, 0.36f, 0.14f), OliveDark);
+                    k.AddBox(new Vector3(0f, 0.34f, 0.135f), new Vector3(0.36f, 0.34f, 0.05f), Khaki);
+                    k.AddBox(new Vector3(0f, 0.15f, 0f), new Vector3(0.39f, 0.07f, 0.24f), Black);
+                    k.AddBox(new Vector3(0.12f, 0.20f, 0.16f), new Vector3(0.10f, 0.12f, 0.07f), OliveDark);
+                    k.AddBox(new Vector3(-0.12f, 0.20f, 0.16f), new Vector3(0.10f, 0.12f, 0.07f), OliveDark);
+                    k.AddBox(new Vector3(0f, 0.34f, -0.19f), new Vector3(0.36f, 0.40f, 0.15f), OliveDark);
+                    k.AddBeam(new Vector3(-0.19f, 0.53f, 0.15f), new Vector3(0.18f, 0.16f, 0.15f),
+                        0.035f, 0.035f, Khaki);
+                    k.AddCylinder(new Vector3(-0.25f, 0.48f, 0f), 0.11f, 0.10f, 0.10f, 8, OliveDark,
+                        MeshKit.AlongY, true, true);
+                    k.AddCylinder(new Vector3(0.25f, 0.48f, 0f), 0.11f, 0.10f, 0.10f, 8, OliveDark,
+                        MeshKit.AlongY, true, true);
+                    break;
+                case CharacterStyle.RoyalScout:
+                    k.AddBox(new Vector3(0f, 0.06f, 0f), new Vector3(0.31f, 0.13f, 0.19f), Black);
+                    k.AddBox(new Vector3(0f, 0.34f, 0f), new Vector3(0.39f, 0.43f, 0.23f), Olive);
+                    k.AddTaper(new Vector3(0f, 0.36f, 0.13f), new Vector2(0.30f, 0.32f),
+                        new Vector2(0.22f, 0.25f), 0.045f, Khaki, Quaternion.identity);
+                    k.AddBeam(new Vector3(-0.16f, 0.55f, 0.17f), new Vector3(0.17f, 0.16f, 0.17f),
+                        0.035f, 0.035f, Black);
+                    k.AddBeam(new Vector3(0.16f, 0.55f, 0.17f), new Vector3(-0.17f, 0.16f, 0.17f),
+                        0.035f, 0.035f, Khaki);
+                    k.AddBox(new Vector3(-0.22f, 0.19f, 0.12f), new Vector3(0.12f, 0.15f, 0.09f), Black);
+                    k.AddBox(new Vector3(0.22f, 0.19f, 0.12f), new Vector3(0.12f, 0.15f, 0.09f), OliveDark);
+                    k.AddBox(new Vector3(0f, 0.18f, -0.16f), new Vector3(0.37f, 0.62f, 0.04f), OliveDark);
+                    break;
+                case CharacterStyle.SilkWarrior:
+                    k.AddBox(new Vector3(0f, 0.06f, 0f), new Vector3(0.32f, 0.14f, 0.20f), VioletDark);
+                    k.AddBox(new Vector3(0f, 0.34f, 0f), new Vector3(0.41f, 0.43f, 0.23f), Magenta);
+                    k.AddTaper(new Vector3(0f, 0.39f, 0.14f), new Vector2(0.31f, 0.33f),
+                        new Vector2(0.22f, 0.25f), 0.05f, Gold, Quaternion.identity);
+                    k.AddBeam(new Vector3(-0.19f, 0.54f, 0.15f), new Vector3(0.16f, 0.16f, 0.17f),
+                        0.045f, 0.045f, Crimson);
+                    k.AddBox(new Vector3(0f, 0.16f, 0f), new Vector3(0.40f, 0.07f, 0.25f), Gold);
+                    k.AddBox(new Vector3(0f, 0.20f, -0.17f), new Vector3(0.43f, 0.72f, 0.04f), VioletDark,
+                        Quaternion.Euler(8f, 0f, 0f));
+                    k.AddCylinder(new Vector3(-0.23f, 0.5f, 0f), 0.11f, 0.10f, 0.10f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    k.AddCylinder(new Vector3(0.23f, 0.5f, 0f), 0.11f, 0.10f, 0.10f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    break;
+                case CharacterStyle.DesertKnight:
+                    k.AddBox(new Vector3(0f, 0.06f, 0f), new Vector3(0.34f, 0.14f, 0.20f), Black);
+                    k.AddBox(new Vector3(0f, 0.34f, 0f), new Vector3(0.44f, 0.44f, 0.25f), Khaki);
+                    k.AddTaper(new Vector3(0f, 0.38f, 0.145f), new Vector2(0.34f, 0.34f),
+                        new Vector2(0.23f, 0.26f), 0.05f, Gold, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.34f, 0.18f), new Vector3(0.12f, 0.21f, 0.035f), OliveDark);
+                    k.AddBox(new Vector3(0f, 0.16f, 0f), new Vector3(0.40f, 0.07f, 0.25f), Black);
+                    k.AddBox(new Vector3(0f, 0.16f, -0.17f), new Vector3(0.43f, 0.71f, 0.04f), Khaki,
+                        Quaternion.Euler(7f, 0f, 0f));
+                    k.AddCylinder(new Vector3(-0.24f, 0.50f, 0f), 0.13f, 0.11f, 0.12f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    k.AddCylinder(new Vector3(0.24f, 0.50f, 0f), 0.13f, 0.11f, 0.12f, 8, Gold,
+                        MeshKit.AlongY, true, true);
                     break;
                 case CharacterStyle.Alien:
                     k.AddEllipsoid(new Vector3(0f, 0.08f, 0f), new Vector3(0.12f, 0.12f, 0.09f), 8, 5, AlienSkinDark,
@@ -230,19 +339,19 @@ namespace PersiaWar.Unity2D5D
                         Quaternion.identity);
                     k.AddBox(new Vector3(0f, 0.34f, 0.11f), new Vector3(0.10f, 0.22f, 0.02f), AlienSkinDark);
                     break;
-                default:   // AlienTrooper
+                default:
                     k.AddEllipsoid(new Vector3(0f, 0.08f, 0f), new Vector3(0.12f, 0.12f, 0.09f), 8, 5, VioletDark,
                         Quaternion.identity);
                     k.AddEllipsoid(new Vector3(0f, 0.32f, 0f), new Vector3(0.18f, 0.27f, 0.13f), 8, 6, AlienSkin,
                         Quaternion.identity);
                     k.AddBox(new Vector3(0f, 0.34f, 0.12f), new Vector3(0.28f, 0.30f, 0.05f), Violet);
                     k.AddSphere(new Vector3(0f, 0.36f, 0.15f), 0.045f, 8, 5, Teal);
-                    k.AddBox(new Vector3(0f, 0.15f, 0f), new Vector3(0.28f, 0.05f, 0.18f), VioletDark);
                     break;
             }
         }
 
         // ------------------------------------------------------------------ head (origin = neck)
+
 
         private static void BuildHead(MeshKit k, CharacterStyle style)
         {
@@ -253,29 +362,75 @@ namespace PersiaWar.Unity2D5D
                     k.AddEllipsoid(new Vector3(0f, 0.16f, 0f), new Vector3(0.10f, 0.12f, 0.11f), 8, 6, Skin,
                         Quaternion.identity);
                     k.AddEllipsoid(new Vector3(0f, 0.08f, 0.04f), new Vector3(0.085f, 0.07f, 0.08f), 8, 5,
-                        MeshKit.C(0.10f, 0.07f, 0.05f, MeshKit.Matte), Quaternion.identity);   // beard
+                        MeshKit.C(0.10f, 0.07f, 0.05f, MeshKit.Matte), Quaternion.identity);
+                    k.AddSphere(new Vector3(-0.045f, 0.18f, 0.094f), 0.018f, 6, 4, EyeDark);
+                    k.AddSphere(new Vector3(0.045f, 0.18f, 0.094f), 0.018f, 6, 4, EyeDark);
                     k.AddCylinder(new Vector3(0f, 0.27f, 0f), 0.115f, 0.03f, 0.10f, 8, Steel,
-                        MeshKit.AlongY, true, true);   // helmet cone
-                    k.AddCylinder(new Vector3(0f, 0.20f, 0f), 0.118f, 0.04f, 8, Gold, MeshKit.AlongY);   // band
-                    k.AddBox(new Vector3(0f, 0.34f, 0f), new Vector3(0.015f, 0.08f, 0.015f), Gold);
+                        MeshKit.AlongY, true, true);
+                    k.AddCylinder(new Vector3(0f, 0.20f, 0f), 0.118f, 0.04f, 8, Gold, MeshKit.AlongY);
+                    k.AddTaper(new Vector3(0f, 0.35f, -0.01f), new Vector2(0.055f, 0.02f),
+                        new Vector2(0.012f, 0.01f), 0.17f, Crimson, Quaternion.identity);
                     break;
                 case CharacterStyle.HeroAnahita:
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.045f, 0.08f, 8, Skin, MeshKit.AlongY);
                     k.AddEllipsoid(new Vector3(0f, 0.16f, 0f), new Vector3(0.095f, 0.115f, 0.10f), 8, 6, Skin,
                         Quaternion.identity);
                     k.AddEllipsoid(new Vector3(0f, 0.20f, -0.02f), new Vector3(0.108f, 0.11f, 0.115f), 8, 6,
-                        MeshKit.C(0.12f, 0.07f, 0.05f, MeshKit.Matte), Quaternion.identity);   // hair
+                        MeshKit.C(0.12f, 0.07f, 0.05f, MeshKit.Matte), Quaternion.identity);
                     k.AddEllipsoid(new Vector3(0f, 0.04f, -0.13f), new Vector3(0.05f, 0.16f, 0.05f), 6, 5,
-                        MeshKit.C(0.12f, 0.07f, 0.05f, MeshKit.Matte), Quaternion.Euler(-12f, 0f, 0f));   // ponytail
-                    k.AddBox(new Vector3(0f, 0.27f, 0.07f), new Vector3(0.12f, 0.02f, 0.02f), Gold);   // diadem
+                        MeshKit.C(0.12f, 0.07f, 0.05f, MeshKit.Matte), Quaternion.Euler(-12f, 0f, 0f));
+                    k.AddSphere(new Vector3(-0.043f, 0.17f, 0.09f), 0.016f, 6, 4, EyeDark);
+                    k.AddSphere(new Vector3(0.043f, 0.17f, 0.09f), 0.016f, 6, 4, EyeDark);
+                    k.AddBox(new Vector3(0f, 0.27f, 0.07f), new Vector3(0.16f, 0.025f, 0.035f), Gold);
+                    k.AddSphere(new Vector3(0f, 0.285f, 0.095f), 0.025f, 6, 4, Magenta);
                     break;
                 case CharacterStyle.Soldier:
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.05f, 0.08f, 8, SkinDark, MeshKit.AlongY);
                     k.AddEllipsoid(new Vector3(0f, 0.16f, 0f), new Vector3(0.10f, 0.12f, 0.11f), 8, 6, Skin,
                         Quaternion.identity);
                     k.AddEllipsoid(new Vector3(0f, 0.21f, 0f), new Vector3(0.125f, 0.10f, 0.135f), 8, 5, OliveDark,
-                        Quaternion.identity);   // helmet
-                    k.AddBox(new Vector3(0f, 0.15f, 0.09f), new Vector3(0.15f, 0.04f, 0.03f), Black);   // strap / goggles
+                        Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.15f, 0.09f), new Vector3(0.15f, 0.04f, 0.03f), Black);
+                    k.AddSphere(new Vector3(-0.045f, 0.17f, 0.108f), 0.014f, 5, 4, EyeDark);
+                    k.AddSphere(new Vector3(0.045f, 0.17f, 0.108f), 0.014f, 5, 4, EyeDark);
+                    break;
+                case CharacterStyle.RoyalScout:
+                    k.AddEllipsoid(new Vector3(0f, 0.16f, 0f), new Vector3(0.10f, 0.12f, 0.11f), 8, 6, Skin,
+                        Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.19f, -0.025f), new Vector3(0.135f, 0.17f, 0.14f), 8, 6,
+                        OliveDark, Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.10f, 0.09f), new Vector3(0.09f, 0.075f, 0.045f), 7, 5,
+                        Khaki, Quaternion.identity);
+                    k.AddSphere(new Vector3(-0.045f, 0.17f, 0.104f), 0.015f, 5, 4, EyeDark);
+                    k.AddSphere(new Vector3(0.045f, 0.17f, 0.104f), 0.015f, 5, 4, EyeDark);
+                    k.AddBox(new Vector3(0f, 0.29f, 0f), new Vector3(0.22f, 0.045f, 0.19f), Olive);
+                    k.AddTaper(new Vector3(0f, 0.35f, -0.01f), new Vector2(0.025f, 0.025f),
+                        new Vector2(0.005f, 0.005f), 0.15f, Khaki, Quaternion.identity);
+                    break;
+                case CharacterStyle.SilkWarrior:
+                    k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.045f, 0.08f, 8, Skin, MeshKit.AlongY);
+                    k.AddEllipsoid(new Vector3(0f, 0.16f, 0f), new Vector3(0.095f, 0.115f, 0.10f), 8, 6, Skin,
+                        Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.21f, -0.04f), new Vector3(0.115f, 0.13f, 0.12f), 8, 6,
+                        VioletDark, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.27f, 0.06f), new Vector3(0.22f, 0.035f, 0.035f), Gold);
+                    k.AddSphere(new Vector3(-0.042f, 0.17f, 0.09f), 0.016f, 6, 4, EyeDark);
+                    k.AddSphere(new Vector3(0.042f, 0.17f, 0.09f), 0.016f, 6, 4, EyeDark);
+                    k.AddTaper(new Vector3(0.09f, 0.17f, -0.02f), new Vector2(0.08f, 0.06f),
+                        new Vector2(0.03f, 0.02f), 0.12f, Magenta, Quaternion.Euler(0f, 0f, -22f));
+                    break;
+                case CharacterStyle.DesertKnight:
+                    k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.045f, 0.08f, 8, SkinDark, MeshKit.AlongY);
+                    k.AddEllipsoid(new Vector3(0f, 0.16f, 0f), new Vector3(0.10f, 0.12f, 0.11f), 8, 6, Skin,
+                        Quaternion.identity);
+                    k.AddEllipsoid(new Vector3(0f, 0.22f, -0.015f), new Vector3(0.145f, 0.16f, 0.14f), 8, 6,
+                        Khaki, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.12f, 0.105f), new Vector3(0.18f, 0.10f, 0.04f), OliveDark);
+                    k.AddSphere(new Vector3(-0.045f, 0.17f, 0.105f), 0.014f, 5, 4, EyeDark);
+                    k.AddSphere(new Vector3(0.045f, 0.17f, 0.105f), 0.014f, 5, 4, EyeDark);
+                    k.AddBox(new Vector3(0f, 0.29f, 0f), new Vector3(0.25f, 0.04f, 0.24f), Khaki);
+                    k.AddTaper(new Vector3(0f, 0.31f, -0.04f), new Vector2(0.13f, 0.06f),
+                        new Vector2(0.04f, 0.025f), 0.17f, Gold, Quaternion.identity);
                     break;
                 case CharacterStyle.Alien:
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.035f, 0.10f, 8, AlienSkinDark, MeshKit.AlongY);
@@ -288,18 +443,19 @@ namespace PersiaWar.Unity2D5D
                     k.AddSphere(new Vector3(0.07f, 0.20f, 0.14f), 0.012f, 5, 4, Teal);
                     k.AddSphere(new Vector3(-0.07f, 0.20f, 0.14f), 0.012f, 5, 4, Teal);
                     break;
-                default:   // AlienTrooper
+                default:
                     k.AddCylinder(new Vector3(0f, 0.03f, 0f), 0.035f, 0.10f, 8, AlienSkinDark, MeshKit.AlongY);
                     k.AddEllipsoid(new Vector3(0f, 0.22f, 0.02f), new Vector3(0.16f, 0.21f, 0.15f), 10, 7, AlienSkin,
                         Quaternion.identity);
                     k.AddEllipsoid(new Vector3(0f, 0.30f, -0.01f), new Vector3(0.17f, 0.13f, 0.16f), 8, 5, Violet,
-                        Quaternion.identity);   // crest
-                    k.AddBox(new Vector3(0f, 0.20f, 0.14f), new Vector3(0.22f, 0.07f, 0.04f), Teal);   // visor
+                        Quaternion.identity);
+                    k.AddBox(new Vector3(0f, 0.20f, 0.14f), new Vector3(0.22f, 0.07f, 0.04f), Teal);
                     break;
             }
         }
 
         // ------------------------------------------------------------------ arm (origin = shoulder, hangs down -Y)
+
 
         private static void BuildArm(MeshKit k, CharacterStyle style)
         {
@@ -307,29 +463,58 @@ namespace PersiaWar.Unity2D5D
             {
                 case CharacterStyle.HeroArdeshir:
                     k.AddSphere(new Vector3(0f, 0.02f, 0f), 0.10f, 8, 5, Gold);
-                    k.AddBox(new Vector3(0f, -0.15f, 0f), new Vector3(0.12f, 0.30f, 0.12f), Navy);
-                    k.AddBox(new Vector3(0f, -0.42f, 0f), new Vector3(0.10f, 0.26f, 0.10f), Steel);
-                    k.AddSphere(new Vector3(0f, -0.58f, 0f), 0.055f, 6, 4, Skin);
+                    k.AddBox(new Vector3(0f, -0.15f, 0f), new Vector3(0.14f, 0.30f, 0.14f), Navy);
+                    k.AddCylinder(new Vector3(0f, -0.40f, 0.02f), 0.082f, 0.09f, 0.12f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    k.AddBox(new Vector3(0f, -0.48f, 0f), new Vector3(0.11f, 0.25f, 0.12f), Steel);
+                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.065f, 7, 5, Skin);
                     break;
                 case CharacterStyle.HeroAnahita:
                     k.AddSphere(new Vector3(0f, 0.02f, 0f), 0.08f, 8, 5, Gold);
-                    k.AddBox(new Vector3(0f, -0.15f, 0f), new Vector3(0.10f, 0.30f, 0.10f), Crimson);
-                    k.AddBox(new Vector3(0f, -0.42f, 0f), new Vector3(0.085f, 0.26f, 0.085f), Skin);
-                    k.AddBox(new Vector3(0f, -0.36f, 0f), new Vector3(0.10f, 0.08f, 0.10f), Gold);
-                    k.AddSphere(new Vector3(0f, -0.58f, 0f), 0.05f, 6, 4, Skin);
+                    k.AddBox(new Vector3(0f, -0.15f, 0f), new Vector3(0.12f, 0.30f, 0.12f), Crimson);
+                    k.AddCylinder(new Vector3(0f, -0.39f, 0.02f), 0.073f, 0.08f, 0.10f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    k.AddBox(new Vector3(0f, -0.48f, 0f), new Vector3(0.095f, 0.24f, 0.095f), Skin);
+                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.055f, 7, 5, Skin);
                     break;
                 case CharacterStyle.Soldier:
                     k.AddSphere(new Vector3(0f, 0.02f, 0f), 0.085f, 8, 5, OliveDark);
-                    k.AddBox(new Vector3(0f, -0.15f, 0f), new Vector3(0.12f, 0.30f, 0.12f), Olive);
-                    k.AddBox(new Vector3(0f, -0.42f, 0f), new Vector3(0.10f, 0.26f, 0.10f), Khaki);
-                    k.AddSphere(new Vector3(0f, -0.58f, 0f), 0.055f, 6, 4, Black);
+                    k.AddBox(new Vector3(0f, -0.15f, 0f), new Vector3(0.14f, 0.30f, 0.14f), Olive);
+                    k.AddBox(new Vector3(0f, -0.40f, 0.02f), new Vector3(0.12f, 0.28f, 0.12f), Khaki);
+                    k.AddCylinder(new Vector3(0f, -0.47f, 0.02f), 0.073f, 0.08f, 0.10f, 8, OliveDark,
+                        MeshKit.AlongY, true, true);
+                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.06f, 7, 5, Black);
+                    break;
+                case CharacterStyle.RoyalScout:
+                    k.AddSphere(new Vector3(0f, 0.01f, 0f), 0.08f, 7, 5, Khaki);
+                    k.AddBox(new Vector3(0f, -0.16f, 0f), new Vector3(0.12f, 0.31f, 0.12f), Olive);
+                    k.AddBox(new Vector3(0f, -0.40f, 0.02f), new Vector3(0.10f, 0.27f, 0.10f), OliveDark);
+                    k.AddCylinder(new Vector3(0f, -0.48f, 0.02f), 0.07f, 0.075f, 0.10f, 8, Khaki,
+                        MeshKit.AlongY, true, true);
+                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.055f, 7, 5, Skin);
+                    break;
+                case CharacterStyle.SilkWarrior:
+                    k.AddSphere(new Vector3(0f, 0.02f, 0f), 0.085f, 7, 5, Gold);
+                    k.AddBox(new Vector3(0f, -0.16f, 0f), new Vector3(0.13f, 0.32f, 0.13f), Magenta);
+                    k.AddBox(new Vector3(0f, -0.39f, 0.02f), new Vector3(0.10f, 0.26f, 0.10f), Violet);
+                    k.AddCylinder(new Vector3(0f, -0.48f, 0.02f), 0.074f, 0.08f, 0.10f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.058f, 7, 5, Skin);
+                    break;
+                case CharacterStyle.DesertKnight:
+                    k.AddSphere(new Vector3(0f, 0.02f, 0f), 0.09f, 7, 5, Gold);
+                    k.AddBox(new Vector3(0f, -0.16f, 0f), new Vector3(0.14f, 0.32f, 0.14f), Khaki);
+                    k.AddBox(new Vector3(0f, -0.40f, 0.02f), new Vector3(0.11f, 0.27f, 0.11f), OliveDark);
+                    k.AddCylinder(new Vector3(0f, -0.48f, 0.02f), 0.078f, 0.085f, 0.10f, 8, Gold,
+                        MeshKit.AlongY, true, true);
+                    k.AddSphere(new Vector3(0f, -0.61f, 0.02f), 0.06f, 7, 5, SkinDark);
                     break;
                 case CharacterStyle.Alien:
                     k.AddBox(new Vector3(0f, -0.20f, 0f), new Vector3(0.07f, 0.40f, 0.07f), AlienSkin);
                     k.AddBox(new Vector3(0f, -0.55f, 0f), new Vector3(0.06f, 0.30f, 0.06f), AlienSkinDark);
                     k.AddBox(new Vector3(0f, -0.74f, 0.02f), new Vector3(0.09f, 0.10f, 0.05f), AlienSkin);
                     break;
-                default:   // AlienTrooper
+                default:
                     k.AddBeam(new Vector3(0f, 0.04f, 0f), new Vector3(0f, 0.12f, 0.08f), 0.05f, 0.05f, Violet);
                     k.AddBox(new Vector3(0f, 0.02f, 0f), new Vector3(0.16f, 0.07f, 0.14f), Violet);
                     k.AddBox(new Vector3(0f, -0.20f, 0f), new Vector3(0.07f, 0.40f, 0.07f), AlienSkin);
@@ -341,6 +526,7 @@ namespace PersiaWar.Unity2D5D
 
         // ------------------------------------------------------------------ leg (origin = hip, hangs down -Y)
 
+
         private static void BuildLeg(MeshKit k, CharacterStyle style)
         {
             switch (style)
@@ -348,26 +534,46 @@ namespace PersiaWar.Unity2D5D
                 case CharacterStyle.HeroArdeshir:
                     k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.17f, 0.44f, 0.18f), NavyDark);
                     k.AddBox(new Vector3(0f, -0.44f, 0.09f), new Vector3(0.15f, 0.10f, 0.05f), Gold);
-                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.14f, 0.38f, 0.15f), Navy);
-                    k.AddBox(new Vector3(0f, -0.83f, 0.04f), new Vector3(0.16f, 0.10f, 0.26f), BootBlack);
+                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.15f, 0.38f, 0.16f), Navy);
+                    k.AddTaper(new Vector3(0f, -0.65f, 0.09f), new Vector2(0.13f, 0.12f),
+                        new Vector2(0.10f, 0.10f), 0.06f, Steel, Quaternion.identity);
+                    k.AddBox(new Vector3(0f, -0.83f, 0.07f), new Vector3(0.18f, 0.12f, 0.28f), BootBlack);
                     break;
                 case CharacterStyle.HeroAnahita:
                     k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.15f, 0.44f, 0.16f), Magenta);
-                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.12f, 0.38f, 0.13f), NavyDark);
-                    k.AddBox(new Vector3(0f, -0.83f, 0.04f), new Vector3(0.14f, 0.10f, 0.24f), BootBlack);
+                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.13f, 0.38f, 0.14f), NavyDark);
+                    k.AddBox(new Vector3(0f, -0.83f, 0.07f), new Vector3(0.17f, 0.11f, 0.25f), BootBlack);
                     break;
                 case CharacterStyle.Soldier:
                     k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.17f, 0.44f, 0.18f), Olive);
-                    k.AddBox(new Vector3(0f, -0.44f, 0.09f), new Vector3(0.15f, 0.10f, 0.05f), OliveDark);
-                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.14f, 0.38f, 0.15f), OliveDark);
-                    k.AddBox(new Vector3(0f, -0.83f, 0.04f), new Vector3(0.16f, 0.10f, 0.26f), BootBlack);
+                    k.AddBox(new Vector3(0f, -0.44f, 0.09f), new Vector3(0.16f, 0.11f, 0.055f), OliveDark);
+                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.15f, 0.38f, 0.16f), OliveDark);
+                    k.AddBox(new Vector3(0f, -0.83f, 0.07f), new Vector3(0.18f, 0.12f, 0.28f), BootBlack);
+                    break;
+                case CharacterStyle.RoyalScout:
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.15f, 0.44f, 0.16f), Olive);
+                    k.AddBox(new Vector3(0f, -0.44f, 0.09f), new Vector3(0.13f, 0.10f, 0.05f), Khaki);
+                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.13f, 0.36f, 0.14f), Black);
+                    k.AddBox(new Vector3(0f, -0.83f, 0.07f), new Vector3(0.17f, 0.11f, 0.25f), BootBlack);
+                    break;
+                case CharacterStyle.SilkWarrior:
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.16f, 0.44f, 0.17f), Magenta);
+                    k.AddBox(new Vector3(0f, -0.44f, 0.09f), new Vector3(0.14f, 0.10f, 0.05f), Gold);
+                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.14f, 0.37f, 0.15f), VioletDark);
+                    k.AddBox(new Vector3(0f, -0.83f, 0.07f), new Vector3(0.17f, 0.11f, 0.25f), Black);
+                    break;
+                case CharacterStyle.DesertKnight:
+                    k.AddBox(new Vector3(0f, -0.22f, 0f), new Vector3(0.17f, 0.44f, 0.18f), Khaki);
+                    k.AddBox(new Vector3(0f, -0.44f, 0.09f), new Vector3(0.16f, 0.11f, 0.055f), Gold);
+                    k.AddBox(new Vector3(0f, -0.64f, 0f), new Vector3(0.15f, 0.38f, 0.16f), OliveDark);
+                    k.AddBox(new Vector3(0f, -0.83f, 0.07f), new Vector3(0.18f, 0.12f, 0.28f), BootBlack);
                     break;
                 case CharacterStyle.Alien:
                     k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.10f, 0.50f, 0.10f), AlienSkin);
                     k.AddBox(new Vector3(0f, -0.65f, 0f), new Vector3(0.08f, 0.40f, 0.08f), AlienSkinDark);
                     k.AddBox(new Vector3(0f, -0.85f, 0.05f), new Vector3(0.10f, 0.06f, 0.20f), AlienSkin);
                     break;
-                default:   // AlienTrooper
+                default:
                     k.AddBox(new Vector3(0f, -0.25f, 0f), new Vector3(0.11f, 0.50f, 0.11f), AlienSkin);
                     k.AddBox(new Vector3(0f, -0.44f, 0.06f), new Vector3(0.12f, 0.12f, 0.04f), Violet);
                     k.AddBox(new Vector3(0f, -0.65f, 0f), new Vector3(0.09f, 0.40f, 0.09f), VioletDark);

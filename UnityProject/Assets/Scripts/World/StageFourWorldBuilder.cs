@@ -928,12 +928,15 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         lightGo.transform.rotation = Quaternion.Euler(48f, -24f, 0f);
         var light = lightGo.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.color = new Color(0.58f, 0.76f, 1f);
-        light.intensity = 1.1f;
+        light.color = new Color(0.64f, 0.80f, 1f);
+        light.intensity = 1.2f;
         light.shadows = LightShadows.None;
+        light.renderMode = LightRenderMode.ForcePixel;
+        RenderSettings.sun = light;
         RenderSettings.ambientLight = new Color(0.22f, 0.27f, 0.35f);
         if (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High)
             light.shadows = LightShadows.Soft;
+        EnvironmentLightingProfile.AddFillLights(root, false);
         GraphicsQualityProfile.ApplyStageFourLook(root, controller != null ? controller.transform : null);
         SpawnMothershipPylon(new Vector3(-44f, 0f, -38f), 0);
         SpawnMothershipPylon(new Vector3(44f, 0f, -38f), 1);
