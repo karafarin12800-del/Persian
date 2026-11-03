@@ -109,6 +109,24 @@ namespace PersiaWar.Unity2D5D
         private Texture2D pixel;
         private Texture2D mapTexture;
         private static Texture2D heroPortraitDisc;
+        private static readonly Color[] HeroPortraitOutfit =
+        {
+            new Color(0.09f, 0.19f, 0.39f),
+            new Color(0.68f, 0.14f, 0.40f),
+            new Color(0.10f, 0.35f, 0.40f),
+            new Color(0.22f, 0.36f, 0.22f),
+            new Color(0.31f, 0.15f, 0.39f),
+            new Color(0.42f, 0.31f, 0.12f)
+        };
+        private static readonly Color[] HeroPortraitHeadwear =
+        {
+            new Color(0.34f, 0.39f, 0.46f),
+            new Color(0.10f, 0.055f, 0.035f),
+            new Color(0.13f, 0.18f, 0.17f),
+            new Color(0.16f, 0.24f, 0.15f),
+            new Color(0.18f, 0.08f, 0.22f),
+            new Color(0.48f, 0.39f, 0.22f)
+        };
         private GUIStyle titleStyle;
         private GUIStyle headerStyle;
         private GUIStyle bodyStyle;
@@ -2642,14 +2660,14 @@ namespace PersiaWar.Unity2D5D
         {
             // Three columns/two rows on narrow portrait phones give each face room
             // to remain visible and keep large, reliable native touch targets.
-            if (Screen.width < 580f && Screen.height > Screen.width)
+            if (Screen.height > Screen.width * 1.18f)
             {
                 const int columns = 3;
                 const float gap = 10f;
                 float totalWidth = Mathf.Min(Screen.width - 28f, 600f);
                 float cardWidth = (totalWidth - gap * (columns - 1)) / columns;
                 float startX = (Screen.width - totalWidth) * 0.5f;
-                float cardHeight = Mathf.Clamp((Screen.height - 372f) * 0.5f, 108f, 182f);
+                float cardHeight = Mathf.Clamp((Screen.height - 420f) * 0.20f, 120f, 250f);
                 const float top = 218f;
                 return new Rect(
                     startX + (index % columns) * (cardWidth + gap),
@@ -2705,25 +2723,6 @@ namespace PersiaWar.Unity2D5D
 
         private void DrawHeroPortrait(Rect rect, int index)
         {
-            Color[] outfit =
-            {
-                new Color(0.09f, 0.19f, 0.39f), // Ardeshir
-                new Color(0.68f, 0.14f, 0.40f), // Anahita
-                new Color(0.10f, 0.35f, 0.40f), // Pars Guard
-                new Color(0.22f, 0.36f, 0.22f), // Royal Scout
-                new Color(0.31f, 0.15f, 0.39f), // Silk Warrior
-                new Color(0.42f, 0.31f, 0.12f)  // Desert Knight
-            };
-            Color[] headwear =
-            {
-                new Color(0.34f, 0.39f, 0.46f),
-                new Color(0.10f, 0.055f, 0.035f),
-                new Color(0.13f, 0.18f, 0.17f),
-                new Color(0.16f, 0.24f, 0.15f),
-                new Color(0.18f, 0.08f, 0.22f),
-                new Color(0.48f, 0.39f, 0.22f)
-            };
-
             float faceWidth = Mathf.Min(rect.width * 0.56f, rect.height * 0.74f);
             float faceHeight = faceWidth * 1.16f;
             Vector2 faceCenter = new Vector2(rect.center.x, rect.y + rect.height * 0.43f);
@@ -2732,9 +2731,9 @@ namespace PersiaWar.Unity2D5D
 
             // Chest and neck silhouette, then hair/helmet, then the face itself.
             DrawPortraitOval(new Rect(faceCenter.x - shoulders * 0.56f,
-                faceCenter.y + faceHeight * 0.38f, shoulders * 0.62f, shoulderHeight), outfit[index]);
+                faceCenter.y + faceHeight * 0.38f, shoulders * 0.62f, shoulderHeight), HeroPortraitOutfit[index]);
             DrawPortraitOval(new Rect(faceCenter.x - shoulders * 0.06f,
-                faceCenter.y + faceHeight * 0.38f, shoulders * 0.62f, shoulderHeight), outfit[index]);
+                faceCenter.y + faceHeight * 0.38f, shoulders * 0.62f, shoulderHeight), HeroPortraitOutfit[index]);
             Fill(new Rect(faceCenter.x - faceWidth * 0.15f, faceCenter.y + faceHeight * 0.24f,
                 faceWidth * 0.30f, faceHeight * 0.38f), new Color(0.66f, 0.43f, 0.31f));
             Fill(new Rect(faceCenter.x - faceWidth * 0.48f, faceCenter.y + faceHeight * 0.50f,
@@ -2742,7 +2741,7 @@ namespace PersiaWar.Unity2D5D
 
             DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.59f,
                 faceCenter.y - faceHeight * 0.56f, faceWidth * 1.18f, faceHeight * 1.18f),
-                headwear[index]);
+                HeroPortraitHeadwear[index]);
             Color skin = new Color(0.78f, 0.54f, 0.40f);
             DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.43f,
                 faceCenter.y - faceHeight * 0.43f, faceWidth * 0.86f, faceHeight * 0.94f), skin);
@@ -2763,7 +2762,7 @@ namespace PersiaWar.Unity2D5D
                 DrawPortraitOval(new Rect(eyeX - faceWidth * 0.025f, eyeY + faceHeight * 0.018f,
                     faceWidth * 0.05f, faceHeight * 0.055f), new Color(0.07f, 0.09f, 0.10f));
                 Fill(new Rect(eyeX - faceWidth * 0.075f, eyeY - faceHeight * 0.055f,
-                    faceWidth * 0.15f, Mathf.Max(1.5f, faceHeight * 0.025f)), headwear[index] * 0.7f);
+                    faceWidth * 0.15f, Mathf.Max(1.5f, faceHeight * 0.025f)), HeroPortraitHeadwear[index] * 0.7f);
             }
             Fill(new Rect(faceCenter.x - faceWidth * 0.018f, faceCenter.y + faceHeight * 0.02f,
                 faceWidth * 0.036f, faceHeight * 0.13f), new Color(0.60f, 0.37f, 0.28f));
@@ -2777,7 +2776,7 @@ namespace PersiaWar.Unity2D5D
                     faceCenter.y + faceHeight * 0.15f, faceWidth * 0.62f, faceHeight * 0.34f),
                     new Color(0.12f, 0.075f, 0.055f));
                 DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.61f,
-                    faceCenter.y - faceHeight * 0.66f, faceWidth * 1.22f, faceHeight * 0.36f), headwear[index]);
+                    faceCenter.y - faceHeight * 0.66f, faceWidth * 1.22f, faceHeight * 0.36f), HeroPortraitHeadwear[index]);
                 Fill(new Rect(faceCenter.x - faceWidth * 0.57f, faceCenter.y - faceHeight * 0.43f,
                     faceWidth * 1.14f, Mathf.Max(2f, faceHeight * 0.055f)), new Color(0.94f, 0.70f, 0.22f));
                 Fill(new Rect(faceCenter.x - faceWidth * 0.035f, faceCenter.y - faceHeight * 0.79f,
@@ -2787,9 +2786,9 @@ namespace PersiaWar.Unity2D5D
             {
                 // Anahita: long dark hair, a forehead diadem and a magenta jewel.
                 DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.58f,
-                    faceCenter.y - faceHeight * 0.06f, faceWidth * 0.22f, faceHeight * 0.62f), headwear[index]);
+                    faceCenter.y - faceHeight * 0.06f, faceWidth * 0.22f, faceHeight * 0.62f), HeroPortraitHeadwear[index]);
                 DrawPortraitOval(new Rect(faceCenter.x + faceWidth * 0.36f,
-                    faceCenter.y - faceHeight * 0.06f, faceWidth * 0.22f, faceHeight * 0.62f), headwear[index]);
+                    faceCenter.y - faceHeight * 0.06f, faceWidth * 0.22f, faceHeight * 0.62f), HeroPortraitHeadwear[index]);
                 Fill(new Rect(faceCenter.x - faceWidth * 0.44f, faceCenter.y - faceHeight * 0.46f,
                     faceWidth * 0.88f, Mathf.Max(2f, faceHeight * 0.045f)), new Color(0.91f, 0.69f, 0.25f));
                 DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.07f,
@@ -2800,7 +2799,7 @@ namespace PersiaWar.Unity2D5D
             {
                 // Pars Guard: olive steel helmet and dark visor.
                 DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.58f,
-                    faceCenter.y - faceHeight * 0.64f, faceWidth * 1.16f, faceHeight * 0.40f), headwear[index]);
+                    faceCenter.y - faceHeight * 0.64f, faceWidth * 1.16f, faceHeight * 0.40f), HeroPortraitHeadwear[index]);
                 Fill(new Rect(faceCenter.x - faceWidth * 0.51f, eyeY + faceHeight * 0.08f,
                     faceWidth * 1.02f, faceHeight * 0.09f), new Color(0.07f, 0.09f, 0.10f));
             }
@@ -2824,7 +2823,7 @@ namespace PersiaWar.Unity2D5D
             {
                 // Desert Knight: khaki helmet and olive face guard.
                 DrawPortraitOval(new Rect(faceCenter.x - faceWidth * 0.58f,
-                    faceCenter.y - faceHeight * 0.65f, faceWidth * 1.16f, faceHeight * 0.40f), headwear[index]);
+                    faceCenter.y - faceHeight * 0.65f, faceWidth * 1.16f, faceHeight * 0.40f), HeroPortraitHeadwear[index]);
                 Fill(new Rect(faceCenter.x - faceWidth * 0.46f, faceCenter.y + faceHeight * 0.15f,
                     faceWidth * 0.92f, faceHeight * 0.21f), new Color(0.20f, 0.25f, 0.15f));
                 Fill(new Rect(faceCenter.x - faceWidth * 0.49f, faceCenter.y - faceHeight * 0.45f,

@@ -39,6 +39,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
     private Color savedAmbientGroundColor;
     private float savedAmbientIntensity;
     private float savedReflectionIntensity;
+    private Light savedSun;
     private bool ambientCaptured;
 
     public bool IsCinematic => introRunning;
@@ -148,6 +149,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             savedAmbientGroundColor = RenderSettings.ambientGroundColor;
             savedAmbientIntensity = RenderSettings.ambientIntensity;
             savedReflectionIntensity = RenderSettings.reflectionIntensity;
+            savedSun = RenderSettings.sun;
             ambientCaptured = true;
             GameObject oldRoot = GameObject.Find(RootName);
             if (oldRoot != null) Destroy(oldRoot);
@@ -1261,6 +1263,8 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             RenderSettings.ambientGroundColor = savedAmbientGroundColor;
             RenderSettings.ambientIntensity = savedAmbientIntensity;
             RenderSettings.reflectionIntensity = savedReflectionIntensity;
+            RenderSettings.sun = savedSun;
+            savedSun = null;
             ambientCaptured = false;
         }
         if (gameplayCamera != null)

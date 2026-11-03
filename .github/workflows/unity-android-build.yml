@@ -172,6 +172,9 @@ jobs:
           assert 'private void DrawHeroPortrait(Rect rect, int index)' in hero_flow and 'private Rect GetHeroCardRect(int index)' in hero_flow, 'Hero selection must display updated face portraits with responsive shared card layout.'
           assert 'GetHeroCardRect(hero)' in hero_flow and 'DrawHeroPortrait(figure, index);' in hero_flow, 'Hero portraits and touch hitboxes must use identical card geometry.'
           assert 'index / columns' in hero_flow and 'index % columns' in hero_flow, 'Portrait-phone hero selection must use a three-column layout.'
+          assert 'Screen.height > Screen.width * 1.18f' in hero_flow, 'Hero selection must switch to a portrait grid based on aspect ratio, not pixel width.'
+          assert 'private static readonly Color[] HeroPortraitOutfit' in hero_flow and 'private static readonly Color[] HeroPortraitHeadwear' in hero_flow, 'Portrait palettes must be cached and not allocated on every GUI repaint.'
+          assert 'RenderSettings.sun = savedSun;' in stage3_builder and 'RenderSettings.sun = savedSun;' in stage_four, 'Temporary Stage 3/4 key lights must restore the previous world sun on exit.'
 
           assert 'ApplyTintToSupportedColorProperties(material, color);' in factory, 'Runtime tint properties are not set explicitly.'
           stage4 = Path('UnityProject/Assets/Scripts/World/StageFourWorldBuilder.cs').read_text(encoding='utf-8')

@@ -59,6 +59,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
     private Color savedAmbientGroundColor;
     private float savedAmbientIntensity;
     private float savedReflectionIntensity;
+    private Light savedSun;
     private bool ambientCaptured;
     private Renderer[] savedPlayerRenderers;
     private bool[] savedPlayerRendererStates;
@@ -227,6 +228,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             savedAmbientGroundColor = RenderSettings.ambientGroundColor;
             savedAmbientIntensity = RenderSettings.ambientIntensity;
             savedReflectionIntensity = RenderSettings.reflectionIntensity;
+            savedSun = RenderSettings.sun;
             ambientCaptured = true;
             GameObject oldWorld = FindSceneObject(WorldRootName);
             if (oldWorld != null) Destroy(oldWorld);
@@ -1855,6 +1857,8 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
             RenderSettings.ambientGroundColor = savedAmbientGroundColor;
             RenderSettings.ambientIntensity = savedAmbientIntensity;
             RenderSettings.reflectionIntensity = savedReflectionIntensity;
+            RenderSettings.sun = savedSun;
+            savedSun = null;
             ambientCaptured = false;
         }
 
