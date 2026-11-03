@@ -161,9 +161,10 @@ jobs:
           assert 'AttachStageOneHoverboard(created.transform, archetype);' in enemy_chase and 'StageOneAlienHoverboard' in enemy_chase and 'StageOneAlienHoverboard_RailL' in enemy_chase and 'StageOneAlienHoverboard_RailR' in enemy_chase, 'Stage 1 alien enemies must use the visible hoverboard/skater silhouette.'
           character_factory = Path('UnityProject/Assets/Scripts/Art/CharacterModelFactory.cs').read_text(encoding='utf-8')
           assert 'new Vector3(0f, 0.15f, 0.215f)' in character_factory and 'new Vector3(0f, 0.53f, -0.17f)' in character_factory, 'Stage 1 alien heads and bodies must retain the expanded non-human silhouettes.'
+          fader = Path('UnityProject/Assets/Scripts/Core/CameraOcclusionFader.cs').read_text(encoding='utf-8')
           assert 'private static Transform FindTreeRoot(Transform t)' in fader and 'Transform treeRoot = FindTreeRoot(col.transform);' in fader, 'Tree crown collider hits must resolve the complete canopy root.'
-          assert 'Tree_OcclusionRoot' in stage1_bootstrap and 'TreeCanopy_MeshKit' in stage1_bootstrap, 'Stage 1 tree trunk/crown colliders and visible canopy must share one occlusion root.'
-          assert 'const float dashWidth = 0.42f;' in stage1_bootstrap and 'const float dashSpacing = 12f;' in stage1_bootstrap and 'IsInsideAndroidCrosswalkExclusion(x, z)' in stage1_bootstrap, 'Road markings must be wide, sparse and excluded from crosswalk approaches.'
+          assert 'Tree_OcclusionRoot' in bootstrap and 'TreeCanopy_MeshKit' in bootstrap, 'Stage 1 tree trunk/crown colliders and visible canopy must share one occlusion root.'
+          assert 'const float dashWidth = 0.42f;' in bootstrap and 'const float dashSpacing = 12f;' in bootstrap and 'IsInsideAndroidCrosswalkExclusion(x, z)' in bootstrap, 'Road markings must be wide, sparse and excluded from crosswalk approaches.'
           stage2_spawner = Path('UnityProject/Assets/Scripts/World/EnemySpawner.cs').read_text(encoding='utf-8')
           assert 'CreateAlienEye(enemy.transform' not in stage2_spawner and 'placeholderRenderer.enabled = false;' in enemy_chase, 'Stage 2 must not render old capsule bodies or duplicate floating eye primitives.'
           assert 'libraryCharacterRig.moveSpeed01' in enemy_chase and 'libraryCharacterRig.Kick(1f)' in enemy_chase, 'Factory enemy models must animate while moving and recoil when firing.'
