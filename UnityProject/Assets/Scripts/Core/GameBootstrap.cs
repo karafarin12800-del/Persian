@@ -2044,12 +2044,12 @@ namespace PersiaWar.Unity2D5D
                     androidBuildingCenters.Add(leftWing);
                     androidBuildingHalfExtents.Add(new Vector2(wingWidth * 0.5f, wingDepth * 0.5f));
                     CreateAndroidBuilding(leftWing, wingWidth, houseHeight, wingDepth,
-                        i * 3, false, false);
+                        i * 3, false, false, false);
 
                     androidBuildingCenters.Add(rightWing);
                     androidBuildingHalfExtents.Add(new Vector2(wingWidth * 0.5f, wingDepth * 0.5f));
                     CreateAndroidBuilding(rightWing, wingWidth, houseHeight, wingDepth,
-                        i * 3 + 1, false, false);
+                        i * 3 + 1, false, false, false);
 
                     footprint = 4.6f;
                     depth = 3.0f;
@@ -2057,7 +2057,7 @@ namespace PersiaWar.Unity2D5D
                     androidBuildingCenters.Add(rearWing);
                     androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
                     CreateAndroidBuilding(rearWing, footprint, houseHeight, depth,
-                        i * 3 + 2, false, false);
+                        i * 3 + 2, false, false, false);
                 }
                 else
                 {
@@ -2084,7 +2084,7 @@ namespace PersiaWar.Unity2D5D
 
                     androidBuildingCenters.Add(house);
                     androidBuildingHalfExtents.Add(new Vector2(footprint * 0.5f, depth * 0.5f));
-                    CreateAndroidBuilding(house, footprint, houseHeight, depth, i, false, false);
+                    CreateAndroidBuilding(house, footprint, houseHeight, depth, i, false, false, false);
                 }
 
                 if (i == 0 || i == 13 || i == 24)
