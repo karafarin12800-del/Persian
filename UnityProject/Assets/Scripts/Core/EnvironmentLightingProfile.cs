@@ -67,7 +67,7 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.ambientGroundColor = warmVillage
                 ? new Color(0.20f, 0.19f, 0.17f)
                 : new Color(0.20f, 0.19f, 0.17f);
-            RenderSettings.ambientIntensity = 1.0f;
+            RenderSettings.ambientIntensity = 1.22f;
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.reflectionIntensity = 0f;
         }
