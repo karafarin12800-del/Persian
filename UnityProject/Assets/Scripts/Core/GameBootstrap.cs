@@ -349,8 +349,13 @@ namespace PersiaWar.Unity2D5D
         private void ConfigureLighting()
         {
             GraphicsQualityProfile.ApplyQualitySettings();
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.24f, 0.27f, 0.30f);
+            RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+            RenderSettings.reflectionIntensity = 0f;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.46f, 0.52f, 0.60f);
+            RenderSettings.ambientEquatorColor = new Color(0.34f, 0.36f, 0.36f);
+            RenderSettings.ambientGroundColor = new Color(0.20f, 0.19f, 0.17f);
+            RenderSettings.ambientIntensity = 1f;
             RenderSettings.fog = false;
             Light sun = FindFirstObjectByType<Light>();
             if (sun == null)
@@ -360,7 +365,7 @@ namespace PersiaWar.Unity2D5D
                 sun.type = LightType.Directional;
             }
             sun.type = LightType.Directional;
-            sun.intensity = 1.15f;
+            sun.intensity = 1.0f;
             sun.color = new Color(1f, 0.93f, 0.82f);
 #if UNITY_ANDROID
             sun.shadows = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High
@@ -390,7 +395,7 @@ namespace PersiaWar.Unity2D5D
             // Mid-light neutral asphalt: the previous near-black tint made streets
             // too dark on Android and reduced contrast against buildings and sidewalks.
             roadMaterial = stageTwoRequested
-                ? MakeStageTwoLitMaterial("Road", new Color(0.52f, 0.54f, 0.57f))
+                ? MakeStageTwoLitMaterial("Road", new Color(0.30f, 0.31f, 0.33f))
                 : MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
 
 #if UNITY_ANDROID
@@ -401,7 +406,7 @@ namespace PersiaWar.Unity2D5D
             // this path now owns the actual 3D terrain geometry.
             Material groundMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidGround3D", new Color(0.43f, 0.34f, 0.23f))
-                : MakeMaterial("AndroidGround3D", new Color(0.12f, 0.46f, 0.08f));
+                : MakeMaterial("AndroidGround3D", new Color(0.20f, 0.38f, 0.14f));
             buildingMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f))
                 : MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
@@ -418,7 +423,7 @@ namespace PersiaWar.Unity2D5D
                 ? MakeStageTwoLitMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f))
                 : MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
             androidSidewalkMaterial = stageTwoRequested
-                ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f))
+                ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.56f, 0.53f, 0.48f))
                 : MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
@@ -546,11 +551,8 @@ namespace PersiaWar.Unity2D5D
             filter.sharedMesh = mesh;
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
-            if (stageTwoRequested)
-            {
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = true;
-            }
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = true;
 
             MeshCollider collider = obj.AddComponent<MeshCollider>();
             collider.sharedMesh = mesh;
