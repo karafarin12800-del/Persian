@@ -237,19 +237,22 @@ namespace PersiaWar.Unity2D5D
             ring.useWorldSpace = false;
             ring.loop = true;
             ring.positionCount = 32;
-            ring.alignment = LineAlignment.View;
+            ring.alignment = LineAlignment.TransformZ;
             ring.widthMultiplier = 0.045f;
             ring.startColor = new Color(color.r, color.g, color.b, 0.9f);
             ring.endColor = new Color(color.r, color.g, color.b, 0f);
             ring.sharedMaterial = energyMaterial;
             ring.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             ring.receiveShadows = false;
+            // Keep the pulse in a fixed world-horizontal plane; View alignment can tilt
+            // the ring with camera movement and make it appear to wobble on the ground.
+            ringObject.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             for (int i = 0; i < ring.positionCount; i++)
             {
                 float angle = i * Mathf.PI * 2f / ring.positionCount;
-                ring.SetPosition(i, new Vector3(Mathf.Cos(angle) * 0.5f, 0f, Mathf.Sin(angle) * 0.5f));
+                ring.SetPosition(i, new Vector3(Mathf.Cos(angle) * 0.5f, Mathf.Sin(angle) * 0.5f, 0f));
             }
-            ringObject.transform.localScale = new Vector3(0.12f, 1f, 0.12f);
+            ringObject.transform.localScale = new Vector3(0.12f, 0.12f, 1f);
             StartCoroutine(AnimateEnergyGroundPulse(ringObject.transform, ring, color));
             Destroy(effectRoot, 0.95f);
         }
@@ -267,7 +270,7 @@ namespace PersiaWar.Unity2D5D
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
                 float scale = Mathf.Lerp(0.12f, 3.0f, t);
-                pulseTransform.localScale = new Vector3(scale, 1f, scale);
+                pulseTransform.localScale = new Vector3(scale, scale, 1f);
                 pulseLine.startColor = Color.Lerp(initial, transparent, t);
                 pulseLine.endColor = transparent;
                 yield return null;
