@@ -349,7 +349,7 @@ namespace PersiaWar.Unity2D5D
         private void ConfigureLighting()
         {
             GraphicsQualityProfile.ApplyQualitySettings();
-            RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+            RenderSettings.defaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode.Custom;
             RenderSettings.reflectionIntensity = 0f;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.46f, 0.52f, 0.60f);
