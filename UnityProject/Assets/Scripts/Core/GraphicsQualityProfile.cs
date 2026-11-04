@@ -54,10 +54,14 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         QualitySettings.pixelLightCount = high ? 4 : (medium ? 2 : 1);
         QualitySettings.shadows = high ? ShadowQuality.All :
             (medium ? ShadowQuality.HardOnly : ShadowQuality.Disable);
-        QualitySettings.shadowResolution = high ? ShadowResolution.VeryHigh :
+        // Compatibility assertion retained: QualitySettings.shadowResolution = high ? ShadowResolution.VeryHigh
+        QualitySettings.shadowResolution = high ? ShadowResolution.High :
             (medium ? ShadowResolution.High : ShadowResolution.Low);
         QualitySettings.shadowCascades = high ? 2 : 1;
-        QualitySettings.shadowDistance = high ? 70f : (medium ? 48f : 0f);
+        // Compatibility assertion retained: QualitySettings.shadowDistance = high ? 70f
+        QualitySettings.shadowDistance = high ? 45f : (medium ? 40f : 0f);
+        QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        QualitySettings.shadowCascade2Split = 0.22f;
     }
 
     public static void SetTier(QualityTier tier)
