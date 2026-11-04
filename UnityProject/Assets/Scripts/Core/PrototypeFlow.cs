@@ -3898,8 +3898,8 @@ namespace PersiaWar.Unity2D5D
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.15f, 0.16f, 0.17f, 1f);
             camera.fieldOfView = 50f;
-            camera.nearClipPlane = 0.1f;
-            camera.farClipPlane = 240f;
+            camera.nearClipPlane = 2.5f;
+            camera.farClipPlane = 200f;
             camera.allowHDR = false;
             camera.allowMSAA = false;
 
