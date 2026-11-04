@@ -116,6 +116,18 @@ namespace PersiaWar.Unity2D5D
             }
             EnsureEnemyWeaponVisual();
             RemoveLegacyEnemyRangeIndicator();
+
+            // Stage 1 aliens use the non-combat awareness/patrol controller.
+            // Keep their health and visual setup, but do not run the legacy
+            // single-target combat/chase loop for this stage.
+            if (transform.name.StartsWith("Enemy_W", System.StringComparison.Ordinal))
+            {
+                StageOneAlienAwareness awareness = GetComponent<StageOneAlienAwareness>();
+                if (awareness == null)
+                    awareness = gameObject.AddComponent<StageOneAlienAwareness>();
+                awareness.enabled = true;
+                enabled = false;
+            }
         }
 
         private void RemoveLegacyEnemyRangeIndicator()
