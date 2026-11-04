@@ -29,6 +29,8 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public static class ModelLibrary
     {
+        public const float GroundLift = 0.04f;
+
         private static readonly Dictionary<ModelKind, Mesh> meshes = new Dictionary<ModelKind, Mesh>();
         private static readonly Dictionary<uint, Mesh> ringMeshes = new Dictionary<uint, Mesh>();
         private static Material sharedMaterial;

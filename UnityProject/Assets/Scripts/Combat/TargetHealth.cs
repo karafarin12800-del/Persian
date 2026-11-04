@@ -407,7 +407,9 @@ namespace PersiaWar.Unity2D5D
             PickupItem pickup = dropped.AddComponent<PickupItem>();
             pickup.ConfigureWeapon(dropKind, 24);
             // PickupItem already scales weapon pickups x2, so keep the model at 0.8 of its default size.
-            PickupVisual.Attach(dropped.transform, visualKind, true, 0.8f);
+            GameObject weaponModel = PickupVisual.Attach(dropped.transform, visualKind, true);
+            if (weaponModel != null)
+                weaponModel.transform.localScale *= 0.8f;
             Debug.Log("PERSIA_COMBAT: dropped enemy weapon " + dropKind);
         }
 

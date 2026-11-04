@@ -17,6 +17,9 @@ namespace PersiaWar.Unity2D5D
     /// </summary>
     public sealed class BloodFX : MonoBehaviour
     {
+        // 0 = energy-only feedback; positive values allow blood/impact effects.
+        public static int Level { get; set; } = 1;
+
         private const int Capacity = 96;
         private const int AtlasCell = 64;
 
