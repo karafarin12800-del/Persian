@@ -652,7 +652,7 @@ jobs:
                       BuildTarget.Android,
                       new[] { GraphicsDeviceType.OpenGLES3 }
                   );
-                  PlayerSettings.colorSpace = ColorSpace.Gamma;
+                  PlayerSettings.colorSpace = ColorSpace.Linear;
 
                   // Apply the Persia War launcher artwork to every legacy Android icon size.
                   // The texture lives in the Unity project so it is also available to local builds.

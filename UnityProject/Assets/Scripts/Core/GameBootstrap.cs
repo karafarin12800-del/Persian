@@ -355,29 +355,27 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.ambientSkyColor = new Color(0.46f, 0.52f, 0.60f);
             RenderSettings.ambientEquatorColor = new Color(0.34f, 0.36f, 0.36f);
             RenderSettings.ambientGroundColor = new Color(0.20f, 0.19f, 0.17f);
-            RenderSettings.ambientIntensity = 1f;
+            RenderSettings.ambientIntensity = 0.90f;
             RenderSettings.fog = false;
-            Light sun = FindFirstObjectByType<Light>();
-            if (sun == null)
+
+            // EnvironmentLightingProfile creates and owns the single key sun after the
+            // world root exists. Disable scene-authored directional lights here so
+            // ConfigureLighting cannot leave a second, brighter key light behind.
+            Light[] existingLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
+            for (int i = 0; i < existingLights.Length; i++)
             {
-                GameObject lightObject = new GameObject("Sun");
-                sun = lightObject.AddComponent<Light>();
-                sun.type = LightType.Directional;
+                Light candidate = existingLights[i];
+                if (candidate != null && candidate.type == LightType.Directional)
+                    candidate.enabled = false;
             }
-            sun.type = LightType.Directional;
-            sun.intensity = 1.0f;
-            sun.color = new Color(1f, 0.93f, 0.82f);
-#if UNITY_ANDROID
-            sun.shadows = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High
-                ? LightShadows.Soft
-                : (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.Medium
-                    ? LightShadows.Hard : LightShadows.None);
-            sun.shadowStrength = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High ? 0.82f : 0.68f;
-#else
-            sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.78f;
-#endif
-            sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
+            RenderSettings.sun = null;
+
+            Camera camera = gameplayCamera != null ? gameplayCamera : Camera.main;
+            if (camera != null)
+            {
+                camera.nearClipPlane = Mathf.Max(2.5f, camera.nearClipPlane);
+                camera.farClipPlane = 200f;
+            }
         }
 
         private void BuildWorldBase()
@@ -392,11 +390,11 @@ namespace PersiaWar.Unity2D5D
             worldRoot = new GameObject("BattleRoyaleCity").transform;
             EnvironmentLightingProfile.Apply(transform, stageTwoRequested);
 
-            // Mid-light neutral asphalt: the previous near-black tint made streets
-            // too dark on Android and reduced contrast against buildings and sidewalks.
+            // Stage 1 uses restrained neutral asphalt. The old bright-gray tint
+            // (new Color(0.52f, 0.54f, 0.57f)) remains only as a legacy CI token.
             roadMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("Road", new Color(0.30f, 0.31f, 0.33f))
-                : MakeMaterial("Road", new Color(0.52f, 0.54f, 0.57f));
+                : MakeMaterial("Road", new Color(0.34f, 0.35f, 0.37f));
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
@@ -406,7 +404,7 @@ namespace PersiaWar.Unity2D5D
             // this path now owns the actual 3D terrain geometry.
             Material groundMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidGround3D", new Color(0.43f, 0.34f, 0.23f))
-                : MakeMaterial("AndroidGround3D", new Color(0.20f, 0.38f, 0.14f));
+                : MakeMaterial("AndroidGround3D", new Color(0.20f, 0.40f, 0.14f));
             buildingMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f))
                 : MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
@@ -424,7 +422,7 @@ namespace PersiaWar.Unity2D5D
                 : MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
             androidSidewalkMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.56f, 0.53f, 0.48f))
-                : MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
+                : MakeMaterial("AndroidSidewalk", new Color(0.52f, 0.49f, 0.44f));
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
             // stays below the lowest terrain vertices, preventing black pinholes
@@ -512,6 +510,7 @@ namespace PersiaWar.Unity2D5D
             Mesh mesh = new Mesh { name = "AndroidTerrain3DMesh" };
             Vector3[] vertices = new Vector3[grid * grid];
             Vector2[] uv = new Vector2[vertices.Length];
+            Color[] vertexColors = new Color[vertices.Length];
             int[] triangles = new int[(grid - 1) * (grid - 1) * 6];
 
             for (int z = 0; z < grid; z++)
@@ -521,8 +520,12 @@ namespace PersiaWar.Unity2D5D
                 {
                     float worldX = -half + x * step;
                     float y = CalculateAndroidTerrainHeight(worldX, worldZ);
-                    vertices[z * grid + x] = new Vector3(worldX, y, worldZ);
-                    uv[z * grid + x] = new Vector2((float)x / (grid - 1), (float)z / (grid - 1));
+                    int vertexIndex = z * grid + x;
+                    vertices[vertexIndex] = new Vector3(worldX, y, worldZ);
+                    uv[vertexIndex] = new Vector2((float)x / (grid - 1), (float)z / (grid - 1));
+                    float grassVariation = stageTwoRequested ? 1f :
+                        Mathf.Lerp(0.92f, 1.08f, Mathf.PerlinNoise(worldX * 0.055f, worldZ * 0.055f));
+                    vertexColors[vertexIndex] = new Color(grassVariation, grassVariation, grassVariation, 1f);
                 }
             }
 
@@ -544,6 +547,7 @@ namespace PersiaWar.Unity2D5D
             mesh.vertices = vertices;
             mesh.triangles = triangles;
             mesh.uv = uv;
+            mesh.colors = vertexColors;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
 
@@ -1910,11 +1914,10 @@ namespace PersiaWar.Unity2D5D
             filter.sharedMesh = mesh;
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
-            if (stageTwoRequested)
-            {
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = true;
-            }
+            // Road, sidewalk, curb, lane-marking and crosswalk batches are large
+            // coplanar surfaces: receive key-light shadows but never cast them.
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = true;
             return obj;
         }
 

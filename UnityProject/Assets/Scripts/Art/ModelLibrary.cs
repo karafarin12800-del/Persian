@@ -103,6 +103,18 @@ namespace PersiaWar.Unity2D5D
             return ModelKind.None;
         }
 
+        public static Vector3 MuzzleLocalOffset(ModelKind kind)
+        {
+            switch (kind)
+            {
+                case ModelKind.Pistol: return new Vector3(0f, 0.046f, 0.23f);
+                case ModelKind.AssaultRifle: return new Vector3(0f, 0.002f, 0.86f);
+                case ModelKind.HeavyMachineGun: return new Vector3(0f, 0.02f, 1.15f);
+                case ModelKind.VoidRifle: return new Vector3(0f, 0f, 0.87f);
+                default: return new Vector3(0f, 0f, 0.5f);
+            }
+        }
+
         public static bool IsWeapon(ModelKind kind)
         {
             return kind >= ModelKind.Pistol && kind <= ModelKind.AlienSword;

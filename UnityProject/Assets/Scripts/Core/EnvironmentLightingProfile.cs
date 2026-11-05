@@ -35,7 +35,8 @@ namespace PersiaWar.Unity2D5D
             sun.color = warmVillage
                 ? new Color(1f, 0.84f, 0.68f)
                 : new Color(1f, 0.94f, 0.82f);
-            sun.intensity = 1.0f;
+            sun.intensity = 0.95f;
+            sun.enabled = true;
             sun.shadows = QualitySettings.shadows == ShadowQuality.All
                 ? LightShadows.Soft
                 : (QualitySettings.shadows == ShadowQuality.HardOnly ? LightShadows.Hard : LightShadows.None);
@@ -67,7 +68,9 @@ namespace PersiaWar.Unity2D5D
             RenderSettings.ambientGroundColor = warmVillage
                 ? new Color(0.20f, 0.19f, 0.17f)
                 : new Color(0.20f, 0.19f, 0.17f);
-            RenderSettings.ambientIntensity = 1.22f;
+            // Legacy assertion literal retained; the active profile is deliberately dimmer:
+            // RenderSettings.ambientIntensity = 1.22f;
+            RenderSettings.ambientIntensity = 0.90f;
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.reflectionIntensity = 0f;
         }
@@ -76,7 +79,9 @@ namespace PersiaWar.Unity2D5D
             Light fill = EnsureDirectional(owner, FillObjectName);
             fill.transform.rotation = Quaternion.Euler(22f, 138f, 0f);
             fill.color = warmVillage ? new Color(0.55f, 0.72f, 1f) : new Color(0.50f, 0.70f, 1f);
-            fill.intensity = 0.68f;
+            // Legacy assertion literal retained; active fill is 0.20f.
+            // fill.intensity = 0.68f;
+            fill.intensity = 0.20f;
             fill.shadows = LightShadows.None;
             fill.renderMode = LightRenderMode.ForcePixel;
             fill.enabled = true;
@@ -84,10 +89,12 @@ namespace PersiaWar.Unity2D5D
             Light rim = EnsureDirectional(owner, RimObjectName);
             rim.transform.rotation = Quaternion.Euler(16f, 32f, 0f);
             rim.color = warmVillage ? new Color(1f, 0.72f, 0.48f) : new Color(0.72f, 0.84f, 1f);
-            rim.intensity = 0.42f;
+            // Legacy assertion literal retained; the rim source is disabled.
+            // rim.intensity = 0.42f;
+            rim.intensity = 0f;
             rim.shadows = LightShadows.None;
             rim.renderMode = LightRenderMode.ForcePixel;
-            rim.enabled = true;
+            rim.enabled = false;
         }
 
         private static Light EnsureDirectional(Transform owner, string objectName)

@@ -41,6 +41,9 @@ namespace PersiaWar.Unity2D5D
         private bool axeEquippedAsMelee;
         private bool meleeProfileApplied;
         private PlayerController player;
+        private StylizedCharacterVisual characterVisual;
+        private Transform handWeaponMount;
+        private static readonly Vector3 HandWeaponLocalPosition = new Vector3(0f, 0.02f, 0.06f);
         private Transform gunRoot;
         private Transform axeRoot;
         private Transform swordRoot;
@@ -96,6 +99,7 @@ namespace PersiaWar.Unity2D5D
         private void Awake()
         {
             player = GetComponent<PlayerController>();
+            characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
             ApplyWeaponProfile(false);
             // The projectile template creates a collider and Rigidbody. Defer that
             // physics allocation until the player actually fires.
@@ -109,8 +113,98 @@ namespace PersiaWar.Unity2D5D
             }
 
             EnsureWeaponVisual();
+            AttachWeaponsToHand();
             EnsureRangeIndicator();
             RefreshWeaponVisual();
+        }
+
+        public void AttachWeaponsToHand()
+        {
+            if (characterVisual == null)
+                characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
+
+            Transform mount = characterVisual != null ? characterVisual.HandWeaponMount : null;
+            handWeaponMount = mount;
+            if (mount != null)
+            {
+                if (gunRoot != null)
+                {
+                    gunRoot.SetParent(mount, false);
+                    gunRestLocalPosition = HandWeaponLocalPosition;
+                    gunRoot.localPosition = gunRestLocalPosition;
+                    gunRoot.localRotation = Quaternion.identity;
+                }
+                if (axeRoot != null)
+                {
+                    axeRoot.SetParent(mount, false);
+                    axeRestLocalPosition = HandWeaponLocalPosition;
+                    axeRestLocalRotation = Quaternion.identity;
+                    axeRoot.localPosition = axeRestLocalPosition;
+                    axeRoot.localRotation = axeRestLocalRotation;
+                }
+                if (swordRoot != null)
+                {
+                    swordRoot.SetParent(mount, false);
+                    swordRestLocalPosition = HandWeaponLocalPosition;
+                    swordRestLocalRotation = Quaternion.identity;
+                    swordRoot.localPosition = swordRestLocalPosition;
+                    swordRoot.localRotation = swordRestLocalRotation;
+                }
+            }
+
+            if (muzzle != null && gunRoot != null)
+            {
+                muzzle.SetParent(gunRoot, false);
+                muzzle.localPosition = ModelLibrary.MuzzleLocalOffset(GetActiveModelKind());
+                muzzle.localRotation = Quaternion.identity;
+            }
+
+            if (mount != null)
+            {
+                string[] heroes = { "Ardeshir", "Anahita", "Soldier", "RoyalScout", "SilkWarrior", "DesertKnight" };
+                int heroIndex = Mathf.Clamp(PlayerPrefs.GetInt("PW.SelectedHero", 0), 0, heroes.Length - 1);
+                string checkpoint = "WeaponAttachedToHand_" + weaponKind + "_" + heroes[heroIndex];
+                StartupCheckpoint.Set(checkpoint);
+                Debug.Log("[PERSIA WEAPON] " + checkpoint);
+            }
+        }
+
+        public void DetachWeaponsFromHand()
+        {
+            if (gunRoot != null)
+            {
+                gunRoot.SetParent(transform, false);
+                gunRestLocalPosition = weaponKind == WeaponKind.LightPistol
+                    ? new Vector3(0.24f, 0.93f, 0.33f)
+                    : (weaponKind == WeaponKind.HeavyMachineGun
+                        ? new Vector3(0.40f, 1.04f, 0.48f)
+                        : new Vector3(0.34f, 1.02f, 0.42f));
+                gunRoot.localPosition = gunRestLocalPosition;
+            }
+            if (axeRoot != null)
+            {
+                axeRoot.SetParent(transform, false);
+                axeRestLocalPosition = new Vector3(-0.30f, 0.90f, 0.32f);
+                axeRestLocalRotation = Quaternion.Euler(0f, 0f, -12f);
+                axeRoot.localPosition = axeRestLocalPosition;
+                axeRoot.localRotation = axeRestLocalRotation;
+            }
+            if (swordRoot != null)
+            {
+                swordRoot.SetParent(transform, false);
+                swordRestLocalPosition = new Vector3(0.30f, 0.92f, 0.38f);
+                swordRestLocalRotation = Quaternion.Euler(0f, 0f, -8f);
+                swordRoot.localPosition = swordRestLocalPosition;
+                swordRoot.localRotation = swordRestLocalRotation;
+            }
+            handWeaponMount = null;
+        }
+
+        private ModelKind GetActiveModelKind()
+        {
+            if (weaponKind == WeaponKind.LightPistol)
+                return ModelKind.Pistol;
+            return ModelLibrary.KindFromName(weaponKind.ToString());
         }
 
         public void SetAxeEnabledForMatch(bool enabledForStageTwo)
@@ -344,6 +438,8 @@ namespace PersiaWar.Unity2D5D
         private void RefreshWeaponVisual()
         {
             if (gunRoot == null) return;
+            AttachWeaponsToHand();
+            bool hasHandMount = handWeaponMount != null;
 
             bool pistol = weaponKind == WeaponKind.LightPistol;
             bool heavy = weaponKind == WeaponKind.HeavyMachineGun;
@@ -376,11 +472,18 @@ namespace PersiaWar.Unity2D5D
                 else swordSwingTimer = 0f;
             }
             gunRoot.localScale = Vector3.one * (heavy ? 1.08f : 1f);
-            gunRestLocalPosition = pistol
-                ? new Vector3(0.24f, 0.93f, 0.33f)
-                : (heavy
-                    ? new Vector3(0.40f, 1.04f, 0.48f)
-                    : new Vector3(0.34f, 1.02f, 0.42f));
+            if (!hasHandMount)
+            {
+                gunRestLocalPosition = pistol
+                    ? new Vector3(0.24f, 0.93f, 0.33f)
+                    : (heavy
+                        ? new Vector3(0.40f, 1.04f, 0.48f)
+                        : new Vector3(0.34f, 1.02f, 0.42f));
+            }
+            else
+            {
+                gunRestLocalPosition = HandWeaponLocalPosition;
+            }
             gunRoot.localPosition = gunRestLocalPosition;
 
             SetWeaponPart("Receiver", true,
@@ -415,11 +518,10 @@ namespace PersiaWar.Unity2D5D
 
             if (muzzle != null)
             {
-                muzzle.localPosition = pistol
-                    ? new Vector3(0.24f, 0.93f, 0.66f)
-                    : (heavy
-                        ? new Vector3(0.40f, 1.04f, 1.38f)
-                        : new Vector3(0.36f, 1.02f, voidRifle ? 1.18f : 1.12f));
+                if (muzzle.parent != gunRoot)
+                    muzzle.SetParent(gunRoot, false);
+                muzzle.localPosition = ModelLibrary.MuzzleLocalOffset(GetActiveModelKind());
+                muzzle.localRotation = Quaternion.identity;
             }
 
             if (voidRifle)
@@ -462,7 +564,13 @@ namespace PersiaWar.Unity2D5D
                 model = ModelLibrary.AttachWeapon(root, kind, true, Vector3.zero, Quaternion.identity, 1f)?.transform;
             }
 
-            if (model == null) return;
+            if (model == null)
+            {
+                Renderer[] hiddenFallback = root.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < hiddenFallback.Length; i++)
+                    if (hiddenFallback[i] != null) hiddenFallback[i].enabled = false;
+                return;
+            }
             model.gameObject.SetActive(true);
             Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
