@@ -671,8 +671,8 @@ namespace PersiaWar.Unity2D5D
             Vector3 initialOrigin = muzzle != null ? muzzle.position : transform.position + Vector3.up;
             Vector3 initialDirection = targetWorldPosition - initialOrigin;
             initialDirection.y = 0f;
-            float initialDistance = initialDirection.magnitude;
-            if (initialDistance < 0.001f || initialDistance > EffectiveRange)
+            float distance = initialDirection.magnitude;
+            if (distance < 0.001f || distance > EffectiveRange)
                 return false;
 
             // Rotate first, then read the hand-mounted muzzle again: the barrel tip
