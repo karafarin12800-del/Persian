@@ -950,20 +950,28 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
         var light = lightGo.AddComponent<Light>();
         light.type = LightType.Directional;
         light.color = new Color(0.70f, 0.84f, 1f);
-        light.intensity = 1.42f;
+        light.intensity = 0.95f;
         light.shadows = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High
             ? LightShadows.Soft
             : (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.Medium
                 ? LightShadows.Hard : LightShadows.None);
-        light.shadowStrength = 0.84f;
+        light.shadowStrength = 0.55f;
+        light.shadowBias = 0.08f;
+        light.shadowNormalBias = 1.0f;
         light.renderMode = LightRenderMode.ForcePixel;
+
+        Light[] existingLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
+        for (int i = 0; i < existingLights.Length; i++)
+            if (existingLights[i] != null && existingLights[i] != light &&
+                existingLights[i].type == LightType.Directional)
+                existingLights[i].enabled = false;
         RenderSettings.sun = light;
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.61f, 0.70f, 0.86f);
-        RenderSettings.ambientEquatorColor = new Color(0.46f, 0.54f, 0.64f);
-        RenderSettings.ambientGroundColor = new Color(0.24f, 0.30f, 0.38f);
-        RenderSettings.ambientIntensity = 1.24f;
-        RenderSettings.reflectionIntensity = 0.76f;
+        RenderSettings.ambientSkyColor = new Color(0.46f, 0.52f, 0.60f);
+        RenderSettings.ambientEquatorColor = new Color(0.34f, 0.36f, 0.36f);
+        RenderSettings.ambientGroundColor = new Color(0.20f, 0.19f, 0.17f);
+        RenderSettings.ambientIntensity = 0.90f;
+        RenderSettings.reflectionIntensity = 0f;
         EnvironmentLightingProfile.AddFillLights(root, false);
         GraphicsQualityProfile.ApplyStageFourLook(root, controller != null ? controller.transform : null);
         SpawnMothershipPylon(new Vector3(-44f, 0f, -38f), 0);
