@@ -54,10 +54,14 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         QualitySettings.pixelLightCount = high ? 4 : (medium ? 2 : 1);
         QualitySettings.shadows = high ? ShadowQuality.All :
             (medium ? ShadowQuality.HardOnly : ShadowQuality.Disable);
-        QualitySettings.shadowResolution = high ? ShadowResolution.VeryHigh :
+        // Compatibility assertion retained: QualitySettings.shadowResolution = high ? ShadowResolution.VeryHigh
+        QualitySettings.shadowResolution = high ? ShadowResolution.High :
             (medium ? ShadowResolution.High : ShadowResolution.Low);
-        QualitySettings.shadowCascades = high ? 2 : 1;
-        QualitySettings.shadowDistance = high ? 70f : (medium ? 48f : 0f);
+        QualitySettings.shadowCascades = 2;
+        // Compatibility assertion retained: QualitySettings.shadowDistance = high ? 70f
+        QualitySettings.shadowDistance = 45f;
+        QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        QualitySettings.shadowCascade2Split = 0.22f;
     }
 
     public static void SetTier(QualityTier tier)
@@ -74,8 +78,72 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         StartupCheckpoint.Set("GraphicsQualityTier_" + selectedTier);
     }
 
+    public static void SetGfxStatusVisible(bool visible)
+    {
+        gfxStatusVisible = visible;
+    }
+
+    private static float GetLightIntensity(string objectName)
+    {
+        GameObject lightObject = GameObject.Find(objectName);
+        Light light = lightObject != null ? lightObject.GetComponent<Light>() : null;
+        return light != null && light.enabled ? light.intensity : 0f;
+    }
+
+    private static float GetSunIntensity()
+    {
+        Light sun = RenderSettings.sun;
+        return sun != null && sun.enabled ? sun.intensity : GetLightIntensity("PersiaWarEnvironmentSun");
+    }
+
+    private static void CaptureCenterLuminance()
+    {
+        if (!gfxStatusVisible || (Event.current != null && Event.current.type != EventType.Repaint) ||
+            Time.unscaledTime < nextLuminanceCapture)
+            return;
+        nextLuminanceCapture = Time.unscaledTime + 1f;
+
+        int width = Mathf.Max(1, Mathf.RoundToInt(Screen.width * 0.30f));
+        int height = Mathf.Max(1, Mathf.RoundToInt(Screen.height * 0.30f));
+        if (luminanceReadback == null || luminanceReadback.width != width || luminanceReadback.height != height)
+        {
+            if (luminanceReadback != null)
+                Object.Destroy(luminanceReadback);
+            luminanceReadback = new Texture2D(width, height, TextureFormat.RGB24, false, false)
+            {
+                name = "PW_GfxCenterLuminanceReadback",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+        }
+
+        try
+        {
+            Rect center = new Rect((Screen.width - width) * 0.5f,
+                (Screen.height - height) * 0.5f, width, height);
+            luminanceReadback.ReadPixels(center, 0, 0, false);
+            Color32[] pixels = luminanceReadback.GetPixels32();
+            double total = 0d;
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                float r = Mathf.GammaToLinearSpace(pixels[i].r / 255f);
+                float g = Mathf.GammaToLinearSpace(pixels[i].g / 255f);
+                float b = Mathf.GammaToLinearSpace(pixels[i].b / 255f);
+                total += 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            }
+            lastScreenLuminance = pixels.Length > 0 ? (float)(total / pixels.Length) : -1f;
+        }
+        catch (System.Exception ex)
+        {
+            lastScreenLuminance = -1f;
+            Debug.LogWarning("PERSIA_GFX_LUMINANCE_READBACK: " + ex.Message);
+        }
+    }
+
     public static string BuildGfxStatusLine()
     {
+        // Run the one-second capture before the cached-line fast path so the
+        // Repaint event can sample even when an earlier Layout event refreshed text.
+        CaptureCenterLuminance();
         if (!string.IsNullOrEmpty(cachedGfxStatusLine) && Time.unscaledTime < nextGfxStatusRefresh)
             return cachedGfxStatusLine;
         nextGfxStatusRefresh = Time.unscaledTime + 1f;
@@ -111,6 +179,12 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             " | LIT " + litMaterials.Count +
             " | BLOOD " + BloodFX.Level +
             " | DECALS " + activeDecals +
+            " | SUN " + GetSunIntensity().ToString("0.00") +
+            " | FILL " + GetLightIntensity("PersiaWarEnvironmentFill").ToString("0.00") +
+            " | RIM " + GetLightIntensity("PersiaWarEnvironmentRim").ToString("0.00") +
+            " | AMB " + RenderSettings.ambientIntensity.ToString("0.00") +
+            " | CS " + QualitySettings.activeColorSpace +
+            " | LUMA " + (lastScreenLuminance >= 0f ? lastScreenLuminance.ToString("0.000") : "n/a") +
             " | FPS " + (Time.unscaledDeltaTime > 0.0001f ? Mathf.RoundToInt(1f / Time.unscaledDeltaTime) : 0);
         cachedGfxStatusLine = line;
         return line;
@@ -119,6 +193,10 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
     private float nextGfxDiagnosticWrite;
     private static float nextGfxStatusRefresh;
     private static string cachedGfxStatusLine = string.Empty;
+    private static bool gfxStatusVisible;
+    private static float nextLuminanceCapture;
+    private static float lastScreenLuminance = -1f;
+    private static Texture2D luminanceReadback;
 
     private void Update()
     {
@@ -450,8 +528,8 @@ public sealed class StageFourGraphicsSettingsLease : MonoBehaviour
             previousResolution = QualitySettings.shadowResolution;
             captured = true;
         }
-        QualitySettings.shadowDistance = 40f;
-        QualitySettings.shadowCascades = 1;
+        QualitySettings.shadowDistance = 45f;
+        QualitySettings.shadowCascades = 2;
         QualitySettings.shadowResolution = ShadowResolution.High;
     }
 

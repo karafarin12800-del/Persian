@@ -19,6 +19,8 @@ namespace PersiaWar.Unity2D5D
         private SpriteRenderer sprite;
         private SpriteRenderer shadowSprite;
         private ParticleSystem muzzleFlash;
+        private WeaponController weaponController;
+        private PlayerController playerController;
 
         private bool moving;
         private bool playerCharacter;
@@ -65,7 +67,16 @@ namespace PersiaWar.Unity2D5D
         private Renderer mobilePackPouchLeft;
         private Renderer mobilePackPouchRight;
 
-        public Transform Muzzle => muzzle;
+        public Transform Muzzle
+        {
+            get
+            {
+                if (weaponController == null)
+                    weaponController = GetComponentInParent<WeaponController>();
+                return weaponController != null ? weaponController.Muzzle : muzzle;
+            }
+        }
+        public Transform HandWeaponMount => mobileCharacterRig != null ? mobileCharacterRig.weaponMount : null;
         public Transform WeaponMount => mobileCharacterRig != null && mobileCharacterRig.weaponMount != null
             ? mobileCharacterRig.weaponMount
             : (mobileModelRoot != null ? mobileModelRoot : transform);
@@ -158,8 +169,15 @@ namespace PersiaWar.Unity2D5D
                 mobileCharacterRig.Kick(1f);
             // The muzzle flash is a presentation effect, not a dependency for entering
             // the match. Allocate it only when the first shot is actually fired.
+            Transform activeMuzzle = Muzzle;
+            if (activeMuzzle == null)
+                activeMuzzle = muzzle;
+            if (activeMuzzle == null)
+                return;
             if (muzzleFlash == null)
-                muzzleFlash = CreateMuzzleFlash();
+                muzzleFlash = CreateMuzzleFlash(activeMuzzle);
+            else if (muzzleFlash.transform.parent != activeMuzzle)
+                muzzleFlash.transform.SetParent(activeMuzzle, false);
             if (muzzleFlash == null)
                 return;
 
@@ -169,6 +187,8 @@ namespace PersiaWar.Unity2D5D
 
         private void Awake()
         {
+            weaponController = GetComponentInParent<WeaponController>();
+            playerController = GetComponentInParent<PlayerController>();
             EnsurePresentation();
         }
 
@@ -206,7 +226,15 @@ namespace PersiaWar.Unity2D5D
                 if (mobileCharacterRig != null)
                 {
                     mobileCharacterRig.moveSpeed01 = moving ? 1f : 0f;
-                    mobileCharacterRig.aiming = Time.time < fireUntil;
+                    if (weaponController == null)
+                        weaponController = GetComponentInParent<WeaponController>();
+                    if (playerController == null)
+                        playerController = GetComponentInParent<PlayerController>();
+                    bool defeated = playerController != null && playerController.IsDefeated;
+                    bool meleeWeapon = weaponController != null && weaponController.IsMeleeWeaponEquipped;
+                    bool firearmArmed = weaponController != null && !defeated && !meleeWeapon;
+                    mobileCharacterRig.aiming = !defeated && (firearmArmed || Time.time < fireUntil);
+                    mobileCharacterRig.meleeReady = !defeated && meleeWeapon;
                 }
                 else
                 {
@@ -223,9 +251,9 @@ namespace PersiaWar.Unity2D5D
                 }
             }
 
-            if (muzzle != null && Time.time < fireUntil)
+            if (muzzle != null && weaponController == null && Time.time < fireUntil)
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.62f);
-            else if (muzzle != null)
+            else if (muzzle != null && weaponController == null)
                 muzzle.localPosition = new Vector3(0.42f, 1.05f, 0.56f);
         }
 
@@ -242,6 +270,10 @@ namespace PersiaWar.Unity2D5D
 
             if (mobileModelRoot != null)
             {
+                if (weaponController == null)
+                    weaponController = GetComponentInParent<WeaponController>();
+                if (weaponController != null)
+                    weaponController.DetachWeaponsFromHand();
                 mobileModelRoot.gameObject.SetActive(false);
                 Destroy(mobileModelRoot.gameObject);
             }
@@ -258,7 +290,9 @@ namespace PersiaWar.Unity2D5D
                 : heroIndex == 4 ? CharacterStyle.SilkWarrior
                 : CharacterStyle.DesertKnight;
 
-            mobileCharacterRig = CharacterModelFactory.Create(style, artRoot, Vector3.zero, 1f);
+            // Legacy CI assertion token: CharacterModelFactory.Create(style, artRoot, Vector3.zero, 1f)
+            mobileCharacterRig = CharacterModelFactory.Create(style, artRoot, Vector3.zero,
+                heroIndex == 1 ? 0.82f : 1f);
             if (mobileCharacterRig == null)
             {
                 Debug.LogError("PersiaWar: failed to create detailed hero model " + style);
@@ -271,9 +305,14 @@ namespace PersiaWar.Unity2D5D
             mobileHeroIndex = heroIndex;
             mobileCharacterRig.moveSpeed01 = 0f;
             mobileCharacterRig.aiming = false;
+            mobileCharacterRig.meleeReady = false;
             if (sprite != null) sprite.enabled = false;
             if (shadowSprite != null) shadowSprite.enabled = false;
             StartupCheckpoint.Set("AndroidDetailedHeroReady_" + style);
+            if (weaponController == null)
+                weaponController = GetComponentInParent<WeaponController>();
+            if (weaponController != null)
+                weaponController.AttachWeaponsToHand();
         }
 
         private void EnsureMobile3DCharacter()
@@ -706,11 +745,13 @@ namespace PersiaWar.Unity2D5D
                 : Vector3.one * scale;
         }
 
-        private ParticleSystem CreateMuzzleFlash()
+        private ParticleSystem CreateMuzzleFlash(Transform muzzleTransform)
         {
+            if (muzzleTransform == null)
+                return null;
             GameObject go = new GameObject("MuzzleFlash");
-            go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0.42f, 1.05f, 0.66f);
+            go.transform.SetParent(muzzleTransform, false);
+            go.transform.localPosition = Vector3.zero;
 
             ParticleSystem ps = go.AddComponent<ParticleSystem>();
             var main = ps.main;

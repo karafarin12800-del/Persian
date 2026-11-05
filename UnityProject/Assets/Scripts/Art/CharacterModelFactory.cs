@@ -37,6 +37,7 @@ namespace PersiaWar.Unity2D5D
         public Transform weaponMount;
         public float moveSpeed01;
         public bool aiming;
+        public bool meleeReady;
 
         private float phase;
         private float recoil;
@@ -66,8 +67,21 @@ namespace PersiaWar.Unity2D5D
 
             SetPitch(leftLeg, swing);
             SetPitch(rightLeg, -swing);
-            SetPitch(leftArm, aiming ? -35f : -swing * 0.8f + breathe * 1.5f * (1f - speed));
-            SetPitch(rightArm, aiming ? -80f + recoil * 18f : swing * 0.8f - breathe * 1.5f * (1f - speed));
+            if (aiming)
+            {
+                leftArm.localRotation = Quaternion.Euler(-62f, 28f, 0f);
+                rightArm.localRotation = Quaternion.Euler(-80f + recoil * 18f, 0f, 0f);
+            }
+            else if (meleeReady)
+            {
+                leftArm.localRotation = Quaternion.Euler(-20f, 0f, 0f);
+                rightArm.localRotation = Quaternion.Euler(-50f, 0f, 0f);
+            }
+            else
+            {
+                SetPitch(leftArm, -swing * 0.8f + breathe * 1.5f * (1f - speed));
+                SetPitch(rightArm, swing * 0.8f - breathe * 1.5f * (1f - speed));
+            }
 
             if (torso != null)
             {

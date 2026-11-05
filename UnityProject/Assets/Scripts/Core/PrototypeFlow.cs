@@ -404,6 +404,7 @@ namespace PersiaWar.Unity2D5D
 
         private void OnGUI()
         {
+            GraphicsQualityProfile.SetGfxStatusVisible(false);
             EnsureUiInitialized();
             if (mode == ScreenMode.Match)
             {
@@ -2198,9 +2199,10 @@ namespace PersiaWar.Unity2D5D
             if (pressed && !Application.isMobilePlatform) RegisterGfxVersionTap();
             if (Time.unscaledTime < gfxStatusVisibleUntil)
             {
+                GraphicsQualityProfile.SetGfxStatusVisible(true);
                 string status = GraphicsQualityProfile.BuildGfxStatusLine();
-                GUI.Label(new Rect(rect.x, rect.y - 48f * GetUiScale(),
-                    Mathf.Min(Screen.width - rect.x - 12f, 500f), 46f * GetUiScale()), status, smallStyle);
+                GUI.Label(new Rect(rect.x, rect.y - 64f * GetUiScale(),
+                    Mathf.Min(Screen.width - rect.x - 12f, 560f), 60f * GetUiScale()), status, smallStyle);
             }
         }
 
@@ -3898,8 +3900,8 @@ namespace PersiaWar.Unity2D5D
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.15f, 0.16f, 0.17f, 1f);
             camera.fieldOfView = 50f;
-            camera.nearClipPlane = 0.1f;
-            camera.farClipPlane = 240f;
+            camera.nearClipPlane = 2.5f;
+            camera.farClipPlane = 200f;
             camera.allowHDR = false;
             camera.allowMSAA = false;
 
