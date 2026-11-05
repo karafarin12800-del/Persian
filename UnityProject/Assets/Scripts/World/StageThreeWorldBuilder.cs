@@ -443,20 +443,28 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         Light key = lightObject.AddComponent<Light>();
         key.type = LightType.Directional;
         key.color = new Color(0.88f, 0.93f, 1f);
-        key.intensity = 1.48f;
+        key.intensity = 0.95f;
         key.shadows = GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.High
             ? LightShadows.Soft
             : (GraphicsQualityProfile.CurrentTier == GraphicsQualityProfile.QualityTier.Medium
                 ? LightShadows.Hard : LightShadows.None);
-        key.shadowStrength = 0.84f;
+        key.shadowStrength = 0.55f;
+        key.shadowBias = 0.08f;
+        key.shadowNormalBias = 1.0f;
         key.renderMode = LightRenderMode.ForcePixel;
+
+        Light[] existingLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
+        for (int i = 0; i < existingLights.Length; i++)
+            if (existingLights[i] != null && existingLights[i] != key &&
+                existingLights[i].type == LightType.Directional)
+                existingLights[i].enabled = false;
         RenderSettings.sun = key;
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.56f, 0.66f, 0.82f);
-        RenderSettings.ambientEquatorColor = new Color(0.47f, 0.53f, 0.60f);
-        RenderSettings.ambientGroundColor = new Color(0.25f, 0.29f, 0.33f);
-        RenderSettings.ambientIntensity = 1.22f;
-        RenderSettings.reflectionIntensity = 0.72f;
+        RenderSettings.ambientSkyColor = new Color(0.46f, 0.52f, 0.60f);
+        RenderSettings.ambientEquatorColor = new Color(0.34f, 0.36f, 0.36f);
+        RenderSettings.ambientGroundColor = new Color(0.20f, 0.19f, 0.17f);
+        RenderSettings.ambientIntensity = 0.90f;
+        RenderSettings.reflectionIntensity = 0f;
         EnvironmentLightingProfile.AddFillLights(worldRoot, false);
     }
 
