@@ -90,9 +90,16 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
         return light != null && light.enabled ? light.intensity : 0f;
     }
 
+    private static float GetSunIntensity()
+    {
+        Light sun = RenderSettings.sun;
+        return sun != null && sun.enabled ? sun.intensity : GetLightIntensity("PersiaWarEnvironmentSun");
+    }
+
     private static void CaptureCenterLuminance()
     {
-        if (!gfxStatusVisible || Time.unscaledTime < nextLuminanceCapture)
+        if (!gfxStatusVisible || (Event.current != null && Event.current.type != EventType.Repaint) ||
+            Time.unscaledTime < nextLuminanceCapture)
             return;
         nextLuminanceCapture = Time.unscaledTime + 1f;
 
@@ -170,7 +177,7 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
             " | LIT " + litMaterials.Count +
             " | BLOOD " + BloodFX.Level +
             " | DECALS " + activeDecals +
-            " | SUN " + GetLightIntensity("PersiaWarEnvironmentSun").ToString("0.00") +
+            " | SUN " + GetSunIntensity().ToString("0.00") +
             " | FILL " + GetLightIntensity("PersiaWarEnvironmentFill").ToString("0.00") +
             " | RIM " + GetLightIntensity("PersiaWarEnvironmentRim").ToString("0.00") +
             " | AMB " + RenderSettings.ambientIntensity.ToString("0.00") +
