@@ -231,9 +231,7 @@ namespace PersiaWar.Unity2D5D
                     if (playerController == null)
                         playerController = GetComponentInParent<PlayerController>();
                     bool defeated = playerController != null && playerController.IsDefeated;
-                    bool meleeWeapon = weaponController != null &&
-                        (weaponController.CurrentWeapon == WeaponController.WeaponKind.Axe ||
-                         weaponController.CurrentWeapon == WeaponController.WeaponKind.AlienSword);
+                    bool meleeWeapon = weaponController != null && weaponController.IsMeleeWeaponEquipped;
                     bool firearmArmed = weaponController != null && !defeated && !meleeWeapon;
                     mobileCharacterRig.aiming = !defeated && (firearmArmed || Time.time < fireUntil);
                     mobileCharacterRig.meleeReady = !defeated && meleeWeapon;
