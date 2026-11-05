@@ -234,6 +234,7 @@ namespace PersiaWar.Unity2D5D
         public void CycleWeapon()
         {
             SaveFirearmAmmoState();
+            axeEquippedAsMelee = false;
             if (!axeEnabledForMatch)
             {
                 weaponKind = (WeaponKind)(((int)weaponKind + 1) % 3);
@@ -268,6 +269,7 @@ namespace PersiaWar.Unity2D5D
                 return;
             }
 
+            axeEquippedAsMelee = false;
             if ((selectedWeapon == WeaponKind.VoidRifle || selectedWeapon == WeaponKind.AlienSword) &&
                 !axeEnabledForMatch)
                 selectedWeapon = WeaponKind.AssaultRifle;
