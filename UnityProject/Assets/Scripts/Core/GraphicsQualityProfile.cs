@@ -528,8 +528,8 @@ public sealed class StageFourGraphicsSettingsLease : MonoBehaviour
             previousResolution = QualitySettings.shadowResolution;
             captured = true;
         }
-        QualitySettings.shadowDistance = 40f;
-        QualitySettings.shadowCascades = 1;
+        QualitySettings.shadowDistance = 45f;
+        QualitySettings.shadowCascades = 2;
         QualitySettings.shadowResolution = ShadowResolution.High;
     }
 
