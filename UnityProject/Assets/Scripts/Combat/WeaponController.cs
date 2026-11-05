@@ -668,16 +668,24 @@ namespace PersiaWar.Unity2D5D
             EnsureProjectileTemplate();
             if (projectilePrefab == null) return false;
 
+            Vector3 initialOrigin = muzzle != null ? muzzle.position : transform.position + Vector3.up;
+            Vector3 initialDirection = targetWorldPosition - initialOrigin;
+            initialDirection.y = 0f;
+            float initialDistance = initialDirection.magnitude;
+            if (initialDistance < 0.001f || initialDistance > EffectiveRange)
+                return false;
+
+            // Rotate first, then read the hand-mounted muzzle again: the barrel tip
+            // moves with the right-hand rig as the player turns.
+            transform.rotation = Quaternion.LookRotation(initialDirection.normalized, Vector3.up);
             Vector3 origin = muzzle != null ? muzzle.position : transform.position + Vector3.up;
             Vector3 direction = targetWorldPosition - origin;
             direction.y = 0f;
-            float distance = direction.magnitude;
-            if (distance < 0.001f || distance > EffectiveRange)
+            if (direction.sqrMagnitude < 0.001f || direction.magnitude > EffectiveRange)
                 return false;
 
             nextFireTime = Time.time + fireCooldown;
             magazine--;
-            transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
 
             Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
             projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
@@ -712,17 +720,18 @@ namespace PersiaWar.Unity2D5D
                 return false;
 
             Vector3 direction = worldDirection.normalized;
+            transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
             Vector3 origin = muzzle != null ? muzzle.position : transform.position + Vector3.up;
 
             nextFireTime = Time.time + fireCooldown;
             magazine--;
-            transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
 
             Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
             projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
             projectile.SetOwner(transform);
             projectile.gameObject.SetActive(true);
             projectile.Launch(direction);
+            MuzzleFlashFX.Show(muzzle, false);
             recoilAmount = 0.12f;
             StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (characterVisual != null)
