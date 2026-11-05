@@ -80,11 +80,13 @@ namespace PersiaWar.Unity2D5D
 
         public Transform Muzzle => muzzle != null ? muzzle : transform;
         public WeaponKind CurrentWeapon => weaponKind;
-        public string CurrentWeaponName => weaponKind == WeaponKind.LightPistol ? "PISTOL"
+        public bool IsMeleeWeaponEquipped => axeEquippedAsMelee ||
+            weaponKind == WeaponKind.Axe || weaponKind == WeaponKind.AlienSword;
+        public string CurrentWeaponName => axeEquippedAsMelee ? "AXE" : (weaponKind == WeaponKind.LightPistol ? "PISTOL"
             : weaponKind == WeaponKind.HeavyMachineGun ? "HEAVY"
             : weaponKind == WeaponKind.Axe ? "AXE"
             : weaponKind == WeaponKind.VoidRifle ? "VOID RIFLE"
-            : weaponKind == WeaponKind.AlienSword ? "ALIEN SWORD" : "RIFLE";
+            : weaponKind == WeaponKind.AlienSword ? "ALIEN SWORD" : "RIFLE");
         public float EffectiveRange => Mathf.Max(1f, weaponRange);
         public float MoveSpeedMultiplier => weaponKind == WeaponKind.LightPistol ? 1.20f
             : weaponKind == WeaponKind.HeavyMachineGun ? 0.78f
@@ -163,7 +165,8 @@ namespace PersiaWar.Unity2D5D
             {
                 string[] heroes = { "Ardeshir", "Anahita", "Soldier", "RoyalScout", "SilkWarrior", "DesertKnight" };
                 int heroIndex = Mathf.Clamp(PlayerPrefs.GetInt("PW.SelectedHero", 0), 0, heroes.Length - 1);
-                string checkpoint = "WeaponAttachedToHand_" + weaponKind + "_" + heroes[heroIndex];
+                string checkpointWeapon = axeEquippedAsMelee ? "Axe" : weaponKind.ToString();
+                string checkpoint = "WeaponAttachedToHand_" + checkpointWeapon + "_" + heroes[heroIndex];
                 StartupCheckpoint.Set(checkpoint);
                 Debug.Log("[PERSIA WEAPON] " + checkpoint);
             }
@@ -202,6 +205,8 @@ namespace PersiaWar.Unity2D5D
 
         private ModelKind GetActiveModelKind()
         {
+            if (axeEquippedAsMelee)
+                return ModelKind.Axe;
             if (weaponKind == WeaponKind.LightPistol)
                 return ModelKind.Pistol;
             return ModelLibrary.KindFromName(weaponKind.ToString());
@@ -657,7 +662,7 @@ namespace PersiaWar.Unity2D5D
 
         public bool TryFire(Vector3 targetWorldPosition)
         {
-            if (weaponKind == WeaponKind.Axe || weaponKind == WeaponKind.AlienSword) return false;
+            if (axeEquippedAsMelee || weaponKind == WeaponKind.Axe || weaponKind == WeaponKind.AlienSword) return false;
             IsMelee = false;
             if (Time.time < nextFireTime) return false;
             if (magazine <= 0)
@@ -703,7 +708,7 @@ namespace PersiaWar.Unity2D5D
 
         public bool TryFireDirection(Vector3 worldDirection)
         {
-            if (weaponKind == WeaponKind.Axe || weaponKind == WeaponKind.AlienSword) return false;
+            if (axeEquippedAsMelee || weaponKind == WeaponKind.Axe || weaponKind == WeaponKind.AlienSword) return false;
             IsMelee = false;
 
             if (Time.time < nextFireTime) return false;
