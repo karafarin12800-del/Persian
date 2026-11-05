@@ -1908,6 +1908,19 @@ namespace PersiaWar.Unity2D5D
             Mesh mesh = new Mesh { name = objectName + "Mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0, true);
+            if (!stageTwoRequested &&
+                (objectName == "AndroidRoadGrid" || objectName == "AndroidSidewalkGrid"))
+            {
+                Color[] surfaceVariation = new Color[vertices.Count];
+                for (int i = 0; i < vertices.Count; i++)
+                {
+                    Vector3 point = vertices[i];
+                    float variation = Mathf.Lerp(0.92f, 1.08f,
+                        Mathf.PerlinNoise(point.x * 0.055f, point.z * 0.055f));
+                    surfaceVariation[i] = new Color(variation, variation, variation, 1f);
+                }
+                mesh.colors = surfaceVariation;
+            }
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             mesh.UploadMeshData(true);
