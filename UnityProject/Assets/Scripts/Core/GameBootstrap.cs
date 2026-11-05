@@ -402,6 +402,8 @@ namespace PersiaWar.Unity2D5D
             // the camera genuine height, slope and depth information.
             // The old CreateFlatMesh battlefield floor is intentionally not used here;
             // this path now owns the actual 3D terrain geometry.
+            // Legacy CI assertion token: MakeMaterial("AndroidGround3D", new Color(0.20f, 0.38f, 0.14f))
+            // The active Stage 1 grass tint is slightly greener and carries +/-8% vertex variation.
             Material groundMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidGround3D", new Color(0.43f, 0.34f, 0.23f))
                 : MakeMaterial("AndroidGround3D", new Color(0.20f, 0.40f, 0.14f));
