@@ -392,9 +392,11 @@ namespace PersiaWar.Unity2D5D
 
             // Stage 1 uses restrained neutral asphalt. The old bright-gray tint
             // (new Color(0.52f, 0.54f, 0.57f)) remains only as a legacy CI token.
+            // Stage 1 design swatches are specified in sRGB and converted once
+            // to linear material values for the project's Linear colour space.
             roadMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("Road", new Color(0.30f, 0.31f, 0.33f))
-                : MakeMaterial("Road", new Color(0.34f, 0.35f, 0.37f));
+                : MakeMaterial("Road", new Color(0.34f, 0.35f, 0.37f).linear);
 
 #if UNITY_ANDROID
             // Android uses a lightweight real 3D terrain mesh rather than the old flat
@@ -406,7 +408,7 @@ namespace PersiaWar.Unity2D5D
             // The active Stage 1 grass tint is slightly greener and carries +/-8% vertex variation.
             Material groundMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidGround3D", new Color(0.43f, 0.34f, 0.23f))
-                : MakeMaterial("AndroidGround3D", new Color(0.20f, 0.40f, 0.14f));
+                : MakeMaterial("AndroidGround3D", new Color(0.20f, 0.40f, 0.14f).linear);
             buildingMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f))
                 : MakeMaterial("AndroidBuilding", new Color(0.54f, 0.40f, 0.28f));
@@ -424,7 +426,7 @@ namespace PersiaWar.Unity2D5D
                 : MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
             androidSidewalkMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.56f, 0.53f, 0.48f))
-                : MakeMaterial("AndroidSidewalk", new Color(0.52f, 0.49f, 0.44f));
+                : MakeMaterial("AndroidSidewalk", new Color(0.52f, 0.49f, 0.44f).linear);
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
             // stays below the lowest terrain vertices, preventing black pinholes
