@@ -141,10 +141,12 @@ public sealed class GraphicsQualityProfile : MonoBehaviour
 
     public static string BuildGfxStatusLine()
     {
+        // Run the one-second capture before the cached-line fast path so the
+        // Repaint event can sample even when an earlier Layout event refreshed text.
+        CaptureCenterLuminance();
         if (!string.IsNullOrEmpty(cachedGfxStatusLine) && Time.unscaledTime < nextGfxStatusRefresh)
             return cachedGfxStatusLine;
         nextGfxStatusRefresh = Time.unscaledTime + 1f;
-        CaptureCenterLuminance();
         HashSet<Material> litMaterials = new HashSet<Material>();
         Renderer[] renderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
         int activeDecals = 0;
