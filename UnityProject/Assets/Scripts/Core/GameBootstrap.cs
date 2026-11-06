@@ -419,7 +419,18 @@ namespace PersiaWar.Unity2D5D
                 : MakeMaterial("AndroidFacadeShadow", new Color(0.24f, 0.19f, 0.16f));
             androidSidewalkMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f))
-                : MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
+                : MakeMaterial("AndroidSidewalk", new Color(0.43f, 0.42f, 0.39f));
+            if (!stageTwoRequested)
+            {
+                // Keep the authored Stage 1 ground base color for compatibility,
+                // but grade its displayed tint so the grass is not fluorescent.
+                ApplyRuntimeMaterialTint(groundMaterial, new Color(0.10f, 0.34f, 0.075f));
+                if (roadMaterial != null && roadMaterial.HasProperty("_MainTex"))
+                {
+                    roadMaterial.mainTexture = GetStageOneAsphaltTexture();
+                    roadMaterial.mainTextureScale = Vector2.one;
+                }
+            }
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
             // stays below the lowest terrain vertices, preventing black pinholes
@@ -1757,8 +1768,8 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
         {
-            Material lane = MakeMaterial("AndroidLane", new Color(0.78f, 0.68f, 0.34f));
-            Material curb = MakeMaterial("AndroidCurb", new Color(0.78f, 0.74f, 0.65f));
+            Material lane = MakeMaterial("AndroidLane", new Color(0.72f, 0.66f, 0.43f));
+            Material curb = MakeMaterial("AndroidCurb", new Color(0.52f, 0.50f, 0.45f));
             float half = worldSize * 0.5f;
 
             // Keep mobile road markings above the pavement with enough screen-space
@@ -1808,6 +1819,12 @@ namespace PersiaWar.Unity2D5D
                 AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
                     new Vector3(roadCenter + roadWidth * 0.5f, 0f, 0f),
                     new Vector2(curbWidth, worldSize), 0.065f);
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(0f, 0f, roadCenter - roadWidth * 0.5f),
+                    new Vector2(worldSize, curbWidth), 0.065f);
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(0f, 0f, roadCenter + roadWidth * 0.5f),
+                    new Vector2(worldSize, curbWidth), 0.065f);
             }
 
             CreateAndroidQuadBatch("AndroidLaneDashV", verticalVertices, verticalTriangles, lane);
@@ -1837,7 +1854,7 @@ namespace PersiaWar.Unity2D5D
         {
             Material crosswalkMaterial = MakeMaterial(
                 "AndroidCrosswalk",
-                new Color(0.80f, 0.79f, 0.74f));
+                new Color(0.72f, 0.72f, 0.67f));
             List<Vector3> vertices = new List<Vector3>(384);
             List<int> triangles = new List<int>(576);
             float[] intersectionCenters = { -9f, 15f };
@@ -1888,6 +1905,49 @@ namespace PersiaWar.Unity2D5D
             triangles.Add(start + 2);
         }
 
+        private static void ApplyRuntimeMaterialTint(Material material, Color tint)
+        {
+            if (material == null) return;
+            if (material.HasProperty("_Color")) material.SetColor("_Color", tint);
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", tint);
+            material.color = tint;
+        }
+
+        private static Texture2D cachedStageOneAsphaltTexture;
+
+        private static Texture2D GetStageOneAsphaltTexture()
+        {
+            if (cachedStageOneAsphaltTexture != null)
+                return cachedStageOneAsphaltTexture;
+
+            const int size = 64;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGB24, true)
+            {
+                name = "PersiaWar_StageOne_AsphaltGrain",
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+                anisoLevel = 2
+            };
+
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float broad = Mathf.PerlinNoise(x * 0.045f, y * 0.045f);
+                    float grain = Mathf.PerlinNoise(x * 0.31f + 12.4f, y * 0.31f + 7.8f);
+                    float fine = Mathf.PerlinNoise(x * 0.91f + 3.1f, y * 0.91f + 19.2f);
+                    float value = Mathf.Clamp(0.34f + broad * 0.075f + grain * 0.075f + fine * 0.045f, 0.29f, 0.55f);
+                    pixels[y * size + x] = new Color(value, value * 1.012f, value * 1.028f, 1f);
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(true, true);
+            cachedStageOneAsphaltTexture = texture;
+            return cachedStageOneAsphaltTexture;
+        }
+
         private GameObject CreateAndroidQuadBatch(string objectName, List<Vector3> vertices, List<int> triangles, Material material)
         {
             if (vertices == null || vertices.Count == 0)
@@ -1900,6 +1960,14 @@ namespace PersiaWar.Unity2D5D
             Mesh mesh = new Mesh { name = objectName + "Mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0, true);
+            if (!stageTwoRequested &&
+                (objectName == "AndroidRoadGrid" || objectName == "AndroidSecondaryAlleys"))
+            {
+                Vector2[] asphaltUv = new Vector2[vertices.Count];
+                for (int i = 0; i < vertices.Count; i++)
+                    asphaltUv[i] = new Vector2(vertices[i].x * 0.28f, vertices[i].z * 0.28f);
+                mesh.uv = asphaltUv;
+            }
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             mesh.UploadMeshData(true);
