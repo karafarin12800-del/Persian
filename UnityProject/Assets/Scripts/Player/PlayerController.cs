@@ -242,6 +242,8 @@ namespace PersiaWar.Unity2D5D
                 visual.SetMoving(input.sqrMagnitude > 0.0001f);
 
             Vector3 facingDirection = hasAimDirection ? aimDirection : input;
+            if (input.sqrMagnitude > 0.0001f)
+                facingDirection = input;
             if (facingDirection.sqrMagnitude > 0.0001f)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(facingDirection, Vector3.up);

@@ -751,9 +751,9 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
                 : (model == 1 ? new Vector3(6.2f, 2.6f, 4.1f) : new Vector3(3.4f, 2.6f, 4.1f));
 
             TargetHealth health = craft.AddComponent<TargetHealth>();
-            // The normal Stage 3 weapon projectile deals 22 damage: every
-            // spacecraft therefore takes exactly four registered hits (88 HP).
-            health.SetMaxHealth(88);
+            // The normal Stage 3 weapon projectile deals 22 damage: the craft takes
+            // three registered hits (66 HP), keeping the air phase moving.
+            health.SetMaxHealth(66);
             EnemyChase chase = craft.AddComponent<EnemyChase>();
             chase.enabled = false;
             hostileHealth.Add(health);
@@ -1247,7 +1247,7 @@ public sealed class StageThreeWorldBuilder : MonoBehaviour
         capsule.center = new Vector3(0f, 0.9f, 0f);
 
         TargetHealth health = alien.AddComponent<TargetHealth>();
-        health.SetMaxHealth(archetype == 3 ? 150 : (archetype == 2 ? 115 : 90));
+        health.SetMaxHealth(archetype == 3 ? 100 : (archetype == 2 ? 80 : 60));
         // Roaming aliens and sentries share the same detailed cached alien meshes.
         // Existing sentry patrol logic still owns guard movement after the intro.
         EnemyChase chase = alien.AddComponent<EnemyChase>();
