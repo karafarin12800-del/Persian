@@ -583,9 +583,10 @@ namespace PersiaWar.Unity2D5D
 
             nextFireTime = Time.time + fireCooldown;
             magazine--;
-            transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+            Quaternion shotRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
 
-            Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
+            // Aim the projectile independently; firing must never overwrite player movement yaw.
+            Projectile projectile = Object.Instantiate(projectilePrefab, origin, shotRotation);
             projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
             projectile.SetOwner(transform);
             projectile.gameObject.SetActive(true);
@@ -622,9 +623,10 @@ namespace PersiaWar.Unity2D5D
 
             nextFireTime = Time.time + fireCooldown;
             magazine--;
-            transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+            Quaternion shotRotation = Quaternion.LookRotation(direction, Vector3.up);
 
-            Projectile projectile = Object.Instantiate(projectilePrefab, origin, transform.rotation);
+            // Aim the projectile independently; firing must never overwrite player movement yaw.
+            Projectile projectile = Object.Instantiate(projectilePrefab, origin, shotRotation);
             projectile.SetDefaults(projectileSpeed, projectileLifetime, projectileDamage);
             projectile.SetOwner(transform);
             projectile.gameObject.SetActive(true);
