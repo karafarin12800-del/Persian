@@ -151,11 +151,15 @@ namespace PersiaWar.Unity2D5D
             moving = value;
         }
 
-        public void PlayFire()
+        public void PlayFire(float fireInterval)
         {
-            fireUntil = Time.time + 0.07f;
+            // Keep the firing pose active through the weapon's shot cadence. A fixed
+            // 70 ms window ended well before the next rifle round and caused visible
+            // idle/fire/idle popping during automatic fire.
+            float interval = Mathf.Max(0.01f, fireInterval);
+            fireUntil = Mathf.Max(fireUntil, Time.time + Mathf.Max(0.22f, interval * 1.35f));
             if (mobileCharacterRig != null)
-                mobileCharacterRig.Kick(1f);
+                mobileCharacterRig.Kick(0.55f);
             // The muzzle flash is a presentation effect, not a dependency for entering
             // the match. Allocate it only when the first shot is actually fired.
             if (muzzleFlash == null)

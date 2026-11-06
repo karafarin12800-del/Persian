@@ -594,7 +594,7 @@ namespace PersiaWar.Unity2D5D
             recoilAmount = 0.12f;
             StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (characterVisual != null)
-                characterVisual.PlayFire();
+                characterVisual.PlayFire(fireCooldown);
             RuntimeGameAudio.PlayWeaponShot((int)weaponKind);
             return true;
         }
@@ -632,7 +632,7 @@ namespace PersiaWar.Unity2D5D
             recoilAmount = 0.12f;
             StylizedCharacterVisual characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
             if (characterVisual != null)
-                characterVisual.PlayFire();
+                characterVisual.PlayFire(fireCooldown);
             RuntimeGameAudio.PlayWeaponShot((int)weaponKind);
             return true;
         }
