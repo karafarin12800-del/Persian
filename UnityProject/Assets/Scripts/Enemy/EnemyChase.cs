@@ -1046,7 +1046,7 @@ namespace PersiaWar.Unity2D5D
             if (libraryCharacterRig != null)
                 libraryCharacterRig.Kick(1f);
             else if (visual != null)
-                visual.PlayFire();
+                visual.PlayFire(rangedCooldown);
             RuntimeGameAudio.PlayEnemyShot();
         }
     }
