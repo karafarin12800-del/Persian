@@ -41,6 +41,8 @@ namespace PersiaWar.Unity2D5D
         private bool axeEquippedAsMelee;
         private bool meleeProfileApplied;
         private PlayerController player;
+        private CharacterRig characterRig;
+        private Transform weaponMount;
         private Transform gunRoot;
         private Transform axeRoot;
         private Transform swordRoot;
@@ -100,15 +102,17 @@ namespace PersiaWar.Unity2D5D
             // The projectile template creates a collider and Rigidbody. Defer that
             // physics allocation until the player actually fires.
 
+            EnsureWeaponVisual();
+            BindCharacterWeaponMount();
+
             if (muzzle == null)
             {
                 GameObject muzzleObject = new GameObject("WeaponMuzzle");
                 muzzle = muzzleObject.transform;
-                muzzle.SetParent(transform, false);
-                muzzle.localPosition = new Vector3(0.36f, 1.02f, 1.12f);
+                muzzle.SetParent(gunRoot != null ? gunRoot : transform, false);
+                muzzle.localPosition = new Vector3(0f, 0.02f, 0.90f);
             }
 
-            EnsureWeaponVisual();
             EnsureRangeIndicator();
             RefreshWeaponVisual();
         }
@@ -376,11 +380,13 @@ namespace PersiaWar.Unity2D5D
                 else swordSwingTimer = 0f;
             }
             gunRoot.localScale = Vector3.one * (heavy ? 1.08f : 1f);
-            gunRestLocalPosition = pistol
-                ? new Vector3(0.24f, 0.93f, 0.33f)
-                : (heavy
-                    ? new Vector3(0.40f, 1.04f, 0.48f)
-                    : new Vector3(0.34f, 1.02f, 0.42f));
+            gunRestLocalPosition = weaponMount != null
+                ? new Vector3(0f, pistol ? 0.115f : 0.075f, pistol ? 0.035f : 0.06f)
+                : (pistol
+                    ? new Vector3(0.24f, 0.93f, 0.33f)
+                    : (heavy
+                        ? new Vector3(0.40f, 1.04f, 0.48f)
+                        : new Vector3(0.34f, 1.02f, 0.42f)));
             gunRoot.localPosition = gunRestLocalPosition;
 
             SetWeaponPart("Receiver", true,
@@ -415,11 +421,19 @@ namespace PersiaWar.Unity2D5D
 
             if (muzzle != null)
             {
+                // Muzzle is weapon-local now, so firing origin stays at the barrel
+                // tip even while the character runs, turns, or changes weapon.
                 muzzle.localPosition = pistol
-                    ? new Vector3(0.24f, 0.93f, 0.66f)
+                    ? new Vector3(0f, 0.025f, 0.30f)
                     : (heavy
-                        ? new Vector3(0.40f, 1.04f, 1.38f)
-                        : new Vector3(0.36f, 1.02f, voidRifle ? 1.18f : 1.12f));
+                        ? new Vector3(0f, 0.025f, 1.10f)
+                        : new Vector3(0f, 0.025f, voidRifle ? 1.18f : 0.91f));
+            }
+
+            if (characterRig != null)
+            {
+                characterRig.weaponEquipped = true;
+                characterRig.twoHandedWeapon = !pistol && !axe && !sword;
             }
 
             if (voidRifle)
@@ -625,6 +639,13 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
+            if (weaponMount == null)
+            {
+                BindCharacterWeaponMount();
+                if (weaponMount != null)
+                    RefreshWeaponVisual();
+            }
+
             if (gunRoot != null)
             {
                 recoilAmount = Mathf.MoveTowards(recoilAmount, 0f, 5.5f * Time.deltaTime);
@@ -669,6 +690,50 @@ namespace PersiaWar.Unity2D5D
                         1f - Mathf.Exp(-22f * Time.deltaTime));
                 }
             }
+        }
+
+        private void BindCharacterWeaponMount()
+        {
+            if (weaponMount != null)
+                return;
+
+            CharacterRig rig = GetComponentInChildren<CharacterRig>(true);
+            if (rig == null || rig.weaponMount == null)
+                return;
+
+            characterRig = rig;
+            weaponMount = rig.weaponMount;
+            rig.weaponEquipped = true;
+
+            // The mount is positioned at the right wrist and counter-rotated against
+            // the forearm, so its local +Z axis remains the character's forward axis.
+            if (gunRoot != null)
+            {
+                gunRoot.SetParent(weaponMount, false);
+                gunRoot.localPosition = new Vector3(0f, 0.075f, 0.06f);
+                gunRoot.localRotation = Quaternion.identity;
+            }
+            if (axeRoot != null)
+            {
+                axeRoot.SetParent(weaponMount, false);
+                axeRestLocalPosition = Vector3.zero;
+                axeRestLocalRotation = Quaternion.Euler(0f, 0f, -12f);
+                axeRoot.localPosition = axeRestLocalPosition;
+                axeRoot.localRotation = axeRestLocalRotation;
+            }
+            if (swordRoot != null)
+            {
+                swordRoot.SetParent(weaponMount, false);
+                swordRestLocalPosition = Vector3.zero;
+                swordRestLocalRotation = Quaternion.Euler(0f, 0f, -8f);
+                swordRoot.localPosition = swordRestLocalPosition;
+                swordRoot.localRotation = swordRestLocalRotation;
+            }
+            if (muzzle != null && gunRoot != null)
+                muzzle.SetParent(gunRoot, false);
+
+            rig.twoHandedWeapon = weaponKind != WeaponKind.LightPistol &&
+                weaponKind != WeaponKind.Axe && weaponKind != WeaponKind.AlienSword;
         }
 
         private void EnsureWeaponVisual()
