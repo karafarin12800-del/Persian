@@ -399,6 +399,22 @@ namespace PersiaWar.Unity2D5D
             androidSidewalkMaterial = stageTwoRequested
                 ? MakeStageTwoLitMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f))
                 : MakeMaterial("AndroidSidewalk", new Color(0.58f, 0.54f, 0.47f));
+
+            // Stage 1 surface pass: retain the established base palette values, then
+            // grade the visible colors and add a subtle asphalt albedo. The old flat
+            // gray road looked almost white on bright phone displays and had no surface
+            // breakup to distinguish asphalt from the surrounding pavement.
+            if (!stageTwoRequested)
+            {
+                ApplyRuntimeMaterialTint(groundMaterial, new Color(0.10f, 0.34f, 0.075f));
+                ApplyRuntimeMaterialTint(androidSidewalkMaterial, new Color(0.46f, 0.45f, 0.42f));
+                if (roadMaterial != null && roadMaterial.HasProperty("_MainTex"))
+                {
+                    roadMaterial.mainTexture = GetStageOneAsphaltTexture();
+                    roadMaterial.mainTextureScale = Vector2.one;
+                }
+            }
+
             BuildAndroidTerrain3D(groundMaterial);
             // A continuous backing slab extends beyond the terrain bounds. Its top
             // stays below the lowest terrain vertices, preventing black pinholes
@@ -436,6 +452,49 @@ namespace PersiaWar.Unity2D5D
         }
 
 #if UNITY_ANDROID
+        private static void ApplyRuntimeMaterialTint(Material material, Color tint)
+        {
+            if (material == null) return;
+            if (material.HasProperty("_Color")) material.SetColor("_Color", tint);
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", tint);
+            material.color = tint;
+        }
+
+        private static Texture2D cachedStageOneAsphaltTexture;
+
+        private static Texture2D GetStageOneAsphaltTexture()
+        {
+            if (cachedStageOneAsphaltTexture != null)
+                return cachedStageOneAsphaltTexture;
+
+            const int size = 64;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGB24, true)
+            {
+                name = "PersiaWar_StageOne_AsphaltGrain",
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+                anisoLevel = 2
+            };
+
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float broad = Mathf.PerlinNoise(x * 0.045f, y * 0.045f);
+                    float grain = Mathf.PerlinNoise(x * 0.31f + 12.4f, y * 0.31f + 7.8f);
+                    float fine = Mathf.PerlinNoise(x * 0.91f + 3.1f, y * 0.91f + 19.2f);
+                    float value = Mathf.Clamp(0.40f + broad * 0.10f + grain * 0.10f + fine * 0.055f, 0.34f, 0.67f);
+                    pixels[y * size + x] = new Color(value, value * 1.012f, value * 1.028f, 1f);
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(true, true);
+            cachedStageOneAsphaltTexture = texture;
+            return cachedStageOneAsphaltTexture;
+        }
+
         private void DisableLegacyWorldBuilderPath()
         {
             // The retired WorldBuilder path used gray-olive ground and nearly black roads.
@@ -640,6 +699,7 @@ namespace PersiaWar.Unity2D5D
             CreateAndroidQuadBatch("AndroidRoadGrid", roadVertices, roadTriangles, roadMaterial);
             CreateAndroidQuadBatch("AndroidSidewalkGrid", sidewalkVertices, sidewalkTriangles, androidSidewalkMaterial);
             BuildAndroidIntersectionsAndLaneMarks(roadWidth);
+            BuildAndroidCrosswalks(roadWidth);
         }
 
         private bool extractionBeaconShown;
@@ -1617,8 +1677,8 @@ namespace PersiaWar.Unity2D5D
 
         private void BuildAndroidIntersectionsAndLaneMarks(float roadWidth)
         {
-            Material lane = MakeMaterial("AndroidLane", new Color(0.78f, 0.68f, 0.34f));
-            Material curb = MakeMaterial("AndroidCurb", new Color(0.78f, 0.74f, 0.65f));
+            Material lane = MakeMaterial("AndroidLane", new Color(0.82f, 0.78f, 0.62f));
+            Material curb = MakeMaterial("AndroidCurb", new Color(0.58f, 0.55f, 0.49f));
             float half = worldSize * 0.5f;
 
             List<Vector3> verticalVertices = new List<Vector3>(1024);
@@ -1646,15 +1706,62 @@ namespace PersiaWar.Unity2D5D
             {
                 AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
                     new Vector3(roadCenter - roadWidth * 0.5f, 0f, 0f),
-                    new Vector2(0.08f, worldSize), 0.055f);
+                    new Vector2(0.12f, worldSize), 0.055f);
                 AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
                     new Vector3(roadCenter + roadWidth * 0.5f, 0f, 0f),
-                    new Vector2(0.08f, worldSize), 0.055f);
+                    new Vector2(0.12f, worldSize), 0.055f);
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(0f, 0f, roadCenter - roadWidth * 0.5f),
+                    new Vector2(worldSize, 0.12f), 0.055f);
+                AddAndroidTerrainFollowingQuad(curbVertices, curbTriangles,
+                    new Vector3(0f, 0f, roadCenter + roadWidth * 0.5f),
+                    new Vector2(worldSize, 0.12f), 0.055f);
             }
 
             CreateAndroidQuadBatch("AndroidLaneDashV", verticalVertices, verticalTriangles, lane);
             CreateAndroidQuadBatch("AndroidLaneDashH", horizontalVertices, horizontalTriangles, lane);
             CreateAndroidQuadBatch("AndroidCurbs", curbVertices, curbTriangles, curb);
+        }
+
+        private void BuildAndroidCrosswalks(float roadWidth)
+        {
+            if (stageTwoRequested) return;
+
+            Material marking = MakeMaterial("AndroidCrosswalk", new Color(0.84f, 0.85f, 0.81f));
+            List<Vector3> vertices = new List<Vector3>(8192);
+            List<int> triangles = new List<int>(12288);
+            float half = worldSize * 0.5f;
+            const int stripeCount = 5;
+            const float stripePitch = 0.72f;
+            const float stripeWidth = 0.42f;
+            const float crossingSpan = 7.2f;
+            float crossingOffset = roadWidth * 0.5f + 1.8f;
+
+            for (float x = -half + roadWidth * 0.5f; x <= half; x += 24f)
+            {
+                for (float z = -half + roadWidth * 0.5f; z <= half; z += 24f)
+                {
+                    for (int stripe = 0; stripe < stripeCount; stripe++)
+                    {
+                        float offset = (stripe - (stripeCount - 1) * 0.5f) * stripePitch;
+
+                        AddAndroidTerrainFollowingQuad(vertices, triangles,
+                            new Vector3(x, 0f, z - crossingOffset + offset),
+                            new Vector2(crossingSpan, stripeWidth), 0.092f);
+                        AddAndroidTerrainFollowingQuad(vertices, triangles,
+                            new Vector3(x, 0f, z + crossingOffset + offset),
+                            new Vector2(crossingSpan, stripeWidth), 0.092f);
+                        AddAndroidTerrainFollowingQuad(vertices, triangles,
+                            new Vector3(x - crossingOffset + offset, 0f, z),
+                            new Vector2(stripeWidth, crossingSpan), 0.092f);
+                        AddAndroidTerrainFollowingQuad(vertices, triangles,
+                            new Vector3(x + crossingOffset + offset, 0f, z),
+                            new Vector2(stripeWidth, crossingSpan), 0.092f);
+                    }
+                }
+            }
+
+            CreateAndroidQuadBatch("AndroidCrosswalks", vertices, triangles, marking);
         }
 
         private static void AddAndroidQuad(List<Vector3> vertices, List<int> triangles, Vector3 center, Vector2 size)
@@ -1686,6 +1793,10 @@ namespace PersiaWar.Unity2D5D
             Mesh mesh = new Mesh { name = objectName + "Mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0, true);
+            Vector2[] roadUv = new Vector2[vertices.Count];
+            for (int i = 0; i < vertices.Count; i++)
+                roadUv[i] = new Vector2(vertices[i].x * 0.25f, vertices[i].z * 0.25f);
+            mesh.uv = roadUv;
             if (stageTwoRequested)
                 mesh.RecalculateNormals();
             mesh.RecalculateBounds();
@@ -2062,15 +2173,19 @@ namespace PersiaWar.Unity2D5D
                 }
                 : new Color[]
                 {
-                    new Color(0.76f, 0.67f, 0.54f),
-                    new Color(0.67f, 0.73f, 0.75f),
-                    new Color(0.80f, 0.71f, 0.57f),
-                    new Color(0.58f, 0.66f, 0.68f),
-                    new Color(0.63f, 0.70f, 0.58f)
+                    new Color(0.62f, 0.54f, 0.43f),
+                    new Color(0.49f, 0.56f, 0.58f),
+                    new Color(0.66f, 0.57f, 0.44f),
+                    new Color(0.45f, 0.53f, 0.55f),
+                    new Color(0.50f, 0.57f, 0.44f)
                 };
             int paletteIndex = Mathf.Abs(Mathf.RoundToInt(position.x + position.z)) % palette.Length;
             Material facade = stageTwoRequested ? MakeStageTwoLitMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]) : MakeMaterial("CityFacade_" + paletteIndex, palette[paletteIndex]);
-            Material trim = stageTwoRequested ? MakeStageTwoLitMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f)) : MakeMaterial("CityTrim_" + paletteIndex, Color.Lerp(palette[paletteIndex], Color.white, 0.28f));
+            float trimBlend = stageTwoRequested ? 0.28f : 0.14f;
+            Color trimColor = Color.Lerp(palette[paletteIndex], Color.white, trimBlend);
+            Material trim = stageTwoRequested
+                ? MakeStageTwoLitMaterial("CityTrim_" + paletteIndex, trimColor)
+                : MakeMaterial("CityTrim_" + paletteIndex, trimColor);
             Material darkWindow = androidWindowMaterial != null
                 ? androidWindowMaterial
                 : (stageTwoRequested ? MakeStageTwoLitMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f)) : MakeMaterial("CityGlass", new Color(0.09f, 0.20f, 0.25f)));
