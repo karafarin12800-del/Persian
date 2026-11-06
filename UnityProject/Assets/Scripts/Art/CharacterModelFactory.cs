@@ -64,7 +64,8 @@ namespace PersiaWar.Unity2D5D
             phase += dt * (2.5f + speed * 9f);
             float swing = Mathf.Sin(phase) * 42f * speed;
             float breathe = Mathf.Sin(Time.time * 1.8f);
-            recoil = Mathf.MoveTowards(recoil, 0f, dt * 7f);
+            // Let recoil settle across consecutive shots instead of snapping back to idle between rounds.
+            recoil = Mathf.MoveTowards(recoil, 0f, dt * 2.4f);
 
             SetPitch(leftLeg, swing);
             SetPitch(rightLeg, -swing);
