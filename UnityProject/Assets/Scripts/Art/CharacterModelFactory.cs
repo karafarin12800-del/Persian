@@ -37,6 +37,8 @@ namespace PersiaWar.Unity2D5D
         public Transform weaponMount;
         public float moveSpeed01;
         public bool aiming;
+        public bool weaponEquipped;
+        public bool twoHandedWeapon;
 
         private float phase;
         private float recoil;
@@ -66,8 +68,23 @@ namespace PersiaWar.Unity2D5D
 
             SetPitch(leftLeg, swing);
             SetPitch(rightLeg, -swing);
-            SetPitch(leftArm, aiming ? -35f : -swing * 0.8f + breathe * 1.5f * (1f - speed));
-            SetPitch(rightArm, aiming ? -80f + recoil * 18f : swing * 0.8f - breathe * 1.5f * (1f - speed));
+
+            if (weaponEquipped)
+            {
+                // Keep the firing hand locked to the weapon mount while the mount
+                // follows the shoulder animation. A rifle uses the left hand as a
+                // forward support hand instead of allowing both arms to swing freely.
+                SetPitch(rightArm, -80f + recoil * 5f);
+                if (twoHandedWeapon && leftArm != null)
+                    leftArm.localRotation = Quaternion.Euler(-55f, 0f, 30f);
+                else
+                    SetPitch(leftArm, -swing * 0.8f + breathe * 1.5f * (1f - speed));
+            }
+            else
+            {
+                SetPitch(leftArm, aiming ? -35f : -swing * 0.8f + breathe * 1.5f * (1f - speed));
+                SetPitch(rightArm, aiming ? -80f + recoil * 18f : swing * 0.8f - breathe * 1.5f * (1f - speed));
+            }
 
             if (torso != null)
             {
