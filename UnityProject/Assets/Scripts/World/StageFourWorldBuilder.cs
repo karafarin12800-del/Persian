@@ -1151,7 +1151,7 @@ public sealed class StageFourWorldBuilder : MonoBehaviour
             capsule.center = new Vector3(0f, 0.97f, 0f);
 
             TargetHealth health = alien.AddComponent<TargetHealth>();
-            health.SetMaxHealth(archetype == 2 ? 135 : (archetype == 3 ? 120 : 95));
+            health.SetMaxHealth(archetype == 2 ? 80 : (archetype == 3 ? 100 : 60));
 
             EnemyChase chase = alien.AddComponent<EnemyChase>();
             chase.Configure(controller.transform, archetype);
