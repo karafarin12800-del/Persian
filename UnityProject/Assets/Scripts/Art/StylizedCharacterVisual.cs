@@ -182,12 +182,22 @@ namespace PersiaWar.Unity2D5D
                 return;
 
             Camera cam = Camera.main;
-            if (cam != null && artRoot != null)
+            if (artRoot != null)
             {
-                Vector3 toCamera = cam.transform.position - artRoot.position;
-                toCamera.y = 0f;
-                if (toCamera.sqrMagnitude > 0.001f)
-                    artRoot.rotation = Quaternion.LookRotation(toCamera.normalized, Vector3.up);
+                if (mobileModelRoot != null)
+                {
+                    // The detailed Android model must inherit the owning character's yaw.
+                    // Billboard rotation here used to cancel PlayerController rotation every frame.
+                    artRoot.localRotation = Quaternion.identity;
+                }
+                else if (cam != null)
+                {
+                    // Keep the lightweight sprite presentation camera-facing on non-mobile builds.
+                    Vector3 toCamera = cam.transform.position - artRoot.position;
+                    toCamera.y = 0f;
+                    if (toCamera.sqrMagnitude > 0.001f)
+                        artRoot.rotation = Quaternion.LookRotation(toCamera.normalized, Vector3.up);
+                }
             }
 
             float t = Time.time + phase;
