@@ -73,13 +73,21 @@ namespace PersiaWar.Unity2D5D
             if (weaponEquipped)
             {
                 // Keep the firing hand locked to the weapon mount while the mount
-                // follows the shoulder animation. A rifle uses the left hand as a
-                // forward support hand instead of allowing both arms to swing freely.
-                SetPitch(rightArm, -80f + recoil * 5f);
-                if (twoHandedWeapon && leftArm != null)
-                    leftArm.localRotation = Quaternion.Euler(-55f, 0f, 30f);
+                // follows the shoulder animation. When no nearby enemy is present,
+                // relax both arms into a lower carry pose instead of holding aim.
+                if (aiming)
+                    SetPitch(rightArm, -80f + recoil * 5f);
                 else
-                    SetPitch(leftArm, -swing * 0.8f + breathe * 1.5f * (1f - speed));
+                    SetPitch(rightArm, -56f + recoil * 2f);
+
+                if (twoHandedWeapon && leftArm != null)
+                    leftArm.localRotation = aiming
+                        ? Quaternion.Euler(-55f, 0f, 30f)
+                        : Quaternion.Euler(-37f, 0f, 30f);
+                else
+                    SetPitch(leftArm, aiming
+                        ? -55f
+                        : -swing * 0.8f + breathe * 1.5f * (1f - speed));
             }
             else
             {
