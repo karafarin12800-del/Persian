@@ -35,6 +35,7 @@ namespace PersiaWar.Unity2D5D
         public GrenadeController Grenades => grenadeController;
         public int Shield => shield;
         public float WorldLimit => worldLimit;
+        public float EffectiveMoveSpeed => moveSpeed * (weapon != null ? weapon.MoveSpeedMultiplier : 1f);
         public Vector2 MoveInput => new Vector2(input.x, input.z);
         public bool IsDefeated { get; private set; }
         public bool IsMovementEnabled => movementEnabled && Time.time >= movementLockUntil && !IsDefeated;
@@ -205,45 +206,63 @@ namespace PersiaWar.Unity2D5D
             transform.position = anchored;
 
             bool canMove = IsMovementEnabled;
-            if (!canMove)
+            if (canMove)
             {
-                if (visual != null) visual.SetMoving(false);
-                return;
-            }
+                float weaponMoveMultiplier = weapon != null ? weapon.MoveSpeedMultiplier : 1f;
+                Vector3 desired = input * moveSpeed * weaponMoveMultiplier * Time.deltaTime;
+                Vector3 next = transform.position + desired;
+                next.x = Mathf.Clamp(next.x, -worldLimit, worldLimit);
+                next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
+                next.y = 0f;
 
-            float weaponMoveMultiplier = weapon != null ? weapon.MoveSpeedMultiplier : 1f;
-            Vector3 desired = input * moveSpeed * weaponMoveMultiplier * Time.deltaTime;
-            Vector3 next = transform.position + desired;
-            next.x = Mathf.Clamp(next.x, -worldLimit, worldLimit);
-            next.z = Mathf.Clamp(next.z, -worldLimit, worldLimit);
-            next.y = 0f;
-
-            if (desired.sqrMagnitude > 0.00001f)
-            {
-                if (!WouldCollide(next))
+                if (desired.sqrMagnitude > 0.00001f)
                 {
-                    transform.position = next;
-                }
-                else
-                {
-                    // Slide along walls and parked vehicles instead of stopping at
-                    // every diagonal collision. Both candidate positions still pass
-                    // through the same solid-obstacle query.
-                    Vector3 slideX = new Vector3(next.x, next.y, transform.position.z);
-                    Vector3 slideZ = new Vector3(transform.position.x, next.y, next.z);
-                    if (!WouldCollide(slideX))
-                        transform.position = slideX;
-                    else if (!WouldCollide(slideZ))
-                        transform.position = slideZ;
+                    if (!WouldCollide(next))
+                    {
+                        transform.position = next;
+                    }
+                    else
+                    {
+                        // Slide along walls and parked vehicles instead of stopping at
+                        // every diagonal collision. Both candidate positions still pass
+                        // through the same solid-obstacle query.
+                        Vector3 slideX = new Vector3(next.x, next.y, transform.position.z);
+                        Vector3 slideZ = new Vector3(transform.position.x, next.y, next.z);
+                        if (!WouldCollide(slideX))
+                            transform.position = slideX;
+                        else if (!WouldCollide(slideZ))
+                            transform.position = slideZ;
+                    }
                 }
             }
 
             if (visual != null)
-                visual.SetMoving(input.sqrMagnitude > 0.0001f);
+                visual.SetMoving(canMove && input.sqrMagnitude > 0.0001f);
 
+            // Preserve an explicit mobile aim direction as the fallback, but never
+            // let the movement stick overwrite it. The nearest nearby enemy takes
+            // priority so strafing/backpedalling keeps the character facing the threat.
             Vector3 facingDirection = hasAimDirection ? aimDirection : input;
-            if (input.sqrMagnitude > 0.0001f)
-                facingDirection = input;
+            TargetHealth nearbyTarget = aim != null ? aim.NearestNearbyTarget : null;
+            bool hasNearbyEnemy = nearbyTarget != null &&
+                nearbyTarget.isActiveAndEnabled && nearbyTarget.CurrentHealth > 0;
+            if (hasNearbyEnemy)
+            {
+                Vector3 targetDirection = nearbyTarget.transform.position - transform.position;
+                targetDirection.y = 0f;
+                if (targetDirection.sqrMagnitude > 0.0001f)
+                    facingDirection = targetDirection.normalized;
+                else
+                    hasNearbyEnemy = false;
+            }
+
+            // With no nearby enemy, keep the weapon lowered. The character can still
+            // move in its chosen direction; it does not hold the firing pose at idle.
+            if (visual != null)
+                visual.SetAiming(hasNearbyEnemy);
+            if (weapon != null)
+                weapon.SetAimRaised(hasNearbyEnemy);
+
             if (facingDirection.sqrMagnitude > 0.0001f)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(facingDirection, Vector3.up);
@@ -310,6 +329,8 @@ namespace PersiaWar.Unity2D5D
         {
             health = GetComponent<TargetHealth>();
             if (health == null) health = gameObject.AddComponent<TargetHealth>();
+            if (health.MaxHealth != 150)
+                health.SetMaxHealth(150);
 
             weapon = GetComponent<WeaponController>();
             if (weapon == null) weapon = gameObject.AddComponent<WeaponController>();
