@@ -21,6 +21,7 @@ namespace PersiaWar.Unity2D5D
         private ParticleSystem muzzleFlash;
 
         private bool moving;
+        private bool aiming;
         private bool playerCharacter;
         private int archetype = 1;
         private float phase;
@@ -151,6 +152,13 @@ namespace PersiaWar.Unity2D5D
             moving = value;
         }
 
+        public void SetAiming(bool value)
+        {
+            aiming = value;
+            if (mobileCharacterRig != null)
+                mobileCharacterRig.aiming = value || Time.time < fireUntil;
+        }
+
         public void PlayFire(float fireInterval)
         {
             // Keep the firing pose active through the weapon's shot cadence. A fixed
@@ -220,7 +228,7 @@ namespace PersiaWar.Unity2D5D
                 if (mobileCharacterRig != null)
                 {
                     mobileCharacterRig.moveSpeed01 = moving ? 1f : 0f;
-                    mobileCharacterRig.aiming = Time.time < fireUntil;
+                    mobileCharacterRig.aiming = aiming || Time.time < fireUntil;
                 }
                 else
                 {

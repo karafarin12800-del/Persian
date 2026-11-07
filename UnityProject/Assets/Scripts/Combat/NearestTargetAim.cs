@@ -18,6 +18,7 @@ namespace PersiaWar.Unity2D5D
         private static readonly float[] CandidateDistanceBuffer = new float[128];
 
         public TargetHealth CurrentTarget { get; private set; }
+        public TargetHealth NearestNearbyTarget { get; private set; }
 
         private void Awake()
         {
@@ -122,6 +123,11 @@ namespace PersiaWar.Unity2D5D
                 CandidateDistanceBuffer[insertAt] = sqrDistance;
                 candidateCount++;
             }
+
+            // Keep the nearest living enemy separately from the unobstructed firing
+            // target. Player facing can track the closest nearby opponent around cover,
+            // while the existing fire path still requires a clear line of sight.
+            NearestNearbyTarget = candidateCount > 0 ? CandidateBuffer[0] : null;
 
             Vector3 origin = weapon != null ? weapon.Muzzle.position : selfPosition + Vector3.up;
             for (int i = 0; i < candidateCount; i++)

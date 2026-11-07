@@ -58,6 +58,7 @@ namespace PersiaWar.Unity2D5D
         private const float AxeSwingDuration = 0.48f;
         private Vector3 gunRestLocalPosition;
         private float recoilAmount;
+        private bool aimRaised;
         private LineRenderer rangeRing;
         private const int RangeRingSegments = 64;
         private const float LightPistolRange = 7.5f;
@@ -94,6 +95,13 @@ namespace PersiaWar.Unity2D5D
         public int Reserve => reserve;
         public int MagazineSize => magazineSize;
         public bool IsMelee { get; private set; }
+
+        public void SetAimRaised(bool value)
+        {
+            aimRaised = value;
+            if (characterRig != null)
+                characterRig.aiming = value;
+        }
 
         private void Awake()
         {
@@ -656,6 +664,18 @@ namespace PersiaWar.Unity2D5D
                     gunRoot.localPosition,
                     target,
                     1f - Mathf.Exp(-24f * Time.deltaTime));
+
+                // Keep the weapon visibly lowered when no nearby opponent is present.
+                // The projectile/fire path remains independent from this presentation pose.
+                Quaternion targetRotation = aimRaised
+                    ? Quaternion.identity
+                    : Quaternion.Euler(19f, 0f, 0f);
+                gunRoot.localRotation = Quaternion.Slerp(
+                    gunRoot.localRotation,
+                    targetRotation,
+                    1f - Mathf.Exp(-12f * Time.deltaTime));
+                if (characterRig != null)
+                    characterRig.aiming = aimRaised;
             }
 
             if (swordRoot != null && swordRoot.gameObject.activeSelf)
@@ -706,6 +726,7 @@ namespace PersiaWar.Unity2D5D
             characterRig = rig;
             weaponMount = rig.weaponMount;
             rig.weaponEquipped = true;
+            rig.aiming = aimRaised;
 
             // The mount is positioned at the right wrist and counter-rotated against
             // the forearm, so its local +Z axis remains the character's forward axis.

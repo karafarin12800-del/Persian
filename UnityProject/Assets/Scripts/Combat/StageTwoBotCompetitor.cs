@@ -16,6 +16,8 @@ namespace PersiaWar.Unity2D5D
         private Material weaponMaterial;
         private Material metalMaterial;
         private Projectile projectileTemplate;
+        private StylizedCharacterVisual characterVisual;
+        private float movementSpeed = 11.5f;
 
         private const float PreferredRange = 12f;
         private const float MaximumRange = 25f;
@@ -26,6 +28,9 @@ namespace PersiaWar.Unity2D5D
         {
             arena = manager;
             number = competitorNumber;
+            characterVisual = GetComponentInChildren<StylizedCharacterVisual>(true);
+            PlayerController localPlayer = FindFirstObjectByType<PlayerController>();
+            movementSpeed = localPlayer != null ? localPlayer.EffectiveMoveSpeed : 11.5f;
             roamDirection = Random.insideUnitSphere;
             roamDirection.y = 0f;
             if (roamDirection.sqrMagnitude < 0.01f) roamDirection = Vector3.forward;
@@ -35,7 +40,12 @@ namespace PersiaWar.Unity2D5D
 
         private void Update()
         {
-            if (GameSession.Instance != null && GameSession.Instance.IsFinished) return;
+            if (GameSession.Instance != null && GameSession.Instance.IsFinished)
+            {
+                characterVisual?.SetMoving(false);
+                SetWeaponPresentation(false);
+                return;
+            }
 
             if (Time.time >= nextThinkTime)
             {
@@ -52,7 +62,14 @@ namespace PersiaWar.Unity2D5D
             Vector3 delta = currentTarget.transform.position - transform.position;
             delta.y = 0f;
             float distance = delta.magnitude;
-            if (distance < 0.01f) return;
+            if (distance < 0.01f)
+            {
+                characterVisual?.SetMoving(false);
+                SetWeaponPresentation(true);
+                return;
+            }
+
+            Vector3 previousPosition = transform.position;
 
             Vector3 direction = delta / distance;
             if (distance > PreferredRange || !HasLineOfSight(currentTarget, distance))
@@ -77,12 +94,16 @@ namespace PersiaWar.Unity2D5D
                     }
                 }
 
-                transform.position += moveDirection * (2.6f * Time.deltaTime);
+                transform.position += moveDirection * (movementSpeed * Time.deltaTime);
             }
+
+            characterVisual?.SetMoving(
+                (transform.position - previousPosition).sqrMagnitude > 0.000001f);
+            SetWeaponPresentation(true);
 
             transform.rotation = Quaternion.Slerp(transform.rotation,
                 Quaternion.LookRotation(direction, Vector3.up),
-                1f - Mathf.Exp(-12f * Time.deltaTime));
+                1f - Mathf.Exp(-18f * Time.deltaTime));
 
             // Competitors visibly aim and fire their own projectiles instead of
             // silently subtracting enemy health at point-blank range.
@@ -231,8 +252,9 @@ namespace PersiaWar.Unity2D5D
 
         private void Roam()
         {
+            Vector3 previousPosition = transform.position;
             roamDirection = Quaternion.Euler(0f, Random.Range(-32f, 32f) * Time.deltaTime, 0f) * roamDirection;
-            Vector3 step = roamDirection * (1.1f * Time.deltaTime);
+            Vector3 step = roamDirection * (movementSpeed * Time.deltaTime);
             if (!Physics.SphereCast(transform.position + Vector3.up * 0.7f, 0.28f,
                 roamDirection, out RaycastHit hit, 0.8f, ~0, QueryTriggerInteraction.Ignore))
             {
@@ -244,10 +266,31 @@ namespace PersiaWar.Unity2D5D
                     (number % 2 == 0 ? 1f : -1f);
             }
 
+            characterVisual?.SetMoving(
+                (transform.position - previousPosition).sqrMagnitude > 0.000001f);
+            SetWeaponPresentation(false);
+
             if (roamDirection.sqrMagnitude > 0.001f)
                 transform.rotation = Quaternion.Slerp(transform.rotation,
                     Quaternion.LookRotation(roamDirection, Vector3.up),
-                    1f - Mathf.Exp(-4f * Time.deltaTime));
+                    1f - Mathf.Exp(-18f * Time.deltaTime));
+        }
+
+        private void SetWeaponPresentation(bool hasNearbyEnemy)
+        {
+            if (characterVisual != null)
+                characterVisual.SetAiming(hasNearbyEnemy);
+
+            if (weaponRoot != null)
+            {
+                Quaternion target = hasNearbyEnemy
+                    ? Quaternion.identity
+                    : Quaternion.Euler(19f, 0f, 0f);
+                weaponRoot.localRotation = Quaternion.Slerp(
+                    weaponRoot.localRotation,
+                    target,
+                    1f - Mathf.Exp(-12f * Time.deltaTime));
+            }
         }
 
         private void OnDestroy()
