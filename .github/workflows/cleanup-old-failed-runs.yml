@@ -1,0 +1,97 @@
+name: Cleanup old and broken workflow runs
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_delete:
+        description: "Confirm permanent deletion of old and broken workflow runs"
+        required: true
+        type: boolean
+        default: false
+      older_than_days:
+        description: "Delete every run older than this many days; broken runs are also deleted regardless of age"
+        required: true
+        type: number
+        default: 30
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: Delete old and broken runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation and age
+        shell: bash
+        env:
+          CONFIRM_DELETE: ${{ inputs.confirm_delete }}
+          OLDER_THAN_DAYS: ${{ inputs.older_than_days }}
+        run: |
+          if [[ "$CONFIRM_DELETE" != "true" ]]; then
+            echo "Deletion was not confirmed. Nothing was deleted."
+            exit 1
+          fi
+          if ! [[ "$OLDER_THAN_DAYS" =~ ^[0-9]+$ ]] || (( OLDER_THAN_DAYS < 1 || OLDER_THAN_DAYS > 3650 )); then
+            echo "older_than_days must be a whole number from 1 to 3650."
+            exit 1
+          fi
+
+      - name: Find and delete matching workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OLDER_THAN_DAYS: ${{ inputs.older_than_days }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff="$(date -u -d "${OLDER_THAN_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Cutoff: $cutoff"
+          echo "Scanning workflow run history with API pagination..."
+
+          mapfile -t run_ids < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
+              --jq ".workflow_runs[]
+                | select((.id | tostring) != \"${GITHUB_RUN_ID}\")
+                | select(
+                    .created_at < \"$cutoff\"
+                    or (.conclusion as \$c
+                        | [\"failure\", \"cancelled\", \"timed_out\", \"action_required\", \"startup_failure\", \"stale\"]
+                        | index(\$c) != null)
+                  )
+                | .id"
+          )
+
+          echo "Found ${#run_ids[@]} matching run(s)."
+          deleted=0
+          skipped=0
+
+          for run_id in "${run_ids[@]}"; do
+            status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/$run_id" --jq '.status')"
+
+            if [[ "$status" == "queued" || "$status" == "in_progress" || "$status" == "waiting" || "$status" == "pending" ]]; then
+              echo "Cancelling active old run $run_id (status: $status)"
+              gh run cancel "$run_id" --repo "${GITHUB_REPOSITORY}" || true
+              for attempt in {1..30}; do
+                sleep 2
+                status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/$run_id" --jq '.status' 2>/dev/null || echo missing)"
+                [[ "$status" == "completed" || "$status" == "missing" ]] && break
+              done
+            fi
+
+            if [[ "$status" != "completed" && "$status" != "missing" ]]; then
+              echo "Skipping run $run_id because it is still active (status: $status)."
+              ((skipped+=1))
+              continue
+            fi
+
+            echo "Deleting run $run_id"
+            if gh run delete "$run_id" --repo "${GITHUB_REPOSITORY}"; then
+              ((deleted+=1))
+            else
+              echo "Could not delete run $run_id; continuing."
+              ((skipped+=1))
+            fi
+          done
+
+          echo "Cleanup finished. Deleted: $deleted. Skipped: $skipped."
